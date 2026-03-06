@@ -14,12 +14,14 @@ Usage:
     wfe home                                    Jump to home node
     wfe go <node-id>                            Navigate to a connected node
     wfe add node [name]                         Create a new node
-    wfe add slot <node-id> <name> <type> [val]  Add a slot to a node
+    wfe add field <node-id> <name> <type> [val] Add a field to a node
     wfe add edge <source> <target> [condition]  Create an edge
     wfe remove node <node-id>                   Delete a node
-    wfe remove slot <node-id> <name>            Remove a slot
+    wfe remove field <node-id> <name>           Remove a field
     wfe remove edge <source> <target>           Remove an edge
-    wfe set <node-id> <slot-name> <value>       Set or update a slot value
+    wfe set <node-id> <field-name> <value>      Set or update a field value
+    wfe fill <field-name> <value>               Fill a field on the current node
+    wfe advance                                 Evaluate edges and move to next node
     wfe commit                                  Freeze graph structure
     wfe checkout                                Create draft copy for editing
     wfe save [path]                             Save graph to a specific path
@@ -66,6 +68,10 @@ def main(args: list[str] | None = None) -> None:
             _cmd_add(args[1:])
         elif cmd == "remove":
             _cmd_remove(args[1:])
+        elif cmd == "fill":
+            _cmd_fill(args[1:])
+        elif cmd == "advance":
+            _cmd_advance()
         elif cmd == "commit":
             _cmd_commit()
         elif cmd == "checkout":
@@ -162,15 +168,15 @@ def _cmd_add(args: list[str]) -> None:
         print()
         print(render_view(session.graph, session.current_node_id))
 
-    elif subcmd == "slot":
+    elif subcmd == "field":
         if len(args) < 4:
-            print("Usage: wfe add slot <node-id> <name> <type> [value]")
+            print("Usage: wfe add field <node-id> <name> <type> [value]")
             return
         node_id, name, type_ = args[1], args[2], args[3]
         value = " ".join(args[4:]) if len(args) > 4 else None
-        session.graph.add_slot(node_id, name, type_, value)
+        session.graph.add_field(node_id, name, type_, value)
         session.persist()
-        print(f"Added slot '{name}' to {node_id}.")
+        print(f"Added field '{name}' to {node_id}.")
         print()
         print(render_view(session.graph, session.current_node_id))
 
@@ -187,7 +193,7 @@ def _cmd_add(args: list[str]) -> None:
         print(render_view(session.graph, session.current_node_id))
 
     else:
-        print(f"Unknown: add {subcmd}. Use: add node | add slot | add edge")
+        print(f"Unknown: add {subcmd}. Use: add node | add field | add edge")
 
 
 def _cmd_remove(args: list[str]) -> None:
@@ -210,13 +216,13 @@ def _cmd_remove(args: list[str]) -> None:
         print()
         print(render_view(session.graph, session.current_node_id))
 
-    elif subcmd == "slot":
+    elif subcmd == "field":
         if len(args) < 3:
-            print("Usage: wfe remove slot <node-id> <name>")
+            print("Usage: wfe remove field <node-id> <name>")
             return
-        session.graph.remove_slot(args[1], args[2])
+        session.graph.remove_field(args[1], args[2])
         session.persist()
-        print(f"Removed slot '{args[2]}' from {args[1]}.")
+        print(f"Removed field '{args[2]}' from {args[1]}.")
         print()
         print(render_view(session.graph, session.current_node_id))
 
@@ -231,24 +237,47 @@ def _cmd_remove(args: list[str]) -> None:
         print(render_view(session.graph, session.current_node_id))
 
     else:
-        print(f"Unknown: remove {subcmd}. Use: remove node | remove slot | remove edge")
+        print(f"Unknown: remove {subcmd}. Use: remove node | remove field | remove edge")
 
 
 def _cmd_set(args: list[str]) -> None:
     if len(args) < 3:
-        print("Usage: wfe set <node-id> <slot-name> <value>")
+        print("Usage: wfe set <node-id> <field-name> <value>")
         return
     session = Session.resume()
-    node_id, slot_name = args[0], args[1]
+    node_id, field_name = args[0], args[1]
     value = " ".join(args[2:])
     node = session.graph._get_node(node_id)
-    if slot_name not in node.slots:
-        raise KeyError(f"Slot '{slot_name}' not found on node '{node_id}'.")
-    if not node.slots[slot_name].writable:
-        raise ValueError(f"Slot '{slot_name}' is read-only.")
-    node.slots[slot_name].value = value
+    if field_name not in node.fields:
+        raise KeyError(f"Field '{field_name}' not found on node '{node_id}'.")
+    if not node.fields[field_name].writable:
+        raise ValueError(f"Field '{field_name}' is read-only.")
+    node.fields[field_name].value = value
     session.persist()
-    print(f"Set {node_id}.{slot_name} = {value!r}")
+    print(f"Set {node_id}.{field_name} = {value!r}")
+    print()
+    print(render_view(session.graph, session.current_node_id))
+
+
+def _cmd_fill(args: list[str]) -> None:
+    if len(args) < 2:
+        print("Usage: wfe fill <field-name> <value>")
+        return
+    session = Session.resume()
+    field_name = args[0]
+    value = " ".join(args[1:])
+    session.fill(field_name, value)
+    session.persist()
+    print(f"Filled {session.current_node_id}.{field_name} = {value!r}")
+    print()
+    print(render_view(session.graph, session.current_node_id))
+
+
+def _cmd_advance() -> None:
+    session = Session.resume()
+    target = session.advance()
+    session.persist()
+    print(f"Advanced to {target}.")
     print()
     print(render_view(session.graph, session.current_node_id))
 

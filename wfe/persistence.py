@@ -11,7 +11,7 @@ from typing import Union
 
 import yaml
 
-from wfe.graph import Edge, Graph, GraphState, Node, Slot
+from wfe.graph import Edge, Field, Graph, GraphState, Node
 
 
 def save(graph: Graph, path: Union[str, Path]) -> None:
@@ -26,9 +26,9 @@ def save(graph: Graph, path: Union[str, Path]) -> None:
         node_data: dict = {"id": node.id}
         if node.prompt:
             node_data["prompt"] = node.prompt
-        if node.slots:
-            node_data["slots"] = {
-                sname: _slot_to_dict(slot) for sname, slot in node.slots.items()
+        if node.fields:
+            node_data["fields"] = {
+                fname: _field_to_dict(f) for fname, f in node.fields.items()
             }
         if node.edges:
             node_data["edges"] = [_edge_to_dict(e) for e in node.edges]
@@ -53,13 +53,13 @@ def load(path: Union[str, Path]) -> Graph:
     graph.nodes = {}
 
     for nid, node_data in data["nodes"].items():
-        slots = {}
-        for sname, sdata in node_data.get("slots", {}).items():
-            slots[sname] = Slot(
-                name=sdata["name"],
-                type=sdata["type"],
-                value=sdata.get("value"),
-                writable=sdata.get("writable", True),
+        fields = {}
+        for fname, fdata in node_data.get("fields", {}).items():
+            fields[fname] = Field(
+                name=fdata["name"],
+                type=fdata["type"],
+                value=fdata.get("value"),
+                writable=fdata.get("writable", True),
             )
         edges = []
         for edata in node_data.get("edges", []):
@@ -69,7 +69,7 @@ def load(path: Union[str, Path]) -> Graph:
             ))
         graph.nodes[nid] = Node(
             id=node_data["id"],
-            slots=slots,
+            fields=fields,
             edges=edges,
             prompt=node_data.get("prompt"),
         )
@@ -77,11 +77,11 @@ def load(path: Union[str, Path]) -> Graph:
     return graph
 
 
-def _slot_to_dict(slot: Slot) -> dict:
-    d: dict = {"name": slot.name, "type": slot.type}
-    if slot.value is not None:
-        d["value"] = slot.value
-    if not slot.writable:
+def _field_to_dict(f: Field) -> dict:
+    d: dict = {"name": f.name, "type": f.type}
+    if f.value is not None:
+        d["value"] = f.value
+    if not f.writable:
         d["writable"] = False
     return d
 

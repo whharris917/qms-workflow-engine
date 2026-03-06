@@ -1,7 +1,8 @@
 """Graph primitives and DAG operations.
 
-REQ-WFE-001 through REQ-WFE-018: Slot, Node, Edge, Graph with lifecycle,
+REQ-WFE-001 through REQ-WFE-018: Field, Node, Edge, Graph with lifecycle,
 construction operations, and DAG invariant enforcement.
+REQ-WFE-027 through REQ-WFE-030: Execution mode - field-filling and edge evaluation.
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ class GraphState(Enum):
 
 
 @dataclass
-class Slot:
+class Field:
     """Atomic unit of data within a node. (REQ-WFE-001)"""
 
     name: str
@@ -40,7 +41,7 @@ class Node:
     """A step in a workflow. (REQ-WFE-002)"""
 
     id: str
-    slots: dict[str, Slot] = field(default_factory=dict)
+    fields: dict[str, Field] = field(default_factory=dict)
     edges: list[Edge] = field(default_factory=list)
     prompt: Optional[str] = None
 
@@ -122,7 +123,7 @@ class Graph:
         for nid, node in self.nodes.items():
             copy.nodes[nid] = Node(
                 id=node.id,
-                slots={k: Slot(s.name, s.type, s.value, s.writable) for k, s in node.slots.items()},
+                fields={k: Field(f.name, f.type, f.value, f.writable) for k, f in node.fields.items()},
                 edges=[Edge(e.target, e.condition) for e in node.edges],
                 prompt=node.prompt,
             )
@@ -150,25 +151,25 @@ class Graph:
         for node in self.nodes.values():
             node.edges = [e for e in node.edges if e.target != node_id]
 
-    # --- Construction: Slots (REQ-WFE-014, REQ-WFE-015) ---
+    # --- Construction: Fields (REQ-WFE-014, REQ-WFE-015) ---
 
-    def add_slot(self, node_id: str, name: str, type: str, value: Any = None, writable: bool = True) -> Slot:
-        """Add a slot to a node. (REQ-WFE-014)"""
+    def add_field(self, node_id: str, name: str, type: str, value: Any = None, writable: bool = True) -> Field:
+        """Add a field to a node. (REQ-WFE-014)"""
         self._require_draft()
         node = self._get_node(node_id)
-        if name in node.slots:
-            raise ValueError(f"Slot '{name}' already exists on node '{node_id}'.")
-        slot = Slot(name=name, type=type, value=value, writable=writable)
-        node.slots[name] = slot
-        return slot
+        if name in node.fields:
+            raise ValueError(f"Field '{name}' already exists on node '{node_id}'.")
+        f = Field(name=name, type=type, value=value, writable=writable)
+        node.fields[name] = f
+        return f
 
-    def remove_slot(self, node_id: str, slot_name: str) -> None:
-        """Remove a slot from a node. (REQ-WFE-015)"""
+    def remove_field(self, node_id: str, field_name: str) -> None:
+        """Remove a field from a node. (REQ-WFE-015)"""
         self._require_draft()
         node = self._get_node(node_id)
-        if slot_name not in node.slots:
-            raise KeyError(f"Slot '{slot_name}' not found on node '{node_id}'.")
-        del node.slots[slot_name]
+        if field_name not in node.fields:
+            raise KeyError(f"Field '{field_name}' not found on node '{node_id}'.")
+        del node.fields[field_name]
 
     # --- Construction: Edges (REQ-WFE-016, REQ-WFE-017, REQ-WFE-018) ---
 
@@ -193,6 +194,41 @@ class Graph:
         source.edges = [e for e in source.edges if e.target != target_id]
         if len(source.edges) == original_len:
             raise KeyError(f"No edge from '{source_id}' to '{target_id}'.")
+
+    # --- Execution: Field-filling and edge evaluation (REQ-WFE-027 through REQ-WFE-030) ---
+
+    def fill_field(self, node_id: str, field_name: str, value: Any) -> None:
+        """Set a field value during execution. Works on committed graphs. (REQ-WFE-027)"""
+        node = self._get_node(node_id)
+        if field_name not in node.fields:
+            raise KeyError(f"Field '{field_name}' not found on node '{node_id}'.")
+        if not node.fields[field_name].writable:
+            raise ValueError(f"Field '{field_name}' is read-only.")
+        node.fields[field_name].value = value
+
+    def evaluate_edges(self, node_id: str) -> list:
+        """Return edges from node whose conditions are satisfied. (REQ-WFE-028)"""
+        node = self._get_node(node_id)
+        return [e for e in node.edges if self._condition_satisfied(e.condition, node)]
+
+    def _condition_satisfied(self, condition: Optional[str], node: Node) -> bool:
+        """Evaluate a condition string against a node's fields. (REQ-WFE-029)
+
+        Supports: no condition (always true), `name==value`, `name!=value`.
+        """
+        if not condition:
+            return True
+        if "==" in condition:
+            name, expected = condition.split("==", 1)
+            name, expected = name.strip(), expected.strip()
+            actual = str(node.fields[name].value) if name in node.fields and node.fields[name].value is not None else ""
+            return actual == expected
+        if "!=" in condition:
+            name, expected = condition.split("!=", 1)
+            name, expected = name.strip(), expected.strip()
+            actual = str(node.fields[name].value) if name in node.fields and node.fields[name].value is not None else ""
+            return actual != expected
+        return False
 
     # --- Helpers ---
 

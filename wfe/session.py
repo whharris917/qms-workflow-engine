@@ -2,6 +2,7 @@
 
 REQ-WFE-019: Current node context.
 REQ-WFE-021: Jump to home.
+REQ-WFE-030: Advance through the graph by evaluating outgoing edges.
 """
 
 from __future__ import annotations
@@ -57,6 +58,29 @@ class Session:
     def home(self) -> None:
         """Jump to home node. (REQ-WFE-021)"""
         self.current_node_id = self.graph.home_id
+
+    def fill(self, field_name: str, value: str) -> None:
+        """Fill a field on the current node during execution. (REQ-WFE-027)"""
+        self.graph.fill_field(self.current_node_id, field_name, value)
+
+    def advance(self) -> str:
+        """Evaluate outgoing edges and move to the next node. (REQ-WFE-030)
+
+        Returns the target node ID navigated to.
+        Raises NavigationError if zero or multiple edges are true.
+        """
+        true_edges = self.graph.evaluate_edges(self.current_node_id)
+        if not true_edges:
+            raise NavigationError(
+                "No outgoing edges evaluate to true. Fill required fields first."
+            )
+        if len(true_edges) > 1:
+            targets = ", ".join(e.target for e in true_edges)
+            raise NavigationError(
+                f"Multiple edges are true ({targets}). Use 'wfe go <id>' to choose."
+            )
+        self.current_node_id = true_edges[0].target
+        return true_edges[0].target
 
     def persist(self) -> None:
         """Save session state and graph to disk."""
