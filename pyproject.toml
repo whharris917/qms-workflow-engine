@@ -1,0 +1,11 @@
+[project]
+name = "qms-workflow-engine"
+version = "0.1.0"
+description = "Graph-based DAG workflow engine for QMS agent orchestration"
+requires-python = ">=3.10"
+dependencies = [
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+wfe = "wfe.cli:main"
