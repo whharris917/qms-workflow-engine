@@ -19,9 +19,11 @@ Usage:
     wfe remove node <node-id>                   Delete a node
     wfe remove slot <node-id> <name>            Remove a slot
     wfe remove edge <source> <target>           Remove an edge
+    wfe set <node-id> <slot-name> <value>       Set or update a slot value
     wfe commit                                  Freeze graph structure
     wfe checkout                                Create draft copy for editing
     wfe save [path]                             Save graph to a specific path
+    wfe help                                    Show all commands
 """
 
 from __future__ import annotations
@@ -29,7 +31,7 @@ from __future__ import annotations
 import sys
 
 from wfe.graph import CycleError, HomeNodeError, ImmutableGraphError
-from wfe.render import render_nodes, render_view
+from wfe.render import HELP_TEXT, render_nodes, render_view
 from wfe.session import NavigationError, NoSessionError, Session
 
 
@@ -70,9 +72,13 @@ def main(args: list[str] | None = None) -> None:
             _cmd_checkout()
         elif cmd == "save":
             _cmd_save(args[1:])
+        elif cmd == "set":
+            _cmd_set(args[1:])
+        elif cmd in ("help", "--help", "-h"):
+            print(HELP_TEXT)
         else:
             print(f"Unknown command: {cmd}")
-            print("Use 'wfe new <name>' to create a graph, or 'wfe' to see current state.")
+            print("Run 'wfe help' to see all commands.")
     except (
         ImmutableGraphError,
         CycleError,
@@ -99,9 +105,16 @@ def _cmd_new(args: list[str]) -> None:
 
 def _cmd_load(args: list[str]) -> None:
     if not args:
-        print("Usage: wfe load <path>")
+        print("Usage: wfe load <name-or-path>")
         return
-    session = Session.load_from(args[0])
+    from pathlib import Path
+    path = args[0]
+    # Resolve bare name to .wfe/<name>.yaml
+    if not Path(path).exists():
+        candidate = Path(".wfe") / f"{path}.yaml"
+        if candidate.exists():
+            path = str(candidate)
+    session = Session.load_from(path)
     print(f"Loaded graph '{session.graph.name}'.")
     print()
     print(render_view(session.graph, session.current_node_id))
@@ -219,6 +232,25 @@ def _cmd_remove(args: list[str]) -> None:
 
     else:
         print(f"Unknown: remove {subcmd}. Use: remove node | remove slot | remove edge")
+
+
+def _cmd_set(args: list[str]) -> None:
+    if len(args) < 3:
+        print("Usage: wfe set <node-id> <slot-name> <value>")
+        return
+    session = Session.resume()
+    node_id, slot_name = args[0], args[1]
+    value = " ".join(args[2:])
+    node = session.graph._get_node(node_id)
+    if slot_name not in node.slots:
+        raise KeyError(f"Slot '{slot_name}' not found on node '{node_id}'.")
+    if not node.slots[slot_name].writable:
+        raise ValueError(f"Slot '{slot_name}' is read-only.")
+    node.slots[slot_name].value = value
+    session.persist()
+    print(f"Set {node_id}.{slot_name} = {value!r}")
+    print()
+    print(render_view(session.graph, session.current_node_id))
 
 
 def _cmd_commit() -> None:

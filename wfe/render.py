@@ -28,6 +28,11 @@ def render_view(graph: Graph, current_node_id: str) -> str:
     label = "  [HOME]" if is_home else ""
     lines.append(f"Node: {node.id}{label}")
 
+    # Orientation hint: home node with no edges is the "blank canvas" state
+    if is_home and not node.edges and graph.state == GraphState.DRAFT:
+        lines.append("  This is the home node - the entry point for all navigation.")
+        lines.append("  Start by adding child nodes, then connect them with edges.")
+
     if node.prompt:
         lines.append(f"Prompt: {node.prompt}")
 
@@ -59,7 +64,7 @@ def render_view(graph: Graph, current_node_id: str) -> str:
 
     # Available actions - progressive disclosure
     lines.append("")
-    lines.append(_available_actions(graph, node, current_node_id))
+    lines.extend(_available_actions(graph, node, current_node_id))
 
     return "\n".join(lines)
 
@@ -80,28 +85,74 @@ def render_nodes(graph: Graph, current_node_id: str) -> str:
     return "\n".join(lines)
 
 
-def _available_actions(graph: Graph, node: Node, current_node_id: str) -> str:
-    """Build the context-sensitive 'Available' line."""
-    actions = []
+HELP_TEXT = """
+Commands:
+  wfe new <name>                               Create a new graph
+  wfe load <name-or-path>                      Load a graph from .wfe/ or a YAML path
+  wfe view                                     Show current node
+  wfe nodes                                    List all nodes in the graph
+  wfe home                                     Jump to the home node
+  wfe go <node-id>                             Navigate to a connected node
 
-    # Navigation
-    if node.edges:
-        targets = [e.target for e in node.edges]
-        if len(targets) == 1:
-            actions.append(f"go {targets[0]}")
-        else:
-            actions.append("go <node-id>")
+  wfe add node [name]                          Create a new node (optional name prefix)
+  wfe add slot <node-id> <name> <type> [val]   Add a slot to a node
+  wfe add edge <source> <target> [condition]   Create an edge between nodes
+  wfe remove node <node-id>                    Delete a node (home node cannot be deleted)
+  wfe remove slot <node-id> <name>             Remove a slot from a node
+  wfe remove edge <source> <target>            Remove an edge
+
+  wfe set <node-id> <slot-name> <value>        Set or update a slot's value
+
+  wfe commit                                   Freeze graph structure (draft -> committed)
+  wfe checkout                                 Create a draft copy for editing (committed -> draft)
+  wfe save [path]                              Save graph to .wfe/ or a specific path
+
+  wfe help                                     Show this help
+
+Slot types: string, int, float, bool, or any label you choose.
+Node IDs are assigned automatically (e.g., review-a1b2c3d4). Use 'wfe nodes' to list them.
+Conditions on edges are free-form strings (e.g., "verdict==approved").
+""".strip()
+
+
+def _available_actions(graph: Graph, node: Node, current_node_id: str) -> list[str]:
+    """Build context-sensitive available action lines, grouped by category."""
+    nav = []
+    construct = []
+    lifecycle = []
+
+    # Navigation: one go entry per outgoing edge (copyable IDs)
+    for edge in node.edges:
+        nav.append(f"go {edge.target}")
     if current_node_id != graph.home_id:
-        actions.append("home")
+        nav.append("home")
 
-    # Construction (draft only)
     if graph.state == GraphState.DRAFT:
-        actions.extend(["add node", "add slot", "add edge", "remove node", "remove slot", "remove edge"])
-        actions.append("commit")
+        # Construction: always available
+        construct.append("add node <name>")
+        construct.append(f"add slot {current_node_id} <name> <type>")
+        construct.append(f"add edge {current_node_id} <target-id>")
+
+        # Removes only when there's something to remove
+        if node.slots:
+            construct.append(f"set {current_node_id} <slot-name> <value>")
+            construct.append(f"remove slot {current_node_id} <name>")
+        if node.edges:
+            construct.append(f"remove edge {current_node_id} <target-id>")
+        if len(graph.nodes) > 1 and current_node_id != graph.home_id:
+            construct.append(f"remove node {current_node_id}")
+
+        lifecycle.append("commit")
     else:
-        actions.append("checkout")
+        lifecycle.append("checkout")
 
-    # Always available
-    actions.extend(["nodes", "save"])
+    lifecycle.extend(["nodes", "save", "help"])
 
-    return "Available: " + " | ".join(actions)
+    lines = []
+    if nav:
+        lines.append("Navigate: " + " | ".join(nav))
+    if construct:
+        lines.append("Construct: " + " | ".join(construct))
+    lines.append("Graph: " + " | ".join(lifecycle))
+
+    return lines
