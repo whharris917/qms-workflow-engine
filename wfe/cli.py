@@ -2,9 +2,9 @@
 
 REQ-WFE-026: Command-line entry point.
 
-Each invocation is a single command. Session state (current graph, current node)
-persists to .wfe/ between invocations. Every command prints the current view
-with available actions - the agent never needs to ask for help.
+Each invocation is a single command. Session state (current graph, current node,
+workspace) persists to .wfe/ between invocations. Every command prints the current
+view with available actions - the agent never needs to ask for help.
 
 Usage:
     wfe new <name>                              Create a new graph
@@ -25,6 +25,16 @@ Usage:
     wfe commit                                  Freeze graph structure
     wfe checkout                                Create draft copy for editing
     wfe save [path]                             Save graph to a specific path
+    wfe template list                           List available templates
+    wfe template show <id>                      Show a template definition
+    wfe instantiate <template-id> [key=value]   Instantiate a template into current graph
+    wfe db list                                 List all mock database keys
+    wfe db get <key>                            Get a value from the mock database
+    wfe db set <key> <value>                    Set a value in the mock database
+    wfe workspace                               Show current workspace
+    wfe workspace set <key> <value>             Set a workspace entry
+    wfe workspace clear                         Clear all workspace entries
+    wfe compile [path]                          Compile current graph to CR markdown
     wfe help                                    Show all commands
 """
 
@@ -37,11 +47,26 @@ from wfe.render import HELP_TEXT, render_nodes, render_view
 from wfe.session import NavigationError, NoSessionError, Session
 
 
+def _load_local_hooks() -> None:
+    """Auto-load workflow_hooks.py from CWD if present (like pytest's conftest.py).
+
+    This registers domain-specific hook implementations without the engine
+    needing to know anything about them.
+    """
+    import importlib.util
+    from pathlib import Path
+    hook_file = Path("workflow_hooks.py")
+    if hook_file.exists():
+        spec = importlib.util.spec_from_file_location("workflow_hooks", hook_file)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+
+
 def main(args: list[str] | None = None) -> None:
+    _load_local_hooks()
     args = args or sys.argv[1:]
 
     if not args:
-        # No command - show current view or guide to create
         try:
             session = Session.resume()
             print(render_view(session.graph, session.current_node_id))
@@ -80,6 +105,20 @@ def main(args: list[str] | None = None) -> None:
             _cmd_save(args[1:])
         elif cmd == "set":
             _cmd_set(args[1:])
+        elif cmd == "draft":
+            _cmd_draft(args[1:])
+        elif cmd == "submit":
+            _cmd_submit(args[1:])
+        elif cmd == "template":
+            _cmd_template(args[1:])
+        elif cmd == "instantiate":
+            _cmd_instantiate(args[1:])
+        elif cmd == "db":
+            _cmd_db(args[1:])
+        elif cmd == "workspace":
+            _cmd_workspace(args[1:])
+        elif cmd == "compile":
+            _cmd_compile(args[1:])
         elif cmd in ("help", "--help", "-h"):
             print(HELP_TEXT)
         else:
@@ -115,13 +154,20 @@ def _cmd_load(args: list[str]) -> None:
         return
     from pathlib import Path
     path = args[0]
-    # Resolve bare name to .wfe/<name>.yaml
+    # Resolve bare name: workflows/ takes priority over .wfe/ (which is session state)
     if not Path(path).exists():
-        candidate = Path(".wfe") / f"{path}.yaml"
-        if candidate.exists():
-            path = str(candidate)
+        for candidate in [
+            Path("workflows") / f"{path}.yaml",
+            Path(".wfe") / f"{path}.yaml",
+        ]:
+            if candidate.exists():
+                path = str(candidate)
+                break
+    from wfe.session import _get_session_id
     session = Session.load_from(path)
-    print(f"Loaded graph '{session.graph.name}'.")
+    sid = _get_session_id()
+    session_note = f" [session: {sid}]" if sid != "default" else ""
+    print(f"Loaded graph '{session.graph.name}'.{session_note}")
     print()
     print(render_view(session.graph, session.current_node_id))
 
@@ -155,7 +201,7 @@ def _cmd_go(args: list[str]) -> None:
 
 def _cmd_add(args: list[str]) -> None:
     if not args:
-        print("Usage: wfe add node|slot|edge ...")
+        print("Usage: wfe add node|field|edge ...")
         return
     session = Session.resume()
     subcmd = args[0].lower()
@@ -198,7 +244,7 @@ def _cmd_add(args: list[str]) -> None:
 
 def _cmd_remove(args: list[str]) -> None:
     if not args:
-        print("Usage: wfe remove node|slot|edge ...")
+        print("Usage: wfe remove node|field|edge ...")
         return
     session = Session.resume()
     subcmd = args[0].lower()
@@ -312,6 +358,178 @@ def _cmd_save(args: list[str]) -> None:
     else:
         session.persist()
         print(f"Saved to {session.graph_path}")
+
+
+def _cmd_draft(args: list[str]) -> None:
+    from pathlib import Path
+    from wfe.form import form_file, write_form
+    session = Session.resume()
+    path = Path(args[0]) if args else form_file()
+    write_form(session.current_node, session.graph.name, path, session.templates)
+    print(f"Form written to: {path}")
+    print(f"Edit the file, then run: wfe submit")
+
+
+def _cmd_submit(args: list[str]) -> None:
+    from pathlib import Path
+    from wfe.form import form_file, read_and_validate
+    session = Session.resume()
+    path = Path(args[0]) if args else form_file()
+    values, errors = read_and_validate(path, session.current_node, session.templates)
+    if errors:
+        print("Form validation failed:")
+        for e in errors:
+            print(e)
+        return
+    for fname, val in values.items():
+        session.graph.fill_field(session.current_node_id, fname, val)
+    session.persist()
+    print(f"Submitted {len(values)} field(s) from {path}.")
+    print()
+    print(render_view(session.graph, session.current_node_id))
+
+
+def _cmd_template(args: list[str]) -> None:
+    from wfe.template import TemplateLibrary
+    lib = TemplateLibrary()
+
+    if not args or args[0] == "list":
+        ids = lib.list_ids()
+        if not ids:
+            print("No templates found in templates/")
+            return
+        print("Templates:")
+        for tid in ids:
+            print(f"  {tid}")
+        return
+
+    if args[0] == "show":
+        if len(args) < 2:
+            print("Usage: wfe template show <id>")
+            return
+        tmpl = lib.get(args[1])
+        print(f"Template: {tmpl.id}")
+        if tmpl.prompt:
+            print(f"Prompt: {tmpl.prompt}")
+        if tmpl.enter_hooks:
+            print(f"Enter hooks: {tmpl.enter_hooks}")
+        if tmpl.exit_hooks:
+            print(f"Exit hooks: {tmpl.exit_hooks}")
+        print("Fields:")
+        for spec in tmpl.field_specs:
+            kind = "parameter" if spec.parameter else ("default=" + repr(spec.default) if spec.default is not None else "writable" if spec.writable else "read-only")
+            print(f"  {spec.name} [{spec.type}] ({kind})")
+        print("Edges:")
+        for et in tmpl.edge_templates:
+            cond = f"  when: {et.condition}" if et.condition else ""
+            print(f"  -> {et.to}{cond}")
+        return
+
+    print(f"Unknown: template {args[0]}. Use: template list | template show <id>")
+
+
+def _cmd_instantiate(args: list[str]) -> None:
+    if not args:
+        print("Usage: wfe instantiate <template-id> [key=value ...]")
+        return
+    session = Session.resume()
+    template_id = args[0]
+
+    params = {}
+    for kv in args[1:]:
+        if "=" not in kv:
+            print(f"Invalid parameter: {kv!r}. Expected key=value.")
+            return
+        k, v = kv.split("=", 1)
+        params[k.strip()] = v.strip()
+
+    from wfe.template import TemplateLibrary, instantiate
+    lib = TemplateLibrary()
+    tmpl = lib.get(template_id)
+    node = instantiate(tmpl, session.graph, params=params)
+    session.persist()
+    print(f"Instantiated template '{template_id}' as node: {node.id}")
+    print()
+    print(render_view(session.graph, session.current_node_id))
+
+
+def _cmd_db(args: list[str]) -> None:
+    from wfe.database import MockDatabase
+    db = MockDatabase()
+
+    if not args or args[0] == "list":
+        keys = db.list_keys()
+        if not keys:
+            print("Database is empty.")
+            return
+        for k in keys:
+            print(f"  {k}: {db.get(k)!r}")
+        return
+
+    if args[0] == "get":
+        if len(args) < 2:
+            print("Usage: wfe db get <key>")
+            return
+        val = db.get(args[1])
+        print(f"{args[1]}: {val!r}")
+        return
+
+    if args[0] == "set":
+        if len(args) < 3:
+            print("Usage: wfe db set <key> <value>")
+            return
+        key = args[1]
+        value = " ".join(args[2:])
+        db.set(key, value)
+        print(f"Set {key} = {value!r}")
+        return
+
+    print(f"Unknown: db {args[0]}. Use: db list | db get <key> | db set <key> <value>")
+
+
+def _cmd_workspace(args: list[str]) -> None:
+    session = Session.resume()
+
+    if not args:
+        if not session.workspace:
+            print("Workspace is empty.")
+        else:
+            for k, v in session.workspace.items():
+                print(f"  {k}: {v!r}")
+        return
+
+    if args[0] == "set":
+        if len(args) < 3:
+            print("Usage: wfe workspace set <key> <value>")
+            return
+        key = args[1]
+        value = " ".join(args[2:])
+        session.workspace[key] = value
+        session.persist()
+        print(f"Workspace: {key} = {value!r}")
+        return
+
+    if args[0] == "clear":
+        session.workspace.clear()
+        session.persist()
+        print("Workspace cleared.")
+        return
+
+    print(f"Unknown: workspace {args[0]}. Use: workspace | workspace set <key> <val> | workspace clear")
+
+
+def _cmd_compile(args: list[str]) -> None:
+    from pathlib import Path
+    from wfe.compile import compile_graph
+    session = Session.resume()
+    output = compile_graph(session.graph)
+    if args:
+        out_path = Path(args[0])
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(output, encoding="utf-8")
+        print(f"Compiled to {out_path}")
+    else:
+        print(output)
 
 
 if __name__ == "__main__":

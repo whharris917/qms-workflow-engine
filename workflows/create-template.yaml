@@ -1,0 +1,51 @@
+name: create-template
+state: committed
+home: define-b1caa30b
+nodes:
+  define-b1caa30b:
+    id: define-b1caa30b
+    prompt: "Run 'wfe draft' to write a form file with inline instructions - edit\
+      \ it, then run 'wfe submit' to fill all fields at once.\n\nFields:\n  template_id\
+      \     - unique identifier (e.g. 'ei'); output: templates/<template_id>.yaml\n\
+      \  prompt          - optional prompt shown when an agent reaches a node of this\
+      \ type\n  fields          - list of field definitions (name, type; optional:\
+      \ parameter, writable, default)\n  edge_templates  - list of edge definitions\
+      \ (to; optional: condition)\n  enter_hooks     - optional hook names fired on\
+      \ node entry, one per line\n  exit_hooks      - optional hook names fired on\
+      \ node exit, one per line\n"
+    exit_hooks:
+    - save_template
+    fields:
+      template_id:
+        name: template_id
+        type: string
+      prompt:
+        name: prompt
+        type: string
+        value: ''
+      fields:
+        name: fields
+        type: nodelist
+      edge_templates:
+        name: edge_templates
+        type: nodelist
+        value: []
+      enter_hooks:
+        name: enter_hooks
+        type: text
+        value: ''
+      exit_hooks:
+        name: exit_hooks
+        type: text
+        value: ''
+    edges:
+    - target: done-bb1bad66
+  done-bb1bad66:
+    id: done-bb1bad66
+    prompt: Template created. Use 'wfe template list' to verify.
+    fields:
+      result:
+        name: result
+        type: string
+        value: Template created successfully.
+        writable: false

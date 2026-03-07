@@ -79,9 +79,9 @@ def render_nodes(graph: Graph, current_node_id: str) -> str:
         if nid == current_node_id:
             markers.append("HERE")
         suffix = f"  [{', '.join(markers)}]" if markers else ""
-        slots = len(node.slots)
+        fields = len(node.fields)
         edges = len(node.edges)
-        lines.append(f"  {nid}  ({slots} slots, {edges} edges){suffix}")
+        lines.append(f"  {nid}  ({fields} fields, {edges} edges){suffix}")
     return "\n".join(lines)
 
 
@@ -103,19 +103,36 @@ Commands:
 
   wfe set <node-id> <field-name> <value>       Set or update a field's value
 
-  wfe fill <field-name> <value>                Fill a field on the current node (execution mode)
+  wfe draft [path]                             Write a form file for the current node (edit it, then submit)
+  wfe submit [path]                            Read and validate the form file, filling all fields at once
+  wfe fill <field-name> <value>                Fill a single field on the current node (execution mode)
   wfe advance                                  Evaluate outgoing edges and move to the next node
 
   wfe commit                                   Freeze graph structure (draft -> committed)
   wfe checkout                                 Create a draft copy for editing (committed -> draft)
   wfe save [path]                              Save graph to .wfe/ or a specific path
 
+  wfe template list                            List available templates (from templates/)
+  wfe template show <id>                       Show a template definition
+  wfe instantiate <template-id> [key=value]    Instantiate a template into the current graph
+
+  wfe db list                                  List all mock database keys
+  wfe db get <key>                             Get a value from the mock database
+  wfe db set <key> <value>                     Set a value in the mock database
+
+  wfe workspace                                Show current workflow workspace
+  wfe workspace set <key> <value>              Set a workspace entry
+  wfe workspace clear                          Clear all workspace entries
+
+  wfe compile [path]                           Compile current graph to CR markdown (stdout or file)
+
   wfe help                                     Show this help
 
-Field types: string, int, float, bool, or any label you choose.
+Field types: string, int, float, bool, text, or any label you choose.
 Node IDs are assigned automatically (e.g., review-a1b2c3d4). Use 'wfe nodes' to list them.
-Conditions on edges are free-form strings (e.g., "verdict==approved").
-Edge conditions support == and != operators (e.g., "verdict!=rejected").
+Conditions on edges are free-form strings (e.g., "outcome==Pass").
+Edge conditions support == and != operators.
+Use 'wfe draft' + 'wfe submit' for nodes with multiple fields or complex list inputs.
 """.strip()
 
 
@@ -151,8 +168,11 @@ def _available_actions(graph: Graph, node: Node, current_node_id: str) -> list[s
     else:
         # Execution: fill unfilled writable fields, advance if edges exist
         unfilled = [f for f in node.fields.values() if f.writable and f.value is None]
+        if unfilled:
+            execute.append("draft  (write form file, edit it, then: submit)")
         for f in unfilled:
-            execute.append(f"fill {f.name} <value>")
+            if f.type not in ("text", "nodelist"):
+                execute.append(f"fill {f.name} <value>")
         if node.edges:
             execute.append("advance")
 

@@ -26,6 +26,7 @@ class Field:
     type: str
     value: Any = None
     writable: bool = True
+    parameter: bool = False  # True if this field was a template parameter
 
 
 @dataclass
@@ -34,6 +35,7 @@ class Edge:
 
     target: str  # Node ID
     condition: Optional[str] = None
+    traverse_hooks: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -44,6 +46,8 @@ class Node:
     fields: dict[str, Field] = field(default_factory=dict)
     edges: list[Edge] = field(default_factory=list)
     prompt: Optional[str] = None
+    enter_hooks: list[str] = field(default_factory=list)
+    exit_hooks: list[str] = field(default_factory=list)
 
 
 class ImmutableGraphError(Exception):
@@ -123,9 +127,17 @@ class Graph:
         for nid, node in self.nodes.items():
             copy.nodes[nid] = Node(
                 id=node.id,
-                fields={k: Field(f.name, f.type, f.value, f.writable) for k, f in node.fields.items()},
-                edges=[Edge(e.target, e.condition) for e in node.edges],
+                fields={
+                    k: Field(f.name, f.type, f.value, f.writable, f.parameter)
+                    for k, f in node.fields.items()
+                },
+                edges=[
+                    Edge(e.target, e.condition, list(e.traverse_hooks))
+                    for e in node.edges
+                ],
                 prompt=node.prompt,
+                enter_hooks=list(node.enter_hooks),
+                exit_hooks=list(node.exit_hooks),
             )
         return copy
 
@@ -153,13 +165,21 @@ class Graph:
 
     # --- Construction: Fields (REQ-WFE-014, REQ-WFE-015) ---
 
-    def add_field(self, node_id: str, name: str, type: str, value: Any = None, writable: bool = True) -> Field:
+    def add_field(
+        self,
+        node_id: str,
+        name: str,
+        type: str,
+        value: Any = None,
+        writable: bool = True,
+        parameter: bool = False,
+    ) -> Field:
         """Add a field to a node. (REQ-WFE-014)"""
         self._require_draft()
         node = self._get_node(node_id)
         if name in node.fields:
             raise ValueError(f"Field '{name}' already exists on node '{node_id}'.")
-        f = Field(name=name, type=type, value=value, writable=writable)
+        f = Field(name=name, type=type, value=value, writable=writable, parameter=parameter)
         node.fields[name] = f
         return f
 
@@ -173,7 +193,9 @@ class Graph:
 
     # --- Construction: Edges (REQ-WFE-016, REQ-WFE-017, REQ-WFE-018) ---
 
-    def add_edge(self, source_id: str, target_id: str, condition: Optional[str] = None) -> Edge:
+    def add_edge(
+        self, source_id: str, target_id: str, condition: Optional[str] = None
+    ) -> Edge:
         """Create an edge between two nodes. (REQ-WFE-016, REQ-WFE-017)"""
         self._require_draft()
         source = self._get_node(source_id)
@@ -221,12 +243,20 @@ class Graph:
         if "==" in condition:
             name, expected = condition.split("==", 1)
             name, expected = name.strip(), expected.strip()
-            actual = str(node.fields[name].value) if name in node.fields and node.fields[name].value is not None else ""
+            actual = (
+                str(node.fields[name].value)
+                if name in node.fields and node.fields[name].value is not None
+                else ""
+            )
             return actual == expected
         if "!=" in condition:
             name, expected = condition.split("!=", 1)
             name, expected = name.strip(), expected.strip()
-            actual = str(node.fields[name].value) if name in node.fields and node.fields[name].value is not None else ""
+            actual = (
+                str(node.fields[name].value)
+                if name in node.fields and node.fields[name].value is not None
+                else ""
+            )
             return actual != expected
         return False
 
@@ -236,6 +266,23 @@ class Graph:
         if node_id not in self.nodes:
             raise KeyError(f"Node '{node_id}' not found.")
         return self.nodes[node_id]
+
+    def set_home(self, node_id: str) -> None:
+        """Designate an existing node as the home node.
+
+        If the previous home node is empty (no fields, edges, or hooks), it is
+        removed. This allows build_node_chain to promote the first real node to
+        home and discard the bare placeholder created by __init__.
+        """
+        self._require_draft()
+        if node_id not in self.nodes:
+            raise KeyError(f"Node '{node_id}' not found.")
+        old_home_id = self.home_id
+        self.home_id = node_id
+        if old_home_id and old_home_id != node_id and old_home_id in self.nodes:
+            old = self.nodes[old_home_id]
+            if not old.fields and not old.edges and not old.enter_hooks and not old.exit_hooks:
+                del self.nodes[old_home_id]
 
     @property
     def home(self) -> Node:

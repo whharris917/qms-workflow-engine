@@ -1,0 +1,30 @@
+id: ei
+prompt: Execute this item. Fill all fields, then advance.
+fields:
+- name: task_description
+  type: string
+  parameter: true
+  writable: false
+- name: vr_required
+  type: bool
+  parameter: true
+  writable: false
+- name: execution_summary
+  type: string
+  writable: true
+- name: outcome
+  type: string
+  writable: true
+- name: performed_by
+  type: string
+  writable: true
+- name: date
+  type: string
+  writable: true
+edge_templates:
+- to: '{next}'
+  condition: outcome==Pass
+- to: '{var}'
+  condition: outcome==Fail
+- to: '{vr}'
+  condition: vr_required==True

@@ -1,0 +1,35 @@
+name: create-workflow
+state: committed
+home: define
+nodes:
+  define:
+    id: define
+    prompt: "Run 'wfe draft' to write a form file with inline instructions - edit\
+      \ it, then run 'wfe submit' to fill all fields at once.\n\nFields:\n  workflow_name\
+      \   - output filename (e.g. 'my-workflow' produces workflows/my-workflow.yaml)\n\
+      \  nodes           - one YAML dict per node; each entry must have a 'template'\
+      \ key plus the template's parameter fields"
+    exit_hooks:
+    - init_target_graph
+    - build_node_chain
+    fields:
+      workflow_name:
+        name: workflow_name
+        type: string
+      nodes:
+        name: nodes
+        type: nodelist
+    edges:
+    - target: done
+  done:
+    id: done
+    prompt: 'Workflow created. Use ''wfe workspace'' to see the saved path. Use
+      ''wfe load <name>'' to inspect it.'
+    enter_hooks:
+    - save_workflow
+    fields:
+      result:
+        name: result
+        type: string
+        value: Workflow created successfully.
+        writable: false
