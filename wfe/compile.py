@@ -64,27 +64,41 @@ def _fv(node: "Node", name: str) -> str:
     return str(f.value)
 
 
-def _subprocess_link(wf_ref: str) -> str:
-    """Format a markdown link for an actual child workflow instance.
+def _parse_child_ref(ref: str) -> tuple[str, str, str]:
+    """Parse a child_workflows entry into (condition, display_id, link_path).
 
-    wf_ref may be a plain ID ("VAR-001") or "ID::path" for an explicit path.
+    Supported formats:
+      "VAR-001"                              -> condition="", id="VAR-001", path=compiled/VAR-001.md
+      "outcome==Fail::VAR-001"               -> condition="outcome==Fail", id="VAR-001", path=compiled/VAR-001.md
+      "outcome==Fail::VAR-001::QMS/VAR/..."  -> condition="outcome==Fail", id="VAR-001", path=explicit
     """
-    if "::" in wf_ref:
-        display, path = wf_ref.split("::", 1)
-        return f"[{display.strip()}]({path.strip()})"
-    return f"[{wf_ref}](compiled/{wf_ref}.md)"
+    parts = ref.split("::")
+    if len(parts) >= 3:
+        return parts[0].strip(), parts[1].strip(), parts[2].strip()
+    if len(parts) == 2:
+        cond, wf_id = parts[0].strip(), parts[1].strip()
+        return cond, wf_id, f"compiled/{wf_id}.md"
+    return "", ref.strip(), f"compiled/{ref.strip()}.md"
 
 
-def _potential_subprocess_links(node: "Node") -> str:
-    """Format potential subprocess links from outgoing subprocess edges."""
+def _child_workflow_link(wf_ref: str) -> str:
+    """Format a markdown link for an actual child workflow instance."""
+    condition, display, path = _parse_child_ref(wf_ref)
+    link = f"[{display}]({path})"
+    return f"{condition}: {link}" if condition else link
+
+
+def _potential_child_workflow_links(node: "Node") -> str:
+    """Format potential child workflow links from outgoing subprocess edges."""
     seen: set[str] = set()
     parts = []
     for edge in node.edges:
         wf = edge.spawns_workflow
         if wf and wf not in seen:
             seen.add(wf)
-            parts.append(f"-> [{wf.upper()}](compiled/{wf}.md)")
-    return " ".join(parts)
+            cond = f"{edge.condition}: " if edge.condition else ""
+            parts.append(f"{cond}[{wf.upper()}](compiled/{wf}.md)")
+    return ", ".join(parts)
 
 
 def _node_executed(node: "Node") -> bool:
@@ -92,18 +106,18 @@ def _node_executed(node: "Node") -> bool:
     return any(f.writable and f.value is not None for f in node.fields.values())
 
 
-def _subprocess_cell(node: "Node") -> str:
-    """Return the subprocess column content for a table row."""
+def _child_workflow_cell(node: "Node") -> str:
+    """Return the Child Workflows column content for a table row."""
     if node.child_workflows:
-        return " ".join(_subprocess_link(ref) for ref in node.child_workflows)
-    # Only show potential pathways for nodes not yet executed.
+        return ", ".join(_child_workflow_link(ref) for ref in node.child_workflows)
+    # Show potential pathways only for nodes not yet executed.
     # An executed node with empty child_workflows completed without spawning.
     if not _node_executed(node):
-        return _potential_subprocess_links(node)
+        return _potential_child_workflow_links(node)
     return ""
 
 
-def _has_subprocess_info(nodes: list["Node"]) -> bool:
+def _has_child_workflow_info(nodes: list["Node"]) -> bool:
     for node in nodes:
         if node.child_workflows:
             return True
@@ -116,10 +130,10 @@ def _render_table(template_id: str, nodes: list["Node"]) -> list[str]:
     if not nodes:
         return []
     field_names = list(nodes[0].fields.keys())
-    show_subproc = _has_subprocess_info(nodes)
+    show_children = _has_child_workflow_info(nodes)
     headers = [_col(n) for n in field_names]
-    if show_subproc:
-        headers.append("Subprocesses")
+    if show_children:
+        headers.append("Child Workflows")
     sep = ["---"] * len(headers)
 
     heading = nodes[0].label or _col(template_id)
@@ -128,8 +142,8 @@ def _render_table(template_id: str, nodes: list["Node"]) -> list[str]:
     lines.append("| " + " | ".join(sep) + " |")
     for node in nodes:
         row = [_fv(node, fn) for fn in field_names]
-        if show_subproc:
-            row.append(_subprocess_cell(node))
+        if show_children:
+            row.append(_child_workflow_cell(node))
         lines.append("| " + " | ".join(row) + " |")
     lines.append("")
     return lines
@@ -138,21 +152,21 @@ def _render_table(template_id: str, nodes: list["Node"]) -> list[str]:
 def _render_section(node: "Node") -> list[str]:
     label = _node_label(node)
     fields_with_values = [(n, f) for n, f in node.fields.items() if f.value is not None]
-    subproc = _subprocess_cell(node)
+    children = _child_workflow_cell(node)
 
-    if not fields_with_values and not subproc:
+    if not fields_with_values and not children:
         return []  # Skip nodes with no document content
 
     lines = [f"### {label}", ""]
     for fname, f in fields_with_values:
         val = _fv(node, fname)
-        if len(fields_with_values) == 1 and not subproc:
+        if len(fields_with_values) == 1 and not children:
             lines.append(val)
         else:
             lines.append(f"**{_col(fname)}:** {val}")
         lines.append("")
-    if subproc:
-        lines.append(f"**Subprocesses:** {subproc}")
+    if children:
+        lines.append(f"**Child Workflows:** {children}")
         lines.append("")
     return lines
 
