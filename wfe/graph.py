@@ -48,6 +48,7 @@ class Node:
     prompt: Optional[str] = None
     enter_hooks: list[str] = field(default_factory=list)
     exit_hooks: list[str] = field(default_factory=list)
+    template_id: Optional[str] = None  # Set when instantiated from a template
 
 
 class ImmutableGraphError(Exception):
@@ -138,6 +139,7 @@ class Graph:
                 prompt=node.prompt,
                 enter_hooks=list(node.enter_hooks),
                 exit_hooks=list(node.exit_hooks),
+                template_id=node.template_id,
             )
         return copy
 

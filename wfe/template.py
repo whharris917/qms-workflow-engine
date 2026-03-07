@@ -137,6 +137,7 @@ def instantiate(
     prefix = name_prefix or template.id
 
     node = graph.add_node(prefix)
+    node.template_id = template.id
     if template.prompt:
         node.prompt = template.prompt
     node.enter_hooks = list(template.enter_hooks)

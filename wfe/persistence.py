@@ -24,6 +24,8 @@ def save(graph: Graph, path: Union[str, Path]) -> None:
     }
     for nid, node in graph.nodes.items():
         node_data: dict = {"id": node.id}
+        if node.template_id:
+            node_data["template_id"] = node.template_id
         if node.prompt:
             node_data["prompt"] = node.prompt
         if node.enter_hooks:
@@ -80,6 +82,7 @@ def load(path: Union[str, Path]) -> Graph:
             prompt=node_data.get("prompt"),
             enter_hooks=node_data.get("enter_hooks", []),
             exit_hooks=node_data.get("exit_hooks", []),
+            template_id=node_data.get("template_id"),
         )
 
     return graph
