@@ -49,6 +49,7 @@ class Template:
     field_specs: list[FieldSpec] = field(default_factory=list)
     edge_templates: list[EdgeTemplate] = field(default_factory=list)
     prompt: Optional[str] = None
+    label: Optional[str] = None  # Display label for compiled output
     enter_hooks: list[str] = field(default_factory=list)
     exit_hooks: list[str] = field(default_factory=list)
 
@@ -107,6 +108,7 @@ def _load_template(path: Path) -> Template:
         field_specs=field_specs,
         edge_templates=edge_templates,
         prompt=data.get("prompt"),
+        label=data.get("label"),
         enter_hooks=data.get("enter_hooks", []),
         exit_hooks=data.get("exit_hooks", []),
     )
@@ -138,6 +140,7 @@ def instantiate(
 
     node = graph.add_node(prefix)
     node.template_id = template.id
+    node.label = template.label
     if template.prompt:
         node.prompt = template.prompt
     node.enter_hooks = list(template.enter_hooks)

@@ -148,6 +148,8 @@ def build_node_chain(ctx: HookContext) -> HookResult:
         else:
             logical_id = str(entry.get("id", f"node-{i}"))
             created_node = target.add_node(logical_id)
+            if entry.get("label"):
+                created_node.label = str(entry["label"])
             if entry.get("prompt"):
                 created_node.prompt = str(entry["prompt"])
             created_node.enter_hooks = _parse_hook_list(entry.get("enter_hooks", []))

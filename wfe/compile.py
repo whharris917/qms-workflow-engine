@@ -38,9 +38,13 @@ def _bfs(graph: "Graph") -> list[str]:
 
 
 def _node_label(node: "Node") -> str:
-    """Derive a display label from prompt or node ID."""
-    if node.prompt:
-        return node.prompt.splitlines()[0].strip()
+    """Return the node's display label.
+
+    Uses node.label if set, otherwise derives from the node ID.
+    prompt is execution-time agent instruction, not document content — excluded.
+    """
+    if node.label:
+        return node.label
     # Strip UUID suffix: "define-a1b2c3d4" -> "define"
     parts = node.id.rsplit("-", 1)
     prefix = parts[0] if len(parts) == 2 and len(parts[1]) == 8 else node.id
@@ -67,7 +71,8 @@ def _render_table(template_id: str, nodes: list["Node"]) -> list[str]:
     headers = [_col(n) for n in field_names]
     sep = ["---"] * len(headers)
 
-    lines = [f"### {_col(template_id)}", ""]
+    heading = nodes[0].label or _col(template_id)
+    lines = [f"### {heading}", ""]
     lines.append("| " + " | ".join(headers) + " |")
     lines.append("| " + " | ".join(sep) + " |")
     for node in nodes:
@@ -80,20 +85,16 @@ def _render_section(node: "Node") -> list[str]:
     label = _node_label(node)
     fields_with_values = [(n, f) for n, f in node.fields.items() if f.value is not None]
 
-    if not fields_with_values and not node.prompt:
-        return []  # Skip empty nodes
+    if not fields_with_values:
+        return []  # Skip nodes with no document content
 
     lines = [f"### {label}", ""]
-    if fields_with_values:
-        for fname, f in fields_with_values:
-            val = _fv(node, fname)
-            if len(fields_with_values) == 1:
-                lines.append(val)
-            else:
-                lines.append(f"**{_col(fname)}:** {val}")
-            lines.append("")
-    elif node.prompt:
-        lines.append(node.prompt)
+    for fname, f in fields_with_values:
+        val = _fv(node, fname)
+        if len(fields_with_values) == 1:
+            lines.append(val)
+        else:
+            lines.append(f"**{_col(fname)}:** {val}")
         lines.append("")
     return lines
 

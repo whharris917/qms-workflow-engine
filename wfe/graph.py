@@ -49,6 +49,7 @@ class Node:
     enter_hooks: list[str] = field(default_factory=list)
     exit_hooks: list[str] = field(default_factory=list)
     template_id: Optional[str] = None  # Set when instantiated from a template
+    label: Optional[str] = None        # Display label for compiled output
 
 
 class ImmutableGraphError(Exception):
@@ -140,6 +141,7 @@ class Graph:
                 enter_hooks=list(node.enter_hooks),
                 exit_hooks=list(node.exit_hooks),
                 template_id=node.template_id,
+                label=node.label,
             )
         return copy
 

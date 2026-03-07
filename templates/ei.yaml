@@ -1,4 +1,5 @@
 id: ei
+label: Execution Items
 prompt: Execute this item. Fill all fields, then advance.
 fields:
 - name: task_description
