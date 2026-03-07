@@ -17,7 +17,7 @@ from typing import Any, Optional
 
 import yaml
 
-from wfe.graph import Graph, Node
+from wfe.graph import Edge, Graph, Node
 
 TEMPLATES_DIR = Path("templates")
 
@@ -39,6 +39,7 @@ class EdgeTemplate:
 
     to: str           # Symbolic: "{next}", "{var}", "{vr}", or literal node ID
     condition: Optional[str] = None
+    spawns_workflow: Optional[str] = None  # Workflow definition ID this edge may spawn
 
 
 @dataclass
@@ -101,6 +102,7 @@ def _load_template(path: Path) -> Template:
         edge_templates.append(EdgeTemplate(
             to=edata["to"],
             condition=edata.get("condition"),
+            spawns_workflow=edata.get("spawns_workflow"),
         ))
 
     return Template(
@@ -160,13 +162,22 @@ def instantiate(
             writable=spec.writable, parameter=spec.parameter,
         )
 
-    # Add edges, omitting those whose symbolic targets aren't in edge_map
+    # Add edges. Subprocess edges (spawns_workflow set) are kept even when
+    # their symbolic target doesn't resolve — they're hand-off references, not
+    # graph navigation. Normal edges are omitted when unresolved.
     for et in template.edge_templates:
         target = edge_map.get(et.to, et.to)
-        if target.startswith("{") and target.endswith("}"):
-            continue  # Still symbolic — omit
-        if target not in graph.nodes:
-            continue  # Target doesn't exist — omit
-        graph.add_edge(node.id, target, et.condition)
+        is_symbolic = target.startswith("{") and target.endswith("}")
+        in_graph = target in graph.nodes
+
+        if not is_symbolic and in_graph:
+            e = graph.add_edge(node.id, target, et.condition)
+            e.spawns_workflow = et.spawns_workflow
+        elif et.spawns_workflow:
+            # Subprocess edge: target may be unresolved or absent — keep as reference
+            node.edges.append(
+                Edge(target=target, condition=et.condition, spawns_workflow=et.spawns_workflow)
+            )
+        # else: unresolved, no subprocess — omit
 
     return node

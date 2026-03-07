@@ -1,0 +1,166 @@
+name: example-cr
+state: committed
+home: define-982f7fcb
+nodes:
+  define-982f7fcb:
+    id: define-982f7fcb
+    label: Change Overview
+    prompt: Fill in all sections, then advance.
+    fields:
+      purpose:
+        name: purpose
+        type: string
+      scope:
+        name: scope
+        type: string
+      current_state:
+        name: current_state
+        type: string
+      proposed_state:
+        name: proposed_state
+        type: string
+    edges:
+    - target: ei-8cd3c128
+  ei-8cd3c128:
+    id: ei-8cd3c128
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: Pre-execution baseline commit
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: false
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: ei-2a3fab37
+      condition: outcome==Pass
+  ei-2a3fab37:
+    id: ei-2a3fab37
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: Implement the feature
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: true
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: ei-026c98c0
+      condition: outcome==Pass
+  ei-026c98c0:
+    id: ei-026c98c0
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: Run qualification tests and push branch
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: false
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: ei-cbddc903
+      condition: outcome==Pass
+  ei-cbddc903:
+    id: ei-cbddc903
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: Post-execution commit
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: false
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: done-2005509b
+      condition: outcome==Pass
+  done-2005509b:
+    id: done-2005509b
+    label: Execution Summary
+    prompt: All items complete.
+    fields:
+      execution_summary:
+        name: execution_summary
+        type: string
+      references:
+        name: references
+        type: string

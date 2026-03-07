@@ -191,9 +191,20 @@ def build_node_chain(ctx: HookContext) -> HookResult:
                 if not raw_target:
                     return HookResult(False, f"'nodes' entry {i + 1}, edge {ej}: missing 'target'.")
                 actual_target = id_map.get(raw_target, raw_target)
+                spawns = edge_spec.get("spawns_workflow") or None
                 if actual_target not in target.nodes:
+                    if spawns:
+                        from wfe.graph import Edge as _Edge
+                        n.edges.append(_Edge(
+                            target=actual_target,
+                            condition=edge_spec.get("condition") or None,
+                            spawns_workflow=str(spawns),
+                        ))
+                        continue
                     return HookResult(False, f"'nodes' entry {i + 1}, edge {ej}: target {raw_target!r} not found.")
-                target.add_edge(n.id, actual_target, edge_spec.get("condition") or None)
+                e = target.add_edge(n.id, actual_target, edge_spec.get("condition") or None)
+                if spawns:
+                    e.spawns_workflow = str(spawns)
         elif i + 1 < len(created):
             target.add_edge(n.id, created[i + 1]["node"].id, _next_cond(tmpl) if tmpl else None)
 

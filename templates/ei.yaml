@@ -27,5 +27,7 @@ edge_templates:
   condition: outcome==Pass
 - to: '{var}'
   condition: outcome==Fail
+  spawns_workflow: var
 - to: '{vr}'
   condition: vr_required==True
+  spawns_workflow: vr

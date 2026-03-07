@@ -34,6 +34,8 @@ def save(graph: Graph, path: Union[str, Path]) -> None:
             node_data["enter_hooks"] = node.enter_hooks
         if node.exit_hooks:
             node_data["exit_hooks"] = node.exit_hooks
+        if node.child_workflows:
+            node_data["child_workflows"] = node.child_workflows
         if node.fields:
             node_data["fields"] = {
                 fname: _field_to_dict(f) for fname, f in node.fields.items()
@@ -76,6 +78,7 @@ def load(path: Union[str, Path]) -> Graph:
                 target=edata["target"],
                 condition=edata.get("condition"),
                 traverse_hooks=edata.get("traverse_hooks", []),
+                spawns_workflow=edata.get("spawns_workflow"),
             ))
         graph.nodes[nid] = Node(
             id=node_data["id"],
@@ -86,6 +89,7 @@ def load(path: Union[str, Path]) -> Graph:
             exit_hooks=node_data.get("exit_hooks", []),
             template_id=node_data.get("template_id"),
             label=node_data.get("label"),
+            child_workflows=node_data.get("child_workflows", []),
         )
 
     return graph
@@ -108,4 +112,6 @@ def _edge_to_dict(edge: Edge) -> dict:
         d["condition"] = edge.condition
     if edge.traverse_hooks:
         d["traverse_hooks"] = edge.traverse_hooks
+    if edge.spawns_workflow:
+        d["spawns_workflow"] = edge.spawns_workflow
     return d

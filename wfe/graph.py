@@ -33,9 +33,10 @@ class Field:
 class Edge:
     """Conditional connection from one node to another. (REQ-WFE-003)"""
 
-    target: str  # Node ID
+    target: str  # Node ID (may be a symbolic placeholder for subprocess edges)
     condition: Optional[str] = None
     traverse_hooks: list[str] = field(default_factory=list)
+    spawns_workflow: Optional[str] = None  # Workflow definition ID this edge may spawn
 
 
 @dataclass
@@ -48,8 +49,9 @@ class Node:
     prompt: Optional[str] = None
     enter_hooks: list[str] = field(default_factory=list)
     exit_hooks: list[str] = field(default_factory=list)
-    template_id: Optional[str] = None  # Set when instantiated from a template
-    label: Optional[str] = None        # Display label for compiled output
+    template_id: Optional[str] = None   # Set when instantiated from a template
+    label: Optional[str] = None         # Display label for compiled output
+    child_workflows: list[str] = field(default_factory=list)  # Auto-managed; set by hooks
 
 
 class ImmutableGraphError(Exception):
@@ -134,7 +136,7 @@ class Graph:
                     for k, f in node.fields.items()
                 },
                 edges=[
-                    Edge(e.target, e.condition, list(e.traverse_hooks))
+                    Edge(e.target, e.condition, list(e.traverse_hooks), e.spawns_workflow)
                     for e in node.edges
                 ],
                 prompt=node.prompt,
@@ -142,6 +144,7 @@ class Graph:
                 exit_hooks=list(node.exit_hooks),
                 template_id=node.template_id,
                 label=node.label,
+                child_workflows=list(node.child_workflows),
             )
         return copy
 
