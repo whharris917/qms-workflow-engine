@@ -1,0 +1,185 @@
+name: create-cr
+state: committed
+home: define
+nodes:
+  define:
+    id: define
+    label: Change Overview
+    prompt: Fill in all fields describing the change, then advance.
+    fields:
+      title:
+        name: title
+        type: string
+      change_type:
+        name: change_type
+        type: string
+      initiator:
+        name: initiator
+        type: string
+      purpose:
+        name: purpose
+        type: string
+      scope:
+        name: scope
+        type: string
+      current_state:
+        name: current_state
+        type: string
+      proposed_state:
+        name: proposed_state
+        type: string
+      risk_assessment:
+        name: risk_assessment
+        type: string
+    edges:
+    - target: ei-baseline
+  ei-baseline:
+    id: ei-baseline
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: Pre-execution baseline commit
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: false
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: ei-implement
+      condition: outcome==Pass
+    - target: '{var}'
+      condition: outcome==Fail
+      spawns_workflow: var
+  ei-implement:
+    id: ei-implement
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: Implement the change
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: true
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: ei-verify
+      condition: outcome==Pass
+    - target: '{var}'
+      condition: outcome==Fail
+      spawns_workflow: var
+    - target: '{vr}'
+      condition: vr_required==True
+      spawns_workflow: vr
+  ei-verify:
+    id: ei-verify
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: Verify and test the change
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: false
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: ei-commit
+      condition: outcome==Pass
+    - target: '{var}'
+      condition: outcome==Fail
+      spawns_workflow: var
+  ei-commit:
+    id: ei-commit
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: Post-execution commit
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: false
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: done
+      condition: outcome==Pass
+    - target: '{var}'
+      condition: outcome==Fail
+      spawns_workflow: var
+  done:
+    id: done
+    label: Done
