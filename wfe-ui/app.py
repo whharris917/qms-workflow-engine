@@ -1,11 +1,15 @@
 """WFE Web UI — minimal Flask application."""
 
+import json
 from pathlib import Path
 
 import markdown
-from flask import Flask, render_template, abort
+from flask import Flask, render_template, abort, request, redirect, url_for
 
 app = Flask(__name__)
+
+DATA_DIR = Path(__file__).resolve().parent / "data"
+DATA_DIR.mkdir(exist_ok=True)
 
 QUALITY_MANUAL_DIR = Path(__file__).resolve().parent.parent.parent / "Quality-Manual"
 
@@ -107,14 +111,22 @@ def index():
     return render_template("index.html", active_page="home")
 
 
+def _list_crs():
+    """List all CR data files, sorted by ID."""
+    crs = []
+    for p in sorted(DATA_DIR.glob("CR-*.json")):
+        crs.append(json.loads(p.read_text(encoding="utf-8")))
+    return crs
+
+
 @app.route("/qms")
 def qms():
-    return render_template("qms.html", active_page="qms")
+    return render_template("qms.html", active_page="qms", crs=_list_crs())
 
 
 @app.route("/workspace")
 def workspace():
-    return render_template("workspace.html", active_page="workspace")
+    return render_template("workspace.html", active_page="workspace", crs=_list_crs())
 
 
 @app.route("/inbox")
@@ -127,9 +139,124 @@ def initiate():
     return render_template("initiate.html", active_page="home")
 
 
+def _next_cr_number():
+    """Determine the next CR number by scanning existing data files."""
+    existing = sorted(DATA_DIR.glob("CR-*.json"))
+    if not existing:
+        return 1
+    # Extract the highest number from filenames like CR-001.json
+    highest = max(int(p.stem.split("-")[1]) for p in existing)
+    return highest + 1
+
+
+def _load_cr(cr_id):
+    """Load a CR's data from disk. Returns None if not found."""
+    path = DATA_DIR / f"{cr_id}.json"
+    if not path.exists():
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _save_cr(cr_id, data):
+    """Save a CR's data to disk."""
+    path = DATA_DIR / f"{cr_id}.json"
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
 @app.route("/create/cr")
 def create_cr():
-    return render_template("create_cr.html", active_page="home")
+    """Initiation stage — no CR ID yet."""
+    return render_template("create_cr.html", active_page="home", stage="initiation", cr=None)
+
+
+@app.route("/create/cr", methods=["POST"])
+def initiate_cr():
+    """Handle the Initiation form: assign a CR ID and persist initial data."""
+    num = _next_cr_number()
+    cr_id = f"CR-{num:03d}"
+    data = {
+        "id": cr_id,
+        "stage": "definition",
+        "title": request.form.get("title", "").strip(),
+        "affects_code": request.form.get("affects_code") == "on",
+        "affects_submodule": request.form.get("affects_submodule") == "on",
+        "submodule": request.form.get("submodule", ""),
+        "purpose": request.form.get("purpose", "").strip(),
+        # Remaining fields empty until Change Definition stage
+        "scope_context": "",
+        "scope_changes": "",
+        "scope_files": "",
+        "current_state": "",
+        "proposed_state": "",
+        "change_description": "",
+        "justification": "",
+        "impact_files": "",
+        "impact_documents": "",
+        "impact_other": "",
+        "testing_summary": "",
+        "implementation_plan": "",
+        "eis": [],
+        "plan_columns": [],
+        "plan_rows": [],
+    }
+    _save_cr(cr_id, data)
+    return redirect(url_for("edit_cr", cr_id=cr_id))
+
+
+@app.route("/cr/<cr_id>")
+def edit_cr(cr_id):
+    """Change Definition stage — full form, all fields editable."""
+    data = _load_cr(cr_id)
+    if data is None:
+        abort(404)
+    return render_template("create_cr.html", active_page="home", stage="definition", cr=data)
+
+
+@app.route("/cr/<cr_id>/save", methods=["POST"])
+def save_cr(cr_id):
+    """Save all fields for an existing CR."""
+    data = _load_cr(cr_id)
+    if data is None:
+        abort(404)
+    # Update all fields from form
+    for field in [
+        "title", "purpose", "scope_context", "scope_changes", "scope_files",
+        "current_state", "proposed_state", "change_description", "justification",
+        "impact_files", "impact_documents", "impact_other",
+        "testing_summary", "implementation_plan",
+    ]:
+        data[field] = request.form.get(field, "").strip()
+    data["affects_code"] = request.form.get("affects_code") == "on"
+    data["affects_submodule"] = request.form.get("affects_submodule") == "on"
+    data["submodule"] = request.form.get("submodule", "")
+    _save_cr(cr_id, data)
+    return redirect(url_for("edit_cr", cr_id=cr_id))
+
+
+@app.route("/cr/<cr_id>/plan")
+def edit_plan(cr_id):
+    """Implementation Plan editor — dedicated page."""
+    data = _load_cr(cr_id)
+    if data is None:
+        abort(404)
+    # Ensure plan fields exist (for CRs created before this feature)
+    data.setdefault("plan_columns", [])
+    data.setdefault("plan_rows", [])
+    return render_template("edit_plan.html", active_page="home", cr=data)
+
+
+@app.route("/cr/<cr_id>/plan/save", methods=["POST"])
+def save_plan(cr_id):
+    """Save the implementation plan table data."""
+    data = _load_cr(cr_id)
+    if data is None:
+        abort(404)
+    payload = request.get_json()
+    data["plan_columns"] = payload.get("columns", [])
+    data["plan_rows"] = payload.get("rows", [])
+    data["eis"] = data["plan_rows"]  # keep eis in sync for the CR summary
+    _save_cr(cr_id, data)
+    return {"ok": True}
 
 
 @app.route("/manual")

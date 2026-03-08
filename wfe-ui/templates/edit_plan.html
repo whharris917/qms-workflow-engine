@@ -1,0 +1,1085 @@
+{% extends "base.html" %}
+{% block title %}{{ cr.id }} — Implementation Plan - QMS Workflow Engine{% endblock %}
+{% block content %}
+<div class="plan-header">
+    <a href="/cr/{{ cr.id }}" class="back-link">&larr; Back to {{ cr.id }}</a>
+    <h1>Implementation Plan</h1>
+    <p class="plan-subtitle">{{ cr.id }}: {{ cr.title }}</p>
+</div>
+
+<div class="plan-body">
+    <div class="toolbar">
+        <button class="tool-btn" onclick="addRow()" title="Add Row">+ Row</button>
+        <button class="tool-btn" onclick="addColumn()" title="Add Column">+ Column</button>
+        <button class="tool-btn danger" onclick="deleteRow()" title="Delete Row">&minus; Row</button>
+        <button class="tool-btn danger" onclick="deleteColumn()" title="Delete Column">&minus; Column</button>
+        <div class="toolbar-spacer"></div>
+        <button class="tool-btn primary" onclick="savePlan()">Save</button>
+    </div>
+
+    <div class="table-wrap">
+        <table class="ei-table" id="ei-table">
+            <thead>
+                <tr id="header-row"></tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+        </table>
+    </div>
+
+    <p class="table-hint" id="empty-hint">
+        Click <strong>+ Row</strong> and <strong>+ Column</strong> to start building your execution item table.
+        Click any cell to select it — new rows insert below and new columns insert to the right of the selection.
+    </p>
+</div>
+
+<!-- Column type picker (hidden, positioned absolutely when shown) -->
+<div class="type-picker" id="type-picker">
+    <div class="type-picker-group">
+        <div class="type-picker-heading">Non-Executable</div>
+        <button class="type-picker-option" data-type="ne-free-text" onclick="pickType('ne-free-text')">
+            <span class="type-dot ne"></span> Free Text
+        </button>
+        <button class="type-picker-option" data-type="ne-prerequisite" onclick="pickType('ne-prerequisite')">
+            <span class="type-dot ne"></span> Prerequisite
+        </button>
+        <button class="type-picker-action" id="auto-sequential-btn" onclick="autoSequential()" style="display:none;">
+            Auto-Sequential
+        </button>
+    </div>
+    <div class="type-picker-divider"></div>
+    <div class="type-picker-group">
+        <div class="type-picker-heading">Executable</div>
+        <button class="type-picker-option" data-type="ex-free-text" onclick="pickType('ex-free-text')">
+            <span class="type-dot ex"></span> Free Text
+        </button>
+        <button class="type-picker-option" data-type="ex-choice-list" onclick="pickType('ex-choice-list')">
+            <span class="type-dot ex"></span> Choice List
+        </button>
+        <div class="choice-editor" id="choice-editor">
+            <div class="choice-list" id="choice-list"></div>
+            <div class="choice-add-row">
+                <input type="text" id="choice-new-input" class="choice-new-input"
+                       placeholder="Add an option..." onkeydown="choiceInputKey(event)">
+                <button class="choice-add-btn" onclick="addChoice()">+</button>
+            </div>
+        </div>
+        <button class="type-picker-option" data-type="ex-cross-reference" onclick="pickType('ex-cross-reference')">
+            <span class="type-dot ex"></span> Cross Reference
+        </button>
+        <button class="type-picker-option" data-type="ex-signature" onclick="pickType('ex-signature')">
+            <span class="type-dot ex"></span> Signature
+        </button>
+    </div>
+</div>
+
+<!-- Prerequisite picker (positioned absolutely when shown) -->
+<div class="prereq-picker" id="prereq-picker">
+    <div class="prereq-picker-heading">Prerequisites</div>
+    <div class="prereq-picker-list" id="prereq-picker-list"></div>
+</div>
+
+<style>
+    .plan-header { margin-bottom: 1.5rem; }
+    .back-link {
+        display: inline-block;
+        font-size: 0.85rem;
+        color: #2a6bcf;
+        text-decoration: none;
+        margin-bottom: 0.75rem;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .plan-header h1 { margin-bottom: 0.25rem; }
+    .plan-subtitle { font-size: 0.9rem; color: #666; }
+    .plan-body { max-width: 100%; }
+
+    /* Toolbar */
+    .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        margin-bottom: 0.75rem;
+        padding: 0.5rem 0.6rem;
+        background: #f8f9fb;
+        border: 1px solid #e8e8e8;
+        border-radius: 8px;
+    }
+    .toolbar-spacer { flex: 1; }
+    .tool-btn {
+        padding: 0.35rem 0.75rem;
+        border: 1px solid #dde1e6;
+        border-radius: 5px;
+        background: #fff;
+        color: #333;
+        font-size: 0.82rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.12s, border-color 0.12s;
+    }
+    .tool-btn:hover { background: #eef1f5; border-color: #c0c6ce; }
+    .tool-btn.danger { color: #c0392b; }
+    .tool-btn.danger:hover { background: #fdecea; border-color: #e6a9a3; }
+    .tool-btn.primary {
+        background: #2a6bcf;
+        color: #fff;
+        border-color: #2a6bcf;
+    }
+    .tool-btn.primary:hover { background: #1a4a9e; }
+
+    /* Table */
+    .table-wrap {
+        overflow-x: auto;
+        border: 1px solid #dde1e6;
+        border-radius: 8px;
+    }
+    .ei-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+    }
+    .ei-table th, .ei-table td {
+        position: relative;
+        min-width: 140px;
+        border: 1px solid #e8e8e8;
+        padding: 0;
+    }
+    .ei-table th:first-child, .ei-table td:first-child {
+        border-left: none;
+    }
+    .ei-table th:last-child, .ei-table td:last-child {
+        border-right: none;
+    }
+    .ei-table thead tr { border-top: none; }
+    .ei-table tbody tr:last-child td { border-bottom: none; }
+
+    /* Header cells */
+    .ei-table th {
+        background: #f4f6f9;
+        vertical-align: top;
+    }
+    .col-header {
+        padding: 0.4rem 0.5rem 0.35rem;
+    }
+    .col-header input {
+        width: 100%;
+        padding: 0.15rem 0.1rem;
+        border: none;
+        background: transparent;
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #1a1a2e;
+        outline: none;
+    }
+    .col-header input::placeholder { color: #aaa; font-weight: 500; }
+    .col-type-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        margin-top: 0.2rem;
+        padding: 0.1rem 0.35rem;
+        border: none;
+        border-radius: 3px;
+        background: transparent;
+        font-size: 0.7rem;
+        color: #888;
+        cursor: pointer;
+        transition: background 0.1s;
+    }
+    .col-type-btn:hover { background: #e4e8ed; }
+    .col-type-btn .type-dot { margin-right: 0.1rem; }
+
+    /* Type dots */
+    .type-dot {
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+    .type-dot.ne { background: #90a4ae; }
+    .type-dot.ex { background: #2a6bcf; }
+    .type-dot.unset { background: #ccc; }
+
+    /* Body cells */
+    .ei-table td textarea {
+        width: 100%;
+        padding: 0.45rem 0.6rem;
+        border: none;
+        background: transparent;
+        font-size: 0.85rem;
+        font-family: inherit;
+        color: #333;
+        resize: none;
+        outline: none;
+        min-height: 2.2em;
+        overflow: hidden;
+    }
+
+    /* Selection */
+    .ei-table td.selected, .ei-table th.selected {
+        outline: 2px solid #4a9eff;
+        outline-offset: -2px;
+        background: #f0f7ff;
+    }
+    .ei-table tr.row-selected td {
+        background: #f5f9ff;
+    }
+
+    /* Row number gutter */
+    .ei-table .row-num {
+        width: 40px;
+        min-width: 40px;
+        max-width: 40px;
+        text-align: center;
+        color: #aaa;
+        font-size: 0.75rem;
+        font-weight: 600;
+        background: #fafbfc;
+        cursor: pointer;
+        user-select: none;
+        padding: 0.45rem 0;
+        vertical-align: middle;
+    }
+    .ei-table th.row-num {
+        background: #eef0f3;
+    }
+    .ei-table tr.row-selected .row-num {
+        background: #dce8f8;
+        color: #2a6bcf;
+    }
+
+    /* Executable columns — locked during authoring */
+    .ei-table td.col-executable {
+        background: #f0f0f0;
+    }
+    .ei-table td.col-executable textarea {
+        display: none;
+    }
+    .ei-table td.col-executable::after {
+        content: '';
+        display: block;
+        min-height: 2.2em;
+    }
+    .ei-table tr.row-selected td.col-executable {
+        background: #eaeef3;
+    }
+
+    /* Prerequisite cells */
+    .ei-table td.col-prerequisite {
+        cursor: pointer;
+    }
+    .prereq-cell {
+        padding: 0.45rem 0.6rem;
+        font-size: 0.85rem;
+        color: #333;
+        min-height: 2.2em;
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        flex-wrap: wrap;
+    }
+    .prereq-placeholder {
+        color: #bbb;
+        font-style: italic;
+        font-size: 0.82rem;
+    }
+
+    /* Prerequisite picker dropdown */
+    .prereq-picker {
+        display: none;
+        position: absolute;
+        z-index: 100;
+        background: #fff;
+        border: 1px solid #dde1e6;
+        border-radius: 8px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+        padding: 0.4rem 0;
+        min-width: 200px;
+        max-height: 260px;
+        overflow-y: auto;
+    }
+    .prereq-picker.open { display: block; }
+    .prereq-picker-heading {
+        font-size: 0.68rem;
+        font-weight: 600;
+        color: #999;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 0.3rem 0.75rem 0.25rem;
+    }
+    .prereq-picker-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.35rem 0.75rem;
+        cursor: pointer;
+        font-size: 0.82rem;
+        color: #333;
+        transition: background 0.08s;
+    }
+    .prereq-picker-item:hover { background: #f0f4f8; }
+    .prereq-picker-item input[type="checkbox"] {
+        margin: 0;
+        accent-color: #2a6bcf;
+    }
+    .prereq-picker-item .prereq-row-label {
+        font-weight: 600;
+        color: #2a6bcf;
+        min-width: 2.5em;
+    }
+    .prereq-picker-item .prereq-row-desc {
+        color: #666;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .table-hint {
+        color: #999;
+        font-size: 0.82rem;
+        margin-top: 0.75rem;
+        line-height: 1.5;
+    }
+
+    /* Save feedback */
+    .save-flash {
+        display: inline-block;
+        margin-left: 0.5rem;
+        font-size: 0.82rem;
+        color: #4caf50;
+        font-weight: 500;
+        opacity: 1;
+        transition: opacity 0.8s;
+    }
+    .save-flash.fade { opacity: 0; }
+
+    /* Type picker dropdown */
+    .type-picker {
+        display: none;
+        position: absolute;
+        z-index: 100;
+        background: #fff;
+        border: 1px solid #dde1e6;
+        border-radius: 8px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+        padding: 0.4rem 0;
+        min-width: 180px;
+    }
+    .type-picker.open { display: block; }
+    .type-picker-group {
+        padding: 0.2rem 0;
+    }
+    .type-picker-heading {
+        font-size: 0.68rem;
+        font-weight: 600;
+        color: #999;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 0.3rem 0.75rem 0.15rem;
+    }
+    .type-picker-divider {
+        height: 1px;
+        background: #eee;
+        margin: 0.2rem 0;
+    }
+    .type-picker-option {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        width: 100%;
+        padding: 0.4rem 0.75rem;
+        border: none;
+        background: none;
+        font-size: 0.82rem;
+        color: #333;
+        cursor: pointer;
+        text-align: left;
+    }
+    .type-picker-option:hover {
+        background: #f0f4f8;
+    }
+    .type-picker-option.active {
+        background: #e8f0fe;
+        font-weight: 600;
+        color: #1a1a2e;
+    }
+    .type-picker-action {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        padding: 0.35rem 0.75rem 0.35rem 1.75rem;
+        border: none;
+        background: none;
+        font-size: 0.78rem;
+        color: #2a6bcf;
+        cursor: pointer;
+        text-align: left;
+    }
+    .type-picker-action:hover {
+        background: #f0f4f8;
+    }
+
+    /* Choice list editor (inline in type picker) */
+    .choice-editor {
+        display: none;
+        padding: 0.35rem 0.75rem 0.5rem;
+        border-top: 1px solid #f0f0f0;
+        background: #fafbfc;
+    }
+    .choice-editor.open { display: block; }
+    .choice-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        margin-bottom: 0.35rem;
+    }
+    .choice-item {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    .choice-item input {
+        flex: 1;
+        padding: 0.25rem 0.4rem;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-family: inherit;
+        color: #333;
+        outline: none;
+        background: #fff;
+    }
+    .choice-item input:focus {
+        border-color: #4a9eff;
+    }
+    .choice-remove-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        border: none;
+        border-radius: 3px;
+        background: transparent;
+        color: #bbb;
+        font-size: 0.85rem;
+        cursor: pointer;
+        flex-shrink: 0;
+        line-height: 1;
+    }
+    .choice-remove-btn:hover { background: #fdecea; color: #c0392b; }
+    .choice-add-row {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    .choice-new-input {
+        flex: 1;
+        padding: 0.25rem 0.4rem;
+        border: 1px solid #dde1e6;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-family: inherit;
+        color: #333;
+        outline: none;
+        background: #fff;
+    }
+    .choice-new-input:focus { border-color: #4a9eff; }
+    .choice-new-input::placeholder { color: #bbb; }
+    .choice-add-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        border: 1px solid #dde1e6;
+        border-radius: 4px;
+        background: #fff;
+        color: #2a6bcf;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        flex-shrink: 0;
+    }
+    .choice-add-btn:hover { background: #eef1f5; }
+</style>
+
+<script>
+    // --- Column type definitions ---
+    const TYPE_LABELS = {
+        '': 'Set type...',
+        'ne-free-text': 'Free Text',
+        'ne-prerequisite': 'Prerequisite',
+        'non-executable': 'Non-Executable',  // legacy compat
+        'ex-free-text': 'Free Text',
+        'ex-choice-list': 'Choice List',
+        'ex-cross-reference': 'Cross Reference',
+        'ex-signature': 'Signature',
+        // legacy compat
+        'free-text': 'Free Text',
+        'choice-list': 'Choice List',
+        'cross-reference': 'Cross Reference',
+        'signature': 'Signature',
+    };
+    const EXECUTABLE_TYPES = ['ex-free-text', 'ex-choice-list', 'ex-cross-reference', 'ex-signature',
+                              'free-text', 'choice-list', 'cross-reference', 'signature'];
+
+    function typeIsExecutable(t) {
+        return EXECUTABLE_TYPES.includes(t);
+    }
+
+    function isChoiceList(t) {
+        return t === 'ex-choice-list' || t === 'choice-list';
+    }
+
+    function typeDotClass(t) {
+        if (!t) return 'unset';
+        return typeIsExecutable(t) ? 'ex' : 'ne';
+    }
+
+    // --- State ---
+    // columns is now an array of { name, type } objects
+    let columns = {{ cr.plan_columns | tojson }};
+    // Migrate old string-based columns to objects
+    columns = columns.map(c => typeof c === 'string' ? { name: c, type: '' } : c);
+
+    let rows = {{ cr.plan_rows | tojson }};
+    let selectedCell = null;
+    let typePickerCol = null;  // which column index the picker is open for
+    let prereqPickerCell = null;  // { row, col } for open prereq picker
+
+    // --- Render ---
+    function render() {
+        const headerRow = document.getElementById('header-row');
+        const tbody = document.getElementById('table-body');
+        const hint = document.getElementById('empty-hint');
+
+        // Header
+        headerRow.innerHTML = '<th class="row-num"></th>';
+        columns.forEach((col, ci) => {
+            const th = document.createElement('th');
+            th.className = isSelected('header', ci) ? 'selected' : '';
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'col-header';
+
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.value = col.name;
+            inp.placeholder = 'Column ' + (ci + 1);
+            inp.addEventListener('input', () => { columns[ci].name = inp.value; });
+            inp.addEventListener('focus', () => select('header', ci));
+            wrapper.appendChild(inp);
+
+            const typeBtn = document.createElement('button');
+            typeBtn.className = 'col-type-btn';
+            typeBtn.type = 'button';
+            const dot = document.createElement('span');
+            dot.className = 'type-dot ' + typeDotClass(col.type);
+            typeBtn.appendChild(dot);
+            let label = TYPE_LABELS[col.type || ''];
+            if (isChoiceList(col.type) && col.choices && col.choices.length) {
+                label += ' (' + col.choices.length + ')';
+            }
+            typeBtn.appendChild(document.createTextNode(label));
+            typeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openTypePicker(ci, typeBtn);
+            });
+            wrapper.appendChild(typeBtn);
+
+            th.appendChild(wrapper);
+            headerRow.appendChild(th);
+        });
+
+        // Body
+        tbody.innerHTML = '';
+        rows.forEach((row, ri) => {
+            const tr = document.createElement('tr');
+            if (selectedCell && selectedCell.row === ri) tr.className = 'row-selected';
+
+            const numTd = document.createElement('td');
+            numTd.className = 'row-num';
+            numTd.textContent = ri + 1;
+            numTd.addEventListener('click', () => selectRow(ri));
+            tr.appendChild(numTd);
+
+            row.forEach((val, ci) => {
+                const td = document.createElement('td');
+                const colType = columns[ci].type;
+                const isExec = typeIsExecutable(colType);
+                const isPrereq = colType === 'ne-prerequisite';
+                let classes = [];
+                if (isSelected(ri, ci)) classes.push('selected');
+                if (isExec) classes.push('col-executable');
+                if (isPrereq) classes.push('col-prerequisite');
+                td.className = classes.join(' ');
+
+                if (isPrereq) {
+                    const prereqDisplay = document.createElement('div');
+                    prereqDisplay.className = 'prereq-cell';
+                    const deps = parsePrereqs(val);
+                    prereqDisplay.textContent = deps.length > 0
+                        ? deps.map(d => 'EI-' + (d + 1)).join(', ')
+                        : '';
+                    if (deps.length === 0) {
+                        const ph = document.createElement('span');
+                        ph.className = 'prereq-placeholder';
+                        ph.textContent = 'None';
+                        prereqDisplay.appendChild(ph);
+                    }
+                    prereqDisplay.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        select(ri, ci);
+                        openPrereqPicker(ri, ci, td);
+                    });
+                    td.appendChild(prereqDisplay);
+                } else if (!isExec) {
+                    const ta = document.createElement('textarea');
+                    ta.rows = 1;
+                    ta.value = val;
+                    ta.addEventListener('input', () => {
+                        rows[ri][ci] = ta.value;
+                        autoResize(ta);
+                    });
+                    ta.addEventListener('focus', () => select(ri, ci));
+                    td.appendChild(ta);
+                }
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+
+        requestAnimationFrame(() => {
+            tbody.querySelectorAll('textarea').forEach(autoResize);
+        });
+
+        hint.style.display = (columns.length === 0 && rows.length === 0) ? 'block' : 'none';
+    }
+
+    function autoResize(ta) {
+        ta.style.height = 'auto';
+        ta.style.height = ta.scrollHeight + 'px';
+    }
+
+    function isSelected(row, col) {
+        return selectedCell && selectedCell.row === row && selectedCell.col === col;
+    }
+
+    function select(row, col) {
+        selectedCell = { row, col };
+        closeTypePicker();
+        // Don't close prereq picker if clicking within the same prereq cell
+        if (prereqPickerCell && !(prereqPickerCell.row === row && prereqPickerCell.col === col)) {
+            closePrereqPicker();
+        }
+        render();
+        if (row === 'header') {
+            const inputs = document.querySelectorAll('#header-row .col-header input');
+            if (inputs[col]) inputs[col].focus();
+        } else {
+            const trs = document.querySelectorAll('#table-body tr');
+            if (trs[row]) {
+                // col+1 to skip the row-num td
+                const td = trs[row].querySelectorAll('td')[col + 1];
+                if (td) {
+                    const ta = td.querySelector('textarea');
+                    if (ta) ta.focus();
+                }
+            }
+        }
+    }
+
+    function selectRow(ri) {
+        selectedCell = { row: ri, col: 0 };
+        closeTypePicker();
+        render();
+    }
+
+    // --- Type Picker ---
+    function openTypePicker(ci, anchorEl) {
+        if (typePickerCol === ci) {
+            closeTypePicker();
+            return;
+        }
+        typePickerCol = ci;
+        const picker = document.getElementById('type-picker');
+        const rect = anchorEl.getBoundingClientRect();
+
+        picker.style.left = rect.left + 'px';
+        picker.style.top = (rect.bottom + 4) + 'px';
+        picker.classList.add('open');
+
+        // Mark the active type
+        picker.querySelectorAll('.type-picker-option').forEach(opt => {
+            opt.classList.toggle('active', opt.dataset.type === (columns[ci].type || ''));
+        });
+
+        // Show choice editor if current type is choice-list
+        updateChoiceEditor();
+
+        // Show auto-sequential button if column is prerequisite
+        document.getElementById('auto-sequential-btn').style.display =
+            columns[ci].type === 'ne-prerequisite' ? 'flex' : 'none';
+    }
+
+    function closeTypePicker() {
+        typePickerCol = null;
+        document.getElementById('type-picker').classList.remove('open');
+        document.getElementById('choice-editor').classList.remove('open');
+    }
+
+    function pickType(type) {
+        if (typePickerCol !== null) {
+            columns[typePickerCol].type = type;
+            // Initialize choices array if switching to choice-list
+            if (isChoiceList(type) && !columns[typePickerCol].choices) {
+                columns[typePickerCol].choices = [];
+            }
+
+            // Mark the active type
+            const picker = document.getElementById('type-picker');
+            picker.querySelectorAll('.type-picker-option').forEach(opt => {
+                opt.classList.toggle('active', opt.dataset.type === type);
+            });
+
+            updateChoiceEditor();
+
+            // Show/hide auto-sequential button
+            document.getElementById('auto-sequential-btn').style.display =
+                type === 'ne-prerequisite' ? 'flex' : 'none';
+
+            // For choice-list and prerequisite, keep picker open
+            if (isChoiceList(type)) {
+                render();
+                requestAnimationFrame(() => {
+                    document.getElementById('choice-new-input').focus();
+                });
+            } else if (type === 'ne-prerequisite') {
+                render();
+            } else {
+                closeTypePicker();
+                render();
+            }
+        }
+    }
+
+    function updateChoiceEditor() {
+        const editor = document.getElementById('choice-editor');
+        if (typePickerCol === null || columns[typePickerCol].type !== 'choice-list') {
+            editor.classList.remove('open');
+            return;
+        }
+        editor.classList.add('open');
+        renderChoices();
+    }
+
+    function renderChoices() {
+        const list = document.getElementById('choice-list');
+        const col = columns[typePickerCol];
+        if (!col.choices) col.choices = [];
+        list.innerHTML = '';
+        col.choices.forEach((val, i) => {
+            const item = document.createElement('div');
+            item.className = 'choice-item';
+
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.value = val;
+            inp.addEventListener('input', () => { col.choices[i] = inp.value; });
+            inp.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace' && inp.value === '') {
+                    e.preventDefault();
+                    removeChoice(i);
+                }
+            });
+            item.appendChild(inp);
+
+            const rmBtn = document.createElement('button');
+            rmBtn.className = 'choice-remove-btn';
+            rmBtn.innerHTML = '&times;';
+            rmBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeChoice(i);
+            });
+            item.appendChild(rmBtn);
+
+            list.appendChild(item);
+        });
+    }
+
+    function addChoice() {
+        const inp = document.getElementById('choice-new-input');
+        const val = inp.value.trim();
+        if (!val || typePickerCol === null) return;
+        if (!columns[typePickerCol].choices) columns[typePickerCol].choices = [];
+        columns[typePickerCol].choices.push(val);
+        inp.value = '';
+        renderChoices();
+        inp.focus();
+    }
+
+    function removeChoice(idx) {
+        if (typePickerCol === null) return;
+        columns[typePickerCol].choices.splice(idx, 1);
+        renderChoices();
+    }
+
+    function choiceInputKey(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            addChoice();
+        }
+    }
+
+    // --- Auto-Sequential ---
+    function autoSequential() {
+        if (typePickerCol === null) return;
+        const ci = typePickerCol;
+        rows.forEach((row, ri) => {
+            if (ri === 0) {
+                row[ci] = '';  // first row has no prerequisites
+            } else {
+                row[ci] = serializePrereqs([ri - 1]);  // depends on previous row
+            }
+        });
+        closeTypePicker();
+        render();
+    }
+
+    // --- Prerequisite Picker ---
+
+    function parsePrereqs(val) {
+        if (!val) return [];
+        try {
+            const arr = JSON.parse(val);
+            if (Array.isArray(arr)) return arr;
+        } catch(e) {}
+        return [];
+    }
+
+    function serializePrereqs(arr) {
+        return arr.length > 0 ? JSON.stringify(arr) : '';
+    }
+
+    function openPrereqPicker(ri, ci, anchorEl) {
+        // Toggle off if already open for this cell
+        if (prereqPickerCell && prereqPickerCell.row === ri && prereqPickerCell.col === ci) {
+            closePrereqPicker();
+            return;
+        }
+        prereqPickerCell = { row: ri, col: ci };
+        const picker = document.getElementById('prereq-picker');
+        const rect = anchorEl.getBoundingClientRect();
+        picker.style.left = rect.left + 'px';
+        picker.style.top = (rect.bottom + 4) + 'px';
+        picker.classList.add('open');
+        renderPrereqOptions();
+    }
+
+    function closePrereqPicker() {
+        prereqPickerCell = null;
+        document.getElementById('prereq-picker').classList.remove('open');
+    }
+
+    function renderPrereqOptions() {
+        if (!prereqPickerCell) return;
+        const { row: ri, col: ci } = prereqPickerCell;
+        const list = document.getElementById('prereq-picker-list');
+        const current = parsePrereqs(rows[ri][ci]);
+        list.innerHTML = '';
+
+        rows.forEach((row, otherRi) => {
+            if (otherRi === ri) return;  // can't be prerequisite of self
+
+            const item = document.createElement('label');
+            item.className = 'prereq-picker-item';
+
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = current.includes(otherRi);
+            cb.addEventListener('change', () => {
+                let deps = parsePrereqs(rows[ri][ci]);
+                if (cb.checked) {
+                    if (!deps.includes(otherRi)) deps.push(otherRi);
+                    deps.sort((a, b) => a - b);
+                } else {
+                    deps = deps.filter(d => d !== otherRi);
+                }
+                rows[ri][ci] = serializePrereqs(deps);
+                // Update the display in the cell without full re-render
+                const trs = document.querySelectorAll('#table-body tr');
+                if (trs[ri]) {
+                    const prereqCell = trs[ri].querySelectorAll('td')[ci + 1]; // +1 for row-num
+                    if (prereqCell) {
+                        const display = prereqCell.querySelector('.prereq-cell');
+                        if (display) {
+                            const newDeps = parsePrereqs(rows[ri][ci]);
+                            display.innerHTML = '';
+                            if (newDeps.length > 0) {
+                                display.textContent = newDeps.map(d => 'EI-' + (d + 1)).join(', ');
+                            } else {
+                                const ph = document.createElement('span');
+                                ph.className = 'prereq-placeholder';
+                                ph.textContent = 'None';
+                                display.appendChild(ph);
+                            }
+                        }
+                    }
+                }
+            });
+            item.appendChild(cb);
+
+            const label = document.createElement('span');
+            label.className = 'prereq-row-label';
+            label.textContent = 'EI-' + (otherRi + 1);
+            item.appendChild(label);
+
+            // Find the first ne-free-text column to use as description
+            const descColIdx = columns.findIndex(c => c.type === 'ne-free-text');
+            if (descColIdx !== -1 && row[descColIdx]) {
+                const desc = document.createElement('span');
+                desc.className = 'prereq-row-desc';
+                desc.textContent = row[descColIdx].substring(0, 50);
+                item.appendChild(desc);
+            }
+
+            list.appendChild(item);
+        });
+
+        if (rows.length <= 1) {
+            const empty = document.createElement('div');
+            empty.style.cssText = 'padding: 0.5rem 0.75rem; color: #999; font-size: 0.82rem;';
+            empty.textContent = 'Add more rows to set prerequisites.';
+            list.appendChild(empty);
+        }
+    }
+
+    // Close pickers on outside click
+    document.addEventListener('click', (e) => {
+        const typePicker = document.getElementById('type-picker');
+        if (typePickerCol !== null && !typePicker.contains(e.target)) {
+            if (!e.target.closest('.col-type-btn')) {
+                closeTypePicker();
+            }
+        }
+        const prereqPicker = document.getElementById('prereq-picker');
+        if (prereqPickerCell !== null && !prereqPicker.contains(e.target)) {
+            if (!e.target.closest('.prereq-cell')) {
+                closePrereqPicker();
+            }
+        }
+    });
+
+    // --- Actions ---
+    function addColumn() {
+        let insertAt = columns.length;
+        if (selectedCell && typeof selectedCell.col === 'number') {
+            insertAt = selectedCell.col + 1;
+        }
+        columns.splice(insertAt, 0, { name: '', type: '' });
+        rows.forEach(row => row.splice(insertAt, 0, ''));
+        selectedCell = { row: 'header', col: insertAt };
+        render();
+        requestAnimationFrame(() => {
+            const inputs = document.querySelectorAll('#header-row .col-header input');
+            if (inputs[insertAt]) inputs[insertAt].focus();
+        });
+    }
+
+    function addRow() {
+        let insertAt = rows.length;
+        if (selectedCell && typeof selectedCell.row === 'number') {
+            insertAt = selectedCell.row + 1;
+        }
+        if (columns.length === 0) addColumn();
+        rows.splice(insertAt, 0, new Array(columns.length).fill(''));
+        selectedCell = { row: insertAt, col: 0 };
+        render();
+        requestAnimationFrame(() => {
+            const trs = document.querySelectorAll('#table-body tr');
+            if (trs[insertAt]) {
+                const ta = trs[insertAt].querySelector('textarea');
+                if (ta) ta.focus();
+            }
+        });
+    }
+
+    function deleteRow() {
+        if (rows.length === 0) return;
+        let idx = rows.length - 1;
+        if (selectedCell && typeof selectedCell.row === 'number') {
+            idx = selectedCell.row;
+        }
+        rows.splice(idx, 1);
+        if (selectedCell && selectedCell.row === idx) {
+            selectedCell = rows.length > 0
+                ? { row: Math.min(idx, rows.length - 1), col: selectedCell.col }
+                : null;
+        }
+        render();
+    }
+
+    function deleteColumn() {
+        if (columns.length === 0) return;
+        let idx = columns.length - 1;
+        if (selectedCell && typeof selectedCell.col === 'number') {
+            idx = selectedCell.col;
+        }
+        columns.splice(idx, 1);
+        rows.forEach(row => row.splice(idx, 1));
+        if (columns.length === 0) {
+            rows.length = 0;
+            selectedCell = null;
+        } else if (selectedCell) {
+            selectedCell = { row: selectedCell.row, col: Math.min(idx, columns.length - 1) };
+        }
+        render();
+    }
+
+    async function savePlan() {
+        const resp = await fetch('/cr/{{ cr.id }}/plan/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ columns, rows })
+        });
+        if (resp.ok) {
+            const btn = document.querySelector('.tool-btn.primary');
+            let flash = document.querySelector('.save-flash');
+            if (!flash) {
+                flash = document.createElement('span');
+                flash.className = 'save-flash';
+                btn.parentNode.insertBefore(flash, btn.nextSibling);
+            }
+            flash.textContent = 'Saved';
+            flash.classList.remove('fade');
+            setTimeout(() => flash.classList.add('fade'), 1200);
+        }
+    }
+
+    // Keyboard: Tab moves between cells
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeTypePicker();
+            closePrereqPicker();
+            return;
+        }
+        if (e.key === 'Tab' && selectedCell && typeof selectedCell.row === 'number') {
+            e.preventDefault();
+            let { row, col } = selectedCell;
+            if (e.shiftKey) {
+                col--;
+                if (col < 0) { col = columns.length - 1; row--; }
+                if (row < 0) { row = 0; col = 0; }
+            } else {
+                col++;
+                if (col >= columns.length) { col = 0; row++; }
+                if (row >= rows.length) { row = rows.length - 1; col = columns.length - 1; }
+            }
+            select(row, col);
+        }
+    });
+
+    // Initial render
+    render();
+</script>
+{% endblock %}

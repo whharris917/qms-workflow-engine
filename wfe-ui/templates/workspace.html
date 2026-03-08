@@ -2,5 +2,114 @@
 {% block title %}Workspace - QMS Workflow Engine{% endblock %}
 {% block content %}
 <h1>Workspace</h1>
-<p>Your checked-out documents and active workflows will appear here.</p>
+<p class="page-subtitle">Documents you are actively working on.</p>
+
+{% if crs %}
+<div class="workspace-cards">
+    {% for cr in crs %}
+    <a href="/cr/{{ cr.id }}" class="workspace-card">
+        <div class="card-header">
+            <span class="card-id">{{ cr.id }}</span>
+            <span class="stage-tag {{ cr.stage }}">{{ cr.stage | capitalize }}</span>
+        </div>
+        <div class="card-title">{{ cr.title or '(untitled)' }}</div>
+        {% if cr.purpose %}
+        <div class="card-purpose">{{ cr.purpose[:120] }}{{ '...' if cr.purpose|length > 120 else '' }}</div>
+        {% endif %}
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<p class="empty-state">Nothing in your workspace. <a href="/initiate">Initiate a workflow</a> to get started.</p>
+{% endif %}
+
+<style>
+    .page-subtitle {
+        color: #666;
+        font-size: 0.9rem;
+        margin-bottom: 1.5rem;
+    }
+    .workspace-cards {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        max-width: 750px;
+    }
+    .workspace-card {
+        display: block;
+        padding: 1rem 1.25rem;
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        text-decoration: none;
+        color: inherit;
+        transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .workspace-card:hover {
+        border-color: #4a9eff;
+        box-shadow: 0 1px 4px rgba(74, 158, 255, 0.12);
+    }
+    .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.35rem;
+    }
+    .card-id {
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: #2a6bcf;
+    }
+    .card-title {
+        font-size: 0.95rem;
+        font-weight: 500;
+        color: #1a1a2e;
+    }
+    .card-purpose {
+        font-size: 0.82rem;
+        color: #888;
+        margin-top: 0.3rem;
+        line-height: 1.4;
+    }
+    .stage-tag {
+        display: inline-block;
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.78rem;
+        font-weight: 500;
+    }
+    .stage-tag.initiation {
+        background: #e3f2fd;
+        color: #1565c0;
+    }
+    .stage-tag.definition {
+        background: #fff3e0;
+        color: #e65100;
+    }
+    .stage-tag.pre_review, .stage-tag.post_review {
+        background: #f3e5f5;
+        color: #7b1fa2;
+    }
+    .stage-tag.pre_approval, .stage-tag.post_approval {
+        background: #e8f5e9;
+        color: #2e7d32;
+    }
+    .stage-tag.execution {
+        background: #fff8e1;
+        color: #f57f17;
+    }
+    .stage-tag.closure {
+        background: #eceff1;
+        color: #546e7a;
+    }
+    .empty-state {
+        color: #888;
+        font-size: 0.9rem;
+    }
+    .empty-state a {
+        color: #2a6bcf;
+        text-decoration: none;
+    }
+    .empty-state a:hover { text-decoration: underline; }
+</style>
 {% endblock %}

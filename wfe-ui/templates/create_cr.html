@@ -1,12 +1,49 @@
 {% extends "base.html" %}
-{% block title %}Create Change Record - QMS Workflow Engine{% endblock %}
+{% block title %}
+    {% if stage == 'initiation' %}Initiate Change Record{% else %}{{ cr.id }} — Change Definition{% endif %}
+    - QMS Workflow Engine
+{% endblock %}
 {% block content %}
 <div class="cr-header">
     <a href="/initiate" class="back-link">&larr; Back to Initiate Workflow</a>
-    <h1>Create Change Record</h1>
+    {% if stage == 'initiation' %}
+        <h1>Create Change Record</h1>
+    {% else %}
+        <h1>{{ cr.id }}: {{ cr.title }}</h1>
+    {% endif %}
 </div>
 
+<!-- Stage Banner -->
+{% set stages = [
+    ('initiation', 'Initiation'),
+    ('definition', 'Change Definition'),
+    ('pre_review', 'Pre-Review'),
+    ('pre_approval', 'Pre-Approval'),
+    ('execution', 'Execution'),
+    ('post_review', 'Post-Review'),
+    ('post_approval', 'Post-Approval'),
+    ('closure', 'Closure'),
+] %}
+{% set stage_indices = {'initiation': 0, 'definition': 1, 'pre_review': 2, 'pre_approval': 3, 'execution': 4, 'post_review': 5, 'post_approval': 6, 'closure': 7} %}
+{% set current_idx = stage_indices.get(stage, 0) %}
+<div class="stage-banner">
+    {% for key, label in stages %}
+        {% set idx = loop.index0 %}
+        {% if not loop.first %}
+        <div class="stage-connector {{ 'active' if idx <= current_idx else '' }}"></div>
+        {% endif %}
+        <div class="stage-step {{ 'active' if idx == current_idx else ('completed' if idx < current_idx else '') }}">
+            <span class="stage-dot">{% if idx < current_idx %}&#10003;{% else %}{{ loop.index }}{% endif %}</span>
+            <span class="stage-label">{{ label }}</span>
+        </div>
+    {% endfor %}
+</div>
+
+{% if stage == 'initiation' %}
 <form class="cr-form" id="cr-form" method="post" action="/create/cr">
+{% else %}
+<form class="cr-form" id="cr-form" method="post" action="/cr/{{ cr.id }}/save">
+{% endif %}
 
     <!-- Title -->
     <div class="form-section">
@@ -17,7 +54,60 @@
             </span>
         </label>
         <input type="text" id="title" name="title" class="form-input"
-               placeholder="e.g. Redesign workflow engine from first principles" required>
+               placeholder="e.g. Redesign workflow engine from first principles"
+               value="{{ cr.title if cr else '' }}" required>
+    </div>
+
+    <!-- Code Impact Classification -->
+    <div class="form-section">
+        <label class="form-label">
+            Code Impact
+            <span class="form-hint">
+                Does this change affect code (as opposed to documents only)?
+            </span>
+        </label>
+        <div class="toggle-row">
+            <label class="toggle-switch">
+                <input type="checkbox" id="affects_code" name="affects_code"
+                       onchange="toggleCodeImpact()"
+                       {{ 'checked' if cr and cr.affects_code else '' }}>
+                <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label" id="affects_code_label">{{ 'Yes' if cr and cr.affects_code else 'No' }}</span>
+        </div>
+
+        <!-- Controlled submodule? -->
+        <div id="submodule-section" class="conditional-section"
+             style="display:{{ 'block' if cr and cr.affects_code else 'none' }};">
+            <label class="form-sublabel" style="margin-top: 0.75rem;">
+                Does it affect a controlled submodule?
+                <span class="form-hint">Controlled submodules are independently versioned repositories managed under this QMS.</span>
+            </label>
+            <div class="toggle-row">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="affects_submodule" name="affects_submodule"
+                           onchange="toggleSubmodule()"
+                           {{ 'checked' if cr and cr.affects_submodule else '' }}>
+                    <span class="toggle-slider"></span>
+                </label>
+                <span class="toggle-label" id="affects_submodule_label">{{ 'Yes' if cr and cr.affects_submodule else 'No' }}</span>
+            </div>
+
+            <!-- Which submodule? -->
+            <div id="which-submodule-section" class="conditional-section"
+                 style="display:{{ 'block' if cr and cr.affects_submodule else 'none' }};">
+                <label for="submodule" class="form-sublabel" style="margin-top: 0.75rem;">
+                    Which submodule?
+                </label>
+                <select id="submodule" name="submodule" class="form-input" onchange="showSdlcStatus()">
+                    <option value="">Select a submodule...</option>
+                    {% for sm in ['flow-state', 'qms-cli', 'qms-workflow-engine', 'claude-qms', 'Quality-Manual'] %}
+                    <option value="{{ sm }}" {{ 'selected' if cr and cr.submodule == sm else '' }}>{{ sm }}</option>
+                    {% endfor %}
+                </select>
+                <div id="sdlc-indicator" style="display:none; margin-top: 0.6rem;"></div>
+            </div>
+        </div>
     </div>
 
     <!-- Purpose -->
@@ -28,8 +118,11 @@
                 What problem does this CR solve? What improvement does it introduce?
             </span>
         </label>
-        <textarea id="purpose" name="purpose" class="form-textarea" rows="3" required></textarea>
+        <textarea id="purpose" name="purpose" class="form-textarea" rows="3" required>{{ cr.purpose if cr else '' }}</textarea>
     </div>
+
+    {% if stage == 'definition' %}
+    <!-- === Change Definition fields (only shown after initiation) === -->
 
     <!-- Scope -->
     <div class="form-section">
@@ -43,17 +136,17 @@
             <div class="form-subsection">
                 <label for="scope_context" class="form-sublabel">Context</label>
                 <span class="form-hint">Reference to parent document (INV) if applicable, or origin of the change.</span>
-                <textarea id="scope_context" name="scope_context" class="form-textarea" rows="2"></textarea>
+                <textarea id="scope_context" name="scope_context" class="form-textarea" rows="2">{{ cr.scope_context }}</textarea>
             </div>
             <div class="form-subsection">
                 <label for="scope_changes" class="form-sublabel">Changes Summary</label>
                 <span class="form-hint">High-level description of what will change.</span>
-                <textarea id="scope_changes" name="scope_changes" class="form-textarea" rows="2" required></textarea>
+                <textarea id="scope_changes" name="scope_changes" class="form-textarea" rows="2">{{ cr.scope_changes }}</textarea>
             </div>
             <div class="form-subsection">
                 <label for="scope_files" class="form-sublabel">Files Affected</label>
                 <span class="form-hint">List of files/documents to be modified or created.</span>
-                <textarea id="scope_files" name="scope_files" class="form-textarea" rows="2"></textarea>
+                <textarea id="scope_files" name="scope_files" class="form-textarea" rows="2">{{ cr.scope_files }}</textarea>
             </div>
         </div>
     </div>
@@ -66,7 +159,7 @@
                 Concise declarative statement(s) describing what exists now. Use present tense.
             </span>
         </label>
-        <textarea id="current_state" name="current_state" class="form-textarea" rows="3" required></textarea>
+        <textarea id="current_state" name="current_state" class="form-textarea" rows="3">{{ cr.current_state }}</textarea>
     </div>
 
     <!-- Proposed State -->
@@ -77,7 +170,7 @@
                 Concise declarative statement(s) describing what will exist after the change. Use present tense.
             </span>
         </label>
-        <textarea id="proposed_state" name="proposed_state" class="form-textarea" rows="3" required></textarea>
+        <textarea id="proposed_state" name="proposed_state" class="form-textarea" rows="3">{{ cr.proposed_state }}</textarea>
     </div>
 
     <!-- Change Description -->
@@ -90,7 +183,7 @@
                 other explanatory content as needed.
             </span>
         </label>
-        <textarea id="change_description" name="change_description" class="form-textarea" rows="6" required></textarea>
+        <textarea id="change_description" name="change_description" class="form-textarea" rows="6">{{ cr.change_description }}</textarea>
     </div>
 
     <!-- Justification -->
@@ -104,7 +197,7 @@
                 how the proposed solution addresses the root cause.
             </span>
         </label>
-        <textarea id="justification" name="justification" class="form-textarea" rows="4" required></textarea>
+        <textarea id="justification" name="justification" class="form-textarea" rows="4">{{ cr.justification }}</textarea>
     </div>
 
     <!-- Impact Assessment -->
@@ -119,17 +212,17 @@
             <div class="form-subsection">
                 <label for="impact_files" class="form-sublabel">Files Affected</label>
                 <span class="form-hint">Code files, configuration files.</span>
-                <textarea id="impact_files" name="impact_files" class="form-textarea" rows="2"></textarea>
+                <textarea id="impact_files" name="impact_files" class="form-textarea" rows="2">{{ cr.impact_files }}</textarea>
             </div>
             <div class="form-subsection">
                 <label for="impact_documents" class="form-sublabel">Documents Affected</label>
                 <span class="form-hint">SOPs, specifications, other controlled documents.</span>
-                <textarea id="impact_documents" name="impact_documents" class="form-textarea" rows="2"></textarea>
+                <textarea id="impact_documents" name="impact_documents" class="form-textarea" rows="2">{{ cr.impact_documents }}</textarea>
             </div>
             <div class="form-subsection">
                 <label for="impact_other" class="form-sublabel">Other</label>
                 <span class="form-hint">External systems, interfaces, dependencies.</span>
-                <textarea id="impact_other" name="impact_other" class="form-textarea" rows="2"></textarea>
+                <textarea id="impact_other" name="impact_other" class="form-textarea" rows="2">{{ cr.impact_other }}</textarea>
             </div>
         </div>
     </div>
@@ -148,31 +241,42 @@
                 For document-only CRs, a description of procedural verification is sufficient.
             </span>
         </label>
-        <textarea id="testing_summary" name="testing_summary" class="form-textarea" rows="4" required></textarea>
+        <textarea id="testing_summary" name="testing_summary" class="form-textarea" rows="4">{{ cr.testing_summary }}</textarea>
     </div>
 
     <!-- Implementation Plan -->
     <div class="form-section">
-        <label for="implementation_plan" class="form-label">
+        <label class="form-label">
             Implementation Plan
             <span class="form-hint">
-                Detailed plan for executing the change. May include: execution item (EI)
-                table with task descriptions, sequenced steps organized by component or
-                area, and dependencies between tasks.
+                The structured execution plan for this change &mdash; execution items (EIs),
+                prerequisites, dependencies, and verification requirements.
             </span>
         </label>
-        <textarea id="implementation_plan" name="implementation_plan" class="form-textarea" rows="6" required></textarea>
+        {% if cr.eis %}
+        <div class="impl-plan-summary">
+            <span class="impl-plan-count">{{ cr.eis | length }} execution item{{ 's' if cr.eis | length != 1 else '' }}</span>
+            <a href="/cr/{{ cr.id }}/plan" class="btn-secondary">Edit Implementation Plan</a>
+        </div>
+        {% else %}
+        <a href="/cr/{{ cr.id }}/plan" class="btn-secondary">Create Implementation Plan</a>
+        {% endif %}
     </div>
+    {% endif %}
 
     <div class="form-actions">
-        <button type="submit" class="btn-primary">Continue</button>
+        {% if stage == 'initiation' %}
+            <button type="submit" class="btn-primary">Initiate Change Record</button>
+        {% else %}
+            <button type="submit" class="btn-primary">Save</button>
+        {% endif %}
         <a href="/initiate" class="btn-cancel">Cancel</a>
     </div>
 </form>
 
 <style>
     .cr-header {
-        margin-bottom: 1.5rem;
+        margin-bottom: 1rem;
     }
     .back-link {
         display: inline-block;
@@ -183,11 +287,72 @@
     }
     .back-link:hover { text-decoration: underline; }
     .cr-header h1 { margin-bottom: 0.35rem; }
-    .cr-header > p {
-        font-size: 0.9rem;
-        color: #666;
-        line-height: 1.5;
+
+    /* Stage Banner */
+    .stage-banner {
+        display: flex;
+        align-items: center;
+        margin-bottom: 2rem;
+        padding: 0.75rem 1rem;
+        background: #f8f9fb;
+        border-radius: 8px;
+        border: 1px solid #e8e8e8;
+        overflow-x: auto;
     }
+    .stage-step {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.2rem;
+        flex-shrink: 0;
+    }
+    .stage-dot {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        font-size: 0.7rem;
+        font-weight: 600;
+        background: #dde1e6;
+        color: #888;
+    }
+    .stage-label {
+        font-size: 0.68rem;
+        color: #888;
+        font-weight: 500;
+        text-align: center;
+        white-space: nowrap;
+    }
+    .stage-step.active .stage-dot {
+        background: #2a6bcf;
+        color: #fff;
+    }
+    .stage-step.active .stage-label {
+        color: #1a1a2e;
+        font-weight: 600;
+    }
+    .stage-step.completed .stage-dot {
+        background: #4caf50;
+        color: #fff;
+    }
+    .stage-step.completed .stage-label {
+        color: #555;
+    }
+    .stage-connector {
+        flex: 1;
+        height: 2px;
+        background: #dde1e6;
+        margin: 0 0.25rem;
+        min-width: 12px;
+        align-self: center;
+        margin-bottom: 1rem;
+    }
+    .stage-connector.active {
+        background: #4caf50;
+    }
+
     .cr-form {
         max-width: 750px;
     }
@@ -276,5 +441,162 @@
         text-decoration: none;
     }
     .btn-cancel:hover { color: #555; }
+    .btn-secondary {
+        display: inline-block;
+        padding: 0.5rem 1.1rem;
+        background: #fff;
+        color: #2a6bcf;
+        border: 1px solid #2a6bcf;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        text-decoration: none;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+    }
+    .btn-secondary:hover {
+        background: #2a6bcf;
+        color: #fff;
+    }
+    .impl-plan-summary {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    .impl-plan-count {
+        font-size: 0.9rem;
+        color: #555;
+    }
+
+    /* Toggle switch */
+    .toggle-row {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        margin-top: 0.25rem;
+    }
+    .toggle-label {
+        font-size: 0.9rem;
+        color: #555;
+    }
+    .toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 40px;
+        height: 22px;
+        flex-shrink: 0;
+    }
+    .toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: #ccc;
+        border-radius: 22px;
+        transition: background 0.2s;
+    }
+    .toggle-slider::before {
+        content: "";
+        position: absolute;
+        height: 16px;
+        width: 16px;
+        left: 3px;
+        bottom: 3px;
+        background: #fff;
+        border-radius: 50%;
+        transition: transform 0.2s;
+    }
+    .toggle-switch input:checked + .toggle-slider {
+        background: #2a6bcf;
+    }
+    .toggle-switch input:checked + .toggle-slider::before {
+        transform: translateX(18px);
+    }
+
+    /* Conditional sections */
+    .conditional-section {
+        padding-left: 1rem;
+        border-left: 2px solid #e8e8e8;
+        margin-top: 0.5rem;
+    }
+
+    /* SDLC indicator */
+    .sdlc-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.45rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        line-height: 1.4;
+    }
+    .sdlc-badge.governed {
+        background: #fff3cd;
+        border: 1px solid #ffc107;
+        color: #856404;
+    }
+    .sdlc-badge.not-governed {
+        background: #e8f5e9;
+        border: 1px solid #81c784;
+        color: #2e7d32;
+    }
 </style>
+
+<script>
+    const SDLC_SUBMODULES = {
+        'flow-state': true,
+        'qms-cli': true,
+        'qms-workflow-engine': true,
+        'claude-qms': false,
+        'Quality-Manual': false
+    };
+
+    function toggleCodeImpact() {
+        const checked = document.getElementById('affects_code').checked;
+        document.getElementById('affects_code_label').textContent = checked ? 'Yes' : 'No';
+        document.getElementById('submodule-section').style.display = checked ? 'block' : 'none';
+        if (!checked) {
+            document.getElementById('affects_submodule').checked = false;
+            toggleSubmodule();
+        }
+    }
+
+    function toggleSubmodule() {
+        const checked = document.getElementById('affects_submodule').checked;
+        document.getElementById('affects_submodule_label').textContent = checked ? 'Yes' : 'No';
+        document.getElementById('which-submodule-section').style.display = checked ? 'block' : 'none';
+        if (!checked) {
+            document.getElementById('submodule').value = '';
+            document.getElementById('sdlc-indicator').style.display = 'none';
+        }
+    }
+
+    function showSdlcStatus() {
+        const sel = document.getElementById('submodule').value;
+        const indicator = document.getElementById('sdlc-indicator');
+        if (!sel) {
+            indicator.style.display = 'none';
+            return;
+        }
+        const governed = SDLC_SUBMODULES[sel];
+        if (governed) {
+            indicator.innerHTML = '<div class="sdlc-badge governed">This submodule contains an SDLC-governed system. Additional verification requirements apply.</div>';
+        } else {
+            indicator.innerHTML = '<div class="sdlc-badge not-governed">This submodule does not contain an SDLC-governed system.</div>';
+        }
+        indicator.style.display = 'block';
+    }
+
+    // On page load, restore SDLC indicator if a submodule is already selected
+    document.addEventListener('DOMContentLoaded', function() {
+        if (document.getElementById('submodule').value) {
+            showSdlcStatus();
+        }
+    });
+</script>
 {% endblock %}
