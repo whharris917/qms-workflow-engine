@@ -1,0 +1,521 @@
+{% extends "base.html" %}
+{% block title %}Initiate Workflow - QMS Workflow Engine{% endblock %}
+{% block content %}
+<h1>Initiate Workflow</h1>
+
+<div class="section-direct">
+    <h2>Create a Document</h2>
+    <p>For experienced users who already know what they need.</p>
+    <div class="direct-buttons">
+        <a href="/create/cr" class="direct-btn">
+            <span class="direct-btn-label">Change Record</span>
+            <span class="direct-btn-desc">Authorize a change to code, documents, or process</span>
+        </a>
+        <a href="/create/inv" class="direct-btn">
+            <span class="direct-btn-label">Investigation</span>
+            <span class="direct-btn-desc">Analyze a deviation or systemic issue</span>
+        </a>
+        <a href="/create/sop" class="direct-btn">
+            <span class="direct-btn-label">SOP</span>
+            <span class="direct-btn-desc">Define a new standard operating procedure</span>
+        </a>
+        <a href="/create/template" class="direct-btn">
+            <span class="direct-btn-label">Template</span>
+            <span class="direct-btn-desc">Create a new document template</span>
+        </a>
+    </div>
+    <p class="child-doc-note">
+        Don't see the document you need? It is likely a child document (VAR, ADD, VR, ER)
+        and cannot be created directly. Navigate to the parent document's execution
+        instructions or use the help guide below for more information.
+    </p>
+</div>
+
+<div class="section-guide">
+    <div class="tree-container">
+        <div class="breadcrumb" id="breadcrumb"></div>
+        <div class="question-card" id="question-card">
+            <!-- Populated by JS -->
+        </div>
+        <div class="result-card" id="result-card" style="display:none;">
+            <!-- Populated by JS when a leaf is reached -->
+        </div>
+    </div>
+</div>
+
+<style>
+    .section-guide {
+        margin-top: 1.5rem;
+    }
+
+    .section-direct {
+        margin-top: 1.5rem;
+    }
+    .section-direct h2 {
+        font-size: 1.15rem;
+        font-weight: 600;
+        color: #1a1a2e;
+        margin-bottom: 0.35rem;
+    }
+    .section-direct > p {
+        font-size: 0.9rem;
+        color: #666;
+    }
+    .direct-buttons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+        margin-top: 0.75rem;
+    }
+    .direct-btn {
+        display: block;
+        background: #fff;
+        border: 1px solid #dde1e6;
+        border-radius: 6px;
+        padding: 1rem 1.25rem;
+        text-decoration: none;
+        color: #333;
+        transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .direct-btn:hover {
+        border-color: #4a9eff;
+        box-shadow: 0 1px 4px rgba(74, 158, 255, 0.15);
+    }
+    .direct-btn-label {
+        display: block;
+        font-weight: 600;
+        font-size: 1rem;
+        color: #1a1a2e;
+    }
+    .direct-btn-desc {
+        display: block;
+        font-size: 0.82rem;
+        color: #777;
+        margin-top: 0.2rem;
+    }
+    .child-doc-note {
+        margin-top: 1rem;
+        font-size: 0.85rem;
+        color: #888;
+        line-height: 1.5;
+    }
+    .child-doc-note a { color: #2a6bcf; }
+
+    .tree-container {
+        margin-top: 1rem;
+        max-width: 700px;
+    }
+    .breadcrumb {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        margin-bottom: 1rem;
+        font-size: 0.85rem;
+        color: #888;
+        min-height: 1.5em;
+    }
+    .breadcrumb .crumb {
+        cursor: pointer;
+        color: #2a6bcf;
+    }
+    .breadcrumb .crumb:hover { text-decoration: underline; }
+    .breadcrumb .sep { color: #ccc; }
+    .breadcrumb .crumb-current { color: #333; font-weight: 500; }
+
+    .question-card {
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 1.5rem;
+    }
+    .question-card h2 {
+        font-size: 1.15rem;
+        font-weight: 600;
+        color: #1a1a2e;
+        margin-bottom: 0.35rem;
+    }
+    .question-card .hint {
+        font-size: 0.85rem;
+        color: #888;
+        margin-bottom: 1rem;
+        line-height: 1.45;
+    }
+    .options {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .option-btn {
+        display: block;
+        width: 100%;
+        text-align: left;
+        background: #f8f9fb;
+        border: 1px solid #dde1e6;
+        border-radius: 6px;
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+        font-size: 0.95rem;
+        color: #333;
+        transition: background 0.12s, border-color 0.12s;
+    }
+    .option-btn:hover {
+        background: #eef2f8;
+        border-color: #4a9eff;
+    }
+    .option-btn .option-label {
+        font-weight: 500;
+    }
+    .option-btn .option-desc {
+        display: block;
+        font-size: 0.82rem;
+        color: #777;
+        margin-top: 0.2rem;
+    }
+
+    .result-card {
+        background: #f0f7ff;
+        border: 1px solid #b3d4fc;
+        border-radius: 8px;
+        padding: 1.5rem;
+    }
+    .result-card h2 {
+        font-size: 1.15rem;
+        font-weight: 600;
+        color: #1a1a2e;
+        margin-bottom: 0.5rem;
+    }
+    .result-card p {
+        font-size: 0.9rem;
+        line-height: 1.5;
+        margin-bottom: 0.75rem;
+    }
+    .result-card .result-type {
+        display: inline-block;
+        background: #2a6bcf;
+        color: #fff;
+        padding: 0.25rem 0.75rem;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-bottom: 0.75rem;
+    }
+    .result-card .result-refs {
+        font-size: 0.82rem;
+        color: #666;
+    }
+    .result-card .result-refs a {
+        color: #2a6bcf;
+    }
+    .btn-start-over {
+        display: inline-block;
+        margin-top: 1rem;
+        padding: 0.5rem 1rem;
+        background: #fff;
+        border: 1px solid #dde1e6;
+        border-radius: 6px;
+        color: #555;
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: background 0.12s;
+    }
+    .btn-start-over:hover { background: #f5f5f5; }
+</style>
+
+<script>
+const TREE = {
+    id: "root",
+    question: "Not sure where to start?",
+    hint: "Answer a few questions and we'll determine the right document type and template.",
+    options: [
+        {
+            label: "Make a change",
+            desc: "New feature, bug fix, refactor, SOP update, template change, or any modification to controlled content.",
+            next: {
+                id: "change-type",
+                question: "Does this change affect any code?",
+                hint: "Code means source files in a governed repository — not documents, SOPs, or templates.",
+                options: [
+                    {
+                        label: "Yes, it affects code",
+                        next: {
+                            id: "submodule",
+                            question: "Does the code change involve a controlled submodule?",
+                            hint: "Controlled submodules: flow-state, qms-cli, claude-qms, Quality-Manual, qms-workflow-engine.",
+                            options: [
+                                {
+                                    label: "Yes, a controlled submodule",
+                                    next: {
+                                        id: "which-submodule",
+                                        question: "Which submodule?",
+                                        hint: "SDLC-governed submodules (flow-state, qms-cli, qms-workflow-engine) require the full development and review cycle including RS/RTM.",
+                                        options: [
+                                            {
+                                                label: "flow-state",
+                                                desc: "SDLC-governed — full dev + review cycle required.",
+                                                next: { id: "result", type: "cr-sdlc", system: "flow-state" }
+                                            },
+                                            {
+                                                label: "qms-cli",
+                                                desc: "SDLC-governed — full dev + review cycle required.",
+                                                next: { id: "result", type: "cr-sdlc", system: "qms-cli" }
+                                            },
+                                            {
+                                                label: "qms-workflow-engine",
+                                                desc: "SDLC-governed — full dev + review cycle required.",
+                                                next: { id: "result", type: "cr-sdlc", system: "qms-workflow-engine" }
+                                            },
+                                            {
+                                                label: "claude-qms",
+                                                desc: "Not SDLC-governed — code CR without RS/RTM.",
+                                                next: { id: "result", type: "cr-non-sdlc-submodule", system: "claude-qms" }
+                                            },
+                                            {
+                                                label: "Quality-Manual",
+                                                desc: "Not SDLC-governed — code CR without RS/RTM.",
+                                                next: { id: "result", type: "cr-non-sdlc-submodule", system: "Quality-Manual" }
+                                            }
+                                        ]
+                                    }
+                                },
+                                {
+                                    label: "No, code outside submodules",
+                                    desc: "Code changes in the parent repo or uncontrolled directories.",
+                                    next: { id: "result", type: "cr-code-no-submodule" }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        label: "No, documents or process only",
+                        desc: "SOP revisions, template updates, process changes, QMS documents.",
+                        next: { id: "result", type: "cr-non-code" }
+                    }
+                ]
+            }
+        },
+        {
+            label: "Something went wrong",
+            desc: "A step failed, a deviation occurred, or a problem was discovered.",
+            next: {
+                id: "wrong-when",
+                question: "When did you discover the problem?",
+                hint: "",
+                options: [
+                    {
+                        label: "During active execution",
+                        desc: "The parent document is still IN_EXECUTION and a step failed or can't proceed as planned.",
+                        next: {
+                            id: "wrong-test",
+                            question: "Is this a test step failure (TP/TC) or a non-test execution item?",
+                            hint: "",
+                            options: [
+                                {
+                                    label: "Test step failed",
+                                    desc: "A step in a Test Protocol or Test Case produced an unexpected result.",
+                                    next: { id: "result", type: "er" }
+                                },
+                                {
+                                    label: "Non-test EI failed",
+                                    desc: "An execution item in a CR, INV, VAR, or ADD cannot be completed as planned.",
+                                    next: { id: "result", type: "var" }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        label: "After a document was closed",
+                        desc: "The parent document is CLOSED but a gap or error was found afterward.",
+                        next: { id: "result", type: "add" }
+                    },
+                    {
+                        label: "It's systemic or recurring",
+                        desc: "This has happened before, affects multiple documents, or the root cause is unclear.",
+                        next: { id: "result", type: "inv" }
+                    }
+                ]
+            }
+        },
+        {
+            label: "I'm not sure",
+            desc: "I know something needs to happen but I don't know what kind of document to create.",
+            next: {
+                id: "unsure",
+                question: "What's closest to your situation?",
+                hint: "Don't overthink it — pick the closest match. The review process will catch any misclassification.",
+                options: [
+                    {
+                        label: "I want to build or change something",
+                        desc: "Even if it's small — a one-line fix, a config change, a doc update.",
+                        next: { id: "result", type: "cr-non-code" }
+                    },
+                    {
+                        label: "Something broke or didn't go as planned",
+                        desc: "A failure, a mistake, an unexpected result.",
+                        next: { id: "result", type: "var" }
+                    },
+                    {
+                        label: "I need to investigate a pattern or root cause",
+                        desc: "Something keeps going wrong, or a single event needs formal analysis.",
+                        next: { id: "result", type: "inv" }
+                    },
+                    {
+                        label: "I still have no idea",
+                        desc: "That's OK — check the Quality Manual for guidance.",
+                        next: { id: "result", type: "manual-redirect" }
+                    }
+                ]
+            }
+        }
+    ]
+};
+
+const RESULTS = {
+    "cr-sdlc": {
+        badge: "CR (SDLC)",
+        title: "Change Record — SDLC-Governed Submodule",
+        desc: "Full development lifecycle: branch, implement, qualify (CI), update RS and RTM, merge, post-review.",
+        refs: ['<a href="/manual/04-Change-Control">Change Control</a>', '<a href="/manual/09-Code-Governance">Code Governance</a>', '<a href="/manual/10-SDLC">SDLC</a>']
+    },
+    "cr-non-sdlc-submodule": {
+        badge: "CR (Submodule)",
+        title: "Change Record — Non-SDLC Submodule",
+        desc: "Code change in a controlled submodule that doesn't require RS/RTM. Branch, implement, review, merge.",
+        refs: ['<a href="/manual/04-Change-Control">Change Control</a>', '<a href="/manual/09-Code-Governance">Code Governance</a>']
+    },
+    "cr-code-no-submodule": {
+        badge: "CR (Code)",
+        title: "Change Record — Code (No Submodule)",
+        desc: "Code change outside controlled submodules. Standard CR workflow without submodule pointer updates.",
+        refs: ['<a href="/manual/04-Change-Control">Change Control</a>']
+    },
+    "cr-non-code": {
+        badge: "CR (Non-Code)",
+        title: "Change Record — Documents / Process",
+        desc: "SOP revision, template update, process change, or other non-code modification. Check out the target document, revise, check in.",
+        refs: ['<a href="/manual/04-Change-Control">Change Control</a>', '<a href="/manual/types/CR">CR Reference</a>']
+    },
+    "var": {
+        badge: "VAR",
+        title: "Variance Report",
+        desc: "A step in an active document failed or can't proceed as planned. The VAR encapsulates the resolution work. Choose Type 1 (parent waits for full closure) or Type 2 (parent can close after VAR is pre-approved).",
+        refs: ['<a href="/manual/05-Deviation-Management">Deviation Management</a>', '<a href="/manual/types/VAR">VAR Reference</a>']
+    },
+    "er": {
+        badge: "ER",
+        title: "Exception Report",
+        desc: "A test step in a Test Protocol or Test Case failed. The ER re-executes the entire test case from scratch.",
+        refs: ['<a href="/manual/types/ER">ER Reference</a>', '<a href="/manual/07-Child-Documents">Child Documents</a>']
+    },
+    "add": {
+        badge: "ADD",
+        title: "Addendum Report",
+        desc: "A gap or error discovered after the parent document was closed. The parent's closure was legitimate at the time; the ADD supplements it.",
+        refs: ['<a href="/manual/types/ADD">ADD Reference</a>', '<a href="/manual/07-Child-Documents">Child Documents</a>']
+    },
+    "inv": {
+        badge: "INV",
+        title: "Investigation",
+        desc: "Formal root cause analysis for systemic or recurring issues. Contains findings and Corrective/Preventive Actions (CAPAs).",
+        refs: ['<a href="/manual/05-Deviation-Management">Deviation Management</a>', '<a href="/manual/types/INV">INV Reference</a>']
+    },
+    "manual-redirect": {
+        badge: "Help",
+        title: "Check the Quality Manual",
+        desc: 'Start with <a href="/manual/START_HERE">Start Here</a> — it has a decision tree for every situation. Or browse the <a href="/manual/FAQ">FAQ</a>.',
+        refs: []
+    }
+};
+
+let history = [];  // stack of {node, choiceLabel}
+
+function render() {
+    const crumbEl = document.getElementById("breadcrumb");
+    const questionEl = document.getElementById("question-card");
+    const resultEl = document.getElementById("result-card");
+
+    // Current node
+    let node = TREE;
+    for (const entry of history) {
+        const opt = node.options[entry.optionIndex];
+        node = opt.next;
+    }
+
+    // Breadcrumb
+    let crumbHtml = "";
+    if (history.length > 0) {
+        crumbHtml += '<span class="crumb" onclick="goTo(-1)">Start</span>';
+        for (let i = 0; i < history.length; i++) {
+            crumbHtml += '<span class="sep"> &rsaquo; </span>';
+            if (i < history.length - 1) {
+                crumbHtml += `<span class="crumb" onclick="goTo(${i})">${history[i].choiceLabel}</span>`;
+            } else {
+                crumbHtml += `<span class="crumb-current">${history[i].choiceLabel}</span>`;
+            }
+        }
+    }
+    crumbEl.innerHTML = crumbHtml;
+
+    // Result leaf
+    if (node.id === "result") {
+        questionEl.style.display = "none";
+        resultEl.style.display = "block";
+        const r = RESULTS[node.type];
+        let refsHtml = r.refs.length
+            ? '<div class="result-refs">See also: ' + r.refs.join(" &middot; ") + "</div>"
+            : "";
+        resultEl.innerHTML = `
+            <span class="result-type">${r.badge}</span>
+            <h2>${r.title}</h2>
+            <p>${r.desc}</p>
+            ${node.system ? '<p><strong>Target system:</strong> ' + node.system + '</p>' : ''}
+            ${refsHtml}
+            <button class="btn-start-over" onclick="startOver()">Start Over</button>
+        `;
+        return;
+    }
+
+    // Question node
+    questionEl.style.display = "block";
+    resultEl.style.display = "none";
+    let optionsHtml = node.options.map((opt, i) => `
+        <button class="option-btn" onclick="choose(${i})">
+            <span class="option-label">${opt.label}</span>
+            ${opt.desc ? '<span class="option-desc">' + opt.desc + '</span>' : ''}
+        </button>
+    `).join("");
+
+    questionEl.innerHTML = `
+        <h2>${node.question}</h2>
+        ${node.hint ? '<div class="hint">' + node.hint + '</div>' : ''}
+        <div class="options">${optionsHtml}</div>
+    `;
+}
+
+function choose(optionIndex) {
+    let node = TREE;
+    for (const entry of history) {
+        node = node.options[entry.optionIndex].next;
+    }
+    const label = node.options[optionIndex].label;
+    history.push({ optionIndex, choiceLabel: label });
+    render();
+}
+
+function goTo(index) {
+    if (index < 0) {
+        history = [];
+    } else {
+        history = history.slice(0, index + 1);
+    }
+    render();
+}
+
+function startOver() {
+    history = [];
+    render();
+}
+
+// Initial render
+render();
+</script>
+{% endblock %}

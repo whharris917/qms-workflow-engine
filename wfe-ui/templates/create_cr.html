@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+{% block title %}Create Change Record - QMS Workflow Engine{% endblock %}
+{% block content %}
+<div class="cr-header">
+    <a href="/initiate" class="back-link">&larr; Back to Initiate Workflow</a>
+    <h1>Create Change Record</h1>
+</div>
+
+<form class="cr-form" id="cr-form" method="post" action="/create/cr">
+
+    <!-- Title -->
+    <div class="form-section">
+        <label for="title" class="form-label">
+            Document Title
+            <span class="form-hint">
+                A short, descriptive title for this Change Record.
+            </span>
+        </label>
+        <input type="text" id="title" name="title" class="form-input"
+               placeholder="e.g. Redesign workflow engine from first principles" required>
+    </div>
+
+    <!-- Purpose -->
+    <div class="form-section">
+        <label for="purpose" class="form-label">
+            Purpose
+            <span class="form-hint">
+                What problem does this CR solve? What improvement does it introduce?
+            </span>
+        </label>
+        <textarea id="purpose" name="purpose" class="form-textarea" rows="3" required></textarea>
+    </div>
+
+    <!-- Scope -->
+    <div class="form-section">
+        <label for="scope" class="form-label">
+            Scope
+            <span class="form-hint">
+                Brief overview of affected system(s) or functionality. Include:
+            </span>
+        </label>
+        <div class="form-subsections">
+            <div class="form-subsection">
+                <label for="scope_context" class="form-sublabel">Context</label>
+                <span class="form-hint">Reference to parent document (INV) if applicable, or origin of the change.</span>
+                <textarea id="scope_context" name="scope_context" class="form-textarea" rows="2"></textarea>
+            </div>
+            <div class="form-subsection">
+                <label for="scope_changes" class="form-sublabel">Changes Summary</label>
+                <span class="form-hint">High-level description of what will change.</span>
+                <textarea id="scope_changes" name="scope_changes" class="form-textarea" rows="2" required></textarea>
+            </div>
+            <div class="form-subsection">
+                <label for="scope_files" class="form-sublabel">Files Affected</label>
+                <span class="form-hint">List of files/documents to be modified or created.</span>
+                <textarea id="scope_files" name="scope_files" class="form-textarea" rows="2"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Current State -->
+    <div class="form-section">
+        <label for="current_state" class="form-label">
+            Current State
+            <span class="form-hint">
+                Concise declarative statement(s) describing what exists now. Use present tense.
+            </span>
+        </label>
+        <textarea id="current_state" name="current_state" class="form-textarea" rows="3" required></textarea>
+    </div>
+
+    <!-- Proposed State -->
+    <div class="form-section">
+        <label for="proposed_state" class="form-label">
+            Proposed State
+            <span class="form-hint">
+                Concise declarative statement(s) describing what will exist after the change. Use present tense.
+            </span>
+        </label>
+        <textarea id="proposed_state" name="proposed_state" class="form-textarea" rows="3" required></textarea>
+    </div>
+
+    <!-- Change Description -->
+    <div class="form-section">
+        <label for="change_description" class="form-label">
+            Change Description
+            <span class="form-hint">
+                Full technical details of the change. Structure is flexible based on
+                complexity &mdash; may include subsections, diagrams, code snippets, or
+                other explanatory content as needed.
+            </span>
+        </label>
+        <textarea id="change_description" name="change_description" class="form-textarea" rows="6" required></textarea>
+    </div>
+
+    <!-- Justification -->
+    <div class="form-section">
+        <label for="justification" class="form-label">
+            Justification
+            <span class="form-hint">
+                Why is this change needed? Explain:
+                the problem being solved or improvement being made;
+                impact of not making this change;
+                how the proposed solution addresses the root cause.
+            </span>
+        </label>
+        <textarea id="justification" name="justification" class="form-textarea" rows="4" required></textarea>
+    </div>
+
+    <!-- Impact Assessment -->
+    <div class="form-section">
+        <label class="form-label">
+            Impact Assessment
+            <span class="form-hint">
+                Assessment of change impact across domains.
+            </span>
+        </label>
+        <div class="form-subsections">
+            <div class="form-subsection">
+                <label for="impact_files" class="form-sublabel">Files Affected</label>
+                <span class="form-hint">Code files, configuration files.</span>
+                <textarea id="impact_files" name="impact_files" class="form-textarea" rows="2"></textarea>
+            </div>
+            <div class="form-subsection">
+                <label for="impact_documents" class="form-sublabel">Documents Affected</label>
+                <span class="form-hint">SOPs, specifications, other controlled documents.</span>
+                <textarea id="impact_documents" name="impact_documents" class="form-textarea" rows="2"></textarea>
+            </div>
+            <div class="form-subsection">
+                <label for="impact_other" class="form-sublabel">Other</label>
+                <span class="form-hint">External systems, interfaces, dependencies.</span>
+                <textarea id="impact_other" name="impact_other" class="form-textarea" rows="2"></textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- Testing Summary -->
+    <div class="form-section">
+        <label for="testing_summary" class="form-label">
+            Testing Summary
+            <span class="form-hint">
+                Description of how the implementation will be verified. This need not be
+                exhaustive; if QA determines comprehensive testing is required, a separate
+                Test Protocol (TP) will be created.
+                For code changes, address both: (1) automated verification &mdash; unit tests,
+                qualification tests, CI checks; and (2) integration verification &mdash; how changed
+                functionality will be verified behaviorally (flag EIs with VR=Yes as needed).
+                For document-only CRs, a description of procedural verification is sufficient.
+            </span>
+        </label>
+        <textarea id="testing_summary" name="testing_summary" class="form-textarea" rows="4" required></textarea>
+    </div>
+
+    <!-- Implementation Plan -->
+    <div class="form-section">
+        <label for="implementation_plan" class="form-label">
+            Implementation Plan
+            <span class="form-hint">
+                Detailed plan for executing the change. May include: execution item (EI)
+                table with task descriptions, sequenced steps organized by component or
+                area, and dependencies between tasks.
+            </span>
+        </label>
+        <textarea id="implementation_plan" name="implementation_plan" class="form-textarea" rows="6" required></textarea>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn-primary">Continue</button>
+        <a href="/initiate" class="btn-cancel">Cancel</a>
+    </div>
+</form>
+
+<style>
+    .cr-header {
+        margin-bottom: 1.5rem;
+    }
+    .back-link {
+        display: inline-block;
+        font-size: 0.85rem;
+        color: #2a6bcf;
+        text-decoration: none;
+        margin-bottom: 0.75rem;
+    }
+    .back-link:hover { text-decoration: underline; }
+    .cr-header h1 { margin-bottom: 0.35rem; }
+    .cr-header > p {
+        font-size: 0.9rem;
+        color: #666;
+        line-height: 1.5;
+    }
+    .cr-form {
+        max-width: 750px;
+    }
+    .form-section {
+        margin-bottom: 1.75rem;
+    }
+    .form-label {
+        display: block;
+        font-weight: 600;
+        font-size: 1rem;
+        color: #1a1a2e;
+        margin-bottom: 0.4rem;
+    }
+    .form-sublabel {
+        display: block;
+        font-weight: 500;
+        font-size: 0.9rem;
+        color: #333;
+        margin-bottom: 0.15rem;
+    }
+    .form-hint {
+        display: block;
+        font-weight: 400;
+        font-size: 0.82rem;
+        color: #888;
+        margin-top: 0.1rem;
+        margin-bottom: 0.4rem;
+        line-height: 1.45;
+    }
+    .form-subsections {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        margin-top: 0.25rem;
+        padding-left: 1rem;
+        border-left: 2px solid #e8e8e8;
+    }
+    .form-subsection {
+        /* container for sublabel + hint + input */
+    }
+    .form-input, .form-textarea {
+        width: 100%;
+        padding: 0.6rem 0.8rem;
+        border: 1px solid #dde1e6;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-family: inherit;
+        color: #333;
+        background: #fff;
+        transition: border-color 0.15s;
+    }
+    .form-input:focus, .form-textarea:focus {
+        outline: none;
+        border-color: #4a9eff;
+        box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.15);
+    }
+    .form-textarea {
+        resize: vertical;
+        min-height: 60px;
+    }
+
+    .form-actions {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-top: 0.5rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e0e0e0;
+    }
+    .btn-primary {
+        display: inline-block;
+        background: #2a6bcf;
+        color: #fff;
+        padding: 0.6rem 1.5rem;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.95rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+    .btn-primary:hover { background: #1a4a9e; }
+    .btn-cancel {
+        font-size: 0.9rem;
+        color: #888;
+        text-decoration: none;
+    }
+    .btn-cancel:hover { color: #555; }
+</style>
+{% endblock %}

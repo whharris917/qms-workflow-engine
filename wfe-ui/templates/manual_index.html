@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Quality Manual - QMS Workflow Engine{% endblock %}
+{% block content %}
+<h1>Quality Manual</h1>
+<p>The complete QMS reference documentation.</p>
+
+<div class="manual-sections">
+    <div class="manual-group">
+        <h2>Chapters</h2>
+        {% for item in toc if item.category == 'main' %}
+        <a href="{{ url_for('manual_page', slug=item.slug) }}" class="manual-link">{{ item.title }}</a>
+        {% endfor %}
+    </div>
+
+    <div class="manual-group">
+        <h2>Key Documents</h2>
+        {% for item in toc if item.category == 'key' %}
+        <a href="{{ url_for('manual_page', slug=item.slug) }}" class="manual-link">{{ item.title }}</a>
+        {% endfor %}
+    </div>
+
+    <div class="manual-group">
+        <h2>Guides</h2>
+        {% for item in toc if item.category == 'guides' %}
+        <a href="{{ url_for('manual_page', slug=item.slug) }}" class="manual-link">{{ item.title }}</a>
+        {% endfor %}
+    </div>
+
+    <div class="manual-group">
+        <h2>Document Type References</h2>
+        {% for item in toc if item.category == 'types' %}
+        <a href="{{ url_for('manual_page', slug=item.slug) }}" class="manual-link">{{ item.title }}</a>
+        {% endfor %}
+    </div>
+</div>
+
+<style>
+    .manual-sections {
+        margin-top: 1.5rem;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.25rem;
+    }
+    .manual-group {
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 1.25rem;
+    }
+    .manual-group h2 {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #1a1a2e;
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #eee;
+    }
+    .manual-link {
+        display: block;
+        padding: 0.35rem 0;
+        color: #2a6bcf;
+        text-decoration: none;
+        font-size: 0.9rem;
+    }
+    .manual-link:hover {
+        color: #1a4a9e;
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}
