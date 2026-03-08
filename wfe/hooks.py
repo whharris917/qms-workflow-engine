@@ -52,11 +52,18 @@ def register(name: str):
 
 
 def fire(hook_names: list[str], ctx: HookContext) -> HookResult:
-    """Fire a sequence of hooks. Stops at the first blocking hook."""
-    for name in hook_names:
+    """Fire a sequence of hooks. Stops at the first blocking hook.
+
+    Hook names may include colon-separated parameters: "name:p1:p2".
+    Parameters are passed as positional arguments after ctx.
+    """
+    for raw in hook_names:
+        parts = raw.split(":")
+        name = parts[0]
+        params = parts[1:]
         if name not in REGISTRY:
             return HookResult(False, f"Hook '{name}' not registered.")
-        result = REGISTRY[name](ctx)
+        result = REGISTRY[name](ctx, *params)
         if not result.allowed:
             return result
     return HookResult(True)

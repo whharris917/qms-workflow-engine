@@ -1,0 +1,31 @@
+{
+  "controlled_submodules": [
+    "flow-state",
+    "qms-cli",
+    "claude-qms",
+    "Quality-Manual",
+    "qms-workflow-engine"
+  ],
+  "submodule_properties": {
+    "flow-state": {
+      "is_sdlc_governed": true,
+      "cr_type": "cr-sdlc"
+    },
+    "qms-cli": {
+      "is_sdlc_governed": true,
+      "cr_type": "cr-sdlc"
+    },
+    "qms-workflow-engine": {
+      "is_sdlc_governed": true,
+      "cr_type": "cr-sdlc"
+    },
+    "claude-qms": {
+      "is_sdlc_governed": false,
+      "cr_type": "cr-non-sdlc-submodule"
+    },
+    "Quality-Manual": {
+      "is_sdlc_governed": false,
+      "cr_type": "cr-non-sdlc-submodule"
+    }
+  }
+}

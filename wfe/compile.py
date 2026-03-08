@@ -268,6 +268,10 @@ def _render_section(
         val = _fv(node, fname)
         if len(fields_with_values) == 1 and not children:
             lines.append(val)
+        elif f.block:
+            lines.append(f"**{_col(fname)}**")
+            lines.append("")
+            lines.append(val)
         else:
             lines.append(f"**{_col(fname)}:** {val}")
         lines.append("")
@@ -294,6 +298,8 @@ def compile_graph(graph: "Graph") -> str:
 
     for nid in order:
         node = graph.nodes[nid]
+        if node.scaffold:
+            continue  # Scaffold nodes are authoring aids, not document content
         tid = node.template_id
         if tid is None:
             groups.append((None, [node]))

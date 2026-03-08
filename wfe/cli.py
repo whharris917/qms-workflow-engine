@@ -47,11 +47,17 @@ from wfe.render import HELP_TEXT, render_nodes, render_view
 from wfe.session import NavigationError, NoSessionError, Session
 
 
+def _load_builtin_hooks() -> None:
+    """Load built-in hook implementations shipped with the engine."""
+    from wfe import builtin_hooks  # noqa: F401 — registers hooks as side effect
+
+
 def _load_local_hooks() -> None:
     """Auto-load workflow_hooks.py from CWD if present (like pytest's conftest.py).
 
     This registers domain-specific hook implementations without the engine
-    needing to know anything about them.
+    needing to know anything about them. Local hooks may override builtins
+    by re-registering the same name.
     """
     import importlib.util
     from pathlib import Path
@@ -63,6 +69,7 @@ def _load_local_hooks() -> None:
 
 
 def main(args: list[str] | None = None) -> None:
+    _load_builtin_hooks()
     _load_local_hooks()
     args = args or sys.argv[1:]
 

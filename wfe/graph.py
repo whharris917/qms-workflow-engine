@@ -27,6 +27,7 @@ class Field:
     value: Any = None
     writable: bool = True
     parameter: bool = False  # True if this field was a template parameter
+    block: bool = False       # Display hint: render as paragraph body in compiled output
 
 
 @dataclass
@@ -52,6 +53,7 @@ class Node:
     template_id: Optional[str] = None   # Set when instantiated from a template
     label: Optional[str] = None         # Display label for compiled output
     child_workflows: list[str] = field(default_factory=list)  # Auto-managed; set by hooks
+    scaffold: bool = False              # Excluded from compiled output; used only during authoring
 
 
 class ImmutableGraphError(Exception):
@@ -119,6 +121,12 @@ class Graph:
         self._require_draft()
         self.state = GraphState.COMMITTED
 
+    def reopen(self) -> None:
+        """Revert a committed graph to draft for pre-approval revision."""
+        if self.state != GraphState.COMMITTED:
+            raise ValueError("Only committed graphs can be reopened.")
+        self.state = GraphState.DRAFT
+
     def checkout(self) -> "Graph":
         """Produce a draft copy for editing. (REQ-WFE-009)"""
         if self.state != GraphState.COMMITTED:
@@ -132,7 +140,7 @@ class Graph:
             copy.nodes[nid] = Node(
                 id=node.id,
                 fields={
-                    k: Field(f.name, f.type, f.value, f.writable, f.parameter)
+                    k: Field(f.name, f.type, f.value, f.writable, f.parameter, f.block)
                     for k, f in node.fields.items()
                 },
                 edges=[
@@ -145,6 +153,7 @@ class Graph:
                 template_id=node.template_id,
                 label=node.label,
                 child_workflows=list(node.child_workflows),
+                scaffold=node.scaffold,
             )
         return copy
 
@@ -180,13 +189,15 @@ class Graph:
         value: Any = None,
         writable: bool = True,
         parameter: bool = False,
+        block: bool = False,
     ) -> Field:
         """Add a field to a node. (REQ-WFE-014)"""
         self._require_draft()
         node = self._get_node(node_id)
         if name in node.fields:
             raise ValueError(f"Field '{name}' already exists on node '{node_id}'.")
-        f = Field(name=name, type=type, value=value, writable=writable, parameter=parameter)
+        f = Field(name=name, type=type, value=value, writable=writable,
+                  parameter=parameter, block=block)
         node.fields[name] = f
         return f
 

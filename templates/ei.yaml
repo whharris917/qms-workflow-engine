@@ -8,8 +8,8 @@ fields:
   writable: false
 - name: vr_required
   type: bool
-  parameter: true
-  writable: false
+  writable: true
+  default: false
 - name: execution_summary
   type: string
   writable: true

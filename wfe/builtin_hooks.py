@@ -1,16 +1,24 @@
-"""Hook implementations for the workflow engine.
+"""Built-in hook implementations for the workflow engine.
 
-Auto-loaded by the CLI on startup if present in the working directory.
-The engine has no knowledge of what any hook does — it only dispatches by name.
+These hooks are generic engine utilities that ship with the engine itself.
+They are auto-loaded by the CLI before any project-level workflow_hooks.py.
+Local workflow_hooks.py may override any of these by re-registering the same name.
 
-Hook names referenced in workflow YAML must be registered here (or in another
-file that is loaded before the workflow executes).
+Parameterized hooks use colon-separated parameters in YAML:
+    exit_hooks:
+      - validate_field_in_db:system:controlled_submodules
+      - lookup_entity_props:system:submodule_properties
+      - extend_chain:ei:additional_eis
 """
 
 from __future__ import annotations
 
 from wfe.hooks import HookContext, HookResult, register
 
+
+# ---------------------------------------------------------------------------
+# Internal utilities
+# ---------------------------------------------------------------------------
 
 def _fv(node, field_name: str) -> str | None:
     """Read a field's string value, or None if absent/empty."""
@@ -33,6 +41,10 @@ def _parse_hook_list(val) -> list[str]:
         return [h.strip() for h in str(val).splitlines() if h.strip()]
     return []
 
+
+# ---------------------------------------------------------------------------
+# Workflow construction hooks
+# ---------------------------------------------------------------------------
 
 @register("init_target_graph")
 def init_target_graph(ctx: HookContext) -> HookResult:
@@ -72,7 +84,6 @@ def build_node_chain(ctx: HookContext) -> HookResult:
     Template-based (node structure comes from a pre-existing template):
       - template: ei
         task_description: Do the thing
-        vr_required: false
 
     Inline (node structure defined directly in the entry):
       - id: define          # optional logical name; used as ID prefix and for edge references
@@ -152,6 +163,8 @@ def build_node_chain(ctx: HookContext) -> HookResult:
                 created_node.label = str(entry["label"])
             if entry.get("prompt"):
                 created_node.prompt = str(entry["prompt"])
+            if entry.get("scaffold"):
+                created_node.scaffold = _to_bool(entry["scaffold"], False)
             created_node.enter_hooks = _parse_hook_list(entry.get("enter_hooks", []))
             created_node.exit_hooks = _parse_hook_list(entry.get("exit_hooks", []))
             for fi, fspec in enumerate(entry.get("fields") or [], start=1):
@@ -166,6 +179,7 @@ def build_node_chain(ctx: HookContext) -> HookResult:
                     value=fspec.get("value", None),
                     writable=_to_bool(fspec.get("writable", True), True),
                     parameter=_to_bool(fspec.get("parameter", False), False),
+                    block=_to_bool(fspec.get("block", False), False),
                 )
             created.append({"entry": entry, "node": created_node, "logical_id": logical_id, "template": None})
 
@@ -351,48 +365,276 @@ def save_template(ctx: HookContext) -> HookResult:
     return HookResult(True)
 
 
-@register("compile_cr")
-def compile_cr(ctx: HookContext) -> HookResult:
-    """Compile the current graph to a QMS CR markdown document.
+@register("compile_to_file")
+def compile_to_file(ctx: HookContext) -> HookResult:
+    """Compile the current graph to a markdown document.
 
-    Reads:  ctx.workspace['cr_output_path']  (explicit path)
-            ctx.workspace['cr_id']            (derives path: QMS/CR/{cr_id}/{cr_id}.md)
-    Falls back to: QMS/CR/{graph.name}/{graph.name}.md
+    Reads:  ctx.workspace['output_path']  (explicit path)
+    Falls back to: compiled/{graph.name}.md
     """
     from pathlib import Path
     from wfe.compile import compile_graph
 
-    output_path = ctx.workspace.get("cr_output_path")
-    if not output_path:
-        cr_id = ctx.workspace.get("cr_id") or ctx.graph.name
-        output_path = f"QMS/CR/{cr_id}/{cr_id}.md"
-
+    output_path = ctx.workspace.get("output_path") or f"compiled/{ctx.graph.name}.md"
     path = Path(output_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     content = compile_graph(ctx.graph)
     path.write_text(content, encoding="utf-8")
-    print(f"Compiled CR to {path}")
+    print(f"Compiled to {path}")
     return HookResult(True)
 
 
-@register("check_document_approved")
-def check_document_approved(ctx: HookContext) -> HookResult:
-    """Check that a document in the mock database is in APPROVED state.
+# ---------------------------------------------------------------------------
+# Data-driven domain hooks (parameterized)
+# ---------------------------------------------------------------------------
 
-    Reads: ctx.current_node.fields['doc_id']
-    Queries: ctx.db
+@register("validate_field_in_db")
+def validate_field_in_db(ctx: HookContext, field_name: str, db_collection: str) -> HookResult:
+    """Block advance if the named field's value is not in db[db_collection] (list).
+
+    Usage in YAML:
+        exit_hooks:
+          - validate_field_in_db:system:controlled_submodules
     """
     if ctx.db is None:
-        return HookResult(False, "MockDatabase not available.")
+        return HookResult(False, "Database not available.")
 
-    doc_id = _fv(ctx.current_node, "doc_id")
-    if not doc_id:
-        return HookResult(False, "No 'doc_id' field on current node.")
+    value = _fv(ctx.current_node, field_name)
+    if not value or not value.strip():
+        return HookResult(False, f"Fill '{field_name}' before advancing.")
+    value = value.strip()
 
-    state = ctx.db.get(f"{doc_id}.state")
-    if state != "APPROVED":
-        return HookResult(
-            False,
-            f"Document {doc_id} is not APPROVED (current state: {state!r})."
+    collection = ctx.db.get(db_collection)
+    if not isinstance(collection, list):
+        return HookResult(False, f"Database collection '{db_collection}' is not a list.")
+
+    if value not in collection:
+        valid = ", ".join(str(v) for v in collection)
+        return HookResult(False, f"'{value}' is not a valid {field_name}. Valid: {valid}")
+
+    return HookResult(True)
+
+
+@register("lookup_entity_props")
+def lookup_entity_props(ctx: HookContext, field_name: str, db_collection: str) -> HookResult:
+    """Write db[db_collection][field_value] properties into ctx.workspace.
+
+    The collection must be a dict of entity_name -> {prop: val, ...}.
+    All properties are written directly to the workspace.
+
+    Usage in YAML:
+        exit_hooks:
+          - lookup_entity_props:system:submodule_properties
+    """
+    if ctx.db is None:
+        return HookResult(False, "Database not available.")
+
+    value = _fv(ctx.current_node, field_name)
+    if not value or not value.strip():
+        return HookResult(False, f"Fill '{field_name}' before advancing.")
+    value = value.strip()
+
+    collection = ctx.db.get(db_collection)
+    if not isinstance(collection, dict):
+        return HookResult(False, f"Database collection '{db_collection}' is not a dict.")
+
+    if value not in collection:
+        return HookResult(False, f"'{value}' not found in {db_collection}.")
+
+    props = collection[value]
+    if not isinstance(props, dict):
+        return HookResult(False, f"Properties for '{value}' in {db_collection} are not a dict.")
+
+    ctx.workspace.update(props)
+    print(f"Loaded properties for '{value}': {props}")
+    return HookResult(True)
+
+
+@register("set_workspace")
+def set_workspace(ctx: HookContext, key: str, value: str) -> HookResult:
+    """Write a literal string value to ctx.workspace[key].
+
+    Runs on all exits from the node (edge-agnostic). Useful for setting defaults
+    that later hooks on other paths may overwrite. Last write wins.
+
+    Usage in YAML:
+        exit_hooks:
+          - set_workspace:cr_type:cr-non-code
+    """
+    ctx.workspace[key] = value
+    return HookResult(True)
+
+
+@register("pull_from_workspace")
+def pull_from_workspace(ctx: HookContext, key: str) -> HookResult:
+    """Write ctx.workspace[key] into ctx.current_node.fields[key].
+
+    The field must exist on the node. Bypasses the writable check — this is
+    an engine operation, not user input.
+
+    Usage in YAML:
+        enter_hooks:
+          - pull_from_workspace:cr_type
+    """
+    val = ctx.workspace.get(key)
+    if val is None:
+        return HookResult(False, f"Workspace key '{key}' not set.")
+
+    if key not in ctx.current_node.fields:
+        return HookResult(False, f"Field '{key}' not found on node '{ctx.current_node.id}'.")
+
+    ctx.current_node.fields[key].value = val  # bypass writable check (engine operation)
+    return HookResult(True)
+
+
+@register("load_workflow")
+def load_workflow(ctx: HookContext, workspace_key: str = "cr_type") -> HookResult:
+    """Load a workflow template and save a DRAFT copy as a new instance.
+
+    Reads:  ctx.workspace[workspace_key]  — template name (e.g. 'cr-sdlc')
+    Writes: ctx.workspace['generated_cr_path']
+            ctx.workspace['generated_cr_compiled']
+
+    Usage in YAML:
+        exit_hooks:
+          - load_workflow              # uses default key 'cr_type'
+          - load_workflow:my_key       # uses custom workspace key
+    """
+    import uuid
+    from pathlib import Path
+    from wfe.compile import compile_graph
+    from wfe.persistence import load, save
+
+    template_name = ctx.workspace.get(workspace_key)
+    if not template_name:
+        return HookResult(False, f"Workspace key '{workspace_key}' not set.")
+
+    template_path = Path("workflows") / f"{template_name}.yaml"
+    if not template_path.exists():
+        return HookResult(False, f"Workflow template not found: {template_path}")
+
+    graph = load(template_path)
+
+    # Generate unique instance name
+    instance_name = f"{template_name}-{uuid.uuid4().hex[:8]}"
+    graph.name = instance_name
+
+    out_dir = Path("workflows")
+    out_dir.mkdir(exist_ok=True)
+    out_path = out_dir / f"{instance_name}.yaml"
+    save(graph, out_path)
+
+    compiled_dir = Path("compiled")
+    compiled_dir.mkdir(exist_ok=True)
+    compiled_path = compiled_dir / f"{instance_name}.md"
+    compiled_path.write_text(compile_graph(graph), encoding="utf-8")
+
+    ctx.workspace["generated_cr_path"] = str(out_path)
+    ctx.workspace["generated_cr_compiled"] = str(compiled_path)
+    print(f"Created workflow instance: {out_path}")
+    print(f"Compiled to: {compiled_path}")
+    return HookResult(True)
+
+
+@register("extend_chain")
+def extend_chain(ctx: HookContext, template_id: str, items_field: str) -> HookResult:
+    """Instantiate template for each line in current_node.fields[items_field].
+
+    Appends new nodes before the terminal (no-edges) node in the current graph.
+    Idempotent: skips items whose first parameter field value already exists on a node.
+
+    Usage in YAML:
+        exit_hooks:
+          - extend_chain:ei:additional_eis
+    """
+    raw = _fv(ctx.current_node, items_field)
+    if not raw:
+        return HookResult(True)  # Nothing to do
+
+    new_items = [line.strip() for line in raw.splitlines() if line.strip()]
+    if not new_items:
+        return HookResult(True)
+
+    if ctx.templates is None:
+        return HookResult(False, "TemplateLibrary not available.")
+
+    try:
+        tmpl = ctx.templates.get(template_id)
+    except KeyError:
+        return HookResult(False, f"Template '{template_id}' not found.")
+
+    # Find the first parameter field — its name is used for idempotency checking
+    param_specs = [spec for spec in tmpl.field_specs if spec.parameter]
+    if not param_specs:
+        return HookResult(False, f"Template '{template_id}' has no parameter fields.")
+    param_name = param_specs[0].name
+
+    # Find {next} condition from template edge templates
+    next_cond: str | None = None
+    for et in tmpl.edge_templates:
+        if et.to == "{next}":
+            next_cond = et.condition
+            break
+
+    g = ctx.graph
+
+    # Find terminal node: the first node with no outgoing edges at all
+    terminal_id: str | None = None
+    for nid, node in g.nodes.items():
+        if not node.edges:
+            terminal_id = nid
+            break
+    if terminal_id is None:
+        return HookResult(False, "No terminal node found in graph.")
+
+    # Collect existing parameter values for idempotency
+    existing_values: set[str] = set()
+    for node in g.nodes.values():
+        f = node.fields.get(param_name)
+        if f and f.value is not None:
+            existing_values.add(str(f.value))
+
+    # Find the "last" node: the one with a navigation edge to terminal via next_cond
+    last_id: str = terminal_id  # sentinel: will be updated below
+    for nid, node in g.nodes.items():
+        for edge in node.edges:
+            if (
+                edge.target == terminal_id
+                and edge.condition == next_cond
+                and edge.spawns_workflow is None
+            ):
+                last_id = nid
+                break
+
+    from wfe.template import instantiate
+
+    for item in new_items:
+        if item in existing_values:
+            continue  # Idempotent: skip duplicates
+
+        # Instantiate template; {next} resolves to terminal
+        new_node = instantiate(
+            tmpl, g,
+            params={param_name: item},
+            edge_map={"{next}": terminal_id},
+            name_prefix=template_id,
         )
+
+        # Rewire: remove last_id → terminal (next_cond), add last_id → new_node
+        if last_id != terminal_id:
+            last_node = g.nodes[last_id]
+            last_node.edges = [
+                e for e in last_node.edges
+                if not (
+                    e.target == terminal_id
+                    and e.condition == next_cond
+                    and e.spawns_workflow is None
+                )
+            ]
+            g.add_edge(last_id, new_node.id, next_cond)
+
+        last_id = new_node.id
+        existing_values.add(item)
+        print(f"Extended chain with: {item!r}")
+
     return HookResult(True)

@@ -1,185 +1,63 @@
 name: create-cr
 state: committed
-home: define
+home: ask-code
 nodes:
-  define:
-    id: define
-    label: Change Overview
-    prompt: Fill in all fields describing the change, then advance.
+  ask-code:
+    id: ask-code
+    label: Code Impact
+    prompt: "Does this change affect any code? Enter 'yes' or 'no'."
+    exit_hooks:
+    - set_workspace:cr_type:cr-non-code
     fields:
-      title:
-        name: title
-        type: string
-      change_type:
-        name: change_type
-        type: string
-      initiator:
-        name: initiator
-        type: string
-      purpose:
-        name: purpose
-        type: string
-      scope:
-        name: scope
-        type: string
-      current_state:
-        name: current_state
-        type: string
-      proposed_state:
-        name: proposed_state
-        type: string
-      risk_assessment:
-        name: risk_assessment
+      affects_code:
+        name: affects_code
         type: string
     edges:
-    - target: ei-baseline
-  ei-baseline:
-    id: ei-baseline
-    template_id: ei
-    label: Execution Items
-    prompt: Execute this item. Fill all fields, then advance.
+    - target: ask-submodule
+      condition: affects_code==yes
+    - target: generate-cr
+      condition: affects_code==no
+  ask-submodule:
+    id: ask-submodule
+    label: Submodule Involvement
+    prompt: |
+      Do the code changes involve a controlled submodule? Enter 'yes' or 'no'.
+      Controlled submodules: flow-state, qms-cli, claude-qms, Quality-Manual, qms-workflow-engine
+    exit_hooks:
+    - set_workspace:cr_type:cr-code-no-submodule
     fields:
-      task_description:
-        name: task_description
-        type: string
-        value: Pre-execution baseline commit
-        writable: false
-        parameter: true
-      vr_required:
-        name: vr_required
-        type: bool
-        value: false
-        writable: false
-        parameter: true
-      execution_summary:
-        name: execution_summary
-        type: string
-      outcome:
-        name: outcome
-        type: string
-      performed_by:
-        name: performed_by
-        type: string
-      date:
-        name: date
+      involves_submodule:
+        name: involves_submodule
         type: string
     edges:
-    - target: ei-implement
-      condition: outcome==Pass
-    - target: '{var}'
-      condition: outcome==Fail
-      spawns_workflow: var
-  ei-implement:
-    id: ei-implement
-    template_id: ei
-    label: Execution Items
-    prompt: Execute this item. Fill all fields, then advance.
+    - target: select-system
+      condition: involves_submodule==yes
+    - target: generate-cr
+      condition: involves_submodule==no
+  select-system:
+    id: select-system
+    label: Target System
+    prompt: |
+      Which controlled submodule does this change target? Enter the exact name.
+      Controlled submodules: flow-state, qms-cli, claude-qms, Quality-Manual, qms-workflow-engine
+      SDLC-governed (full dev+review cycle required): flow-state, qms-cli, qms-workflow-engine
+    exit_hooks:
+    - validate_field_in_db:system:controlled_submodules
+    - lookup_entity_props:system:submodule_properties
     fields:
-      task_description:
-        name: task_description
-        type: string
-        value: Implement the change
-        writable: false
-        parameter: true
-      vr_required:
-        name: vr_required
-        type: bool
-        value: true
-        writable: false
-        parameter: true
-      execution_summary:
-        name: execution_summary
-        type: string
-      outcome:
-        name: outcome
-        type: string
-      performed_by:
-        name: performed_by
-        type: string
-      date:
-        name: date
+      system:
+        name: system
         type: string
     edges:
-    - target: ei-verify
-      condition: outcome==Pass
-    - target: '{var}'
-      condition: outcome==Fail
-      spawns_workflow: var
-    - target: '{vr}'
-      condition: vr_required==True
-      spawns_workflow: vr
-  ei-verify:
-    id: ei-verify
-    template_id: ei
-    label: Execution Items
-    prompt: Execute this item. Fill all fields, then advance.
-    fields:
-      task_description:
-        name: task_description
-        type: string
-        value: Verify and test the change
-        writable: false
-        parameter: true
-      vr_required:
-        name: vr_required
-        type: bool
-        value: false
-        writable: false
-        parameter: true
-      execution_summary:
-        name: execution_summary
-        type: string
-      outcome:
-        name: outcome
-        type: string
-      performed_by:
-        name: performed_by
-        type: string
-      date:
-        name: date
-        type: string
-    edges:
-    - target: ei-commit
-      condition: outcome==Pass
-    - target: '{var}'
-      condition: outcome==Fail
-      spawns_workflow: var
-  ei-commit:
-    id: ei-commit
-    template_id: ei
-    label: Execution Items
-    prompt: Execute this item. Fill all fields, then advance.
-    fields:
-      task_description:
-        name: task_description
-        type: string
-        value: Post-execution commit
-        writable: false
-        parameter: true
-      vr_required:
-        name: vr_required
-        type: bool
-        value: false
-        writable: false
-        parameter: true
-      execution_summary:
-        name: execution_summary
-        type: string
-      outcome:
-        name: outcome
-        type: string
-      performed_by:
-        name: performed_by
-        type: string
-      date:
-        name: date
-        type: string
+    - target: generate-cr
+  generate-cr:
+    id: generate-cr
+    label: Generate CR
+    prompt: All routing information collected. Advance to generate the CR workflow.
+    exit_hooks:
+    - load_workflow
     edges:
     - target: done
-      condition: outcome==Pass
-    - target: '{var}'
-      condition: outcome==Fail
-      spawns_workflow: var
   done:
     id: done
     label: Done
