@@ -9,12 +9,26 @@
 
 <div class="plan-body">
     <div class="toolbar">
-        <button class="tool-btn" onclick="addRow()" title="Add Row">+ Row</button>
-        <button class="tool-btn" onclick="addColumn()" title="Add Column">+ Column</button>
-        <button class="tool-btn danger" onclick="deleteRow()" title="Delete Row">&minus; Row</button>
-        <button class="tool-btn danger" onclick="deleteColumn()" title="Delete Column">&minus; Column</button>
+        <div id="authoring-tools">
+            <button class="tool-btn" onclick="addRow()" title="Add Row">+ Row</button>
+            <button class="tool-btn" onclick="addColumn()" title="Add Column">+ Column</button>
+            <button class="tool-btn danger" onclick="deleteRow()" title="Delete Row">&minus; Row</button>
+            <button class="tool-btn danger" onclick="deleteColumn()" title="Delete Column">&minus; Column</button>
+            <span class="toolbar-divider"></span>
+            <button class="tool-btn props-btn" id="props-toggle" onclick="toggleProperties()" title="Table Properties">Properties</button>
+        </div>
+        <div id="execution-tools" style="display:none;">
+            <span class="exec-tools-label">Execution Tools</span>
+            <button class="tool-btn exec-tool" id="exec-mark-na" onclick="markNA()" title="Mark selected cell as N/A" disabled>Mark N/A</button>
+            <button class="tool-btn exec-tool issue" id="exec-initiate-issue" onclick="initiateIssue()" title="Initiate a child workflow for this issue" disabled>Initiate Issue</button>
+            <span class="toolbar-divider"></span>
+            <button class="tool-btn exec-tool history-toggle" id="history-toggle" onclick="toggleHistory()" title="Show/hide row execution history">View History</button>
+        </div>
         <div class="toolbar-spacer"></div>
-        <button class="tool-btn primary" onclick="savePlan()">Save</button>
+        <button class="tool-btn primary" onclick="savePlan()" id="save-btn">Save</button>
+        <button class="tool-btn preview-toggle" id="preview-toggle" onclick="togglePreview()">
+            <span id="preview-toggle-label">Preview Execution</span>
+        </button>
     </div>
 
     <div class="table-wrap">
@@ -70,12 +84,39 @@
             <span class="type-dot ex"></span> Signature
         </button>
     </div>
+    <div class="type-picker-divider"></div>
+    <div class="type-picker-group">
+        <div class="type-picker-heading">Auto-Executed</div>
+        <button class="type-picker-option" data-type="ae-acceptance-criteria" onclick="pickType('ae-acceptance-criteria')">
+            <span class="type-dot ae"></span> Acceptance Criteria
+        </button>
+        <div class="rule-editor" id="rule-editor">
+            <div class="rule-editor-heading">Evaluation Rule</div>
+            <div class="rule-editor-body" id="rule-editor-body"></div>
+        </div>
+    </div>
 </div>
 
 <!-- Prerequisite picker (positioned absolutely when shown) -->
 <div class="prereq-picker" id="prereq-picker">
     <div class="prereq-picker-heading">Prerequisites</div>
     <div class="prereq-picker-list" id="prereq-picker-list"></div>
+</div>
+
+<!-- Table Properties panel -->
+<div class="props-panel" id="props-panel">
+    <div class="props-heading">Table Properties</div>
+    <label class="props-toggle-row" id="prop-sequential">
+        <input type="checkbox" id="prop-sequential-cb" onchange="onPropChange()">
+        <div class="props-toggle-text">
+            <span class="props-toggle-label">Sequential Column Execution</span>
+            <span class="props-toggle-desc">
+                Executable columns must be completed left-to-right within each row.
+                If an upstream value is changed, all downstream executable cells in
+                that row revert to their default values.
+            </span>
+        </div>
+    </label>
 </div>
 
 <style>
@@ -124,6 +165,54 @@
         border-color: #2a6bcf;
     }
     .tool-btn.primary:hover { background: #1a4a9e; }
+    .tool-btn.preview-toggle {
+        background: #f3ecf7;
+        color: #7b1fa2;
+        border-color: #d1c4e9;
+    }
+    .tool-btn.preview-toggle:hover { background: #ece0f3; }
+    .tool-btn.preview-toggle.active {
+        background: #7b1fa2;
+        color: #fff;
+        border-color: #7b1fa2;
+    }
+    .tool-btn.preview-toggle.active:hover { background: #6a1b9a; }
+    #authoring-tools, #execution-tools {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+    .exec-tools-label {
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: #999;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        margin-right: 0.2rem;
+    }
+    .tool-btn.exec-tool {
+        background: #fff;
+        color: #333;
+    }
+    .tool-btn.exec-tool:disabled {
+        opacity: 0.4;
+        cursor: default;
+    }
+    .tool-btn.exec-tool:disabled:hover {
+        background: #fff;
+        border-color: #dde1e6;
+    }
+    .tool-btn.exec-tool.issue {
+        color: #e65100;
+        border-color: #ffcc80;
+    }
+    .tool-btn.exec-tool.issue:hover:not(:disabled) {
+        background: #fff3e0;
+        border-color: #ffb74d;
+    }
+    .tool-btn.exec-tool.issue:disabled {
+        color: #e65100;
+    }
 
     /* Table */
     .table-wrap {
@@ -197,6 +286,7 @@
     }
     .type-dot.ne { background: #90a4ae; }
     .type-dot.ex { background: #2a6bcf; }
+    .type-dot.ae { background: #7b1fa2; }
     .type-dot.unset { background: #ccc; }
 
     /* Body cells */
@@ -226,9 +316,9 @@
 
     /* Row number gutter */
     .ei-table .row-num {
-        width: 40px;
-        min-width: 40px;
-        max-width: 40px;
+        width: 110px;
+        min-width: 110px;
+        max-width: 110px;
         text-align: center;
         color: #aaa;
         font-size: 0.75rem;
@@ -263,6 +353,202 @@
         background: #eaeef3;
     }
 
+    /* Auto-executed columns — locked, distinct from manual executable */
+    .ei-table td.col-auto-executed {
+        background: #f3ecf7;
+    }
+    .ei-table td.col-auto-executed textarea {
+        display: none;
+    }
+    .ei-table td.col-auto-executed::after {
+        content: '';
+        display: block;
+        min-height: 2.2em;
+    }
+    .ei-table tr.row-selected td.col-auto-executed {
+        background: #ece0f3;
+    }
+
+    /* Preview mode */
+    .preview-mode .ei-table th {
+        background: #e8edf3;
+    }
+    .preview-mode .ei-table td.col-executable {
+        background: #fff;
+        cursor: text;
+    }
+    .preview-mode .ei-table td.col-executable textarea {
+        display: block;
+    }
+    .preview-mode .ei-table td.col-executable::after {
+        display: none;
+    }
+    .preview-mode .ei-table td.col-executable.exec-choice select {
+        width: 100%;
+        padding: 0.4rem 0.5rem;
+        border: none;
+        background: transparent;
+        font-size: 0.85rem;
+        font-family: inherit;
+        color: #333;
+        outline: none;
+        cursor: pointer;
+    }
+    .preview-mode .ei-table td.col-executable.exec-signature {
+        cursor: pointer;
+    }
+    .preview-mode .ei-table td.col-executable.exec-signature .sig-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.4rem 0.6rem;
+        color: #2a6bcf;
+        font-size: 0.82rem;
+        cursor: pointer;
+        background: none;
+        border: none;
+        font-family: inherit;
+    }
+    .preview-mode .ei-table td.col-executable.exec-signature .sig-btn:hover {
+        text-decoration: underline;
+    }
+    .preview-mode .ei-table td.col-executable.exec-signed {
+        background: #e8f5e9;
+    }
+    .preview-mode .ei-table td.col-executable.exec-signed .sig-display {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.82rem;
+        color: #2e7d32;
+    }
+
+    /* Acceptance criteria in preview */
+    .preview-mode .ei-table td.col-auto-executed {
+        text-align: center;
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+    .preview-mode .ei-table td.col-auto-executed.ac-pass {
+        background: #e8f5e9;
+        color: #2e7d32;
+    }
+    .preview-mode .ei-table td.col-auto-executed.ac-fail {
+        background: #fff;
+        color: #bbb;
+    }
+
+    /* Cross-reference cell states in preview */
+    .preview-mode .ei-table td.col-executable .ref-cell {
+        padding: 0.45rem 0.6rem;
+        font-size: 0.85rem;
+        min-height: 2.2em;
+        cursor: pointer;
+    }
+    .preview-mode .ei-table td.col-executable .ref-cell.ref-empty {
+        color: #bbb;
+        font-style: italic;
+    }
+    .preview-mode .ei-table td.col-executable .ref-cell.ref-na {
+        color: #90a4ae;
+        font-weight: 500;
+    }
+    .preview-mode .ei-table td.col-executable .ref-cell.ref-linked {
+        color: #e65100;
+        font-weight: 500;
+    }
+    .preview-mode .ei-table td.col-executable.exec-selected-ref {
+        outline: 2px solid #4a9eff;
+        outline-offset: -2px;
+    }
+
+    /* History toggle button */
+    .tool-btn.history-toggle {
+        color: #37474f;
+        border-color: #b0bec5;
+    }
+    .tool-btn.history-toggle:hover {
+        background: #eceff1;
+    }
+    .tool-btn.history-toggle.active {
+        background: #37474f;
+        color: #fff;
+        border-color: #37474f;
+    }
+    .tool-btn.history-toggle.active:hover {
+        background: #263238;
+    }
+
+    /* History rows */
+    .preview-mode .ei-table tr.history-row td {
+        background: #f8faff;
+        border-top: 1px dashed #c5d5ea;
+    }
+    .preview-mode .ei-table tr.history-row td.history-cell {
+        padding: 0.35rem 0.6rem;
+    }
+    .preview-mode .ei-table tr.history-row .history-cell-value {
+        font-size: 0.8rem;
+        color: #1565c0;
+        font-style: italic;
+    }
+    .preview-mode .ei-table tr.history-row td.row-num {
+        color: #90a4ae;
+        font-size: 0.7rem;
+        font-style: italic;
+    }
+
+    /* Timestamp column */
+    .history-ts-header {
+        min-width: 180px;
+        width: 180px;
+        padding: 0.5rem 0.6rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #607d8b;
+        background: #eceff1 !important;
+        text-align: center;
+    }
+    .history-ts-cell {
+        min-width: 180px;
+        width: 180px;
+        font-size: 0.75rem;
+        color: #607d8b;
+        text-align: center;
+        padding: 0.35rem 0.5rem;
+        white-space: nowrap;
+    }
+    .history-ts-live {
+        font-weight: 600;
+        color: #2e7d32;
+        font-style: normal;
+        background: #f1f8e9;
+    }
+
+    /* Sequential lock in preview */
+    .preview-mode .ei-table td.seq-locked {
+        background: #f7f7f7;
+    }
+    .preview-mode .ei-table td.seq-locked textarea,
+    .preview-mode .ei-table td.seq-locked select,
+    .preview-mode .ei-table td.seq-locked .sig-btn,
+    .preview-mode .ei-table td.seq-locked .ref-cell {
+        pointer-events: none;
+        opacity: 0.35;
+    }
+
+    /* Row gating in preview */
+    .preview-mode .ei-table tr.row-gated td {
+        opacity: 0.45;
+    }
+    .preview-mode .ei-table tr.row-gated td.row-num {
+        opacity: 1;
+        color: #ccc;
+    }
+    .preview-mode .ei-table tr.row-gated td.col-executable textarea,
+    .preview-mode .ei-table tr.row-gated td.col-executable select,
+    .preview-mode .ei-table tr.row-gated td.col-executable .sig-btn {
+        pointer-events: none;
+    }
+
     /* Prerequisite cells */
     .ei-table td.col-prerequisite {
         cursor: pointer;
@@ -277,10 +563,8 @@
         gap: 0.3rem;
         flex-wrap: wrap;
     }
-    .prereq-placeholder {
-        color: #bbb;
-        font-style: italic;
-        font-size: 0.82rem;
+    .prereq-cell.prereq-na {
+        color: #90a4ae;
     }
 
     /* Prerequisite picker dropdown */
@@ -501,6 +785,178 @@
         flex-shrink: 0;
     }
     .choice-add-btn:hover { background: #eef1f5; }
+
+    /* Rule editor (boolean expression builder) */
+    .rule-editor {
+        display: none;
+        padding: 0.5rem 0.6rem;
+        border-top: 1px solid #f0f0f0;
+        background: #fafbfc;
+    }
+    .rule-editor.open { display: block; }
+    .rule-editor-heading {
+        font-size: 0.68rem;
+        font-weight: 600;
+        color: #7b1fa2;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-bottom: 0.4rem;
+    }
+
+    /* Rule group (AND/OR container) */
+    .rule-group {
+        border-left: 2px solid #d1c4e9;
+        padding-left: 0.5rem;
+        margin-bottom: 0.25rem;
+    }
+    .rule-group-header {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        margin-bottom: 0.3rem;
+    }
+    .rule-op-select {
+        padding: 0.15rem 0.3rem;
+        border: 1px solid #d1c4e9;
+        border-radius: 4px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #7b1fa2;
+        background: #f3ecf7;
+        cursor: pointer;
+        outline: none;
+    }
+    .rule-group-actions {
+        display: flex;
+        gap: 0.25rem;
+        margin-top: 0.3rem;
+    }
+    .rule-add-btn {
+        padding: 0.15rem 0.4rem;
+        border: 1px solid #dde1e6;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        background: #fff;
+        color: #555;
+        cursor: pointer;
+    }
+    .rule-add-btn:hover { background: #f0f4f8; }
+    .rule-add-btn.group { color: #7b1fa2; border-color: #d1c4e9; }
+    .rule-add-btn.group:hover { background: #f3ecf7; }
+
+    /* Rule condition row */
+    .rule-condition {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        margin-bottom: 0.25rem;
+        flex-wrap: wrap;
+    }
+    .rule-condition select, .rule-condition input {
+        padding: 0.2rem 0.35rem;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        font-size: 0.76rem;
+        font-family: inherit;
+        color: #333;
+        background: #fff;
+        outline: none;
+    }
+    .rule-condition select:focus, .rule-condition input:focus {
+        border-color: #7b1fa2;
+    }
+    .rule-condition .cond-col-select { min-width: 90px; }
+    .rule-condition .cond-op-select { min-width: 70px; }
+    .rule-condition .cond-val-select, .rule-condition .cond-val-input {
+        min-width: 80px;
+    }
+    .rule-remove-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        border: none;
+        border-radius: 3px;
+        background: transparent;
+        color: #bbb;
+        font-size: 0.8rem;
+        cursor: pointer;
+        flex-shrink: 0;
+        line-height: 1;
+    }
+    .rule-remove-btn:hover { background: #fdecea; color: #c0392b; }
+
+    /* Toolbar divider */
+    .toolbar-divider {
+        display: inline-block;
+        width: 1px;
+        height: 1.2rem;
+        background: #dde1e6;
+        margin: 0 0.15rem;
+    }
+
+    /* Properties button */
+    .tool-btn.props-btn {
+        color: #555;
+    }
+    .tool-btn.props-btn.active {
+        background: #e8edf3;
+        border-color: #b0bec5;
+        color: #1a1a2e;
+    }
+
+    /* Properties panel */
+    .props-panel {
+        display: none;
+        position: absolute;
+        z-index: 100;
+        background: #fff;
+        border: 1px solid #dde1e6;
+        border-radius: 8px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+        padding: 0.6rem 0;
+        min-width: 320px;
+        max-width: 400px;
+    }
+    .props-panel.open { display: block; }
+    .props-heading {
+        font-size: 0.68rem;
+        font-weight: 600;
+        color: #999;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 0.2rem 0.75rem 0.4rem;
+    }
+    .props-toggle-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.5rem;
+        padding: 0.45rem 0.75rem;
+        cursor: pointer;
+        transition: background 0.08s;
+    }
+    .props-toggle-row:hover { background: #f5f7fa; }
+    .props-toggle-row input[type="checkbox"] {
+        margin-top: 0.15rem;
+        accent-color: #2a6bcf;
+        flex-shrink: 0;
+    }
+    .props-toggle-text {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+    }
+    .props-toggle-label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #1a1a2e;
+    }
+    .props-toggle-desc {
+        font-size: 0.76rem;
+        color: #777;
+        line-height: 1.4;
+    }
 </style>
 
 <script>
@@ -514,6 +970,7 @@
         'ex-choice-list': 'Choice List',
         'ex-cross-reference': 'Cross Reference',
         'ex-signature': 'Signature',
+        'ae-acceptance-criteria': 'Acceptance Criteria',
         // legacy compat
         'free-text': 'Free Text',
         'choice-list': 'Choice List',
@@ -522,9 +979,14 @@
     };
     const EXECUTABLE_TYPES = ['ex-free-text', 'ex-choice-list', 'ex-cross-reference', 'ex-signature',
                               'free-text', 'choice-list', 'cross-reference', 'signature'];
+    const AUTO_EXECUTED_TYPES = ['ae-acceptance-criteria'];
 
     function typeIsExecutable(t) {
         return EXECUTABLE_TYPES.includes(t);
+    }
+
+    function typeIsAutoExecuted(t) {
+        return AUTO_EXECUTED_TYPES.includes(t);
     }
 
     function isChoiceList(t) {
@@ -533,11 +995,14 @@
 
     function typeDotClass(t) {
         if (!t) return 'unset';
-        return typeIsExecutable(t) ? 'ex' : 'ne';
+        if (typeIsAutoExecuted(t)) return 'ae';
+        if (typeIsExecutable(t)) return 'ex';
+        return 'ne';
     }
 
     // --- State ---
     // columns is now an array of { name, type } objects
+    const crId = {{ cr.id | tojson }};
     let columns = {{ cr.plan_columns | tojson }};
     // Migrate old string-based columns to objects
     columns = columns.map(c => typeof c === 'string' ? { name: c, type: '' } : c);
@@ -546,114 +1011,149 @@
     let selectedCell = null;
     let typePickerCol = null;  // which column index the picker is open for
     let prereqPickerCell = null;  // { row, col } for open prereq picker
+    let tableProperties = {{ (cr.table_properties or {}) | tojson }};
+    // Defaults for any missing properties
+    if (tableProperties.sequentialExecution === undefined) tableProperties.sequentialExecution = false;
+
+    let previewMode = false;
+    let previewData = [];  // simulated execution data (same shape as rows)
+    let previewHistory = [];  // per-row audit trail: previewHistory[ri] = [{ values: [...], timestamp: '...' }, ...]
+    let historyMode = false;  // whether history rows are visible in preview
+    let dirtyRows = new Set();  // rows with unsnapshot free-text edits
+    let previewSelection = null;  // { row, col } — selected cell in preview mode
 
     // --- Render ---
+    let _rendering = false;  // guard against blur events fired during DOM rebuild
     function render() {
+        _rendering = true;
         const headerRow = document.getElementById('header-row');
         const tbody = document.getElementById('table-body');
         const hint = document.getElementById('empty-hint');
 
         // Header
-        headerRow.innerHTML = '<th class="row-num"></th>';
+        headerRow.innerHTML = '<th class="row-num">ID</th>';
         columns.forEach((col, ci) => {
             const th = document.createElement('th');
             th.className = isSelected('header', ci) ? 'selected' : '';
 
-            const wrapper = document.createElement('div');
-            wrapper.className = 'col-header';
+            if (previewMode) {
+                // Read-only header in preview
+                th.style.padding = '0.5rem 0.6rem';
+                th.style.fontSize = '0.82rem';
+                th.style.fontWeight = '600';
+                th.style.color = '#1a1a2e';
+                th.textContent = col.name || ('Column ' + (ci + 1));
+            } else {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'col-header';
 
-            const inp = document.createElement('input');
-            inp.type = 'text';
-            inp.value = col.name;
-            inp.placeholder = 'Column ' + (ci + 1);
-            inp.addEventListener('input', () => { columns[ci].name = inp.value; });
-            inp.addEventListener('focus', () => select('header', ci));
-            wrapper.appendChild(inp);
+                const inp = document.createElement('input');
+                inp.type = 'text';
+                inp.value = col.name;
+                inp.placeholder = 'Column ' + (ci + 1);
+                inp.addEventListener('input', () => { columns[ci].name = inp.value; });
+                inp.addEventListener('focus', () => select('header', ci));
+                wrapper.appendChild(inp);
 
-            const typeBtn = document.createElement('button');
-            typeBtn.className = 'col-type-btn';
-            typeBtn.type = 'button';
-            const dot = document.createElement('span');
-            dot.className = 'type-dot ' + typeDotClass(col.type);
-            typeBtn.appendChild(dot);
-            let label = TYPE_LABELS[col.type || ''];
-            if (isChoiceList(col.type) && col.choices && col.choices.length) {
-                label += ' (' + col.choices.length + ')';
+                const typeBtn = document.createElement('button');
+                typeBtn.className = 'col-type-btn';
+                typeBtn.type = 'button';
+                const dot = document.createElement('span');
+                dot.className = 'type-dot ' + typeDotClass(col.type);
+                typeBtn.appendChild(dot);
+                let label = TYPE_LABELS[col.type || ''];
+                if (isChoiceList(col.type) && col.choices && col.choices.length) {
+                    label += ' (' + col.choices.length + ')';
+                }
+                typeBtn.appendChild(document.createTextNode(label));
+                typeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openTypePicker(ci, typeBtn);
+                });
+                wrapper.appendChild(typeBtn);
+
+                th.appendChild(wrapper);
             }
-            typeBtn.appendChild(document.createTextNode(label));
-            typeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                openTypePicker(ci, typeBtn);
-            });
-            wrapper.appendChild(typeBtn);
-
-            th.appendChild(wrapper);
             headerRow.appendChild(th);
         });
 
+        // Timestamp column header (only in history mode)
+        if (previewMode && historyMode) {
+            const tsTh = document.createElement('th');
+            tsTh.className = 'history-ts-header';
+            tsTh.textContent = 'Timestamp';
+            headerRow.appendChild(tsTh);
+        }
+
         // Body
         tbody.innerHTML = '';
-        rows.forEach((row, ri) => {
-            const tr = document.createElement('tr');
-            if (selectedCell && selectedCell.row === ri) tr.className = 'row-selected';
+        if (previewMode) {
+            renderPreviewBody(tbody);
+        } else {
+            rows.forEach((row, ri) => {
+                const tr = document.createElement('tr');
+                if (selectedCell && selectedCell.row === ri) tr.className = 'row-selected';
 
-            const numTd = document.createElement('td');
-            numTd.className = 'row-num';
-            numTd.textContent = ri + 1;
-            numTd.addEventListener('click', () => selectRow(ri));
-            tr.appendChild(numTd);
+                const numTd = document.createElement('td');
+                numTd.className = 'row-num';
+                numTd.textContent = crId + '-EI-' + (ri + 1);
+                numTd.addEventListener('click', () => selectRow(ri));
+                tr.appendChild(numTd);
 
-            row.forEach((val, ci) => {
-                const td = document.createElement('td');
-                const colType = columns[ci].type;
-                const isExec = typeIsExecutable(colType);
-                const isPrereq = colType === 'ne-prerequisite';
-                let classes = [];
-                if (isSelected(ri, ci)) classes.push('selected');
-                if (isExec) classes.push('col-executable');
-                if (isPrereq) classes.push('col-prerequisite');
-                td.className = classes.join(' ');
+                row.forEach((val, ci) => {
+                    const td = document.createElement('td');
+                    const colType = columns[ci].type;
+                    const isExec = typeIsExecutable(colType);
+                    const isAutoExec = typeIsAutoExecuted(colType);
+                    const isPrereq = colType === 'ne-prerequisite';
+                    let classes = [];
+                    if (isSelected(ri, ci)) classes.push('selected');
+                    if (isExec) classes.push('col-executable');
+                    if (isAutoExec) classes.push('col-auto-executed');
+                    if (isPrereq) classes.push('col-prerequisite');
+                    td.className = classes.join(' ');
 
-                if (isPrereq) {
-                    const prereqDisplay = document.createElement('div');
-                    prereqDisplay.className = 'prereq-cell';
-                    const deps = parsePrereqs(val);
-                    prereqDisplay.textContent = deps.length > 0
-                        ? deps.map(d => 'EI-' + (d + 1)).join(', ')
-                        : '';
-                    if (deps.length === 0) {
-                        const ph = document.createElement('span');
-                        ph.className = 'prereq-placeholder';
-                        ph.textContent = 'None';
-                        prereqDisplay.appendChild(ph);
+                    if (isAutoExec) {
+                        // Locked — auto-executed columns are filled by the engine
+                    } else if (isPrereq) {
+                        const prereqDisplay = document.createElement('div');
+                        prereqDisplay.className = 'prereq-cell';
+                        const deps = parsePrereqs(val);
+                        if (deps.length > 0) {
+                            prereqDisplay.textContent = deps.map(d => crId + '-EI-' + (d + 1)).join(', ');
+                        } else {
+                            prereqDisplay.textContent = 'N/A';
+                            prereqDisplay.classList.add('prereq-na');
+                        }
+                        prereqDisplay.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            select(ri, ci);
+                            openPrereqPicker(ri, ci, td);
+                        });
+                        td.appendChild(prereqDisplay);
+                    } else if (!isExec) {
+                        const ta = document.createElement('textarea');
+                        ta.rows = 1;
+                        ta.value = val;
+                        ta.addEventListener('input', () => {
+                            rows[ri][ci] = ta.value;
+                            autoResize(ta);
+                        });
+                        ta.addEventListener('focus', () => select(ri, ci));
+                        td.appendChild(ta);
                     }
-                    prereqDisplay.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        select(ri, ci);
-                        openPrereqPicker(ri, ci, td);
-                    });
-                    td.appendChild(prereqDisplay);
-                } else if (!isExec) {
-                    const ta = document.createElement('textarea');
-                    ta.rows = 1;
-                    ta.value = val;
-                    ta.addEventListener('input', () => {
-                        rows[ri][ci] = ta.value;
-                        autoResize(ta);
-                    });
-                    ta.addEventListener('focus', () => select(ri, ci));
-                    td.appendChild(ta);
-                }
-                tr.appendChild(td);
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
             });
-            tbody.appendChild(tr);
-        });
 
-        requestAnimationFrame(() => {
-            tbody.querySelectorAll('textarea').forEach(autoResize);
-        });
+            requestAnimationFrame(() => {
+                tbody.querySelectorAll('textarea').forEach(autoResize);
+            });
+        }
 
-        hint.style.display = (columns.length === 0 && rows.length === 0) ? 'block' : 'none';
+        hint.style.display = (!previewMode && columns.length === 0 && rows.length === 0) ? 'block' : 'none';
+        _rendering = false;
     }
 
     function autoResize(ta) {
@@ -666,20 +1166,29 @@
     }
 
     function select(row, col) {
-        selectedCell = { row, col };
-        closeTypePicker();
-        // Don't close prereq picker if clicking within the same prereq cell
-        if (prereqPickerCell && !(prereqPickerCell.row === row && prereqPickerCell.col === col)) {
-            closePrereqPicker();
+        const alreadySelected = selectedCell && selectedCell.row === row && selectedCell.col === col;
+        if (!alreadySelected) {
+            selectedCell = { row, col };
+            closeTypePicker();
+            // Don't close prereq picker if clicking within the same prereq cell
+            if (prereqPickerCell && !(prereqPickerCell.row === row && prereqPickerCell.col === col)) {
+                closePrereqPicker();
+            }
+            render();
         }
-        render();
+        // Always focus the target (even if already selected — handles initial click)
+        focusSelectedCell();
+    }
+
+    function focusSelectedCell() {
+        if (!selectedCell) return;
+        const { row, col } = selectedCell;
         if (row === 'header') {
             const inputs = document.querySelectorAll('#header-row .col-header input');
             if (inputs[col]) inputs[col].focus();
         } else {
-            const trs = document.querySelectorAll('#table-body tr');
+            const trs = document.querySelectorAll('#table-body tr:not(.history-row)');
             if (trs[row]) {
-                // col+1 to skip the row-num td
                 const td = trs[row].querySelectorAll('td')[col + 1];
                 if (td) {
                     const ta = td.querySelector('textarea');
@@ -720,12 +1229,16 @@
         // Show auto-sequential button if column is prerequisite
         document.getElementById('auto-sequential-btn').style.display =
             columns[ci].type === 'ne-prerequisite' ? 'flex' : 'none';
+
+        // Show rule editor if column is acceptance criteria
+        updateRuleEditor();
     }
 
     function closeTypePicker() {
         typePickerCol = null;
         document.getElementById('type-picker').classList.remove('open');
         document.getElementById('choice-editor').classList.remove('open');
+        document.getElementById('rule-editor').classList.remove('open');
     }
 
     function pickType(type) {
@@ -743,18 +1256,24 @@
             });
 
             updateChoiceEditor();
+            updateRuleEditor();
 
             // Show/hide auto-sequential button
             document.getElementById('auto-sequential-btn').style.display =
                 type === 'ne-prerequisite' ? 'flex' : 'none';
 
-            // For choice-list and prerequisite, keep picker open
+            // Initialize rule if switching to acceptance criteria
+            if (isAcceptanceCriteria(type) && !columns[typePickerCol].rule) {
+                columns[typePickerCol].rule = defaultRule();
+            }
+
+            // For choice-list, prerequisite, and acceptance criteria, keep picker open
             if (isChoiceList(type)) {
                 render();
                 requestAnimationFrame(() => {
                     document.getElementById('choice-new-input').focus();
                 });
-            } else if (type === 'ne-prerequisite') {
+            } else if (type === 'ne-prerequisite' || isAcceptanceCriteria(type)) {
                 render();
             } else {
                 closeTypePicker();
@@ -831,6 +1350,247 @@
         }
     }
 
+    // --- Rule Editor (Boolean Expression Builder) ---
+
+    // Condition types available for each column type
+    const COND_OPS = {
+        'ex-choice-list':     [{ value: 'equals', label: 'equals' }],
+        'ex-free-text':       [{ value: 'is-filled', label: 'is filled' }],
+        'ex-signature':       [{ value: 'is-signed', label: 'is signed' }],
+        'ex-cross-reference': [{ value: 'ref-status', label: 'reference status is' }],
+        // legacy
+        'choice-list':        [{ value: 'equals', label: 'equals' }],
+        'free-text':          [{ value: 'is-filled', label: 'is filled' }],
+        'signature':          [{ value: 'is-signed', label: 'is signed' }],
+        'cross-reference':    [{ value: 'ref-status', label: 'reference status is' }],
+    };
+
+    const REF_STATUSES = [
+        'pre-approved', 'in-execution', 'post-approved', 'closed'
+    ];
+
+    function isAcceptanceCriteria(t) {
+        return t === 'ae-acceptance-criteria';
+    }
+
+    function defaultRule() {
+        return { op: 'AND', conditions: [] };
+    }
+
+    function updateRuleEditor() {
+        const editor = document.getElementById('rule-editor');
+        if (typePickerCol === null || !isAcceptanceCriteria(columns[typePickerCol].type)) {
+            editor.classList.remove('open');
+            return;
+        }
+        editor.classList.add('open');
+        const col = columns[typePickerCol];
+        if (!col.rule) col.rule = defaultRule();
+        renderRuleGroup(document.getElementById('rule-editor-body'), col.rule, null, null);
+    }
+
+    function renderRuleGroup(container, group, parent, indexInParent) {
+        container.innerHTML = '';
+
+        // Group header: AND/OR selector + remove button if nested
+        const header = document.createElement('div');
+        header.className = 'rule-group-header';
+
+        const opSel = document.createElement('select');
+        opSel.className = 'rule-op-select';
+        ['AND', 'OR'].forEach(op => {
+            const opt = document.createElement('option');
+            opt.value = op;
+            opt.textContent = op;
+            opt.selected = group.op === op;
+            opSel.appendChild(opt);
+        });
+        opSel.addEventListener('change', () => {
+            group.op = opSel.value;
+        });
+        header.appendChild(opSel);
+
+        if (parent !== null) {
+            const rmBtn = document.createElement('button');
+            rmBtn.className = 'rule-remove-btn';
+            rmBtn.innerHTML = '&times;';
+            rmBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                parent.conditions.splice(indexInParent, 1);
+                updateRuleEditor();
+            });
+            header.appendChild(rmBtn);
+        }
+
+        container.appendChild(header);
+
+        // Group body
+        const groupEl = document.createElement('div');
+        groupEl.className = 'rule-group';
+
+        group.conditions.forEach((cond, i) => {
+            if (cond.op) {
+                // Nested group
+                const nestedContainer = document.createElement('div');
+                nestedContainer.style.marginBottom = '0.3rem';
+                renderRuleGroup(nestedContainer, cond, group, i);
+                groupEl.appendChild(nestedContainer);
+            } else {
+                // Leaf condition
+                const condEl = renderCondition(cond, group, i);
+                groupEl.appendChild(condEl);
+            }
+        });
+
+        // Add buttons
+        const actions = document.createElement('div');
+        actions.className = 'rule-group-actions';
+
+        const addCondBtn = document.createElement('button');
+        addCondBtn.className = 'rule-add-btn';
+        addCondBtn.textContent = '+ Condition';
+        addCondBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            group.conditions.push({ type: 'all-executed' });
+            updateRuleEditor();
+        });
+        actions.appendChild(addCondBtn);
+
+        const addGroupBtn = document.createElement('button');
+        addGroupBtn.className = 'rule-add-btn group';
+        addGroupBtn.textContent = '+ Group';
+        addGroupBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            group.conditions.push({ op: 'OR', conditions: [] });
+            updateRuleEditor();
+        });
+        actions.appendChild(addGroupBtn);
+
+        groupEl.appendChild(actions);
+        container.appendChild(groupEl);
+    }
+
+    function renderCondition(cond, parent, index) {
+        const row = document.createElement('div');
+        row.className = 'rule-condition';
+
+        // Condition type selector
+        const typeSel = document.createElement('select');
+        typeSel.className = 'cond-col-select';
+
+        // Special aggregate conditions
+        const aggOpt = document.createElement('option');
+        aggOpt.value = 'all-executed';
+        aggOpt.textContent = 'All executed columns';
+        aggOpt.selected = cond.type === 'all-executed';
+        typeSel.appendChild(aggOpt);
+
+        // Column-specific conditions
+        columns.forEach((col, ci) => {
+            if (ci === typePickerCol) return;  // skip self
+            if (!typeIsExecutable(col.type)) return;  // only executable columns
+            const opt = document.createElement('option');
+            opt.value = 'col:' + ci;
+            opt.textContent = col.name || ('Column ' + (ci + 1));
+            opt.selected = cond.type === 'column' && cond.column === ci;
+            typeSel.appendChild(opt);
+        });
+
+        typeSel.addEventListener('change', () => {
+            const val = typeSel.value;
+            if (val === 'all-executed') {
+                parent.conditions[index] = { type: 'all-executed' };
+            } else {
+                const ci = parseInt(val.split(':')[1]);
+                parent.conditions[index] = { type: 'column', column: ci, operator: '', value: '' };
+            }
+            updateRuleEditor();
+        });
+        row.appendChild(typeSel);
+
+        if (cond.type === 'all-executed') {
+            const label = document.createElement('span');
+            label.style.cssText = 'font-size: 0.76rem; color: #666;';
+            label.textContent = 'are completed';
+            row.appendChild(label);
+        } else if (cond.type === 'column' && cond.column !== undefined) {
+            const colDef = columns[cond.column];
+            if (colDef) {
+                const ops = COND_OPS[colDef.type] || [];
+                if (ops.length > 0) {
+                    const opSel = document.createElement('select');
+                    opSel.className = 'cond-op-select';
+                    ops.forEach(op => {
+                        const opt = document.createElement('option');
+                        opt.value = op.value;
+                        opt.textContent = op.label;
+                        opt.selected = cond.operator === op.value;
+                        opSel.appendChild(opt);
+                    });
+                    opSel.addEventListener('change', () => {
+                        cond.operator = opSel.value;
+                        updateRuleEditor();
+                    });
+                    row.appendChild(opSel);
+
+                    // Auto-select first operator if none set
+                    if (!cond.operator && ops.length > 0) {
+                        cond.operator = ops[0].value;
+                    }
+
+                    // Value selector (depends on operator)
+                    if (cond.operator === 'equals' && isChoiceList(colDef.type)) {
+                        const valSel = document.createElement('select');
+                        valSel.className = 'cond-val-select';
+                        const emptyOpt = document.createElement('option');
+                        emptyOpt.value = '';
+                        emptyOpt.textContent = 'Select...';
+                        valSel.appendChild(emptyOpt);
+                        (colDef.choices || []).forEach(ch => {
+                            const opt = document.createElement('option');
+                            opt.value = ch;
+                            opt.textContent = ch;
+                            opt.selected = cond.value === ch;
+                            valSel.appendChild(opt);
+                        });
+                        valSel.addEventListener('change', () => { cond.value = valSel.value; });
+                        row.appendChild(valSel);
+                    } else if (cond.operator === 'ref-status') {
+                        const valSel = document.createElement('select');
+                        valSel.className = 'cond-val-select';
+                        const emptyOpt = document.createElement('option');
+                        emptyOpt.value = '';
+                        emptyOpt.textContent = 'Select...';
+                        valSel.appendChild(emptyOpt);
+                        REF_STATUSES.forEach(st => {
+                            const opt = document.createElement('option');
+                            opt.value = st;
+                            opt.textContent = st;
+                            opt.selected = cond.value === st;
+                            valSel.appendChild(opt);
+                        });
+                        valSel.addEventListener('change', () => { cond.value = valSel.value; });
+                        row.appendChild(valSel);
+                    }
+                    // is-filled and is-signed need no value
+                }
+            }
+        }
+
+        // Remove button
+        const rmBtn = document.createElement('button');
+        rmBtn.className = 'rule-remove-btn';
+        rmBtn.innerHTML = '&times;';
+        rmBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            parent.conditions.splice(index, 1);
+            updateRuleEditor();
+        });
+        row.appendChild(rmBtn);
+
+        return row;
+    }
+
     // --- Auto-Sequential ---
     function autoSequential() {
         if (typePickerCol === null) return;
@@ -844,6 +1604,33 @@
         });
         closeTypePicker();
         render();
+    }
+
+    // --- Table Properties ---
+
+    function toggleProperties() {
+        const panel = document.getElementById('props-panel');
+        const btn = document.getElementById('props-toggle');
+        if (panel.classList.contains('open')) {
+            closeProperties();
+            return;
+        }
+        const rect = btn.getBoundingClientRect();
+        panel.style.left = rect.left + 'px';
+        panel.style.top = (rect.bottom + 4) + 'px';
+        panel.classList.add('open');
+        btn.classList.add('active');
+        // Sync checkbox state
+        document.getElementById('prop-sequential-cb').checked = tableProperties.sequentialExecution;
+    }
+
+    function closeProperties() {
+        document.getElementById('props-panel').classList.remove('open');
+        document.getElementById('props-toggle').classList.remove('active');
+    }
+
+    function onPropChange() {
+        tableProperties.sequentialExecution = document.getElementById('prop-sequential-cb').checked;
     }
 
     // --- Prerequisite Picker ---
@@ -916,7 +1703,7 @@
                             const newDeps = parsePrereqs(rows[ri][ci]);
                             display.innerHTML = '';
                             if (newDeps.length > 0) {
-                                display.textContent = newDeps.map(d => 'EI-' + (d + 1)).join(', ');
+                                display.textContent = newDeps.map(d => crId + '-EI-' + (d + 1)).join(', ');
                             } else {
                                 const ph = document.createElement('span');
                                 ph.className = 'prereq-placeholder';
@@ -967,6 +1754,18 @@
             if (!e.target.closest('.prereq-cell')) {
                 closePrereqPicker();
             }
+        }
+        const propsPanel = document.getElementById('props-panel');
+        if (propsPanel.classList.contains('open') && !propsPanel.contains(e.target)) {
+            if (!e.target.closest('#props-toggle')) {
+                closeProperties();
+            }
+        }
+        // Clear preview selection when clicking outside ref cells
+        if (previewMode && previewSelection && !e.target.closest('.ref-cell') && !e.target.closest('#execution-tools')) {
+            previewSelection = null;
+            updateExecTools();
+            render();
         }
     });
 
@@ -1036,11 +1835,471 @@
         render();
     }
 
+    // --- Preview Execution Mode ---
+
+    function togglePreview() {
+        previewMode = !previewMode;
+        const toggle = document.getElementById('preview-toggle');
+        const label = document.getElementById('preview-toggle-label');
+        const tools = document.getElementById('authoring-tools');
+        const wrap = document.querySelector('.table-wrap');
+
+        const execTools = document.getElementById('execution-tools');
+
+        toggle.classList.toggle('active', previewMode);
+        label.textContent = previewMode ? 'Back to Authoring' : 'Preview Execution';
+        tools.style.display = previewMode ? 'none' : 'flex';
+        execTools.style.display = previewMode ? 'flex' : 'none';
+
+        if (previewMode) {
+            // Initialize preview data — copy of rows for simulation
+            previewData = rows.map(row => row.map(v => ''));
+            previewHistory = rows.map(() => []);
+            historyMode = false;
+            previewSelection = null;
+            wrap.classList.add('preview-mode');
+            closeTypePicker();
+            closePrereqPicker();
+            updateExecTools();
+        } else {
+            // Flush any pending dirty snapshots before leaving preview
+            dirtyRows.forEach(ri => recordSnapshot(ri));
+            dirtyRows.clear();
+            wrap.classList.remove('preview-mode');
+            previewSelection = null;
+        }
+        selectedCell = null;
+        render();
+    }
+
+    function toggleHistory() {
+        historyMode = !historyMode;
+        document.getElementById('history-toggle').classList.toggle('active', historyMode);
+        render();
+    }
+
+    function evaluateAcceptanceCriteria(ri, ci) {
+        const col = columns[ci];
+        if (!col.rule) return false;
+        return evaluateRule(col.rule, ri);
+    }
+
+    function evaluateRule(rule, ri) {
+        if (!rule.conditions || rule.conditions.length === 0) return true;
+        if (rule.op === 'AND') {
+            return rule.conditions.every(c => evaluateCondition(c, ri));
+        } else {
+            return rule.conditions.some(c => evaluateCondition(c, ri));
+        }
+    }
+
+    function evaluateCondition(cond, ri) {
+        if (cond.op) {
+            // Nested group
+            return evaluateRule(cond, ri);
+        }
+        if (cond.type === 'all-executed') {
+            // Check all executable columns in this row have values (N/A counts as executed)
+            return columns.every((col, ci) => {
+                if (!typeIsExecutable(col.type)) return true;
+                const v = previewData[ri][ci];
+                return v !== '';
+            });
+        }
+        if (cond.type === 'column' && cond.column !== undefined) {
+            const val = previewData[ri][cond.column];
+            switch (cond.operator) {
+                case 'equals': return val === cond.value;
+                case 'is-filled': return val !== '';
+                case 'is-signed': return val !== '';
+                case 'ref-status': {
+                    if (!val || val === 'N/A') return false;
+                    try {
+                        const ref = JSON.parse(val);
+                        return ref.status === cond.value;
+                    } catch(e) {
+                        return val === cond.value;
+                    }
+                }
+                default: return false;
+            }
+        }
+        return false;
+    }
+
+    // --- Sequential Execution ---
+
+    // Returns ordered list of column indices that are executable, left-to-right
+    function executableColumnOrder() {
+        const order = [];
+        for (let ci = 0; ci < columns.length; ci++) {
+            if (typeIsExecutable(columns[ci].type)) order.push(ci);
+        }
+        return order;
+    }
+
+    // Cascade revert: clear all executable cells to the right of changedCi in the given row
+    function cascadeRevert(ri, changedCi) {
+        if (!tableProperties.sequentialExecution) return;
+        const order = executableColumnOrder();
+        const pos = order.indexOf(changedCi);
+        if (pos === -1) return;
+        // Clear everything after this position
+        for (let i = pos + 1; i < order.length; i++) {
+            previewData[ri][order[i]] = '';
+        }
+    }
+
+    // Check if a cell is sequentially locked (upstream executable cell is still empty)
+    function isCellSeqLocked(ri, ci) {
+        if (!tableProperties.sequentialExecution) return false;
+        if (!typeIsExecutable(columns[ci].type)) return false;
+        const order = executableColumnOrder();
+        const pos = order.indexOf(ci);
+        if (pos <= 0) return false;  // first executable column is never seq-locked
+        // Check all preceding executable columns have values
+        for (let i = 0; i < pos; i++) {
+            if (previewData[ri][order[i]] === '') return true;
+        }
+        return false;
+    }
+
+    // --- Audit Trail ---
+
+    function recordSnapshot(ri) {
+        if (!previewHistory[ri]) previewHistory[ri] = [];
+        previewHistory[ri].unshift({
+            values: previewData[ri].slice(),  // shallow copy of current row values
+            timestamp: new Date().toISOString().replace('T', ' ').split('.')[0] + ' UTC'
+        });
+    }
+
+    function isRowGated(ri) {
+        // Check all prerequisite columns — each referenced row's acceptance criteria must pass
+        for (let ci = 0; ci < columns.length; ci++) {
+            if (columns[ci].type !== 'ne-prerequisite') continue;
+            const deps = parsePrereqs(rows[ri][ci]);
+            for (const depRi of deps) {
+                // Find the acceptance criteria column for the dep row
+                const acCol = columns.findIndex(c => isAcceptanceCriteria(c.type));
+                if (acCol === -1) continue;
+                if (!evaluateAcceptanceCriteria(depRi, acCol)) return true;
+            }
+        }
+        return false;
+    }
+
+    function renderPreviewBody(tbody) {
+        rows.forEach((row, ri) => {
+            const tr = document.createElement('tr');
+            const gated = isRowGated(ri);
+            if (gated) tr.className = 'row-gated';
+
+            // Row ID
+            const numTd = document.createElement('td');
+            numTd.className = 'row-num';
+            numTd.textContent = crId + '-EI-' + (ri + 1);
+            tr.appendChild(numTd);
+
+            row.forEach((val, ci) => {
+                const td = document.createElement('td');
+                const colType = columns[ci].type;
+                const isExec = typeIsExecutable(colType);
+                const isAutoExec = typeIsAutoExecuted(colType);
+                const isPrereq = colType === 'ne-prerequisite';
+                let classes = [];
+                if (isExec) classes.push('col-executable');
+                if (isAutoExec) classes.push('col-auto-executed');
+
+                if (isAutoExec && isAcceptanceCriteria(colType)) {
+                    const pass = evaluateAcceptanceCriteria(ri, ci);
+                    classes.push(pass ? 'ac-pass' : 'ac-fail');
+                    td.className = classes.join(' ');
+                    td.textContent = pass ? 'PASS' : '';
+                } else if (isPrereq) {
+                    td.className = classes.join(' ');
+                    const deps = parsePrereqs(val);
+                    const display = document.createElement('div');
+                    if (deps.length > 0) {
+                        display.style.cssText = 'padding: 0.45rem 0.6rem; font-size: 0.85rem; color: #333;';
+                        display.textContent = deps.map(d => crId + '-EI-' + (d + 1)).join(', ');
+                    } else {
+                        display.style.cssText = 'padding: 0.45rem 0.6rem; font-size: 0.85rem; color: #90a4ae;';
+                        display.textContent = 'N/A';
+                    }
+                    td.appendChild(display);
+                } else if (isExec) {
+                    // Render interactive execution controls
+                    const seqLocked = isCellSeqLocked(ri, ci);
+
+                    if (isChoiceList(colType)) {
+                        classes.push('exec-choice');
+                        if (seqLocked) classes.push('seq-locked');
+                        td.className = classes.join(' ');
+                        const sel = document.createElement('select');
+                        const emptyOpt = document.createElement('option');
+                        emptyOpt.value = '';
+                        emptyOpt.textContent = '— Select —';
+                        sel.appendChild(emptyOpt);
+                        (columns[ci].choices || []).forEach(ch => {
+                            const opt = document.createElement('option');
+                            opt.value = ch;
+                            opt.textContent = ch;
+                            opt.selected = previewData[ri][ci] === ch;
+                            sel.appendChild(opt);
+                        });
+                        if (seqLocked) {
+                            sel.disabled = true;
+                        } else {
+                            sel.addEventListener('change', () => {
+                                previewData[ri][ci] = sel.value;
+                                cascadeRevert(ri, ci);
+                                recordSnapshot(ri);
+                                render();
+                            });
+                        }
+                        td.appendChild(sel);
+                    } else if (colType === 'ex-signature' || colType === 'signature') {
+                        const signed = previewData[ri][ci] !== '';
+                        if (signed) {
+                            classes.push('exec-signed');
+                            td.className = classes.join(' ');
+                            const display = document.createElement('div');
+                            display.className = 'sig-display';
+                            display.textContent = previewData[ri][ci];
+                            td.appendChild(display);
+                        } else {
+                            classes.push('exec-signature');
+                            if (seqLocked) classes.push('seq-locked');
+                            td.className = classes.join(' ');
+                            const btn = document.createElement('button');
+                            btn.className = 'sig-btn';
+                            btn.textContent = seqLocked ? '' : 'Sign';
+                            if (!seqLocked) {
+                                btn.addEventListener('click', () => {
+                                    previewData[ri][ci] = 'claude — ' + new Date().toISOString().replace('T', ' ').split('.')[0] + ' UTC';
+                                    cascadeRevert(ri, ci);
+                                    recordSnapshot(ri);
+                                    render();
+                                });
+                            }
+                            td.appendChild(btn);
+                        }
+                    } else if (colType === 'ex-cross-reference' || colType === 'cross-reference') {
+                        const isSelRef = previewSelection && previewSelection.row === ri && previewSelection.col === ci;
+                        if (isSelRef) classes.push('exec-selected-ref');
+                        if (seqLocked) classes.push('seq-locked');
+                        td.className = classes.join(' ');
+                        const val = previewData[ri][ci];
+                        const refCell = document.createElement('div');
+                        refCell.className = 'ref-cell';
+                        if (seqLocked) {
+                            refCell.classList.add('ref-empty');
+                            refCell.textContent = '';
+                        } else if (val === 'N/A') {
+                            refCell.classList.add('ref-na');
+                            refCell.textContent = 'N/A';
+                        } else if (val && val.startsWith('{')) {
+                            // Linked issue
+                            try {
+                                const issue = JSON.parse(val);
+                                refCell.classList.add('ref-linked');
+                                refCell.textContent = issue.id + ' (' + issue.status + ')';
+                            } catch(e) {
+                                refCell.classList.add('ref-empty');
+                                refCell.textContent = 'Click to select action';
+                            }
+                        } else {
+                            refCell.classList.add('ref-empty');
+                            refCell.textContent = 'Click to select action';
+                        }
+                        if (!seqLocked) {
+                            refCell.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                previewSelection = { row: ri, col: ci };
+                                updateExecTools();
+                                render();
+                            });
+                        }
+                        td.appendChild(refCell);
+                    } else {
+                        // ex-free-text
+                        if (seqLocked) classes.push('seq-locked');
+                        td.className = classes.join(' ');
+                        const ta = document.createElement('textarea');
+                        ta.rows = 1;
+                        ta.value = previewData[ri][ci];
+                        ta.placeholder = seqLocked ? '' : 'Enter...';
+                        if (seqLocked) {
+                            ta.disabled = true;
+                        } else {
+                            ta.addEventListener('input', () => {
+                                previewData[ri][ci] = ta.value;
+                                autoResize(ta);
+                                cascadeRevert(ri, ci);
+                                dirtyRows.add(ri);
+                                // Debounced re-eval only (no snapshot — that happens on blur)
+                                clearTimeout(ta._evalTimer);
+                                ta._evalTimer = setTimeout(() => {
+                                    const cursorPos = ta.selectionStart || 0;
+                                    render();
+                                    const trs = document.querySelectorAll('#table-body tr:not(.history-row)');
+                                    if (trs[ri]) {
+                                        const newTd = trs[ri].querySelectorAll('td')[ci + 1];
+                                        if (newTd) {
+                                            const newTa = newTd.querySelector('textarea');
+                                            if (newTa) {
+                                                newTa.focus();
+                                                newTa.setSelectionRange(cursorPos, cursorPos);
+                                            }
+                                        }
+                                    }
+                                }, 300);
+                            });
+                            ta.addEventListener('blur', () => {
+                                if (dirtyRows.has(ri) && !_rendering) {
+                                    // Snapshot on real blur (user left the cell),
+                                    // not on DOM-destruction blur from render()
+                                    dirtyRows.delete(ri);
+                                    recordSnapshot(ri);
+                                }
+                            });
+                        }
+                        td.appendChild(ta);
+                    }
+                } else {
+                    // ne-free-text — show read-only
+                    td.className = classes.join(' ');
+                    const display = document.createElement('div');
+                    display.style.cssText = 'padding: 0.45rem 0.6rem; font-size: 0.85rem; color: #333;';
+                    display.textContent = val;
+                    td.appendChild(display);
+                }
+
+                tr.appendChild(td);
+            });
+
+            // Timestamp cell for live row (only in history mode)
+            if (historyMode) {
+                const tsTd = document.createElement('td');
+                tsTd.className = 'history-ts-cell history-ts-live';
+                tsTd.textContent = 'Current';
+                tr.appendChild(tsTd);
+            }
+
+            tbody.appendChild(tr);
+
+            // History snapshot rows (only when history mode is on and snapshots exist)
+            if (historyMode && previewHistory[ri] && previewHistory[ri].length > 0) {
+                previewHistory[ri].forEach((snapshot, si) => {
+                    const htr = document.createElement('tr');
+                    htr.className = 'history-row';
+
+                    // ID cell
+                    const hNum = document.createElement('td');
+                    hNum.className = 'row-num history-cell';
+                    hNum.textContent = crId + '-EI-' + (ri + 1);
+                    htr.appendChild(hNum);
+
+                    // Value cells
+                    snapshot.values.forEach((val, ci) => {
+                        const htd = document.createElement('td');
+                        htd.className = 'history-cell';
+                        const colType = columns[ci] ? columns[ci].type : '';
+
+                        let displayVal = val;
+                        if (val === '') {
+                            displayVal = '';
+                        } else if (val === 'N/A') {
+                            displayVal = 'N/A';
+                        } else if ((colType === 'ex-cross-reference' || colType === 'cross-reference') && val.startsWith('{')) {
+                            try {
+                                const ref = JSON.parse(val);
+                                displayVal = ref.id + ' (' + ref.status + ')';
+                            } catch(e) {}
+                        } else if (colType === 'ne-prerequisite') {
+                            const deps = parsePrereqs(val);
+                            displayVal = deps.length > 0 ? deps.map(d => crId + '-EI-' + (d + 1)).join(', ') : 'N/A';
+                        } else if (typeIsAutoExecuted(colType)) {
+                            // Re-evaluate acceptance criteria against this snapshot? No — just show blank
+                            displayVal = '';
+                        }
+
+                        const display = document.createElement('div');
+                        display.className = 'history-cell-value';
+                        display.textContent = displayVal;
+                        htd.appendChild(display);
+                        htr.appendChild(htd);
+                    });
+
+                    // Timestamp cell
+                    const hTs = document.createElement('td');
+                    hTs.className = 'history-cell history-ts-cell';
+                    hTs.textContent = snapshot.timestamp;
+                    htr.appendChild(hTs);
+
+                    tbody.appendChild(htr);
+                });
+            }
+        });
+
+        // Auto-resize textareas in preview
+        requestAnimationFrame(() => {
+            tbody.querySelectorAll('textarea').forEach(autoResize);
+        });
+    }
+
+    function updateExecTools() {
+        const naBtn = document.getElementById('exec-mark-na');
+        const issueBtn = document.getElementById('exec-initiate-issue');
+        if (!previewMode || !previewSelection) {
+            naBtn.disabled = true;
+            issueBtn.disabled = true;
+            return;
+        }
+        const { row: ri, col: ci } = previewSelection;
+        const colType = columns[ci].type;
+        const isCrossRef = colType === 'ex-cross-reference' || colType === 'cross-reference';
+        const gated = isRowGated(ri);
+        const seqLocked = isCellSeqLocked(ri, ci);
+        naBtn.disabled = !isCrossRef || gated || seqLocked;
+        issueBtn.disabled = !isCrossRef || gated || seqLocked;
+    }
+
+    function markNA() {
+        if (!previewSelection) return;
+        const { row: ri, col: ci } = previewSelection;
+        previewData[ri][ci] = 'N/A';
+        cascadeRevert(ri, ci);
+        recordSnapshot(ri);
+        previewSelection = null;
+        updateExecTools();
+        render();
+    }
+
+    function initiateIssue() {
+        if (!previewSelection) return;
+        const { row: ri, col: ci } = previewSelection;
+        // In a real system this would open a child workflow.
+        // For preview, simulate creating an issue reference.
+        const issueId = 'CR-001-ER-' + (ri + 1);
+        previewData[ri][ci] = JSON.stringify({
+            id: issueId,
+            status: 'draft',
+            type: 'ER'
+        });
+        cascadeRevert(ri, ci);
+        recordSnapshot(ri);
+        previewSelection = null;
+        updateExecTools();
+        render();
+    }
+
     async function savePlan() {
         const resp = await fetch('/cr/{{ cr.id }}/plan/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ columns, rows })
+            body: JSON.stringify({ columns, rows, tableProperties })
         });
         if (resp.ok) {
             const btn = document.querySelector('.tool-btn.primary');

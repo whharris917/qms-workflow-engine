@@ -198,6 +198,7 @@ def initiate_cr():
         "eis": [],
         "plan_columns": [],
         "plan_rows": [],
+        "table_properties": {},
     }
     _save_cr(cr_id, data)
     return redirect(url_for("edit_cr", cr_id=cr_id))
@@ -242,6 +243,7 @@ def edit_plan(cr_id):
     # Ensure plan fields exist (for CRs created before this feature)
     data.setdefault("plan_columns", [])
     data.setdefault("plan_rows", [])
+    data.setdefault("table_properties", {})
     return render_template("edit_plan.html", active_page="home", cr=data)
 
 
@@ -254,6 +256,7 @@ def save_plan(cr_id):
     payload = request.get_json()
     data["plan_columns"] = payload.get("columns", [])
     data["plan_rows"] = payload.get("rows", [])
+    data["table_properties"] = payload.get("tableProperties", {})
     data["eis"] = data["plan_rows"]  # keep eis in sync for the CR summary
     _save_cr(cr_id, data)
     return {"ok": True}
