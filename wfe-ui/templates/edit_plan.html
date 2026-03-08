@@ -1016,16 +1016,13 @@
     if (tableProperties.sequentialExecution === undefined) tableProperties.sequentialExecution = false;
 
     let previewMode = false;
-    let previewData = [];  // simulated execution data (same shape as rows)
-    let previewHistory = [];  // per-row audit trail: previewHistory[ri] = [{ values: [...], timestamp: '...' }, ...]
+    let currentPlanState = null;  // server execution state (PlanState), populated on preview enter
     let historyMode = false;  // whether history rows are visible in preview
-    let dirtyRows = new Set();  // rows with unsnapshot free-text edits
+    let historyCache = {};  // row -> [snapshots], fetched from server
     let previewSelection = null;  // { row, col } — selected cell in preview mode
 
     // --- Render ---
-    let _rendering = false;  // guard against blur events fired during DOM rebuild
     function render() {
-        _rendering = true;
         const headerRow = document.getElementById('header-row');
         const tbody = document.getElementById('table-body');
         const hint = document.getElementById('empty-hint');
@@ -1153,7 +1150,6 @@
         }
 
         hint.style.display = (!previewMode && columns.length === 0 && rows.length === 0) ? 'block' : 'none';
-        _rendering = false;
     }
 
     function autoResize(ta) {
@@ -1837,13 +1833,12 @@
 
     // --- Preview Execution Mode ---
 
-    function togglePreview() {
+    async function togglePreview() {
         previewMode = !previewMode;
         const toggle = document.getElementById('preview-toggle');
         const label = document.getElementById('preview-toggle-label');
         const tools = document.getElementById('authoring-tools');
         const wrap = document.querySelector('.table-wrap');
-
         const execTools = document.getElementById('execution-tools');
 
         toggle.classList.toggle('active', previewMode);
@@ -1852,19 +1847,24 @@
         execTools.style.display = previewMode ? 'flex' : 'none';
 
         if (previewMode) {
-            // Initialize preview data — copy of rows for simulation
-            previewData = rows.map(row => row.map(v => ''));
-            previewHistory = rows.map(() => []);
+            // Start execution on the server, get initial state
+            const resp = await fetch('/api/cr/' + crId + '/execution/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ actor: 'user' })
+            });
+            const result = await resp.json();
+            currentPlanState = result.data;
             historyMode = false;
+            historyCache = {};
             previewSelection = null;
             wrap.classList.add('preview-mode');
             closeTypePicker();
             closePrereqPicker();
             updateExecTools();
         } else {
-            // Flush any pending dirty snapshots before leaving preview
-            dirtyRows.forEach(ri => recordSnapshot(ri));
-            dirtyRows.clear();
+            currentPlanState = null;
+            historyCache = {};
             wrap.classList.remove('preview-mode');
             previewSelection = null;
         }
@@ -1872,138 +1872,108 @@
         render();
     }
 
-    function toggleHistory() {
+    async function toggleHistory() {
         historyMode = !historyMode;
         document.getElementById('history-toggle').classList.toggle('active', historyMode);
+        if (historyMode && currentPlanState) {
+            // Fetch history for all rows from the server
+            const fetches = currentPlanState.rows.map((_, ri) => fetchHistory(ri));
+            await Promise.all(fetches);
+        }
         render();
     }
 
+    // --- Server-backed business logic ---
+    // These functions read from currentPlanState (fetched from the engine API).
+    // All computation happens server-side; these are thin lookups.
+
     function evaluateAcceptanceCriteria(ri, ci) {
-        const col = columns[ci];
-        if (!col.rule) return false;
-        return evaluateRule(col.rule, ri);
+        if (!currentPlanState) return false;
+        const row = currentPlanState.rows[ri];
+        return row && row.acceptance ? row.acceptance.passed : false;
     }
 
-    function evaluateRule(rule, ri) {
-        if (!rule.conditions || rule.conditions.length === 0) return true;
-        if (rule.op === 'AND') {
-            return rule.conditions.every(c => evaluateCondition(c, ri));
-        } else {
-            return rule.conditions.some(c => evaluateCondition(c, ri));
-        }
-    }
-
-    function evaluateCondition(cond, ri) {
-        if (cond.op) {
-            // Nested group
-            return evaluateRule(cond, ri);
-        }
-        if (cond.type === 'all-executed') {
-            // Check all executable columns in this row have values (N/A counts as executed)
-            return columns.every((col, ci) => {
-                if (!typeIsExecutable(col.type)) return true;
-                const v = previewData[ri][ci];
-                return v !== '';
-            });
-        }
-        if (cond.type === 'column' && cond.column !== undefined) {
-            const val = previewData[ri][cond.column];
-            switch (cond.operator) {
-                case 'equals': return val === cond.value;
-                case 'is-filled': return val !== '';
-                case 'is-signed': return val !== '';
-                case 'ref-status': {
-                    if (!val || val === 'N/A') return false;
-                    try {
-                        const ref = JSON.parse(val);
-                        return ref.status === cond.value;
-                    } catch(e) {
-                        return val === cond.value;
-                    }
-                }
-                default: return false;
-            }
-        }
-        return false;
-    }
-
-    // --- Sequential Execution ---
-
-    // Returns ordered list of column indices that are executable, left-to-right
-    function executableColumnOrder() {
-        const order = [];
-        for (let ci = 0; ci < columns.length; ci++) {
-            if (typeIsExecutable(columns[ci].type)) order.push(ci);
-        }
-        return order;
-    }
-
-    // Cascade revert: clear all executable cells to the right of changedCi in the given row
-    function cascadeRevert(ri, changedCi) {
-        if (!tableProperties.sequentialExecution) return;
-        const order = executableColumnOrder();
-        const pos = order.indexOf(changedCi);
-        if (pos === -1) return;
-        // Clear everything after this position
-        for (let i = pos + 1; i < order.length; i++) {
-            previewData[ri][order[i]] = '';
-        }
-    }
-
-    // Check if a cell is sequentially locked (upstream executable cell is still empty)
     function isCellSeqLocked(ri, ci) {
-        if (!tableProperties.sequentialExecution) return false;
-        if (!typeIsExecutable(columns[ci].type)) return false;
-        const order = executableColumnOrder();
-        const pos = order.indexOf(ci);
-        if (pos <= 0) return false;  // first executable column is never seq-locked
-        // Check all preceding executable columns have values
-        for (let i = 0; i < pos; i++) {
-            if (previewData[ri][order[i]] === '') return true;
-        }
-        return false;
-    }
-
-    // --- Audit Trail ---
-
-    function recordSnapshot(ri) {
-        if (!previewHistory[ri]) previewHistory[ri] = [];
-        previewHistory[ri].unshift({
-            values: previewData[ri].slice(),  // shallow copy of current row values
-            timestamp: new Date().toISOString().replace('T', ' ').split('.')[0] + ' UTC'
-        });
+        if (!currentPlanState) return false;
+        const row = currentPlanState.rows[ri];
+        if (!row) return false;
+        const cell = row.cells.find(c => c.col === ci);
+        return cell ? cell.status === 'locked' : false;
     }
 
     function isRowGated(ri) {
-        // Check all prerequisite columns — each referenced row's acceptance criteria must pass
-        for (let ci = 0; ci < columns.length; ci++) {
-            if (columns[ci].type !== 'ne-prerequisite') continue;
-            const deps = parsePrereqs(rows[ri][ci]);
-            for (const depRi of deps) {
-                // Find the acceptance criteria column for the dep row
-                const acCol = columns.findIndex(c => isAcceptanceCriteria(c.type));
-                if (acCol === -1) continue;
-                if (!evaluateAcceptanceCriteria(depRi, acCol)) return true;
-            }
+        if (!currentPlanState) return false;
+        const row = currentPlanState.rows[ri];
+        return row ? row.gated : false;
+    }
+
+    function getCellValue(ri, ci) {
+        if (!currentPlanState) return '';
+        const row = currentPlanState.rows[ri];
+        if (!row) return '';
+        const cell = row.cells.find(c => c.col === ci);
+        return cell ? cell.value : '';
+    }
+
+    function getCellDisplayValue(ri, ci) {
+        if (!currentPlanState) return '';
+        const row = currentPlanState.rows[ri];
+        if (!row) return '';
+        const cell = row.cells.find(c => c.col === ci);
+        return cell ? cell.display_value : '';
+    }
+
+    function getCellStatus(ri, ci) {
+        if (!currentPlanState) return 'empty';
+        const row = currentPlanState.rows[ri];
+        if (!row) return 'empty';
+        const cell = row.cells.find(c => c.col === ci);
+        return cell ? cell.status : 'empty';
+    }
+
+    // --- API helpers ---
+
+    async function apiExecuteCell(ri, ci, action, value) {
+        const resp = await fetch('/api/cr/' + crId + '/execution/cell', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                row: ri, col: ci, action: action,
+                value: value || '', actor: 'user'
+            })
+        });
+        const result = await resp.json();
+        if (result.ok && result.plan_state) {
+            currentPlanState = result.plan_state;
         }
-        return false;
+        return result;
+    }
+
+    async function fetchHistory(ri) {
+        const resp = await fetch('/api/cr/' + crId + '/execution/history/' + ri);
+        const result = await resp.json();
+        if (result.ok) {
+            historyCache[ri] = result.data;
+        }
+        return historyCache[ri] || [];
     }
 
     function renderPreviewBody(tbody) {
-        rows.forEach((row, ri) => {
+        if (!currentPlanState) return;
+
+        currentPlanState.rows.forEach((rowState, ri) => {
             const tr = document.createElement('tr');
-            const gated = isRowGated(ri);
-            if (gated) tr.className = 'row-gated';
+            if (rowState.gated) tr.className = 'row-gated';
 
             // Row ID
             const numTd = document.createElement('td');
             numTd.className = 'row-num';
-            numTd.textContent = crId + '-EI-' + (ri + 1);
+            numTd.textContent = rowState.row_id;
             tr.appendChild(numTd);
 
-            row.forEach((val, ci) => {
+            rowState.cells.forEach((cellState, ci) => {
                 const td = document.createElement('td');
-                const colType = columns[ci].type;
+                const colType = cellState.column_type;
                 const isExec = typeIsExecutable(colType);
                 const isAutoExec = typeIsAutoExecuted(colType);
                 const isPrereq = colType === 'ne-prerequisite';
@@ -2012,25 +1982,24 @@
                 if (isAutoExec) classes.push('col-auto-executed');
 
                 if (isAutoExec && isAcceptanceCriteria(colType)) {
-                    const pass = evaluateAcceptanceCriteria(ri, ci);
+                    const pass = rowState.acceptance ? rowState.acceptance.passed : false;
                     classes.push(pass ? 'ac-pass' : 'ac-fail');
                     td.className = classes.join(' ');
                     td.textContent = pass ? 'PASS' : '';
                 } else if (isPrereq) {
                     td.className = classes.join(' ');
-                    const deps = parsePrereqs(val);
                     const display = document.createElement('div');
-                    if (deps.length > 0) {
-                        display.style.cssText = 'padding: 0.45rem 0.6rem; font-size: 0.85rem; color: #333;';
-                        display.textContent = deps.map(d => crId + '-EI-' + (d + 1)).join(', ');
-                    } else {
+                    const dv = cellState.display_value;
+                    if (dv === 'N/A') {
                         display.style.cssText = 'padding: 0.45rem 0.6rem; font-size: 0.85rem; color: #90a4ae;';
-                        display.textContent = 'N/A';
+                    } else {
+                        display.style.cssText = 'padding: 0.45rem 0.6rem; font-size: 0.85rem; color: #333;';
                     }
+                    display.textContent = dv;
                     td.appendChild(display);
                 } else if (isExec) {
-                    // Render interactive execution controls
-                    const seqLocked = isCellSeqLocked(ri, ci);
+                    const seqLocked = cellState.status === 'locked';
+                    const cellVal = cellState.value;
 
                     if (isChoiceList(colType)) {
                         classes.push('exec-choice');
@@ -2045,28 +2014,26 @@
                             const opt = document.createElement('option');
                             opt.value = ch;
                             opt.textContent = ch;
-                            opt.selected = previewData[ri][ci] === ch;
+                            opt.selected = cellVal === ch;
                             sel.appendChild(opt);
                         });
                         if (seqLocked) {
                             sel.disabled = true;
                         } else {
-                            sel.addEventListener('change', () => {
-                                previewData[ri][ci] = sel.value;
-                                cascadeRevert(ri, ci);
-                                recordSnapshot(ri);
+                            sel.addEventListener('change', async () => {
+                                await apiExecuteCell(ri, ci, 'fill', sel.value);
                                 render();
                             });
                         }
                         td.appendChild(sel);
                     } else if (colType === 'ex-signature' || colType === 'signature') {
-                        const signed = previewData[ri][ci] !== '';
+                        const signed = cellState.status === 'signed';
                         if (signed) {
                             classes.push('exec-signed');
                             td.className = classes.join(' ');
                             const display = document.createElement('div');
                             display.className = 'sig-display';
-                            display.textContent = previewData[ri][ci];
+                            display.textContent = cellVal;
                             td.appendChild(display);
                         } else {
                             classes.push('exec-signature');
@@ -2076,10 +2043,8 @@
                             btn.className = 'sig-btn';
                             btn.textContent = seqLocked ? '' : 'Sign';
                             if (!seqLocked) {
-                                btn.addEventListener('click', () => {
-                                    previewData[ri][ci] = 'claude — ' + new Date().toISOString().replace('T', ' ').split('.')[0] + ' UTC';
-                                    cascadeRevert(ri, ci);
-                                    recordSnapshot(ri);
+                                btn.addEventListener('click', async () => {
+                                    await apiExecuteCell(ri, ci, 'sign');
                                     render();
                                 });
                             }
@@ -2090,25 +2055,17 @@
                         if (isSelRef) classes.push('exec-selected-ref');
                         if (seqLocked) classes.push('seq-locked');
                         td.className = classes.join(' ');
-                        const val = previewData[ri][ci];
                         const refCell = document.createElement('div');
                         refCell.className = 'ref-cell';
                         if (seqLocked) {
                             refCell.classList.add('ref-empty');
                             refCell.textContent = '';
-                        } else if (val === 'N/A') {
+                        } else if (cellState.status === 'na') {
                             refCell.classList.add('ref-na');
                             refCell.textContent = 'N/A';
-                        } else if (val && val.startsWith('{')) {
-                            // Linked issue
-                            try {
-                                const issue = JSON.parse(val);
-                                refCell.classList.add('ref-linked');
-                                refCell.textContent = issue.id + ' (' + issue.status + ')';
-                            } catch(e) {
-                                refCell.classList.add('ref-empty');
-                                refCell.textContent = 'Click to select action';
-                            }
+                        } else if (cellVal && cellVal.startsWith('{')) {
+                            refCell.classList.add('ref-linked');
+                            refCell.textContent = cellState.display_value;
                         } else {
                             refCell.classList.add('ref-empty');
                             refCell.textContent = 'Click to select action';
@@ -2128,40 +2085,17 @@
                         td.className = classes.join(' ');
                         const ta = document.createElement('textarea');
                         ta.rows = 1;
-                        ta.value = previewData[ri][ci];
+                        ta.value = cellVal;
                         ta.placeholder = seqLocked ? '' : 'Enter...';
                         if (seqLocked) {
                             ta.disabled = true;
                         } else {
-                            ta.addEventListener('input', () => {
-                                previewData[ri][ci] = ta.value;
-                                autoResize(ta);
-                                cascadeRevert(ri, ci);
-                                dirtyRows.add(ri);
-                                // Debounced re-eval only (no snapshot — that happens on blur)
-                                clearTimeout(ta._evalTimer);
-                                ta._evalTimer = setTimeout(() => {
-                                    const cursorPos = ta.selectionStart || 0;
-                                    render();
-                                    const trs = document.querySelectorAll('#table-body tr:not(.history-row)');
-                                    if (trs[ri]) {
-                                        const newTd = trs[ri].querySelectorAll('td')[ci + 1];
-                                        if (newTd) {
-                                            const newTa = newTd.querySelector('textarea');
-                                            if (newTa) {
-                                                newTa.focus();
-                                                newTa.setSelectionRange(cursorPos, cursorPos);
-                                            }
-                                        }
-                                    }
-                                }, 300);
-                            });
-                            ta.addEventListener('blur', () => {
-                                if (dirtyRows.has(ri) && !_rendering) {
-                                    // Snapshot on real blur (user left the cell),
-                                    // not on DOM-destruction blur from render()
-                                    dirtyRows.delete(ri);
-                                    recordSnapshot(ri);
+                            // Debounced server call on blur for free-text
+                            ta.addEventListener('input', () => { autoResize(ta); });
+                            ta.addEventListener('blur', async () => {
+                                if (ta.value !== cellVal) {
+                                    await apiExecuteCell(ri, ci, 'fill', ta.value);
+                                    // Don't re-render here — user has moved focus elsewhere
                                 }
                             });
                         }
@@ -2172,7 +2106,7 @@
                     td.className = classes.join(' ');
                     const display = document.createElement('div');
                     display.style.cssText = 'padding: 0.45rem 0.6rem; font-size: 0.85rem; color: #333;';
-                    display.textContent = val;
+                    display.textContent = cellState.display_value;
                     td.appendChild(display);
                 }
 
@@ -2189,22 +2123,22 @@
 
             tbody.appendChild(tr);
 
-            // History snapshot rows (only when history mode is on and snapshots exist)
-            if (historyMode && previewHistory[ri] && previewHistory[ri].length > 0) {
-                previewHistory[ri].forEach((snapshot, si) => {
+            // History snapshot rows (fetched from server)
+            if (historyMode && historyCache[ri] && historyCache[ri].length > 0) {
+                historyCache[ri].forEach((snapshot) => {
                     const htr = document.createElement('tr');
                     htr.className = 'history-row';
 
-                    // ID cell
                     const hNum = document.createElement('td');
                     hNum.className = 'row-num history-cell';
-                    hNum.textContent = crId + '-EI-' + (ri + 1);
+                    hNum.textContent = rowState.row_id;
                     htr.appendChild(hNum);
 
-                    // Value cells
-                    snapshot.values.forEach((val, ci) => {
+                    // Values are keyed by column index as string
+                    for (let ci = 0; ci < columns.length; ci++) {
                         const htd = document.createElement('td');
                         htd.className = 'history-cell';
+                        const val = snapshot.values[String(ci)] || '';
                         const colType = columns[ci] ? columns[ci].type : '';
 
                         let displayVal = val;
@@ -2221,7 +2155,6 @@
                             const deps = parsePrereqs(val);
                             displayVal = deps.length > 0 ? deps.map(d => crId + '-EI-' + (d + 1)).join(', ') : 'N/A';
                         } else if (typeIsAutoExecuted(colType)) {
-                            // Re-evaluate acceptance criteria against this snapshot? No — just show blank
                             displayVal = '';
                         }
 
@@ -2230,9 +2163,8 @@
                         display.textContent = displayVal;
                         htd.appendChild(display);
                         htr.appendChild(htd);
-                    });
+                    }
 
-                    // Timestamp cell
                     const hTs = document.createElement('td');
                     hTs.className = 'history-cell history-ts-cell';
                     hTs.textContent = snapshot.timestamp;
@@ -2266,30 +2198,19 @@
         issueBtn.disabled = !isCrossRef || gated || seqLocked;
     }
 
-    function markNA() {
+    async function markNA() {
         if (!previewSelection) return;
         const { row: ri, col: ci } = previewSelection;
-        previewData[ri][ci] = 'N/A';
-        cascadeRevert(ri, ci);
-        recordSnapshot(ri);
+        await apiExecuteCell(ri, ci, 'mark_na');
         previewSelection = null;
         updateExecTools();
         render();
     }
 
-    function initiateIssue() {
+    async function initiateIssue() {
         if (!previewSelection) return;
         const { row: ri, col: ci } = previewSelection;
-        // In a real system this would open a child workflow.
-        // For preview, simulate creating an issue reference.
-        const issueId = 'CR-001-ER-' + (ri + 1);
-        previewData[ri][ci] = JSON.stringify({
-            id: issueId,
-            status: 'draft',
-            type: 'ER'
-        });
-        cascadeRevert(ri, ci);
-        recordSnapshot(ri);
+        await apiExecuteCell(ri, ci, 'initiate_issue');
         previewSelection = null;
         updateExecTools();
         render();

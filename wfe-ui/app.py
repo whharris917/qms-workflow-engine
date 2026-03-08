@@ -11,6 +11,10 @@ app = Flask(__name__)
 DATA_DIR = Path(__file__).resolve().parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
+# Register the execution API blueprint
+from api import api as api_blueprint  # noqa: E402
+app.register_blueprint(api_blueprint)
+
 QUALITY_MANUAL_DIR = Path(__file__).resolve().parent.parent.parent / "Quality-Manual"
 
 
