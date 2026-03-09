@@ -19,7 +19,7 @@ from .types import (
     Snapshot,
 )
 from .execution import PlanEngine
-from .persistence import load_plan, load_execution_state, save_execution_state
+from .persistence import load_plan
 
 __all__ = [
     "ColumnDef",
@@ -34,6 +34,4 @@ __all__ = [
     "Snapshot",
     "PlanEngine",
     "load_plan",
-    "load_execution_state",
-    "save_execution_state",
 ]

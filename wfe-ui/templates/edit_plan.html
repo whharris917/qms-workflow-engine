@@ -1945,6 +1945,10 @@
         const result = await resp.json();
         if (result.ok && result.plan_state) {
             currentPlanState = result.plan_state;
+            // Keep history cache fresh if history mode is active
+            if (historyMode) {
+                await fetchHistory(ri);
+            }
         }
         return result;
     }
@@ -2094,8 +2098,9 @@
                             ta.addEventListener('input', () => { autoResize(ta); });
                             ta.addEventListener('blur', async () => {
                                 if (ta.value !== cellVal) {
-                                    await apiExecuteCell(ri, ci, 'fill', ta.value);
-                                    // Don't re-render here — user has moved focus elsewhere
+                                    const result = await apiExecuteCell(ri, ci, 'fill', ta.value);
+                                    // Re-render to reflect cascading reverts and state changes
+                                    if (result.ok) render();
                                 }
                             });
                         }

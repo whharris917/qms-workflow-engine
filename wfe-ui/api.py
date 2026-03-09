@@ -2,6 +2,9 @@
 
 Thin wrapper over engine.PlanEngine — all business logic lives in the engine.
 Responses are agent-friendly: self-describing state with affordances.
+
+Execution state is ephemeral (in-memory only). It resets on server restart
+or when the client calls start_execution again.
 """
 
 from __future__ import annotations
@@ -11,25 +14,24 @@ from pathlib import Path
 from flask import Blueprint, request, abort
 
 from engine import PlanEngine
-from engine.persistence import load_plan, load_execution_state, save_execution_state
+from engine.persistence import load_plan
+from engine.types import ExecutionState
 
 api = Blueprint("api", __name__, url_prefix="/api")
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
 
+# In-memory execution engines, keyed by cr_id.
+# Cleared on server restart; reset per-CR on start_execution.
+_engines: dict[str, PlanEngine] = {}
+
 
 def _get_engine(cr_id: str) -> PlanEngine:
-    """Load plan + execution state, return an engine instance."""
-    plan = load_plan(DATA_DIR, cr_id)
-    if plan is None:
-        abort(404, description=f"CR {cr_id} not found")
-    state = load_execution_state(DATA_DIR, cr_id)
-    return PlanEngine(plan, state)
-
-
-def _save(engine: PlanEngine):
-    """Persist the engine's execution state."""
-    save_execution_state(DATA_DIR, engine.state)
+    """Return the in-memory engine for a CR, or 404 if not started."""
+    engine = _engines.get(cr_id)
+    if engine is None:
+        abort(404, description=f"No active execution for {cr_id}. Call start first.")
+    return engine
 
 
 @api.route("/cr/<cr_id>/plan")
@@ -69,12 +71,15 @@ def get_row(cr_id, row):
 
 @api.route("/cr/<cr_id>/execution/start", methods=["POST"])
 def start_execution(cr_id):
-    """Initialize execution. Idempotent."""
+    """Start a fresh execution session. Always resets state."""
     body = request.get_json(silent=True) or {}
     actor = body.get("actor", "unknown")
-    engine = _get_engine(cr_id)
+    plan = load_plan(DATA_DIR, cr_id)
+    if plan is None:
+        abort(404, description=f"CR {cr_id} not found")
+    engine = PlanEngine(plan, ExecutionState(cr_id=cr_id))
     ps = engine.start_execution(actor)
-    _save(engine)
+    _engines[cr_id] = engine
     return {"ok": True, "data": ps.to_dict()}
 
 
@@ -113,7 +118,6 @@ def execute_cell(cr_id):
         return {"ok": False, "error": f"Unknown action: {action}"}, 400
 
     if result.ok:
-        _save(engine)
         # Include full plan state so the client can re-render everything
         ps = engine.get_plan_state()
         return {

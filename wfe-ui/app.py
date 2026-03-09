@@ -3,8 +3,9 @@
 import json
 from pathlib import Path
 
+import yaml
 import markdown
-from flask import Flask, render_template, abort, request, redirect, url_for
+from flask import Flask, render_template, abort, request, redirect, url_for, jsonify
 
 app = Flask(__name__)
 
@@ -138,9 +139,106 @@ def inbox():
     return render_template("inbox.html", active_page="inbox")
 
 
+WORKFLOWS_DIR = Path(__file__).resolve().parent.parent / "workflows"
+
+
+def _list_workflows():
+    """List all workflow YAML files with name and state."""
+    workflows = []
+    if WORKFLOWS_DIR.exists():
+        import yaml
+        for p in sorted(WORKFLOWS_DIR.glob("*.yaml")):
+            try:
+                data = yaml.safe_load(p.read_text(encoding="utf-8"))
+                workflows.append({
+                    "name": data.get("name", p.stem),
+                    "state": data.get("state", "unknown"),
+                })
+            except Exception:
+                workflows.append({"name": p.stem, "state": "error"})
+    return workflows
+
+
 @app.route("/initiate")
 def initiate():
-    return render_template("initiate.html", active_page="home")
+    return render_template("initiate.html", active_page="home", workflows=_list_workflows())
+
+
+# --- Template Editor ---
+
+DOCTYPES_DIR = Path(__file__).resolve().parent / "templates" / "doctypes"
+DOCTYPES_DIR.mkdir(exist_ok=True)
+
+
+def _list_templates():
+    """List all template YAML files."""
+    templates = []
+    for p in sorted(DOCTYPES_DIR.glob("*.template.yaml")):
+        try:
+            data = yaml.safe_load(p.read_text(encoding="utf-8"))
+            templates.append({
+                "slug": p.name.replace(".template.yaml", ""),
+                "name": data.get("name", p.stem),
+                "abbreviation": data.get("abbreviation", ""),
+                "field_count": len(data.get("fields", [])),
+            })
+        except Exception:
+            templates.append({"slug": p.stem, "name": p.stem, "abbreviation": "?", "field_count": 0})
+    return templates
+
+
+@app.route("/templates")
+def template_list():
+    return render_template("template_list.html", active_page="templates", templates=_list_templates())
+
+
+@app.route("/template/<slug>")
+def template_editor(slug):
+    tpl_path = DOCTYPES_DIR / f"{slug}.template.yaml"
+    if not tpl_path.exists():
+        abort(404)
+    tpl_data = yaml.safe_load(tpl_path.read_text(encoding="utf-8"))
+    wf_path = DOCTYPES_DIR / f"{slug}.workflow.yaml"
+    wf_data = yaml.safe_load(wf_path.read_text(encoding="utf-8")) if wf_path.exists() else None
+    return render_template("template_editor.html", active_page="templates", slug=slug,
+                           template_data=tpl_data, workflow_data=wf_data)
+
+
+@app.route("/template/<slug>/save", methods=["POST"])
+def template_save(slug):
+    payload = request.get_json()
+    if not payload:
+        return {"ok": False, "error": "No data"}, 400
+    tpl_data = payload.get("template")
+    wf_data = payload.get("workflow")
+    if tpl_data:
+        path = DOCTYPES_DIR / f"{slug}.template.yaml"
+        path.write_text(yaml.dump(tpl_data, default_flow_style=False, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    if wf_data:
+        path = DOCTYPES_DIR / f"{slug}.workflow.yaml"
+        path.write_text(yaml.dump(wf_data, default_flow_style=False, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    return {"ok": True}
+
+
+@app.route("/template/create", methods=["POST"])
+def template_create():
+    payload = request.get_json()
+    name = payload.get("name", "").strip()
+    abbreviation = payload.get("abbreviation", "").strip().upper()
+    if not abbreviation:
+        return {"ok": False, "error": "Abbreviation is required"}, 400
+    slug = abbreviation
+    path = DOCTYPES_DIR / f"{slug}.template.yaml"
+    if path.exists():
+        return {"ok": False, "error": f"Template {slug} already exists"}, 409
+    data = {
+        "name": name or f"{abbreviation} Document",
+        "abbreviation": abbreviation,
+        "id_format": f"{abbreviation}-{{number:03d}}",
+        "fields": [],
+    }
+    path.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    return {"ok": True, "slug": slug}
 
 
 def _next_cr_number():
@@ -264,6 +362,12 @@ def save_plan(cr_id):
     data["eis"] = data["plan_rows"]  # keep eis in sync for the CR summary
     _save_cr(cr_id, data)
     return {"ok": True}
+
+
+@app.route("/sandbox")
+def sandbox():
+    templates = _list_templates()
+    return render_template("sandbox.html", active_page="sandbox", templates=templates)
 
 
 @app.route("/manual")

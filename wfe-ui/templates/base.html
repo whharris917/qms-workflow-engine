@@ -101,6 +101,12 @@
             <a href="{{ url_for('inbox') }}" class="{% if active_page == 'inbox' %}active{% endif %}">
                 <span class="nav-icon">&#9993;</span> Inbox
             </a>
+            <a href="{{ url_for('template_list') }}" class="{% if active_page == 'templates' %}active{% endif %}">
+                <span class="nav-icon">&#9634;</span> Templates
+            </a>
+            <a href="{{ url_for('sandbox') }}" class="{% if active_page == 'sandbox' %}active{% endif %}">
+                <span class="nav-icon">&#9654;</span> Workflow Sandbox
+            </a>
             <a href="{{ url_for('manual_index') }}" class="{% if active_page == 'manual' %}active{% endif %}">
                 <span class="nav-icon">&#9733;</span> Quality Manual
             </a>

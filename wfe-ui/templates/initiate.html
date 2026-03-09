@@ -31,6 +31,34 @@
     </p>
 </div>
 
+<div class="section-direct">
+    <h2>Create a Workflow</h2>
+    <p>Workflows are reusable, data-driven process definitions that guide execution step by step.</p>
+    <div class="direct-buttons">
+        <a href="/create/workflow" class="direct-btn">
+            <span class="direct-btn-label">Blank Workflow</span>
+            <span class="direct-btn-desc">Start from scratch with an empty node graph</span>
+        </a>
+        <a href="/create/workflow?from=create-cr" class="direct-btn">
+            <span class="direct-btn-label">From Template: Create CR</span>
+            <span class="direct-btn-desc">Clone the CR creation workflow as a starting point</span>
+        </a>
+    </div>
+    <details class="workflow-catalog">
+        <summary>Browse existing workflows</summary>
+        <div class="catalog-list">
+            {% for wf in workflows %}
+            <a href="/workflow/{{ wf.name }}" class="catalog-item">
+                <span class="catalog-name">{{ wf.name }}</span>
+                <span class="catalog-state">{{ wf.state }}</span>
+            </a>
+            {% else %}
+            <p class="catalog-empty">No workflows found.</p>
+            {% endfor %}
+        </div>
+    </details>
+</div>
+
 <div class="section-guide">
     <div class="tree-container">
         <div class="breadcrumb" id="breadcrumb"></div>
@@ -100,6 +128,48 @@
         line-height: 1.5;
     }
     .child-doc-note a { color: #2a6bcf; }
+
+    .workflow-catalog {
+        margin-top: 1rem;
+    }
+    .workflow-catalog summary {
+        font-size: 0.85rem;
+        color: #2a6bcf;
+        cursor: pointer;
+        font-weight: 500;
+    }
+    .workflow-catalog summary:hover { text-decoration: underline; }
+    .catalog-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+        margin-top: 0.6rem;
+    }
+    .catalog-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0.75rem;
+        background: #f8f9fb;
+        border: 1px solid #e8e8e8;
+        border-radius: 5px;
+        text-decoration: none;
+        color: #333;
+        font-size: 0.85rem;
+        transition: border-color 0.12s;
+    }
+    .catalog-item:hover { border-color: #4a9eff; }
+    .catalog-name { font-weight: 500; }
+    .catalog-state {
+        font-size: 0.75rem;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    .catalog-empty {
+        font-size: 0.85rem;
+        color: #999;
+    }
 
     .tree-container {
         margin-top: 1rem;
