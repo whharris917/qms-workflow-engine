@@ -936,10 +936,18 @@ function connect() {
         if (ev.type === 'init') {
             addLog(ev);
             pathEl.textContent = ev.current_path || '\u2014';
-            /* Render the current page state immediately */
-            if (ev.page) extractState(ev.page);
-            /* Replay recent history into the event log */
+            /* Recover focus from the most recent result event in history */
             var hist = ev.history || [];
+            var lastFocus = null;
+            for (var i = hist.length - 1; i >= 0; i--) {
+                if (hist[i].type === 'result' && hist[i].focus) {
+                    lastFocus = hist[i].focus;
+                    break;
+                }
+            }
+            /* Render the current page state immediately (with recovered focus) */
+            if (ev.page) extractState(ev.page, lastFocus);
+            /* Replay recent history into the event log */
             hist.slice(-20).forEach(addLog);
             return;
         }
