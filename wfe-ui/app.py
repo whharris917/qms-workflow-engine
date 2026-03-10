@@ -440,10 +440,18 @@ def _compute_focus(before: dict, after: dict) -> dict:
         if old is None or old.get("value") != field.get("value"):
             changed[label] = field
 
-    before_labels = {a["label"] for a in before.get("affordances", [])}
+    def _aff_key(a):
+        """Stable identity for an affordance — action + field for set_field, else action."""
+        b = a.get("body", {})
+        action = b.get("action", "")
+        if action == "set_field":
+            return (action, b.get("field", ""))
+        return (action, b.get("node", b.get("label", "")))
+
+    before_keys = {_aff_key(a) for a in before.get("affordances", [])}
     new_affordances = []
     for a in after.get("affordances", []):
-        if a["label"] not in before_labels:
+        if _aff_key(a) not in before_keys:
             new_affordances.append(a)
 
     return {
