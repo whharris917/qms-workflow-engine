@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Agent Observer</title>
+    <title>Observer: {{ workflow_title }}</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Consolas', 'Monaco', monospace; background: #0a0a0a; color: #aaa; }
@@ -75,7 +75,7 @@
 </head>
 <body>
     <div class="header">
-        <h1>Agent Observer</h1>
+        <h1>Observer: {{ workflow_title }}</h1>
         <div class="status">
             <span class="status-label">stream:</span>
             <span id="conn" class="disconnected">off</span>
@@ -116,10 +116,10 @@ var agentState = null;     // latest parsed page JSON
 var lastRaw = null;        // latest raw content string
 var lastMessage = '';
 
+/* Renderer availability is declared by the workflow, not guessed from data shape. */
+var allowedRenderers = {{ renderers|safe }};
+
 function registerRenderer(r) {
-    /* r.matches(state) — returns true if this renderer can display the given state.
-       If omitted, renderer matches everything (e.g. Raw). */
-    if (!r.matches) r.matches = function() { return true; };
     renderers[r.id] = r;
     /* Create container div */
     var container = document.createElement('div');
@@ -128,22 +128,14 @@ function registerRenderer(r) {
     document.getElementById('view-frame').appendChild(container);
     r._container = container;
     r.init(container);
-    /* Create mode button */
+    /* Create mode button — only visible if this workflow declares it */
     var btn = document.createElement('button');
     btn.className = 'mode-btn';
     btn.id = 'btn-' + r.id;
     btn.textContent = r.label;
     btn.onclick = function() { setMode(r.id); };
+    btn.style.display = allowedRenderers.indexOf(r.id) >= 0 ? '' : 'none';
     document.getElementById('mode-toggle').appendChild(btn);
-}
-
-function updateVisibleButtons() {
-    /* Show/hide mode buttons based on which renderers match current state */
-    for (var id in renderers) {
-        var btn = document.getElementById('btn-' + id);
-        var visible = renderers[id].matches(agentState);
-        btn.style.display = visible ? '' : 'none';
-    }
 }
 
 function setMode(id) {
@@ -166,11 +158,6 @@ function setMode(id) {
 function broadcastState(state, msg) {
     agentState = state;
     lastMessage = msg;
-    updateVisibleButtons();
-    /* If current renderer doesn't match, fall back to raw */
-    if (activeRenderer && renderers[activeRenderer] && !renderers[activeRenderer].matches(state)) {
-        setMode('raw');
-    }
     if (activeRenderer && renderers[activeRenderer]) {
         renderers[activeRenderer].update(state, msg);
     }
@@ -338,7 +325,7 @@ registerRenderer({
     registerRenderer({
         id: 'map',
         label: 'Map',
-        matches: function(s) { return s && s.state && ('hp' in s.state || 'position' in s.state) && !s.state.stage; },
+        /* renderer availability declared by workflow, not matched here */
         init: function(c) {
             c.innerHTML = '<canvas id="map-canvas"></canvas>'
                 + '<div style="position:absolute;top:0;left:0;right:0;padding:0.6rem 0.8rem;display:flex;gap:1.2rem;align-items:center;background:rgba(10,10,10,0.85);border-bottom:1px solid #222;">'
@@ -572,7 +559,7 @@ registerRenderer({
     registerRenderer({
         id: 'terminal',
         label: 'Terminal',
-        matches: function(s) { return s && s.state && ('hp' in s.state || 'position' in s.state) && !s.state.stage; },
+        /* renderer availability declared by workflow, not matched here */
         init: function(c) {
             c.style.cssText = 'position:relative;overflow:hidden;';
             /* CRT scanline overlay + phosphor glow */
@@ -784,7 +771,7 @@ registerRenderer({
     registerRenderer({
         id: 'workflow',
         label: 'Workflow',
-        matches: function(s) { return s && s.state && !!s.state.stage; },
+        /* renderer availability declared by workflow, not matched here */
         init: function(c) {
             c.style.cssText = 'overflow-y:auto;padding:0;';
             /* Style goes in <head> so container.innerHTML can't destroy it */
@@ -904,7 +891,7 @@ function addLog(event) {
    SSE CONNECTION
    ====================================================================== */
 function connect() {
-    var es = new EventSource('/agent/current/stream');
+    var es = new EventSource('{{ stream_url }}');
     es.onopen = function() { connEl.textContent='live'; connEl.className='connected'; };
     es.onerror = function() { connEl.textContent='off'; connEl.className='disconnected'; es.close(); setTimeout(connect,3000); };
     es.onmessage = function(e) {
@@ -912,13 +899,10 @@ function connect() {
         if (ev.type === 'init') {
             addLog(ev);
             pathEl.textContent = ev.current_path || '\u2014';
+            /* Render the current page state immediately */
+            if (ev.page) extractState(ev.page);
+            /* Replay recent history into the event log */
             var hist = ev.history || [];
-            for (var i = hist.length-1; i >= 0; i--) {
-                if (hist[i].type === 'navigate' && hist[i].content) {
-                    extractState(hist[i].content);
-                    break;
-                }
-            }
             hist.slice(-20).forEach(addLog);
             return;
         }
@@ -934,7 +918,8 @@ function connect() {
 }
 
 /* ── Boot ── */
-setMode('raw');
+/* Default to the last (most specific) declared renderer */
+setMode(allowedRenderers[allowedRenderers.length - 1] || 'raw');
 connect();
 </script>
 </body>

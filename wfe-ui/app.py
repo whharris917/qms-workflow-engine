@@ -374,27 +374,53 @@ def sandbox():
 
 # ── Agent Portal ──
 
-_agent_state = {
-    "current_path": None,
-    "data": {},
-    "history": [],
-}
-_observer_queues: list[Queue] = []
+# -- Workflow registry: per-workflow state, observers, history --
+
+_WORKFLOW_STATE_DIR = DATA_DIR / "workflows"
+_WORKFLOW_STATE_DIR.mkdir(exist_ok=True)
+
+# In-memory state per workflow: observers and event history (not persisted)
+_workflow_observers: dict[str, list[Queue]] = {}
+_workflow_history: dict[str, list[dict]] = {}
+_workflow_current_path: dict[str, str | None] = {}
 
 
-def _agent_notify(event: dict):
+def _wf_state_path(workflow_id: str) -> Path:
+    """Return the on-disk JSON state file for a workflow."""
+    return _WORKFLOW_STATE_DIR / f"{workflow_id}.state.json"
+
+
+def _wf_load_state(workflow_id: str) -> dict:
+    """Load workflow state from disk, or return empty dict if none."""
+    p = _wf_state_path(workflow_id)
+    if p.exists():
+        with open(p) as f:
+            return json.load(f)
+    return {}
+
+
+def _wf_save_state(workflow_id: str, data: dict):
+    """Persist workflow state to disk."""
+    p = _wf_state_path(workflow_id)
+    with open(p, "w") as f:
+        json.dump(data, f, indent=2)
+
+
+def _wf_notify(workflow_id: str, event: dict):
+    """Append event to history and push to all SSE observers for a workflow."""
     event.setdefault("timestamp", _time.time())
-    _agent_state["history"].append(event)
-    if len(_agent_state["history"]) > 500:
-        _agent_state["history"] = _agent_state["history"][-500:]
+    hist = _workflow_history.setdefault(workflow_id, [])
+    hist.append(event)
+    if len(hist) > 500:
+        _workflow_history[workflow_id] = hist[-500:]
     dead = []
-    for q in _observer_queues:
+    for q in _workflow_observers.get(workflow_id, []):
         try:
             q.put_nowait(event)
         except Exception:
             dead.append(q)
     for q in dead:
-        _observer_queues.remove(q)
+        _workflow_observers[workflow_id].remove(q)
 
 
 # ---------------------------------------------------------------------------
@@ -521,12 +547,13 @@ def _maze_default_data():
     }
 
 
-def _maze_data():
-    """Return the current agent maze data, initializing if needed."""
-    d = _agent_state["data"]
+def _maze_data(workflow_id: str) -> dict:
+    """Return the current maze data for a workflow, initializing if needed."""
+    d = _wf_load_state(workflow_id)
     if "hp" not in d:
-        _agent_state["data"] = _maze_default_data()
-    return _agent_state["data"]
+        d = _maze_default_data()
+        _wf_save_state(workflow_id, d)
+    return d
 
 
 def _maze_items_here(room_id, data):
@@ -535,13 +562,14 @@ def _maze_items_here(room_id, data):
     return [i for i in room.get("items", []) if i not in data["picked_up"]]
 
 
-def _render_maze_room(room_id):
+def _render_maze_room(room_id, workflow_id: str):
     """Render the agent's current maze room as a JSON-serializable dict."""
     room = _MAZE.get(room_id)
     if room is None:
         return None
 
-    data = _maze_data()
+    data = _maze_data(workflow_id)
+    api_url = f"/agent/{workflow_id}"
 
     # Handle pit auto-move + damage
     if "auto_move" in room:
@@ -551,11 +579,12 @@ def _render_maze_room(room_id):
         data["hp"] = max(0, data["hp"] - dmg)
         dest = room["auto_move"]
         data["position"] = dest
+        _wf_save_state(workflow_id, data)
         msg = room.get("damage_msg", "")
         if data["hp"] <= 0:
-            return _render_death(msg)
-        _agent_notify({"type": "navigate", "path": dest, "content": f"(auto-moved to {dest})"})
-        page = _render_maze_room(dest)
+            return _render_death(workflow_id, msg)
+        _wf_notify(workflow_id, {"type": "navigate", "path": dest, "content": f"(auto-moved to {dest})"})
+        page = _render_maze_room(dest, workflow_id)
         if msg:
             page["message"] = msg + f" (-{room.get('damage', 0)} HP)"
         return page
@@ -573,7 +602,7 @@ def _render_maze_room(room_id):
             data["hp"] = max(0, data["hp"] - dmg)
             msg = room.get("hazard_msg", "") + f" (-{dmg} HP)"
             if data["hp"] <= 0:
-                return _render_death(msg)
+                return _render_death(workflow_id, msg)
 
     # Handle shrine heal
     if room.get("heal") and not data["flags"].get(f"healed_{room_id}"):
@@ -585,6 +614,9 @@ def _render_maze_room(room_id):
         actual = data["hp"] - old_hp
         if actual > 0:
             msg = room.get("heal_msg", f"You recover {actual} HP.")
+
+    # Persist any mutations from hazard/heal processing
+    _wf_save_state(workflow_id, data)
 
     # Determine description
     is_dark = room.get("dark") and "torch" not in data["inventory"]
@@ -605,7 +637,7 @@ def _render_maze_room(room_id):
     for direction, dest in room.get("exits", {}).items():
         affordances.append({
             "id": n, "label": f"Move {direction}",
-            "method": "POST", "url": "/agent/maze",
+            "method": "POST", "url": api_url,
             "body": {"action": "move", "direction": direction},
         })
         n += 1
@@ -615,21 +647,21 @@ def _render_maze_room(room_id):
         if data["flags"].get(f"unlocked_{room_id}_{direction}"):
             affordances.append({
                 "id": n, "label": f"Move {direction} (unlocked)",
-                "method": "POST", "url": "/agent/maze",
+                "method": "POST", "url": api_url,
                 "body": {"action": "move", "direction": direction},
             })
             n += 1
         elif lock["key"] in data["inventory"]:
             affordances.append({
                 "id": n, "label": f"Unlock {direction} gate with {_ITEMS[lock['key']]['name']}",
-                "method": "POST", "url": "/agent/maze",
+                "method": "POST", "url": api_url,
                 "body": {"action": "unlock", "direction": direction},
             })
             n += 1
         else:
             affordances.append({
                 "id": n, "label": f"[Locked] {lock['desc']} (need a key)",
-                "method": "POST", "url": "/agent/maze",
+                "method": "POST", "url": api_url,
                 "body": {"action": "move", "direction": direction},
             })
             n += 1
@@ -639,7 +671,7 @@ def _render_maze_room(room_id):
         for direction, dest in room.get("enemy_exit", {}).items():
             affordances.append({
                 "id": n, "label": f"Move {direction}",
-                "method": "POST", "url": "/agent/maze",
+                "method": "POST", "url": api_url,
                 "body": {"action": "move", "direction": direction},
             })
             n += 1
@@ -650,7 +682,7 @@ def _render_maze_room(room_id):
         item = _ITEMS[item_id]
         affordances.append({
             "id": n, "label": f"Pick up {item['name']}",
-            "method": "POST", "url": "/agent/maze",
+            "method": "POST", "url": api_url,
             "body": {"action": "pick_up", "item": item_id},
         })
         n += 1
@@ -665,7 +697,7 @@ def _render_maze_room(room_id):
         if item.get("consumable"):
             affordances.append({
                 "id": n, "label": f"Use {item['name']}",
-                "method": "POST", "url": "/agent/maze",
+                "method": "POST", "url": api_url,
                 "body": {"action": "use", "item": item_id},
             })
             n += 1
@@ -674,7 +706,7 @@ def _render_maze_room(room_id):
     if room.get("drink") and not data["flags"].get(f"drunk_{room_id}"):
         affordances.append({
             "id": n, "label": "Drink from the cistern",
-            "method": "POST", "url": "/agent/maze",
+            "method": "POST", "url": api_url,
             "body": {"action": "drink"},
         })
         n += 1
@@ -684,14 +716,14 @@ def _render_maze_room(room_id):
         if "sword" in data["inventory"]:
             affordances.append({
                 "id": n, "label": f"Attack the {enemy} with your sword",
-                "method": "POST", "url": "/agent/maze",
+                "method": "POST", "url": api_url,
                 "body": {"action": "attack"},
             })
             n += 1
         else:
             affordances.append({
                 "id": n, "label": f"Attack the {enemy} (bare-handed — risky!)",
-                "method": "POST", "url": "/agent/maze",
+                "method": "POST", "url": api_url,
                 "body": {"action": "attack"},
             })
             n += 1
@@ -700,7 +732,7 @@ def _render_maze_room(room_id):
     if room_id == "vault" and "treasure" not in data["picked_up"]:
         affordances.append({
             "id": n, "label": "Take the gold coin",
-            "method": "POST", "url": "/agent/maze",
+            "method": "POST", "url": api_url,
             "body": {"action": "take_treasure"},
         })
         n += 1
@@ -728,9 +760,10 @@ def _render_maze_room(room_id):
     return result
 
 
-def _render_death(reason=""):
+def _render_death(workflow_id: str, reason=""):
     """Render the death screen."""
-    data = _maze_data()
+    data = _maze_data(workflow_id)
+    api_url = f"/agent/{workflow_id}"
     msg = "You have perished."
     if reason:
         msg = reason + " " + msg
@@ -745,7 +778,7 @@ def _render_death(reason=""):
         "instructions": msg,
         "affordances": [{
             "id": 1, "label": "Restart from entrance",
-            "method": "POST", "url": "/agent/maze",
+            "method": "POST", "url": api_url,
             "body": {"action": "restart"},
         }],
     }
@@ -777,6 +810,24 @@ _CR_STAGE_TO_LIFECYCLE = {
     for sid, s in _CR_DEF["stages"].items()
 }
 
+# -- Workflow registry --
+# Each entry maps a workflow_id to its type and display metadata.
+# The type determines which render/process functions handle it.
+_WORKFLOWS = {
+    "maze": {
+        "type": "maze",
+        "title": "Dungeon Maze",
+        "description": "Navigate a 13-room dungeon. Find the treasure, avoid the traps.",
+        "renderers": ["raw", "map", "terminal"],
+    },
+    "create-cr": {
+        "type": "create-cr",
+        "title": "Create Change Record",
+        "description": "Author a Change Record through the full pre-approval lifecycle.",
+        "renderers": ["raw", "workflow"],
+    },
+}
+
 
 def _cr_default_data():
     """Return a fresh agent data dict for the CR workflow, derived from YAML."""
@@ -787,12 +838,13 @@ def _cr_default_data():
     return d
 
 
-def _cr_data():
+def _cr_data(workflow_id: str) -> dict:
     """Return the current CR workflow data, initializing if needed."""
-    d = _agent_state.get("data", {})
+    d = _wf_load_state(workflow_id)
     if "stage" not in d or "title" not in d:
-        _agent_state["data"] = _cr_default_data()
-    return _agent_state["data"]
+        d = _cr_default_data()
+        _wf_save_state(workflow_id, d)
+    return d
 
 
 def _trunc(val, length=80):
@@ -860,7 +912,7 @@ def _cr_field_summary(data, stage):
     return fields
 
 
-def _cr_build_affordances(data, stage):
+def _cr_build_affordances(data, stage, workflow_id: str):
     """Generate affordances from YAML field definitions and stage config.
 
     Affordance rules by field type:
@@ -876,6 +928,7 @@ def _cr_build_affordances(data, stage):
     """
     affordances = []
     n = 1
+    api_url = f"/agent/{workflow_id}"
     stage_def = _CR_DEF["stages"][stage]
 
     # -- Field affordances --
@@ -896,7 +949,7 @@ def _cr_build_affordances(data, stage):
                 suffix = f" (current: \"{_trunc(current, 50)}\")"
             placeholder = fdef.get("placeholder", f"<{label.lower()}>")
             a = {"id": n, "label": f"Set {label}{suffix}",
-                 "method": "POST", "url": "/agent/create-cr",
+                 "method": "POST", "url": api_url,
                  "body": {"action": "set_field", "field": key, "value": placeholder}}
             affordances.append(a)
             n += 1
@@ -908,7 +961,7 @@ def _cr_build_affordances(data, stage):
             opp_tag = "Yes" if opposite else "No"
             a = {"id": n,
                  "label": f"[{tag}] {label} — click to set {opp_tag}",
-                 "method": "POST", "url": "/agent/create-cr",
+                 "method": "POST", "url": api_url,
                  "body": {"action": "set_field", "field": key, "value": opposite}}
             affordances.append(a)
             n += 1
@@ -925,7 +978,7 @@ def _cr_build_affordances(data, stage):
                 prefix = "[Selected] " if selected else ""
                 a = {"id": n,
                      "label": f"{prefix}Set {label.lower()}: {opt}{tag}",
-                     "method": "POST", "url": "/agent/create-cr",
+                     "method": "POST", "url": api_url,
                      "body": {"action": "set_field", "field": key, "value": opt}}
                 affordances.append(a)
                 n += 1
@@ -938,7 +991,7 @@ def _cr_build_affordances(data, stage):
         if "stage" in nav:
             body["stage"] = nav["stage"]
         a = {"id": n, "label": nav["label"],
-             "method": "POST", "url": "/agent/create-cr", "body": body}
+             "method": "POST", "url": api_url, "body": body}
         affordances.append(a)
         n += 1
 
@@ -948,7 +1001,7 @@ def _cr_build_affordances(data, stage):
         required = proceed.get("requires", [])
         if all(data.get(f) for f in required):
             a = {"id": n, "label": proceed["label"],
-                 "method": "POST", "url": "/agent/create-cr",
+                 "method": "POST", "url": api_url,
                  "body": {"action": "proceed"}}
             affordances.append(a)
             n += 1
@@ -956,7 +1009,7 @@ def _cr_build_affordances(data, stage):
     # -- Stage actions --
     for act in stage_def.get("actions", []):
         a = {"id": n, "label": act["label"],
-             "method": "POST", "url": "/agent/create-cr",
+             "method": "POST", "url": api_url,
              "body": {"action": act["action"]}}
         affordances.append(a)
         n += 1
@@ -964,15 +1017,15 @@ def _cr_build_affordances(data, stage):
     return affordances
 
 
-def _render_cr_stage(stage=None):
+def _render_cr_stage(workflow_id: str, stage=None):
     """Render the current CR workflow stage as a JSON-serializable dict."""
-    data = _cr_data()
+    data = _cr_data(workflow_id)
     if stage is None:
         stage = data["stage"]
 
     info = _CR_STAGE_INFO[stage]
     stage_idx = _CR_STAGES.index(stage)
-    affordances = _cr_build_affordances(data, stage)
+    affordances = _cr_build_affordances(data, stage, workflow_id)
 
     # Build fields display
     fields_display = _cr_field_summary(data, stage)
@@ -1026,14 +1079,15 @@ def _render_cr_stage(stage=None):
     return result
 
 
-def _process_cr_action(body):
+def _process_cr_action(workflow_id: str, body):
     """Process a POST action for the Create CR workflow."""
-    data = _cr_data()
+    data = _cr_data(workflow_id)
     action = body.get("action")
 
     if action == "restart":
-        _agent_state["data"] = _cr_default_data()
-        return _render_cr_stage()
+        data = _cr_default_data()
+        _wf_save_state(workflow_id, data)
+        return _render_cr_stage(workflow_id)
 
     stage = data["stage"]
 
@@ -1065,7 +1119,8 @@ def _process_cr_action(body):
         else:
             return {"error": f"Unknown field: {field}"}
 
-        page = _render_cr_stage()
+        _wf_save_state(workflow_id, data)
+        page = _render_cr_stage(workflow_id)
         display_val = str(value)
         page["message"] = f"Set {field} = \"{_trunc(display_val, 60)}\""
         return page
@@ -1077,9 +1132,10 @@ def _process_cr_action(body):
         if stage not in data["completed_stages"]:
             data["completed_stages"].append(stage)
         data["stage"] = _CR_STAGES[idx + 1]
-        page = _render_cr_stage()
+        _wf_save_state(workflow_id, data)
+        page = _render_cr_stage(workflow_id)
         page["message"] = f"Advanced to: {_CR_STAGE_INFO[data['stage']]['title']}"
-        _agent_notify({"type": "navigate", "path": data["stage"], "content": json.dumps(page)})
+        _wf_notify(workflow_id, {"type": "navigate", "path": data["stage"], "content": json.dumps(page)})
         return page
 
     if action == "go_back":
@@ -1087,9 +1143,10 @@ def _process_cr_action(body):
         if idx <= 0:
             return {"error": "Already at the first stage."}
         data["stage"] = _CR_STAGES[idx - 1]
-        page = _render_cr_stage()
+        _wf_save_state(workflow_id, data)
+        page = _render_cr_stage(workflow_id)
         page["message"] = f"Returned to: {_CR_STAGE_INFO[data['stage']]['title']}"
-        _agent_notify({"type": "navigate", "path": data["stage"], "content": json.dumps(page)})
+        _wf_notify(workflow_id, {"type": "navigate", "path": data["stage"], "content": json.dumps(page)})
         return page
 
     if action == "go_to":
@@ -1097,9 +1154,10 @@ def _process_cr_action(body):
         if target not in _CR_STAGES:
             return {"error": f"Unknown stage: {target}"}
         data["stage"] = target
-        page = _render_cr_stage()
+        _wf_save_state(workflow_id, data)
+        page = _render_cr_stage(workflow_id)
         page["message"] = f"Jumped to: {_CR_STAGE_INFO[target]['title']}"
-        _agent_notify({"type": "navigate", "path": target, "content": json.dumps(page)})
+        _wf_notify(workflow_id, {"type": "navigate", "path": target, "content": json.dumps(page)})
         return page
 
     if action == "submit":
@@ -1108,54 +1166,56 @@ def _process_cr_action(body):
         data["stage"] = "submitted"
         if "preflight" not in data["completed_stages"]:
             data["completed_stages"].append("preflight")
-        page = _render_cr_stage()
+        _wf_save_state(workflow_id, data)
+        page = _render_cr_stage(workflow_id)
         page["message"] = "Change Record submitted for review. Well done."
         page["completed"] = True
-        _agent_notify({"type": "navigate", "path": "submitted", "content": json.dumps(page)})
+        _wf_notify(workflow_id, {"type": "navigate", "path": "submitted", "content": json.dumps(page)})
         return page
 
     return {"error": f"Unknown action: {action}"}
 
 
-def _render_agent_node(path):
-    """Render a workflow node as a JSON-serializable dict."""
-    if path == "maze":
-        data = _maze_data()
+def _render_agent_node(workflow_id: str):
+    """Render the current state of a workflow as a JSON-serializable dict."""
+    wf_type = _WORKFLOWS.get(workflow_id, {}).get("type")
+    if wf_type == "maze":
+        data = _maze_data(workflow_id)
         if data["hp"] <= 0:
-            return _render_death()
-        return _render_maze_room(data["position"])
+            return _render_death(workflow_id)
+        return _render_maze_room(data["position"], workflow_id)
 
-    if path == "create-cr":
-        return _render_cr_stage()
+    if wf_type == "create-cr":
+        return _render_cr_stage(workflow_id)
 
-    return {"error": f"Node not yet defined: {path}"}
+    return {"error": f"Unknown workflow: {workflow_id}"}
 
 
-_last_action_time: float = 0.0
+_last_action_times: dict[str, float] = {}
 _ACTION_COOLDOWN: float = 1.0  # seconds between actions
 
 
-def _process_agent_action(path, body):
-    """Process a POST action at a workflow node."""
-    global _last_action_time
-
-    # Rate limit
+def _process_agent_action(workflow_id: str, body):
+    """Process a POST action for a workflow."""
+    # Rate limit per workflow
     now = _time.time()
-    elapsed = now - _last_action_time
+    elapsed = now - _last_action_times.get(workflow_id, 0.0)
     if elapsed < _ACTION_COOLDOWN:
         return {
             "error": f"Too fast. Wait {_ACTION_COOLDOWN - elapsed:.1f}s before your next action.",
             "retry_after": round(_ACTION_COOLDOWN - elapsed, 1),
         }
-    _last_action_time = now
+    _last_action_times[workflow_id] = now
 
-    if path == "create-cr":
-        return _process_cr_action(body)
+    wf_type = _WORKFLOWS.get(workflow_id, {}).get("type")
 
-    if path != "maze":
-        return {"error": f"No action handler for: {path}"}
+    if wf_type == "create-cr":
+        return _process_cr_action(workflow_id, body)
 
-    data = _maze_data()
+    if wf_type != "maze":
+        return {"error": f"Unknown workflow: {workflow_id}"}
+
+    data = _maze_data(workflow_id)
     pos = data["position"]
     room = _MAZE.get(pos)
     if room is None:
@@ -1165,15 +1225,16 @@ def _process_agent_action(path, body):
 
     # --- restart ---
     if action == "restart":
-        _agent_state["data"] = _maze_default_data()
-        page = _render_maze_room("entrance")
+        data = _maze_default_data()
+        _wf_save_state(workflow_id, data)
+        page = _render_maze_room("entrance", workflow_id)
         page["message"] = "You awaken at the entrance, memories of your demise fading like a dream."
-        _agent_notify({"type": "navigate", "path": "entrance", "content": json.dumps(page)})
+        _wf_notify(workflow_id, {"type": "navigate", "path": "entrance", "content": json.dumps(page)})
         return page
 
     # --- dead check ---
     if data["hp"] <= 0:
-        return _render_death()
+        return _render_death(workflow_id)
 
     # --- move ---
     if action == "move":
@@ -1203,13 +1264,11 @@ def _process_agent_action(path, body):
                 valid += list((room.get("enemy_exit") or {}).keys())
             return {"error": f"Cannot go {direction}. Valid exits: {', '.join(valid) or 'none'}"}
 
-        # Clear per-room hazard flags so re-entry triggers them again
-        # (but NOT for the room we're leaving — only reset on re-entry)
         data["position"] = dest
-        # Reset hazard flag for destination so it triggers on re-entry
         data["flags"].pop(f"hazard_{dest}", None)
-        page = _render_maze_room(data["position"])
-        _agent_notify({"type": "navigate", "path": data["position"], "content": json.dumps(page)})
+        _wf_save_state(workflow_id, data)
+        page = _render_maze_room(data["position"], workflow_id)
+        _wf_notify(workflow_id, {"type": "navigate", "path": data["position"], "content": json.dumps(page)})
         return page
 
     # --- unlock ---
@@ -1221,7 +1280,8 @@ def _process_agent_action(path, body):
         if locked["key"] not in data["inventory"]:
             return {"error": f"You don't have the required key."}
         data["flags"][f"unlocked_{pos}_{direction}"] = True
-        page = _render_maze_room(pos)
+        _wf_save_state(workflow_id, data)
+        page = _render_maze_room(pos, workflow_id)
         page["message"] = f"You unlock the {direction} gate with the {_ITEMS[locked['key']]['name']}. The way is open."
         return page
 
@@ -1236,7 +1296,8 @@ def _process_agent_action(path, body):
             return {"error": f"No '{item_id}' here to pick up."}
         data["inventory"].append(item_id)
         data["picked_up"].append(item_id)
-        page = _render_maze_room(pos)
+        _wf_save_state(workflow_id, data)
+        page = _render_maze_room(pos, workflow_id)
         page["message"] = f"You pick up the {_ITEMS[item_id]['name']}. {_ITEMS[item_id]['desc']}"
         return page
 
@@ -1253,7 +1314,8 @@ def _process_agent_action(path, body):
         data["hp"] = min(data["max_hp"], data["hp"] + heal)
         actual = data["hp"] - old_hp
         data["inventory"].remove(item_id)
-        page = _render_maze_room(pos)
+        _wf_save_state(workflow_id, data)
+        page = _render_maze_room(pos, workflow_id)
         page["message"] = f"You use the {item['name']}. Restored {actual} HP."
         return page
 
@@ -1267,7 +1329,8 @@ def _process_agent_action(path, body):
         old_hp = data["hp"]
         data["hp"] = min(data["max_hp"], data["hp"] + 2)
         actual = data["hp"] - old_hp
-        page = _render_maze_room(pos)
+        _wf_save_state(workflow_id, data)
+        page = _render_maze_room(pos, workflow_id)
         page["message"] = f"You drink the cool water. Restored {actual} HP."
         return page
 
@@ -1283,25 +1346,25 @@ def _process_agent_action(path, body):
         if "amulet" in data["inventory"]:
             enemy_dmg = max(0, enemy_dmg - 1)
         if has_sword:
-            # Win with sword — take reduced damage
             dmg_taken = max(0, enemy_dmg - 2)
             data["hp"] = max(0, data["hp"] - dmg_taken)
             data["flags"][f"{enemy}_defeated"] = True
+            _wf_save_state(workflow_id, data)
             if data["hp"] <= 0:
-                return _render_death(f"You slay the {enemy}, but its dying blow fells you.")
-            page = _render_maze_room(pos)
+                return _render_death(workflow_id, f"You slay the {enemy}, but its dying blow fells you.")
+            page = _render_maze_room(pos, workflow_id)
             msg = f"You strike the {enemy} with your sword and it crumbles to dust!"
             if dmg_taken > 0:
                 msg += f" It managed to wound you in the fight. (-{dmg_taken} HP)"
             page["message"] = msg
             return page
         else:
-            # Bare-handed — take full damage, still win but costly
             data["hp"] = max(0, data["hp"] - enemy_dmg)
             data["flags"][f"{enemy}_defeated"] = True
+            _wf_save_state(workflow_id, data)
             if data["hp"] <= 0:
-                return _render_death(f"You wrestle the {enemy} to pieces, but its claws tear you apart.")
-            page = _render_maze_room(pos)
+                return _render_death(workflow_id, f"You wrestle the {enemy} to pieces, but its claws tear you apart.")
+            page = _render_maze_room(pos, workflow_id)
             page["message"] = f"You wrestle the {enemy} apart with your bare hands! But it wounds you grievously. (-{enemy_dmg} HP)"
             return page
 
@@ -1314,7 +1377,8 @@ def _process_agent_action(path, body):
         data["inventory"].append("treasure")
         data["picked_up"].append("treasure")
         data["flags"]["won"] = True
-        page = _render_maze_room(pos)
+        _wf_save_state(workflow_id, data)
+        page = _render_maze_room(pos, workflow_id)
         page["message"] = "You take the gold coin from the pedestal. It is heavy and warm in your hand. Congratulations — you have completed the dungeon!"
         page["completed"] = True
         return page
@@ -1324,25 +1388,50 @@ def _process_agent_action(path, body):
 
 @app.route("/agent")
 def agent_portal():
-    return render_template("agent.html")
+    # Build workflow list with state summaries
+    workflows = []
+    for wf_id, wf_info in _WORKFLOWS.items():
+        state = _wf_load_state(wf_id)
+        has_state = bool(state)
+        workflows.append({
+            "id": wf_id,
+            "title": wf_info["title"],
+            "description": wf_info["description"],
+            "has_state": has_state,
+        })
+    return render_template("agent.html", active_page="agent", workflows=workflows)
 
 
-@app.route("/agent/current")
-def agent_current():
-    return render_template("agent_observer.html")
+@app.route("/agent/<workflow_id>/observe")
+def agent_observe(workflow_id):
+    if workflow_id not in _WORKFLOWS:
+        abort(404)
+    wf_info = _WORKFLOWS[workflow_id]
+    return render_template(
+        "agent_observer.html",
+        workflow_id=workflow_id,
+        workflow_title=wf_info["title"],
+        stream_url=f"/agent/{workflow_id}/stream",
+        renderers=json.dumps(wf_info["renderers"]),
+    )
 
 
-@app.route("/agent/current/stream")
-def agent_stream():
+@app.route("/agent/<workflow_id>/stream")
+def agent_stream(workflow_id):
+    if workflow_id not in _WORKFLOWS:
+        return jsonify({"error": "Unknown workflow"}), 404
+
     def generate():
         q = Queue()
-        _observer_queues.append(q)
+        observers = _workflow_observers.setdefault(workflow_id, [])
+        observers.append(q)
         try:
+            page = _render_agent_node(workflow_id)
             init = {
                 "type": "init",
-                "current_path": _agent_state["current_path"],
-                "data": _agent_state["data"],
-                "history": _agent_state["history"][-100:],
+                "current_path": _workflow_current_path.get(workflow_id),
+                "page": page,
+                "history": _workflow_history.get(workflow_id, [])[-100:],
             }
             yield f"data: {json.dumps(init)}\n\n"
             while True:
@@ -1354,8 +1443,8 @@ def agent_stream():
         except GeneratorExit:
             pass
         finally:
-            if q in _observer_queues:
-                _observer_queues.remove(q)
+            if q in _workflow_observers.get(workflow_id, []):
+                _workflow_observers[workflow_id].remove(q)
     return Response(
         generate(),
         mimetype="text/event-stream",
@@ -1363,22 +1452,38 @@ def agent_stream():
     )
 
 
-@app.route("/agent/<path:node_path>", methods=["GET"])
-def agent_node_get(node_path):
-    page = _render_agent_node(node_path)
-    _agent_state["current_path"] = node_path
-    _agent_notify({"type": "navigate", "path": node_path, "content": json.dumps(page)})
+@app.route("/agent/<workflow_id>/reset", methods=["POST"])
+def agent_reset(workflow_id):
+    if workflow_id not in _WORKFLOWS:
+        return jsonify({"error": "Unknown workflow"}), 404
+    p = _wf_state_path(workflow_id)
+    if p.exists():
+        p.unlink()
+    _workflow_history.pop(workflow_id, None)
+    _workflow_current_path.pop(workflow_id, None)
+    return jsonify({"message": f"Workflow '{workflow_id}' reset."})
+
+
+@app.route("/agent/<workflow_id>", methods=["GET"])
+def agent_workflow_get(workflow_id):
+    if workflow_id not in _WORKFLOWS:
+        return jsonify({"error": f"Unknown workflow: {workflow_id}"}), 404
+    page = _render_agent_node(workflow_id)
+    _workflow_current_path[workflow_id] = workflow_id
+    _wf_notify(workflow_id, {"type": "navigate", "path": workflow_id, "content": json.dumps(page)})
     if page is None:
-        return jsonify({"error": f"Unknown node: {node_path}"}), 404
+        return jsonify({"error": f"Unknown workflow: {workflow_id}"}), 404
     return jsonify(page)
 
 
-@app.route("/agent/<path:node_path>", methods=["POST"])
-def agent_node_post(node_path):
+@app.route("/agent/<workflow_id>", methods=["POST"])
+def agent_workflow_post(workflow_id):
+    if workflow_id not in _WORKFLOWS:
+        return jsonify({"error": f"Unknown workflow: {workflow_id}"}), 404
     body = request.get_json(silent=True) or {}
-    _agent_notify({"type": "action", "path": node_path, "body": body})
-    result = _process_agent_action(node_path, body)
-    _agent_notify({"type": "result", "path": node_path, "result": result})
+    _wf_notify(workflow_id, {"type": "action", "path": workflow_id, "body": body})
+    result = _process_agent_action(workflow_id, body)
+    _wf_notify(workflow_id, {"type": "result", "path": workflow_id, "result": result})
     if "error" in result:
         return jsonify(result), 422
     return jsonify(result)
