@@ -1,19 +1,22 @@
 ## Agent workflow definition: Create Change Record
 ##
-## This file defines the fields, stages, visibility rules, and metadata
+## This file defines the nodes, fields, visibility rules, and metadata
 ## for the agent-facing CR creation workflow. The Python code interprets
 ## this declaratively — no workflow-specific if-chains.
+##
+## Fields are owned by their node — each node declares its own fields.
+## Nodes with show_all_fields: true aggregate fields from all nodes.
 ##
 ## Affordance generation rules (by field type):
 ##   text     → "Set {label}" with placeholder as value template
 ##   boolean  → toggle showing current state, offering the opposite
-##   select   → one affordance per option, marking current selection
+##   select   → single affordance with pipe-delimited options
 ##   computed → no affordance (read-only)
 ##
-## Stage-level affordances:
+## Node-level affordances:
 ##   navigation → always available (go_back, go_to)
 ##   proceed    → gated on required fields being non-null
-##   actions    → unconditional stage actions (submit, restart)
+##   actions    → unconditional node actions (submit, restart)
 
 submodules:
   - flow-state
@@ -27,7 +30,7 @@ sdlc_governed:
   - qms-cli
   - qms-workflow-engine
 
-stages:
+nodes:
   initiation:
     title: Initiation
     lifecycle_label: Initiation
@@ -36,6 +39,65 @@ stages:
     proceed:
       label: Proceed to Change Definition
       requires: [title, purpose]
+    fields:
+      title:
+        label: Document Title
+        type: text
+        key: title
+        instruction: A short, descriptive title for this Change Record.
+        placeholder: "<short descriptive title for this Change Record>"
+        default: null
+
+      affects_code:
+        label: Code Impact
+        type: boolean
+        key: affects_code
+        instruction: Does this change affect code (as opposed to documents only)?
+        default: false
+
+      affects_submodule:
+        label: Affects Submodule
+        type: boolean
+        key: affects_submodule
+        instruction: Does it affect a controlled submodule?
+        default: false
+        visible_when:
+          affects_code: true
+
+      submodule:
+        label: Submodule
+        type: select
+        key: submodule
+        options_ref: submodules
+        annotate_from: sdlc_governed
+        annotation: "(SDLC governed)"
+        instruction: Which controlled submodule is affected?
+        default: null
+        visible_when:
+          affects_submodule: true
+
+      sdlc_governed:
+        label: SDLC Governed
+        type: computed
+        key: submodule
+        instruction_when_true: >-
+          This submodule contains an SDLC-governed system.
+          Additional verification requirements apply.
+        instruction_when_false: >-
+          This submodule does not contain an SDLC-governed system.
+        computed: sdlc_check
+        visible_when:
+          affects_submodule: true
+          submodule: not_null
+
+      purpose:
+        label: Purpose
+        type: text
+        key: purpose
+        instruction: >-
+          What problem does this CR solve? What improvement does it introduce?
+        placeholder: "<what problem does this CR solve? what improvement does it introduce?>"
+        default: null
 
   definition:
     title: Change Definition
@@ -49,18 +111,115 @@ stages:
     proceed:
       label: Proceed to Pre-Submission Review
       requires: [scope_changes, current_state, proposed_state, change_description, justification]
+    fields:
+      scope_context:
+        label: "Scope: Context"
+        type: text
+        key: scope_context
+        instruction: >-
+          Reference to parent document (e.g. INV) if applicable, or origin of the change.
+        placeholder: "<reference to parent document or origin of this change>"
+        default: null
+
+      scope_changes:
+        label: "Scope: Changes Summary"
+        type: text
+        key: scope_changes
+        instruction: High-level description of what will change.
+        placeholder: "<high-level description of what will change>"
+        default: null
+
+      scope_files:
+        label: "Scope: Files Affected"
+        type: text
+        key: scope_files
+        instruction: List of files or documents to be modified or created.
+        placeholder: "<list of files or documents to be modified or created>"
+        default: null
+
+      current_state:
+        label: Current State
+        type: text
+        key: current_state
+        instruction: Concise present-tense description of what exists now.
+        placeholder: "<concise present-tense description of what exists now>"
+        default: null
+
+      proposed_state:
+        label: Proposed State
+        type: text
+        key: proposed_state
+        instruction: Concise present-tense description of what will exist after the change.
+        placeholder: "<concise present-tense description of what will exist after the change>"
+        default: null
+
+      change_description:
+        label: Change Description
+        type: text
+        key: change_description
+        instruction: >-
+          Full technical details of the change. May include subsections,
+          code snippets, or other explanatory content.
+        placeholder: "<full technical details of the change>"
+        default: null
+
+      justification:
+        label: Justification
+        type: text
+        key: justification
+        instruction: >-
+          Why is this change needed? The problem being solved, impact of not changing,
+          and how the solution addresses root cause.
+        placeholder: "<why is this change needed? problem being solved, impact of not changing, how solution addresses root cause>"
+        default: null
+
+      impact_files:
+        label: "Impact: Files"
+        type: text
+        key: impact_files
+        instruction: Code files, configuration files affected.
+        placeholder: "<code files, configuration files affected>"
+        default: null
+
+      impact_documents:
+        label: "Impact: Documents"
+        type: text
+        key: impact_documents
+        instruction: SOPs, specifications, other controlled documents affected.
+        placeholder: "<SOPs, specifications, other controlled documents affected>"
+        default: null
+
+      impact_other:
+        label: "Impact: Other"
+        type: text
+        key: impact_other
+        instruction: External systems, interfaces, dependencies affected.
+        placeholder: "<external systems, interfaces, dependencies affected>"
+        default: null
+
+      testing_summary:
+        label: Testing Summary
+        type: text
+        key: testing_summary
+        instruction: >-
+          How will the implementation be verified? Address automated verification
+          and integration verification for code changes; procedural verification
+          for document-only CRs.
+        placeholder: "<how will the implementation be verified? automated tests, integration checks, procedural verification>"
+        default: null
 
   preflight:
     title: Pre-Submission Review
     lifecycle_label: Pre-Review
+    show_all_fields: true
     instruction: >-
       Review all fields before submission. You may go back to correct any field.
     navigation:
       - action: go_to
-        stage: initiation
+        node: initiation
         label: Go back to Initiation
       - action: go_to
-        stage: definition
+        node: definition
         label: Go back to Change Definition
     actions:
       - action: submit
@@ -69,6 +228,7 @@ stages:
   submitted:
     title: Submitted for Review
     lifecycle_label: Pre-Review
+    show_all_fields: true
     instruction: >-
       This Change Record has been submitted for review.
     actions:
@@ -86,176 +246,3 @@ lifecycle_banner:
   - Closure
 
 objective: Complete all required fields and submit this Change Record for review.
-
-fields:
-  title:
-    label: Document Title
-    type: text
-    key: title
-    instruction: A short, descriptive title for this Change Record.
-    placeholder: "<short descriptive title for this Change Record>"
-    stages: [initiation, definition, preflight, submitted]
-    default: null
-
-  affects_code:
-    label: Code Impact
-    type: boolean
-    key: affects_code
-    instruction: Does this change affect code (as opposed to documents only)?
-    stages: [initiation, definition, preflight, submitted]
-    default: false
-
-  affects_submodule:
-    label: Affects Submodule
-    type: boolean
-    key: affects_submodule
-    instruction: Does it affect a controlled submodule?
-    stages: [initiation, definition, preflight, submitted]
-    default: false
-    visible_when:
-      affects_code: true
-
-  submodule:
-    label: Submodule
-    type: select
-    key: submodule
-    options_ref: submodules
-    annotate_from: sdlc_governed
-    annotation: "(SDLC governed)"
-    instruction: Which controlled submodule is affected?
-    stages: [initiation, definition, preflight, submitted]
-    default: null
-    visible_when:
-      affects_submodule: true
-
-  sdlc_governed:
-    label: SDLC Governed
-    type: computed
-    key: submodule
-    instruction_when_true: >-
-      This submodule contains an SDLC-governed system.
-      Additional verification requirements apply.
-    instruction_when_false: >-
-      This submodule does not contain an SDLC-governed system.
-    stages: [initiation, definition, preflight, submitted]
-    computed: sdlc_check
-    visible_when:
-      affects_submodule: true
-      submodule: not_null
-
-  purpose:
-    label: Purpose
-    type: text
-    key: purpose
-    instruction: >-
-      What problem does this CR solve? What improvement does it introduce?
-    placeholder: "<what problem does this CR solve? what improvement does it introduce?>"
-    stages: [initiation, definition, preflight, submitted]
-    default: null
-
-  scope_context:
-    label: "Scope: Context"
-    type: text
-    key: scope_context
-    instruction: >-
-      Reference to parent document (e.g. INV) if applicable, or origin of the change.
-    placeholder: "<reference to parent document or origin of this change>"
-    stages: [definition, preflight, submitted]
-    default: null
-
-  scope_changes:
-    label: "Scope: Changes Summary"
-    type: text
-    key: scope_changes
-    instruction: High-level description of what will change.
-    placeholder: "<high-level description of what will change>"
-    stages: [definition, preflight, submitted]
-    default: null
-
-  scope_files:
-    label: "Scope: Files Affected"
-    type: text
-    key: scope_files
-    instruction: List of files or documents to be modified or created.
-    placeholder: "<list of files or documents to be modified or created>"
-    stages: [definition, preflight, submitted]
-    default: null
-
-  current_state:
-    label: Current State
-    type: text
-    key: current_state
-    instruction: Concise present-tense description of what exists now.
-    placeholder: "<concise present-tense description of what exists now>"
-    stages: [definition, preflight, submitted]
-    default: null
-
-  proposed_state:
-    label: Proposed State
-    type: text
-    key: proposed_state
-    instruction: Concise present-tense description of what will exist after the change.
-    placeholder: "<concise present-tense description of what will exist after the change>"
-    stages: [definition, preflight, submitted]
-    default: null
-
-  change_description:
-    label: Change Description
-    type: text
-    key: change_description
-    instruction: >-
-      Full technical details of the change. May include subsections,
-      code snippets, or other explanatory content.
-    placeholder: "<full technical details of the change>"
-    stages: [definition, preflight, submitted]
-    default: null
-
-  justification:
-    label: Justification
-    type: text
-    key: justification
-    instruction: >-
-      Why is this change needed? The problem being solved, impact of not changing,
-      and how the solution addresses root cause.
-    placeholder: "<why is this change needed? problem being solved, impact of not changing, how solution addresses root cause>"
-    stages: [definition, preflight, submitted]
-    default: null
-
-  impact_files:
-    label: "Impact: Files"
-    type: text
-    key: impact_files
-    instruction: Code files, configuration files affected.
-    placeholder: "<code files, configuration files affected>"
-    stages: [definition, preflight, submitted]
-    default: null
-
-  impact_documents:
-    label: "Impact: Documents"
-    type: text
-    key: impact_documents
-    instruction: SOPs, specifications, other controlled documents affected.
-    placeholder: "<SOPs, specifications, other controlled documents affected>"
-    stages: [definition, preflight, submitted]
-    default: null
-
-  impact_other:
-    label: "Impact: Other"
-    type: text
-    key: impact_other
-    instruction: External systems, interfaces, dependencies affected.
-    placeholder: "<external systems, interfaces, dependencies affected>"
-    stages: [definition, preflight, submitted]
-    default: null
-
-  testing_summary:
-    label: Testing Summary
-    type: text
-    key: testing_summary
-    instruction: >-
-      How will the implementation be verified? Address automated verification
-      and integration verification for code changes; procedural verification
-      for document-only CRs.
-    placeholder: "<how will the implementation be verified? automated tests, integration checks, procedural verification>"
-    stages: [definition, preflight, submitted]
-    default: null

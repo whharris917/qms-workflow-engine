@@ -825,20 +825,26 @@ with open(_CR_YAML_PATH) as _f:
 
 _CR_SUBMODULES = _CR_DEF["submodules"]
 _CR_SDLC_GOVERNED = set(_CR_DEF["sdlc_governed"])
-_CR_STAGES = list(_CR_DEF["stages"].keys())
+_CR_NODES = list(_CR_DEF["nodes"].keys())
 _CR_LIFECYCLE = _CR_DEF["lifecycle_banner"]
 _CR_OBJECTIVE = _CR_DEF["objective"]
-_CR_FIELDS = _CR_DEF["fields"]
 
-# Derived from the stages dict
-_CR_STAGE_INFO = {
-    sid: {"title": s["title"], "instruction": s["instruction"]}
-    for sid, s in _CR_DEF["stages"].items()
+# Derived from the nodes dict
+_CR_NODE_INFO = {
+    nid: {"title": n["title"], "instruction": n["instruction"]}
+    for nid, n in _CR_DEF["nodes"].items()
 }
-_CR_STAGE_TO_LIFECYCLE = {
-    sid: s["lifecycle_label"]
-    for sid, s in _CR_DEF["stages"].items()
+_CR_NODE_TO_LIFECYCLE = {
+    nid: n["lifecycle_label"]
+    for nid, n in _CR_DEF["nodes"].items()
 }
+# Aggregate all fields across all nodes (preserving declaration order)
+_CR_ALL_FIELDS = {}
+_CR_NODE_FIELDS = {}  # node_id -> {field_id: fdef}
+for _nid, _ndef in _CR_DEF["nodes"].items():
+    node_fields = _ndef.get("fields", {})
+    _CR_NODE_FIELDS[_nid] = node_fields
+    _CR_ALL_FIELDS.update(node_fields)
 
 # -- Workflow registry --
 # Each entry maps a workflow_id to its type and display metadata.
@@ -861,8 +867,8 @@ _WORKFLOWS = {
 
 def _cr_default_data():
     """Return a fresh agent data dict for the CR workflow, derived from YAML."""
-    d = {"stage": _CR_STAGES[0], "completed_stages": [], "message": None}
-    for fdef in _CR_FIELDS.values():
+    d = {"node": _CR_NODES[0], "completed_nodes": [], "message": None}
+    for fdef in _CR_ALL_FIELDS.values():
         if fdef.get("type") != "computed":
             d[fdef["key"]] = fdef.get("default")
     return d
@@ -871,7 +877,7 @@ def _cr_default_data():
 def _cr_data(workflow_id: str) -> dict:
     """Return the current CR workflow data, initializing if needed."""
     d = _wf_load_state(workflow_id)
-    if "stage" not in d or "title" not in d:
+    if "node" not in d or "title" not in d:
         d = _cr_default_data()
         _wf_save_state(workflow_id, d)
     return d
@@ -907,16 +913,20 @@ def _cr_field_visible(fdef, data):
     return True
 
 
-def _cr_field_summary(data, stage):
-    """Return a dict of all fields relevant to the current stage, including nulls.
+def _cr_field_summary(data, node):
+    """Return a dict of all fields relevant to the current node, including nulls.
 
-    Driven entirely by the YAML workflow definition — no hardcoded field logic.
+    Fields are owned by their node. Nodes with show_all_fields aggregate all fields.
     """
+    node_def = _CR_DEF["nodes"][node]
+    if node_def.get("show_all_fields"):
+        field_defs = _CR_ALL_FIELDS
+    else:
+        field_defs = _CR_NODE_FIELDS.get(node, {})
+
     fields = {}
-    for fdef in _CR_FIELDS.values():
-        # Stage gate
-        if stage not in fdef.get("stages", []):
-            continue
+    for fdef in field_defs.values():
+        # Skip if not currently visible
         # Conditional visibility
         if not _cr_field_visible(fdef, data):
             continue
@@ -942,16 +952,16 @@ def _cr_field_summary(data, stage):
     return fields
 
 
-def _cr_build_affordances(data, stage, workflow_id: str):
-    """Generate affordances from YAML field definitions and stage config.
+def _cr_build_affordances(data, node, workflow_id: str):
+    """Generate affordances from YAML field definitions and node config.
 
     Affordance rules by field type:
       text     → "Set {label}" with placeholder as value template
       boolean  → toggle showing current state, offering the opposite
-      select   → one affordance per option, marking current selection
+      select   → single affordance with pipe-delimited options
       computed → no affordance (read-only)
 
-    Stage-level affordances (from stages.{stage} in YAML):
+    Node-level affordances (from nodes.{node} in YAML):
       navigation → always emitted
       proceed    → gated on all required fields being non-null
       actions    → unconditional
@@ -959,12 +969,15 @@ def _cr_build_affordances(data, stage, workflow_id: str):
     affordances = []
     n = 1
     api_url = f"/agent/{workflow_id}"
-    stage_def = _CR_DEF["stages"][stage]
+    node_def = _CR_DEF["nodes"][node]
 
     # -- Field affordances --
-    for fdef in _CR_FIELDS.values():
-        if stage not in fdef.get("stages", []):
-            continue
+    if node_def.get("show_all_fields"):
+        field_defs = _CR_ALL_FIELDS
+    else:
+        field_defs = _CR_NODE_FIELDS.get(node, {})
+
+    for fdef in field_defs.values():
         if not _cr_field_visible(fdef, data):
             continue
 
@@ -1018,17 +1031,17 @@ def _cr_build_affordances(data, stage, workflow_id: str):
         # computed → no affordance
 
     # -- Navigation affordances --
-    for nav in stage_def.get("navigation", []):
+    for nav in node_def.get("navigation", []):
         body = {"action": nav["action"]}
-        if "stage" in nav:
-            body["stage"] = nav["stage"]
+        if "node" in nav:
+            body["node"] = nav["node"]
         a = {"id": n, "label": nav["label"],
              "method": "POST", "url": api_url, "body": body}
         affordances.append(a)
         n += 1
 
     # -- Proceed gate --
-    proceed = stage_def.get("proceed")
+    proceed = node_def.get("proceed")
     if proceed:
         required = proceed.get("requires", [])
         if all(data.get(f) for f in required):
@@ -1038,8 +1051,8 @@ def _cr_build_affordances(data, stage, workflow_id: str):
             affordances.append(a)
             n += 1
 
-    # -- Stage actions --
-    for act in stage_def.get("actions", []):
+    # -- Node actions --
+    for act in node_def.get("actions", []):
         a = {"id": n, "label": act["label"],
              "method": "POST", "url": api_url,
              "body": {"action": act["action"]}}
@@ -1049,24 +1062,24 @@ def _cr_build_affordances(data, stage, workflow_id: str):
     return affordances
 
 
-def _render_cr_stage(workflow_id: str, stage=None):
-    """Render the current CR workflow stage as a JSON-serializable dict."""
+def _render_cr_node(workflow_id: str, node=None):
+    """Render the current CR workflow node as a JSON-serializable dict."""
     data = _cr_data(workflow_id)
-    if stage is None:
-        stage = data["stage"]
+    if node is None:
+        node = data["node"]
 
-    info = _CR_STAGE_INFO[stage]
-    stage_idx = _CR_STAGES.index(stage)
-    affordances = _cr_build_affordances(data, stage, workflow_id)
+    info = _CR_NODE_INFO[node]
+    node_idx = _CR_NODES.index(node)
+    affordances = _cr_build_affordances(data, node, workflow_id)
 
     # Build fields display
-    fields_display = _cr_field_summary(data, stage)
+    fields_display = _cr_field_summary(data, node)
 
     # Build lifecycle banner data
-    lifecycle_current = _CR_STAGE_TO_LIFECYCLE.get(stage, "Initiation")
+    lifecycle_current = _CR_NODE_TO_LIFECYCLE.get(node, "Initiation")
     lifecycle_completed = []
-    for cs in data["completed_stages"]:
-        lbl = _CR_STAGE_TO_LIFECYCLE.get(cs)
+    for cn in data["completed_nodes"]:
+        lbl = _CR_NODE_TO_LIFECYCLE.get(cn)
         if lbl and lbl not in lifecycle_completed:
             lifecycle_completed.append(lbl)
 
@@ -1074,39 +1087,20 @@ def _render_cr_stage(workflow_id: str, stage=None):
         "message": data.get("message"),
         "state": {
             "workflow": "Create Change Record",
-            "stage": stage,
-            "stage_title": info["title"],
-            "progress": f"{stage_idx + 1}/{len(_CR_STAGES)}",
+            "node": node,
+            "node_title": info["title"],
+            "progress": f"{node_idx + 1}/{len(_CR_NODES)}",
             "lifecycle": _CR_LIFECYCLE,
             "lifecycle_current": lifecycle_current,
             "lifecycle_completed": lifecycle_completed,
-            "completed_stages": data["completed_stages"],
+            "completed_nodes": data["completed_nodes"],
             "fields": fields_display,
         },
         "instructions": info["instruction"],
         "affordances": affordances,
     }
 
-    if stage == "preflight":
-        result["review"] = {
-            "title": data["title"],
-            "affects_code": data["affects_code"],
-            "submodule": data["submodule"],
-            "purpose": data["purpose"],
-            "scope_context": data["scope_context"],
-            "scope_changes": data["scope_changes"],
-            "scope_files": data["scope_files"],
-            "current_state": data["current_state"],
-            "proposed_state": data["proposed_state"],
-            "change_description": data["change_description"],
-            "justification": data["justification"],
-            "impact_files": data["impact_files"],
-            "impact_documents": data["impact_documents"],
-            "impact_other": data["impact_other"],
-            "testing_summary": data["testing_summary"],
-        }
-
-    if stage != "submitted":
+    if node != "submitted":
         result["objective"] = "Complete all required fields and submit this Change Record for review."
 
     return result
@@ -1120,9 +1114,9 @@ def _process_cr_action(workflow_id: str, body):
     if action == "restart":
         data = _cr_default_data()
         _wf_save_state(workflow_id, data)
-        return _render_cr_stage(workflow_id)
+        return _render_cr_node(workflow_id)
 
-    stage = data["stage"]
+    node = data["node"]
 
     if action == "set_field":
         field = body.get("field", "")
@@ -1155,52 +1149,52 @@ def _process_cr_action(workflow_id: str, body):
         display_val = str(value)
         data["message"] = f"Set {field} = \"{_trunc(display_val, 60)}\""
         _wf_save_state(workflow_id, data)
-        return _render_cr_stage(workflow_id)
+        return _render_cr_node(workflow_id)
 
     if action == "proceed":
-        idx = _CR_STAGES.index(stage)
-        if idx >= len(_CR_STAGES) - 1:
-            return {"error": "Already at the final stage."}
-        if stage not in data["completed_stages"]:
-            data["completed_stages"].append(stage)
-        data["stage"] = _CR_STAGES[idx + 1]
-        data["message"] = f"Advanced to: {_CR_STAGE_INFO[data['stage']]['title']}"
+        idx = _CR_NODES.index(node)
+        if idx >= len(_CR_NODES) - 1:
+            return {"error": "Already at the final node."}
+        if node not in data["completed_nodes"]:
+            data["completed_nodes"].append(node)
+        data["node"] = _CR_NODES[idx + 1]
+        data["message"] = f"Advanced to: {_CR_NODE_INFO[data['node']]['title']}"
         _wf_save_state(workflow_id, data)
-        page = _render_cr_stage(workflow_id)
-        _wf_notify(workflow_id, {"type": "navigate", "path": data["stage"], "content": json.dumps(page)})
+        page = _render_cr_node(workflow_id)
+        _wf_notify(workflow_id, {"type": "navigate", "path": data["node"], "content": json.dumps(page)})
         return page
 
     if action == "go_back":
-        idx = _CR_STAGES.index(stage)
+        idx = _CR_NODES.index(node)
         if idx <= 0:
-            return {"error": "Already at the first stage."}
-        data["stage"] = _CR_STAGES[idx - 1]
-        data["message"] = f"Returned to: {_CR_STAGE_INFO[data['stage']]['title']}"
+            return {"error": "Already at the first node."}
+        data["node"] = _CR_NODES[idx - 1]
+        data["message"] = f"Returned to: {_CR_NODE_INFO[data['node']]['title']}"
         _wf_save_state(workflow_id, data)
-        page = _render_cr_stage(workflow_id)
-        _wf_notify(workflow_id, {"type": "navigate", "path": data["stage"], "content": json.dumps(page)})
+        page = _render_cr_node(workflow_id)
+        _wf_notify(workflow_id, {"type": "navigate", "path": data["node"], "content": json.dumps(page)})
         return page
 
     if action == "go_to":
-        target = body.get("stage", "")
-        if target not in _CR_STAGES:
-            return {"error": f"Unknown stage: {target}"}
-        data["stage"] = target
-        data["message"] = f"Jumped to: {_CR_STAGE_INFO[target]['title']}"
+        target = body.get("node", "")
+        if target not in _CR_NODES:
+            return {"error": f"Unknown node: {target}"}
+        data["node"] = target
+        data["message"] = f"Jumped to: {_CR_NODE_INFO[target]['title']}"
         _wf_save_state(workflow_id, data)
-        page = _render_cr_stage(workflow_id)
+        page = _render_cr_node(workflow_id)
         _wf_notify(workflow_id, {"type": "navigate", "path": target, "content": json.dumps(page)})
         return page
 
     if action == "submit":
-        if stage != "preflight":
-            return {"error": "You can only submit from the Pre-Submission Review stage."}
-        data["stage"] = "submitted"
-        if "preflight" not in data["completed_stages"]:
-            data["completed_stages"].append("preflight")
+        if node != "preflight":
+            return {"error": "You can only submit from the Pre-Submission Review node."}
+        data["node"] = "submitted"
+        if "preflight" not in data["completed_nodes"]:
+            data["completed_nodes"].append("preflight")
         data["message"] = "Change Record submitted for review. Well done."
         _wf_save_state(workflow_id, data)
-        page = _render_cr_stage(workflow_id)
+        page = _render_cr_node(workflow_id)
         _wf_notify(workflow_id, {"type": "navigate", "path": "submitted", "content": json.dumps(page)})
         return page
 
@@ -1217,7 +1211,7 @@ def _render_agent_node(workflow_id: str):
         return _render_maze_room(data["position"], workflow_id)
 
     if wf_type == "create-cr":
-        return _render_cr_stage(workflow_id)
+        return _render_cr_node(workflow_id)
 
     return {"error": f"Unknown workflow: {workflow_id}"}
 

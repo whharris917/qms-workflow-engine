@@ -697,8 +697,8 @@ registerRenderer({
         return html + '</div>';
     }
 
-    /* Build the stage banner from state.lifecycle, state.lifecycle_current, state.lifecycle_completed */
-    function renderStageBanner(state) {
+    /* Build the node banner from state.lifecycle, state.lifecycle_current, state.lifecycle_completed */
+    function renderNodeBanner(state) {
         var s = state.state || {};
         var lifecycle = s.lifecycle || [];
         var current = s.lifecycle_current || '';
@@ -736,12 +736,12 @@ registerRenderer({
         html += '<span class="wf-progress">' + esc(s.progress || '') + '</span>';
         html += '</div>';
 
-        /* ── Stage banner (derived from state.completed_stages + state.stage) ── */
-        html += renderStageBanner(state);
+        /* ── Node banner (derived from state.completed_nodes + state.node) ── */
+        html += renderNodeBanner(state);
 
-        /* ── state.state.stage_title ── */
+        /* ── state.state.node_title ── */
         html += '<div class="wf-section">';
-        html += '<div class="wf-section-head">' + esc(s.stage_title || s.stage) + '</div>';
+        html += '<div class="wf-section-head">' + esc(s.node_title || s.node) + '</div>';
         html += '</div>';
 
         /* ── description ── */
