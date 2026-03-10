@@ -115,6 +115,7 @@ var activeRenderer = null; // currently active renderer id
 var agentState = null;     // latest parsed page JSON
 var lastRaw = null;        // latest raw content string
 var lastMessage = '';
+var currentFocus = null;   // latest Focus from POST result
 
 /* Renderer availability is declared by the workflow, not guessed from data shape. */
 var allowedRenderers = {{ renderers|safe }};
@@ -152,24 +153,25 @@ function setMode(id) {
     r._container.classList.add('active');
     document.getElementById('btn-' + id).classList.add('active');
     r.activate();
-    if (agentState) r.update(agentState, lastMessage);
+    if (agentState) r.update(agentState, lastMessage, currentFocus);
 }
 
-function broadcastState(state, msg) {
+function broadcastState(state, msg, focus) {
     agentState = state;
     lastMessage = msg;
+    currentFocus = focus || null;
     if (activeRenderer && renderers[activeRenderer]) {
-        renderers[activeRenderer].update(state, msg);
+        renderers[activeRenderer].update(state, msg, currentFocus);
     }
 }
 
 /* ── State extraction from SSE payloads ── */
-function extractState(raw) {
+function extractState(raw, focus) {
     var obj;
     try { obj = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { return; }
     if (!obj || !obj.state) return;
     lastRaw = typeof raw === 'string' ? raw : JSON.stringify(raw);
-    broadcastState(obj, obj.message || '');
+    broadcastState(obj, obj.message || '', focus);
 }
 
 /* ======================================================================
@@ -640,14 +642,15 @@ registerRenderer({
     }
 
     /* Render fields — each field is {value, instruction?} */
-    function renderFields(fields) {
+    function renderFields(fields, changedFields) {
         var keys = Object.keys(fields);
         if (!keys.length) return '<span class="wf-empty-obj">(empty)</span>';
         var html = '<div class="wf-fields">';
         for (var i = 0; i < keys.length; i++) {
             var k = keys[i];
             var f = fields[k];
-            html += '<div class="wf-field">';
+            var focused = changedFields && (k in changedFields);
+            html += '<div class="wf-field' + (focused ? ' wf-focus' : '') + '">';
             html += '<div class="wf-field-label">' + esc(k) + '</div>';
             if (f && typeof f === 'object' && 'value' in f) {
                 /* Structured field: {value, instruction?} */
@@ -692,8 +695,11 @@ registerRenderer({
         return html + '</div>';
     }
 
-    function render(state, msg) {
+    function render(state, msg, focus) {
         if (!container || !state) return;
+
+        var changedFields = (focus && focus.changed) ? focus.changed : {};
+        var unlockedLabels = (focus && focus.unlocked) ? focus.unlocked : [];
 
         var html = '';
 
@@ -731,7 +737,7 @@ registerRenderer({
         if (s.fields) {
             html += '<div class="wf-card">';
             html += '<div class="wf-card-head">state.fields</div>';
-            html += renderFields(s.fields);
+            html += renderFields(s.fields, changedFields);
             html += '</div>';
         }
 
@@ -753,6 +759,7 @@ registerRenderer({
                 if (/Proceed|Submit/.test(a.label)) cls += ' wf-aff-primary';
                 else if (/Go back/.test(a.label)) cls += ' wf-aff-nav';
                 else if (/\[Selected\]/.test(a.label)) cls += ' wf-aff-selected';
+                if (unlockedLabels.indexOf(a.label) >= 0) cls += ' wf-aff-focus';
                 html += '<div class="' + cls + '">';
                 html += '<div class="wf-aff-top">';
                 html += '<span class="wf-aff-id">' + a.id + '</span>';
@@ -854,11 +861,15 @@ registerRenderer({
                 + '.wf-aff-selected { border-color:#4caf50; background:#f0fff0; }'
                 + '.wf-aff-selected .wf-aff-label { color:#2e7d32; }'
                 + '.wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; }'
+
+                /* Focus highlights */
+                + '.wf-focus { border-left:3px solid #2a6bcf; background:#f0f5ff; }'
+                + '.wf-aff-focus { border-left:3px solid #2a6bcf; }'
                 ;
             document.head.appendChild(style);
             container = c;
         },
-        update: function(state, msg) { render(state, msg); },
+        update: function(state, msg, focus) { render(state, msg, focus); },
         activate: function() {},
         deactivate: function() {}
     });
@@ -912,7 +923,7 @@ function connect() {
             if (ev.content) extractState(ev.content);
         }
         if (ev.type === 'result' && ev.result) {
-            extractState(ev.result);
+            extractState(ev.result, ev.focus || null);
         }
     };
 }

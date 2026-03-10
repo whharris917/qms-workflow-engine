@@ -1528,12 +1528,12 @@ def agent_workflow_post(workflow_id):
 
     # result is the after-FoV (returned by the action processor)
     after_fov = result
+    focus = _compute_focus(before_fov, after_fov)
 
-    # Push full FoV to Observer via SSE
-    _wf_notify(workflow_id, {"type": "result", "path": workflow_id, "result": after_fov})
+    # Push full FoV + Focus to Observer via SSE
+    _wf_notify(workflow_id, {"type": "result", "path": workflow_id, "result": after_fov, "focus": focus})
 
     # Return Focus to agent
-    focus = _compute_focus(before_fov, after_fov)
     return jsonify(focus)
 
 
