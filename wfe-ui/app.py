@@ -1502,8 +1502,9 @@ def agent_workflow_get(workflow_id):
     if workflow_id not in _WORKFLOWS:
         return jsonify({"error": f"Unknown workflow: {workflow_id}"}), 404
     page = _render_agent_node(workflow_id)
-    _workflow_current_path[workflow_id] = workflow_id
-    _wf_notify(workflow_id, {"type": "navigate", "path": workflow_id, "content": json.dumps(page)})
+    node = (page.get("state") or {}).get("node") or (page.get("state") or {}).get("position") or workflow_id
+    _workflow_current_path[workflow_id] = node
+    _wf_notify(workflow_id, {"type": "navigate", "path": node, "content": json.dumps(page)})
     if page is None:
         return jsonify({"error": f"Unknown workflow: {workflow_id}"}), 404
     return jsonify(page)
@@ -1528,6 +1529,10 @@ def agent_workflow_post(workflow_id):
     # result is the after-FoV (returned by the action processor)
     after_fov = result
     focus = _compute_focus(before_fov, after_fov)
+
+    # Track current node
+    node = (after_fov.get("state") or {}).get("node") or (after_fov.get("state") or {}).get("position") or workflow_id
+    _workflow_current_path[workflow_id] = node
 
     # Push full FoV + Focus to Observer via SSE
     _wf_notify(workflow_id, {"type": "result", "path": workflow_id, "result": after_fov, "focus": focus})

@@ -935,7 +935,8 @@ function connect() {
         var ev = JSON.parse(e.data);
         if (ev.type === 'init') {
             addLog(ev);
-            pathEl.textContent = ev.current_path || '\u2014';
+            var pageState = (ev.page && ev.page.state) || {};
+            pathEl.textContent = pageState.node || pageState.position || ev.current_path || '\u2014';
             /* Recover focus from the most recent result event in history */
             var hist = ev.history || [];
             var lastFocus = null;
@@ -957,6 +958,8 @@ function connect() {
             if (ev.content) extractState(ev.content);
         }
         if (ev.type === 'result' && ev.result) {
+            var s = ev.result.state || {};
+            pathEl.textContent = s.node || s.position || '';
             extractState(ev.result, ev.focus || null);
         }
     };
