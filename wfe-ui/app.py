@@ -423,6 +423,41 @@ def _wf_notify(workflow_id: str, event: dict):
         _workflow_observers[workflow_id].remove(q)
 
 
+def _compute_focus(before: dict, after: dict) -> dict:
+    """Compute the Focus — the subset of the FoV that changed between two renders.
+
+    Returns a dict with:
+      message   — the action confirmation message (from the after FoV)
+      changed   — fields whose value changed (same shape as state.fields)
+      unlocked  — affordance labels that are new (not present in before)
+      affordances — the full affordance objects for newly unlocked affordances
+    """
+    before_fields = (before.get("state") or {}).get("fields", {})
+    after_fields = (after.get("state") or {}).get("fields", {})
+
+    changed = {}
+    for label, field in after_fields.items():
+        old = before_fields.get(label)
+        if old is None or old.get("value") != field.get("value"):
+            changed[label] = field
+
+    before_ids = {a["id"] for a in before.get("affordances", [])}
+    before_labels = {a["label"] for a in before.get("affordances", [])}
+    unlocked = []
+    unlocked_affordances = []
+    for a in after.get("affordances", []):
+        if a["id"] not in before_ids and a["label"] not in before_labels:
+            unlocked.append(a["label"])
+            unlocked_affordances.append(a)
+
+    return {
+        "message": after.get("message"),
+        "changed": changed,
+        "unlocked": unlocked,
+        "affordances": unlocked_affordances,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Dungeon Puzzle — rooms, items, hazards, combat, locked doors
 # ---------------------------------------------------------------------------
@@ -831,7 +866,7 @@ _WORKFLOWS = {
 
 def _cr_default_data():
     """Return a fresh agent data dict for the CR workflow, derived from YAML."""
-    d = {"stage": _CR_STAGES[0], "completed_stages": []}
+    d = {"stage": _CR_STAGES[0], "completed_stages": [], "message": None}
     for fdef in _CR_FIELDS.values():
         if fdef.get("type") != "computed":
             d[fdef["key"]] = fdef.get("default")
@@ -1039,6 +1074,7 @@ def _render_cr_stage(workflow_id: str, stage=None):
             lifecycle_completed.append(lbl)
 
     result = {
+        "message": data.get("message"),
         "state": {
             "workflow": "Create Change Record",
             "stage": stage,
@@ -1119,11 +1155,10 @@ def _process_cr_action(workflow_id: str, body):
         else:
             return {"error": f"Unknown field: {field}"}
 
-        _wf_save_state(workflow_id, data)
-        page = _render_cr_stage(workflow_id)
         display_val = str(value)
-        page["message"] = f"Set {field} = \"{_trunc(display_val, 60)}\""
-        return page
+        data["message"] = f"Set {field} = \"{_trunc(display_val, 60)}\""
+        _wf_save_state(workflow_id, data)
+        return _render_cr_stage(workflow_id)
 
     if action == "proceed":
         idx = _CR_STAGES.index(stage)
@@ -1132,9 +1167,9 @@ def _process_cr_action(workflow_id: str, body):
         if stage not in data["completed_stages"]:
             data["completed_stages"].append(stage)
         data["stage"] = _CR_STAGES[idx + 1]
+        data["message"] = f"Advanced to: {_CR_STAGE_INFO[data['stage']]['title']}"
         _wf_save_state(workflow_id, data)
         page = _render_cr_stage(workflow_id)
-        page["message"] = f"Advanced to: {_CR_STAGE_INFO[data['stage']]['title']}"
         _wf_notify(workflow_id, {"type": "navigate", "path": data["stage"], "content": json.dumps(page)})
         return page
 
@@ -1143,9 +1178,9 @@ def _process_cr_action(workflow_id: str, body):
         if idx <= 0:
             return {"error": "Already at the first stage."}
         data["stage"] = _CR_STAGES[idx - 1]
+        data["message"] = f"Returned to: {_CR_STAGE_INFO[data['stage']]['title']}"
         _wf_save_state(workflow_id, data)
         page = _render_cr_stage(workflow_id)
-        page["message"] = f"Returned to: {_CR_STAGE_INFO[data['stage']]['title']}"
         _wf_notify(workflow_id, {"type": "navigate", "path": data["stage"], "content": json.dumps(page)})
         return page
 
@@ -1154,9 +1189,9 @@ def _process_cr_action(workflow_id: str, body):
         if target not in _CR_STAGES:
             return {"error": f"Unknown stage: {target}"}
         data["stage"] = target
+        data["message"] = f"Jumped to: {_CR_STAGE_INFO[target]['title']}"
         _wf_save_state(workflow_id, data)
         page = _render_cr_stage(workflow_id)
-        page["message"] = f"Jumped to: {_CR_STAGE_INFO[target]['title']}"
         _wf_notify(workflow_id, {"type": "navigate", "path": target, "content": json.dumps(page)})
         return page
 
@@ -1166,10 +1201,9 @@ def _process_cr_action(workflow_id: str, body):
         data["stage"] = "submitted"
         if "preflight" not in data["completed_stages"]:
             data["completed_stages"].append("preflight")
+        data["message"] = "Change Record submitted for review. Well done."
         _wf_save_state(workflow_id, data)
         page = _render_cr_stage(workflow_id)
-        page["message"] = "Change Record submitted for review. Well done."
-        page["completed"] = True
         _wf_notify(workflow_id, {"type": "navigate", "path": "submitted", "content": json.dumps(page)})
         return page
 
@@ -1481,12 +1515,26 @@ def agent_workflow_post(workflow_id):
     if workflow_id not in _WORKFLOWS:
         return jsonify({"error": f"Unknown workflow: {workflow_id}"}), 404
     body = request.get_json(silent=True) or {}
+
+    # Capture before-FoV
+    before_fov = _render_agent_node(workflow_id)
+
     _wf_notify(workflow_id, {"type": "action", "path": workflow_id, "body": body})
     result = _process_agent_action(workflow_id, body)
-    _wf_notify(workflow_id, {"type": "result", "path": workflow_id, "result": result})
+
     if "error" in result:
+        _wf_notify(workflow_id, {"type": "result", "path": workflow_id, "result": result})
         return jsonify(result), 422
-    return jsonify(result)
+
+    # result is the after-FoV (returned by the action processor)
+    after_fov = result
+
+    # Push full FoV to Observer via SSE
+    _wf_notify(workflow_id, {"type": "result", "path": workflow_id, "result": after_fov})
+
+    # Return Focus to agent
+    focus = _compute_focus(before_fov, after_fov)
+    return jsonify(focus)
 
 
 @app.route("/manual")
