@@ -1,0 +1,210 @@
+## Agent workflow definition: Create Change Record
+##
+## This file defines the fields, stages, visibility rules, and metadata
+## for the agent-facing CR creation workflow. The Python code interprets
+## this declaratively — no workflow-specific if-chains.
+
+submodules:
+  - flow-state
+  - qms-cli
+  - qms-workflow-engine
+  - claude-qms
+  - Quality-Manual
+
+sdlc_governed:
+  - flow-state
+  - qms-cli
+  - qms-workflow-engine
+
+stages:
+  initiation:
+    title: Initiation
+    lifecycle_label: Initiation
+    instruction: >-
+      Provide the document title, classify code impact, and state the purpose of this change.
+  definition:
+    title: Change Definition
+    lifecycle_label: Change Definition
+    instruction: >-
+      Define the scope, describe the change in detail, assess impact, and outline how
+      the implementation will be verified.
+  preflight:
+    title: Pre-Submission Review
+    lifecycle_label: Pre-Review
+    instruction: >-
+      Review all fields before submission. You may go back to correct any field.
+  submitted:
+    title: Submitted for Review
+    lifecycle_label: Pre-Review
+    instruction: >-
+      This Change Record has been submitted for review.
+
+lifecycle_banner:
+  - Initiation
+  - Change Definition
+  - Pre-Review
+  - Pre-Approval
+  - Execution
+  - Post-Review
+  - Post-Approval
+  - Closure
+
+objective: Complete all required fields and submit this Change Record for review.
+
+fields:
+  title:
+    label: Document Title
+    type: text
+    key: title
+    instruction: A short, descriptive title for this Change Record.
+    stages: [initiation, definition, preflight, submitted]
+    default: null
+
+  affects_code:
+    label: Code Impact
+    type: boolean
+    key: affects_code
+    instruction: Does this change affect code (as opposed to documents only)?
+    stages: [initiation, definition, preflight, submitted]
+    default: false
+
+  affects_submodule:
+    label: Affects Submodule
+    type: boolean
+    key: affects_submodule
+    instruction: Does it affect a controlled submodule?
+    stages: [initiation, definition, preflight, submitted]
+    default: false
+    visible_when:
+      affects_code: true
+
+  submodule:
+    label: Submodule
+    type: select
+    key: submodule
+    options_ref: submodules
+    instruction: Which controlled submodule is affected?
+    stages: [initiation, definition, preflight, submitted]
+    default: null
+    visible_when:
+      affects_submodule: true
+
+  sdlc_governed:
+    label: SDLC Governed
+    type: computed
+    key: submodule
+    instruction_when_true: >-
+      This submodule contains an SDLC-governed system.
+      Additional verification requirements apply.
+    instruction_when_false: >-
+      This submodule does not contain an SDLC-governed system.
+    stages: [initiation, definition, preflight, submitted]
+    computed: sdlc_check
+    visible_when:
+      affects_submodule: true
+      submodule: not_null
+
+  purpose:
+    label: Purpose
+    type: text
+    key: purpose
+    instruction: >-
+      What problem does this CR solve? What improvement does it introduce?
+    stages: [initiation, definition, preflight, submitted]
+    default: null
+
+  scope_context:
+    label: "Scope: Context"
+    type: text
+    key: scope_context
+    instruction: >-
+      Reference to parent document (e.g. INV) if applicable, or origin of the change.
+    stages: [definition, preflight, submitted]
+    default: null
+
+  scope_changes:
+    label: "Scope: Changes Summary"
+    type: text
+    key: scope_changes
+    instruction: High-level description of what will change.
+    stages: [definition, preflight, submitted]
+    default: null
+
+  scope_files:
+    label: "Scope: Files Affected"
+    type: text
+    key: scope_files
+    instruction: List of files or documents to be modified or created.
+    stages: [definition, preflight, submitted]
+    default: null
+
+  current_state:
+    label: Current State
+    type: text
+    key: current_state
+    instruction: Concise present-tense description of what exists now.
+    stages: [definition, preflight, submitted]
+    default: null
+
+  proposed_state:
+    label: Proposed State
+    type: text
+    key: proposed_state
+    instruction: Concise present-tense description of what will exist after the change.
+    stages: [definition, preflight, submitted]
+    default: null
+
+  change_description:
+    label: Change Description
+    type: text
+    key: change_description
+    instruction: >-
+      Full technical details of the change. May include subsections,
+      code snippets, or other explanatory content.
+    stages: [definition, preflight, submitted]
+    default: null
+
+  justification:
+    label: Justification
+    type: text
+    key: justification
+    instruction: >-
+      Why is this change needed? The problem being solved, impact of not changing,
+      and how the solution addresses root cause.
+    stages: [definition, preflight, submitted]
+    default: null
+
+  impact_files:
+    label: "Impact: Files"
+    type: text
+    key: impact_files
+    instruction: Code files, configuration files affected.
+    stages: [definition, preflight, submitted]
+    default: null
+
+  impact_documents:
+    label: "Impact: Documents"
+    type: text
+    key: impact_documents
+    instruction: SOPs, specifications, other controlled documents affected.
+    stages: [definition, preflight, submitted]
+    default: null
+
+  impact_other:
+    label: "Impact: Other"
+    type: text
+    key: impact_other
+    instruction: External systems, interfaces, dependencies affected.
+    stages: [definition, preflight, submitted]
+    default: null
+
+  testing_summary:
+    label: Testing Summary
+    type: text
+    key: testing_summary
+    instruction: >-
+      How will the implementation be verified? Address automated verification
+      and integration verification for code changes; procedural verification
+      for document-only CRs.
+    stages: [definition, preflight, submitted]
+    default: null
