@@ -440,11 +440,10 @@ def _compute_focus(before: dict, after: dict) -> dict:
         if old is None or old.get("value") != field.get("value"):
             changed[label] = field
 
-    before_ids = {a["id"] for a in before.get("affordances", [])}
     before_labels = {a["label"] for a in before.get("affordances", [])}
     new_affordances = []
     for a in after.get("affordances", []):
-        if a["id"] not in before_ids and a["label"] not in before_labels:
+        if a["label"] not in before_labels:
             new_affordances.append(a)
 
     return {
@@ -1003,16 +1002,18 @@ def _cr_build_affordances(data, stage, workflow_id: str):
             annotate_set = set(_CR_DEF.get(fdef.get("annotate_from", ""), []))
             annotation = fdef.get("annotation", "")
             current = data.get(key)
+            suffix = f" (current: \"{current}\")" if current else ""
+            opts_display = []
             for opt in options:
-                selected = current == opt
                 tag = f" {annotation}" if opt in annotate_set else ""
-                prefix = "[Selected] " if selected else ""
-                a = {"id": n,
-                     "label": f"{prefix}Set {label.lower()}: {opt}{tag}",
-                     "method": "POST", "url": api_url,
-                     "body": {"action": "set_field", "field": key, "value": opt}}
-                affordances.append(a)
-                n += 1
+                opts_display.append(f"{opt}{tag}")
+            placeholder = " | ".join(opts_display)
+            a = {"id": n,
+                 "label": f"Set {label}{suffix}",
+                 "method": "POST", "url": api_url,
+                 "body": {"action": "set_field", "field": key, "value": f"<{placeholder}>"}}
+            affordances.append(a)
+            n += 1
 
         # computed → no affordance
 
