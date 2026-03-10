@@ -860,29 +860,108 @@ def _cr_field_summary(data, stage):
     return fields
 
 
-def _aff(n, label, field=None, value=None, action="set_field", **extra):
-    """Helper to build an affordance dict. Returns (affordance_dict, next_n)."""
-    body = {"action": action}
-    if field is not None:
-        body["field"] = field
-    if value is not None:
-        body["value"] = value
-    body.update(extra)
-    return {
-        "id": n, "label": label,
-        "method": "POST", "url": "/agent/create-cr",
-        "body": body,
-    }, n + 1
+def _cr_build_affordances(data, stage):
+    """Generate affordances from YAML field definitions and stage config.
 
+    Affordance rules by field type:
+      text     → "Set {label}" with placeholder as value template
+      boolean  → toggle showing current state, offering the opposite
+      select   → one affordance per option, marking current selection
+      computed → no affordance (read-only)
 
-def _text_aff(n, data, field, label, hint):
-    """Build an affordance for a free-text field, showing current value."""
-    current = data[field]
-    suffix = ""
-    if current:
-        suffix = f" (current: \"{_trunc(current, 50)}\")"
-    a, n = _aff(n, f"Set {label}{suffix}", field=field, value=hint)
-    return a, n
+    Stage-level affordances (from stages.{stage} in YAML):
+      navigation → always emitted
+      proceed    → gated on all required fields being non-null
+      actions    → unconditional
+    """
+    affordances = []
+    n = 1
+    stage_def = _CR_DEF["stages"][stage]
+
+    # -- Field affordances --
+    for fdef in _CR_FIELDS.values():
+        if stage not in fdef.get("stages", []):
+            continue
+        if not _cr_field_visible(fdef, data):
+            continue
+
+        ftype = fdef.get("type", "text")
+        key = fdef["key"]
+        label = fdef["label"]
+
+        if ftype == "text":
+            current = data.get(key)
+            suffix = ""
+            if current:
+                suffix = f" (current: \"{_trunc(current, 50)}\")"
+            placeholder = fdef.get("placeholder", f"<{label.lower()}>")
+            a = {"id": n, "label": f"Set {label}{suffix}",
+                 "method": "POST", "url": "/agent/create-cr",
+                 "body": {"action": "set_field", "field": key, "value": placeholder}}
+            affordances.append(a)
+            n += 1
+
+        elif ftype == "boolean":
+            current = data.get(key, False)
+            tag = "Yes" if current else "No"
+            opposite = not current
+            opp_tag = "Yes" if opposite else "No"
+            a = {"id": n,
+                 "label": f"[{tag}] {label} — click to set {opp_tag}",
+                 "method": "POST", "url": "/agent/create-cr",
+                 "body": {"action": "set_field", "field": key, "value": opposite}}
+            affordances.append(a)
+            n += 1
+
+        elif ftype == "select":
+            options_ref = fdef.get("options_ref")
+            options = _CR_DEF.get(options_ref, []) if options_ref else []
+            annotate_set = set(_CR_DEF.get(fdef.get("annotate_from", ""), []))
+            annotation = fdef.get("annotation", "")
+            current = data.get(key)
+            for opt in options:
+                selected = current == opt
+                tag = f" {annotation}" if opt in annotate_set else ""
+                prefix = "[Selected] " if selected else ""
+                a = {"id": n,
+                     "label": f"{prefix}Set {label.lower()}: {opt}{tag}",
+                     "method": "POST", "url": "/agent/create-cr",
+                     "body": {"action": "set_field", "field": key, "value": opt}}
+                affordances.append(a)
+                n += 1
+
+        # computed → no affordance
+
+    # -- Navigation affordances --
+    for nav in stage_def.get("navigation", []):
+        body = {"action": nav["action"]}
+        if "stage" in nav:
+            body["stage"] = nav["stage"]
+        a = {"id": n, "label": nav["label"],
+             "method": "POST", "url": "/agent/create-cr", "body": body}
+        affordances.append(a)
+        n += 1
+
+    # -- Proceed gate --
+    proceed = stage_def.get("proceed")
+    if proceed:
+        required = proceed.get("requires", [])
+        if all(data.get(f) for f in required):
+            a = {"id": n, "label": proceed["label"],
+                 "method": "POST", "url": "/agent/create-cr",
+                 "body": {"action": "proceed"}}
+            affordances.append(a)
+            n += 1
+
+    # -- Stage actions --
+    for act in stage_def.get("actions", []):
+        a = {"id": n, "label": act["label"],
+             "method": "POST", "url": "/agent/create-cr",
+             "body": {"action": act["action"]}}
+        affordances.append(a)
+        n += 1
+
+    return affordances
 
 
 def _render_cr_stage(stage=None):
@@ -893,109 +972,7 @@ def _render_cr_stage(stage=None):
 
     info = _CR_STAGE_INFO[stage]
     stage_idx = _CR_STAGES.index(stage)
-    affordances = []
-    n = 1
-
-    # ── Initiation ──
-    if stage == "initiation":
-        # Title
-        a, n = _text_aff(n, data, "title", "Document Title",
-                         "<short descriptive title for this Change Record>")
-        affordances.append(a)
-
-        # Code Impact toggle
-        if data["affects_code"]:
-            a, n = _aff(n, "[Yes] Code affects code — click to set No",
-                        field="affects_code", value=False)
-        else:
-            a, n = _aff(n, "[No] Code affects code — click to set Yes",
-                        field="affects_code", value=True)
-        affordances.append(a)
-
-        # Conditional: submodule selection (only if affects_code)
-        if data["affects_code"]:
-            if data["affects_submodule"]:
-                a, n = _aff(n, "[Yes] Affects controlled submodule — click to set No",
-                            field="affects_submodule", value=False)
-            else:
-                a, n = _aff(n, "[No] Affects controlled submodule — click to set Yes",
-                            field="affects_submodule", value=True)
-            affordances.append(a)
-
-            if data["affects_submodule"]:
-                for sub in _CR_SUBMODULES:
-                    selected = data["submodule"] == sub
-                    governed = sub in _CR_SDLC_GOVERNED
-                    tag = " (SDLC governed)" if governed else ""
-                    a, n = _aff(n,
-                                f"{'[Selected] ' if selected else ''}Set submodule: {sub}{tag}",
-                                field="submodule", value=sub)
-                    affordances.append(a)
-
-        # Purpose
-        a, n = _text_aff(n, data, "purpose", "Purpose",
-                         "<what problem does this CR solve? what improvement does it introduce?>")
-        affordances.append(a)
-
-        # Proceed gate: title and purpose required
-        if data["title"] and data["purpose"]:
-            a, n = _aff(n, "Proceed to Change Definition", action="proceed")
-            affordances.append(a)
-
-    # ── Change Definition ──
-    elif stage == "definition":
-        text_fields = [
-            ("scope_context", "Scope: Context",
-             "<reference to parent document or origin of this change>"),
-            ("scope_changes", "Scope: Changes Summary",
-             "<high-level description of what will change>"),
-            ("scope_files", "Scope: Files Affected",
-             "<list of files or documents to be modified or created>"),
-            ("current_state", "Current State",
-             "<concise present-tense description of what exists now>"),
-            ("proposed_state", "Proposed State",
-             "<concise present-tense description of what will exist after the change>"),
-            ("change_description", "Change Description",
-             "<full technical details of the change>"),
-            ("justification", "Justification",
-             "<why is this change needed? problem being solved, impact of not changing, how solution addresses root cause>"),
-            ("impact_files", "Impact Assessment: Files Affected",
-             "<code files, configuration files affected>"),
-            ("impact_documents", "Impact Assessment: Documents Affected",
-             "<SOPs, specifications, other controlled documents affected>"),
-            ("impact_other", "Impact Assessment: Other",
-             "<external systems, interfaces, dependencies affected>"),
-            ("testing_summary", "Testing Summary",
-             "<how will the implementation be verified? automated tests, integration checks, procedural verification>"),
-        ]
-        for field_key, label, hint in text_fields:
-            a, n = _text_aff(n, data, field_key, label, hint)
-            affordances.append(a)
-
-        # Navigation
-        a, n = _aff(n, "Go back to Initiation", action="go_back")
-        affordances.append(a)
-
-        # Proceed gate: key fields required
-        required = ["scope_changes", "current_state", "proposed_state",
-                     "change_description", "justification"]
-        if all(data[f] for f in required):
-            a, n = _aff(n, "Proceed to Pre-Submission Review", action="proceed")
-            affordances.append(a)
-
-    # ── Preflight ──
-    elif stage == "preflight":
-        a, n = _aff(n, "Go back to Initiation", action="go_to", stage="initiation")
-        affordances.append(a)
-        a, n = _aff(n, "Go back to Change Definition", action="go_to", stage="definition")
-        affordances.append(a)
-        a, n = _aff(n, "Submit for Review", action="submit")
-        affordances.append(a)
-
-    # ── Submitted ──
-    elif stage == "submitted":
-        a, n = _aff(n, "Start a new Change Record", action="restart")
-        affordances.append(a)
+    affordances = _cr_build_affordances(data, stage)
 
     # Build fields display
     fields_display = _cr_field_summary(data, stage)
