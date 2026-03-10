@@ -146,6 +146,12 @@ function registerRenderer(r) {
 }
 
 function setMode(id) {
+    /* Non-raw renderers force FoV mode */
+    if (id !== 'raw' && viewMode === 'focus') {
+        viewMode = 'fov';
+        document.getElementById('btn-fov').classList.add('active');
+        document.getElementById('btn-focus').classList.remove('active');
+    }
     if (activeRenderer === id) return;
     /* Deactivate previous */
     if (activeRenderer && renderers[activeRenderer]) {
@@ -166,6 +172,11 @@ function setViewMode(mode) {
     viewMode = mode;
     document.getElementById('btn-fov').classList.toggle('active', mode === 'fov');
     document.getElementById('btn-focus').classList.toggle('active', mode === 'focus');
+    /* Focus forces Raw renderer */
+    if (mode === 'focus' && activeRenderer !== 'raw') {
+        setMode('raw');
+        return; /* setMode already calls dispatchRender */
+    }
     /* Re-render with current data */
     if (activeRenderer && renderers[activeRenderer]) {
         dispatchRender();
