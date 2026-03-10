@@ -85,6 +85,11 @@
             <span id="path" class="path-value">&mdash;</span>
         </div>
         <div class="mode-toggle" id="mode-toggle"></div>
+        <span style="color:#333;margin:0 0.3rem;">|</span>
+        <div class="mode-toggle" id="view-toggle">
+            <button class="mode-btn active" id="btn-fov" onclick="setViewMode('fov')">FoV</button>
+            <button class="mode-btn" id="btn-focus" onclick="setViewMode('focus')">Focus</button>
+        </div>
     </div>
     <div class="panels">
         <div class="panel-view">
@@ -116,6 +121,7 @@ var agentState = null;     // latest parsed page JSON
 var lastRaw = null;        // latest raw content string
 var lastMessage = '';
 var currentFocus = null;   // latest Focus from POST result
+var viewMode = 'fov';      // 'fov' or 'focus'
 
 /* Renderer availability is declared by the workflow, not guessed from data shape. */
 var allowedRenderers = {{ renderers|safe }};
@@ -153,7 +159,27 @@ function setMode(id) {
     r._container.classList.add('active');
     document.getElementById('btn-' + id).classList.add('active');
     r.activate();
-    if (agentState) r.update(agentState, lastMessage, currentFocus);
+    if (agentState) dispatchRender();
+}
+
+function setViewMode(mode) {
+    viewMode = mode;
+    document.getElementById('btn-fov').classList.toggle('active', mode === 'fov');
+    document.getElementById('btn-focus').classList.toggle('active', mode === 'focus');
+    /* Re-render with current data */
+    if (activeRenderer && renderers[activeRenderer]) {
+        dispatchRender();
+    }
+}
+
+function dispatchRender() {
+    var r = renderers[activeRenderer];
+    if (!r) return;
+    if (viewMode === 'focus' && currentFocus && activeRenderer === 'raw') {
+        r.update(currentFocus, currentFocus.message || '', null);
+    } else {
+        r.update(agentState, lastMessage, currentFocus);
+    }
 }
 
 function broadcastState(state, msg, focus) {
@@ -161,7 +187,7 @@ function broadcastState(state, msg, focus) {
     lastMessage = msg;
     currentFocus = focus || null;
     if (activeRenderer && renderers[activeRenderer]) {
-        renderers[activeRenderer].update(state, msg, currentFocus);
+        dispatchRender();
     }
 }
 
@@ -699,7 +725,7 @@ registerRenderer({
         if (!container || !state) return;
 
         var changedFields = (focus && focus.changed) ? focus.changed : {};
-        var unlockedLabels = (focus && focus.unlocked) ? focus.unlocked : [];
+        var newAffLabels = (focus && focus.new_affordances) ? focus.new_affordances.map(function(a){ return a.label; }) : [];
 
         var html = '';
 
@@ -759,7 +785,7 @@ registerRenderer({
                 if (/Proceed|Submit/.test(a.label)) cls += ' wf-aff-primary';
                 else if (/Go back/.test(a.label)) cls += ' wf-aff-nav';
                 else if (/\[Selected\]/.test(a.label)) cls += ' wf-aff-selected';
-                if (unlockedLabels.indexOf(a.label) >= 0) cls += ' wf-aff-focus';
+                if (newAffLabels.indexOf(a.label) >= 0) cls += ' wf-aff-focus';
                 html += '<div class="' + cls + '">';
                 html += '<div class="wf-aff-top">';
                 html += '<span class="wf-aff-id">' + a.id + '</span>';

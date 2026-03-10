@@ -429,8 +429,7 @@ def _compute_focus(before: dict, after: dict) -> dict:
     Returns a dict with:
       message   — the action confirmation message (from the after FoV)
       changed   — fields whose value changed (same shape as state.fields)
-      unlocked  — affordance labels that are new (not present in before)
-      affordances — the full affordance objects for newly unlocked affordances
+      new_affordances — the full affordance objects for newly available affordances
     """
     before_fields = (before.get("state") or {}).get("fields", {})
     after_fields = (after.get("state") or {}).get("fields", {})
@@ -443,18 +442,15 @@ def _compute_focus(before: dict, after: dict) -> dict:
 
     before_ids = {a["id"] for a in before.get("affordances", [])}
     before_labels = {a["label"] for a in before.get("affordances", [])}
-    unlocked = []
-    unlocked_affordances = []
+    new_affordances = []
     for a in after.get("affordances", []):
         if a["id"] not in before_ids and a["label"] not in before_labels:
-            unlocked.append(a["label"])
-            unlocked_affordances.append(a)
+            new_affordances.append(a)
 
     return {
         "message": after.get("message"),
         "changed": changed,
-        "unlocked": unlocked,
-        "affordances": unlocked_affordances,
+        "new_affordances": new_affordances,
     }
 
 
