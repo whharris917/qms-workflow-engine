@@ -9,8 +9,8 @@
 ##
 ## Affordance generation rules (by field type):
 ##   text/boolean/select → "Set {label} (current: {value})" with body value "<value>"
+##   boolean/select      → affordance includes "options" list of valid values
 ##   computed            → no affordance (read-only)
-##   Select fields expose valid options via the "options" key in the FoV field entry.
 ##
 ## Node-level affordances:
 ##   navigation → always available (go_back, go_to)

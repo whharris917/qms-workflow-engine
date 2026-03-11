@@ -1014,8 +1014,8 @@ def _cr_build_affordances(data, node, workflow_id: str):
 
     Affordance rules by field type:
       text     → "Set {label}" with placeholder as value template
-      boolean  → toggle showing current state, offering the opposite
-      select   → single affordance with pipe-delimited options
+      boolean  → "Set {label}" with options: [true, false]
+      select   → "Set {label}" with options from YAML definition
       computed → no affordance (read-only)
 
     Node-level affordances (from nodes.{node} in YAML):
@@ -1051,6 +1051,12 @@ def _cr_build_affordances(data, node, workflow_id: str):
                  "label": f"Set {label} (current: {display})",
                  "method": "POST", "url": api_url,
                  "body": {"action": "set_field", "field": key, "value": "<value>"}}
+            if ftype == "boolean":
+                a["options"] = [True, False]
+            elif ftype == "select":
+                options_ref = fdef.get("options_ref")
+                if options_ref:
+                    a["options"] = _CR_DEF.get(options_ref, [])
             affordances.append(a)
             n += 1
 
@@ -1154,7 +1160,9 @@ def _process_cr_action(workflow_id: str, body):
         if field in valid_text:
             data[field] = value
         elif field in valid_bool:
-            data[field] = bool(value)
+            if value is not True and value is not False:
+                return {"error": f"Invalid value for {field}. Must be true or false."}
+            data[field] = value
             # Clear downstream fields when toggling off
             if field == "affects_code" and not value:
                 data["affects_submodule"] = False
