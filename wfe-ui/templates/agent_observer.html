@@ -679,16 +679,20 @@ registerRenderer({
     }
 
     /* Render fields — each field is {value, instruction?} */
-    function renderFields(fields, highlightedFields) {
+    function renderFields(fields, fieldCategory) {
         var keys = Object.keys(fields);
         if (!keys.length) return '<span class="wf-empty-obj">(empty)</span>';
         var html = '<div class="wf-fields">';
         for (var i = 0; i < keys.length; i++) {
             var k = keys[i];
             var f = fields[k];
-            var focused = highlightedFields && (k in highlightedFields);
-            html += '<div class="wf-field' + (focused ? ' wf-focus' : '') + '">';
-            html += '<div class="wf-field-label">' + esc(k) + '</div>';
+            var cat = fieldCategory[k] || null;
+            var catCls = cat ? ' wf-fb-' + cat : '';
+            html += '<div class="wf-field' + catCls + '">';
+            var tagMap = {outcome:'SET', 'new':'NEW', modified:'CHANGED'};
+            var tagCls = {outcome:'wf-tag-outcome', 'new':'wf-tag-new', modified:'wf-tag-modified'};
+            var tag = cat ? '<span class="' + tagCls[cat] + '">' + tagMap[cat] + '</span>' : '';
+            html += '<div class="wf-field-label">' + esc(k) + tag + '</div>';
             if (f && typeof f === 'object' && 'value' in f) {
                 /* Structured field: {value, instruction?} */
                 if (f.instruction) {
@@ -735,20 +739,17 @@ registerRenderer({
     function render(state, msg, feedback) {
         if (!container || !state) return;
 
-        /* Merge outcome + effects fields into a single set of highlighted fields */
-        var highlightedFields = {};
-        var highlightedAffs = [];
+        /* Categorize feedback into distinct highlight buckets */
+        var fieldCategory = {};   // label → 'outcome' | 'new' | 'modified'
+        var affCategory = {};     // label → 'new' | 'modified'
         if (feedback) {
             var out = feedback.outcome || {};
             var eff = feedback.effects || {};
-            var nf = eff.new_fields || {};
-            var mf = eff.modified_fields || {};
-            for (var k in out) highlightedFields[k] = out[k];
-            for (var k in nf) highlightedFields[k] = nf[k];
-            for (var k in mf) highlightedFields[k] = mf[k];
-            var na = eff.new_affordances || [];
-            var ma = eff.modified_affordances || [];
-            highlightedAffs = na.concat(ma).map(function(a){ return a.label; });
+            for (var k in out) fieldCategory[k] = 'outcome';
+            for (var k in (eff.new_fields || {})) fieldCategory[k] = 'new';
+            for (var k in (eff.modified_fields || {})) fieldCategory[k] = 'modified';
+            (eff.new_affordances || []).forEach(function(a){ affCategory[a.label] = 'new'; });
+            (eff.modified_affordances || []).forEach(function(a){ affCategory[a.label] = 'modified'; });
         }
 
         var html = '';
@@ -787,7 +788,7 @@ registerRenderer({
         if (s.fields) {
             html += '<div class="wf-card">';
             html += '<div class="wf-card-head">state.fields</div>';
-            html += renderFields(s.fields, highlightedFields);
+            html += renderFields(s.fields, fieldCategory);
             html += '</div>';
         }
 
@@ -809,11 +810,13 @@ registerRenderer({
                 if (/Proceed|Submit/.test(a.label)) cls += ' wf-aff-primary';
                 else if (/Go back/.test(a.label)) cls += ' wf-aff-nav';
                 else if (/\[Selected\]/.test(a.label)) cls += ' wf-aff-selected';
-                if (highlightedAffs.indexOf(a.label) >= 0) cls += ' wf-aff-focus';
+                if (affCategory[a.label]) cls += ' wf-aff-' + affCategory[a.label];
                 html += '<div class="' + cls + '">';
                 html += '<div class="wf-aff-top">';
                 html += '<span class="wf-aff-id">' + a.id + '</span>';
-                html += '<span class="wf-aff-label">' + esc(a.label) + '</span>';
+                var ac = affCategory[a.label];
+                var affTag = ac === 'new' ? '<span class="wf-tag-new">NEW</span>' : ac === 'modified' ? '<span class="wf-tag-modified">CHANGED</span>' : '';
+                html += '<span class="wf-aff-label">' + esc(a.label) + affTag + '</span>';
                 html += '<span class="wf-aff-method">' + esc(a.method) + '</span>';
                 html += '</div>';
                 html += '<div class="wf-aff-detail">' + esc(a.url) + ' &nbsp; ' + esc(JSON.stringify(a.body)) + '</div>';
@@ -913,8 +916,14 @@ registerRenderer({
                 + '.wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; }'
 
                 /* Focus highlights */
-                + '.wf-focus { border-left:3px solid #2a6bcf; background:#f0f5ff; }'
-                + '.wf-aff-focus { border-left:3px solid #2a6bcf; }'
+                + '.wf-fb-outcome { border-left:3px solid #2a6bcf; background:#f0f5ff; }'
+                + '.wf-fb-new { border-left:3px solid #4caf50; background:#f0faf0; }'
+                + '.wf-fb-modified { border-left:3px solid #e6a817; background:#fdf8ed; }'
+                + '.wf-aff-new { border-left:3px solid #4caf50; }'
+                + '.wf-aff-modified { border-left:3px solid #e6a817; }'
+                + '.wf-tag-outcome { font-size:0.6em; font-weight:700; color:#2a6bcf; vertical-align:super; margin-left:0.5em; letter-spacing:0.05em; }'
+                + '.wf-tag-new { font-size:0.6em; font-weight:700; color:#4caf50; vertical-align:super; margin-left:0.5em; letter-spacing:0.05em; }'
+                + '.wf-tag-modified { font-size:0.6em; font-weight:700; color:#e6a817; vertical-align:super; margin-left:0.5em; letter-spacing:0.05em; }'
                 ;
             document.head.appendChild(style);
             container = c;

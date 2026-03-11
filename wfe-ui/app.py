@@ -976,11 +976,11 @@ def _cr_field_summary(data, node):
         label = fdef["label"]
 
         if ftype == "boolean":
-            value = "Yes" if data.get(key) else "No"
+            value = bool(data.get(key))
             instruction = fdef.get("instruction")
         elif ftype == "computed" and fdef.get("computed") == "sdlc_check":
-            value = "Yes" if data.get(key) in _CR_SDLC_GOVERNED else "No"
-            if data.get(key) in _CR_SDLC_GOVERNED:
+            value = data.get(key) in _CR_SDLC_GOVERNED
+            if value:
                 instruction = fdef.get("instruction_when_true")
             else:
                 instruction = fdef.get("instruction_when_false")
@@ -988,7 +988,25 @@ def _cr_field_summary(data, node):
             value = _trunc(data.get(key))
             instruction = fdef.get("instruction")
 
-        fields[label] = _field(value, instruction)
+        entry = _field(value, instruction)
+
+        # Expose valid options for select fields (with annotations if defined)
+        if ftype == "select":
+            options_ref = fdef.get("options_ref")
+            if options_ref:
+                raw_options = _CR_DEF.get(options_ref, [])
+                annotate_from = fdef.get("annotate_from", "")
+                annotation = fdef.get("annotation", "")
+                if annotate_from and annotation:
+                    annotate_set = set(_CR_DEF.get(annotate_from, []))
+                    entry["options"] = [
+                        f"{opt} {annotation}" if opt in annotate_set else opt
+                        for opt in raw_options
+                    ]
+                else:
+                    entry["options"] = raw_options
+
+        fields[label] = entry
     return fields
 
 
@@ -1025,46 +1043,15 @@ def _cr_build_affordances(data, node, workflow_id: str):
         key = fdef["key"]
         label = fdef["label"]
 
-        if ftype == "text":
+        if ftype in ("text", "boolean", "select"):
             current = data.get(key)
-            suffix = ""
-            if current:
-                suffix = f" (current: \"{_trunc(current, 50)}\")"
-            placeholder = fdef.get("placeholder", f"<{label.lower()}>")
-            a = {"id": n, "label": f"Set {label}{suffix}",
-                 "method": "POST", "url": api_url,
-                 "body": {"action": "set_field", "field": key, "value": placeholder}}
-            affordances.append(a)
-            n += 1
-
-        elif ftype == "boolean":
-            current = data.get(key, False)
-            tag = "Yes" if current else "No"
-            opposite = not current
-            opp_tag = "Yes" if opposite else "No"
+            if ftype == "boolean":
+                current = bool(current)
+            display = json.dumps(current) if not isinstance(current, str) else f'"{_trunc(current, 50)}"' if current else "null"
             a = {"id": n,
-                 "label": f"[{tag}] {label} — click to set {opp_tag}",
+                 "label": f"Set {label} (current: {display})",
                  "method": "POST", "url": api_url,
-                 "body": {"action": "set_field", "field": key, "value": opposite}}
-            affordances.append(a)
-            n += 1
-
-        elif ftype == "select":
-            options_ref = fdef.get("options_ref")
-            options = _CR_DEF.get(options_ref, []) if options_ref else []
-            annotate_set = set(_CR_DEF.get(fdef.get("annotate_from", ""), []))
-            annotation = fdef.get("annotation", "")
-            current = data.get(key)
-            suffix = f" (current: \"{current}\")" if current else ""
-            opts_display = []
-            for opt in options:
-                tag = f" {annotation}" if opt in annotate_set else ""
-                opts_display.append(f"{opt}{tag}")
-            placeholder = " | ".join(opts_display)
-            a = {"id": n,
-                 "label": f"Set {label}{suffix}",
-                 "method": "POST", "url": api_url,
-                 "body": {"action": "set_field", "field": key, "value": f"<{placeholder}>"}}
+                 "body": {"action": "set_field", "field": key, "value": "<value>"}}
             affordances.append(a)
             n += 1
 

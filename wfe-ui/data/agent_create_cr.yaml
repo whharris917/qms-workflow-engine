@@ -8,10 +8,9 @@
 ## Nodes with show_all_fields: true aggregate fields from all nodes.
 ##
 ## Affordance generation rules (by field type):
-##   text     → "Set {label}" with placeholder as value template
-##   boolean  → toggle showing current state, offering the opposite
-##   select   → single affordance with pipe-delimited options
-##   computed → no affordance (read-only)
+##   text/boolean/select → "Set {label} (current: {value})" with body value "<value>"
+##   computed            → no affordance (read-only)
+##   Select fields expose valid options via the "options" key in the FoV field entry.
 ##
 ## Node-level affordances:
 ##   navigation → always available (go_back, go_to)
@@ -45,7 +44,6 @@ nodes:
         type: text
         key: title
         instruction: A short, descriptive title for this Change Record.
-        placeholder: "<short descriptive title for this Change Record>"
         default: null
 
       affects_code:
@@ -96,7 +94,6 @@ nodes:
         key: purpose
         instruction: >-
           What problem does this CR solve? What improvement does it introduce?
-        placeholder: "<what problem does this CR solve? what improvement does it introduce?>"
         default: null
 
   definition:
@@ -118,7 +115,6 @@ nodes:
         key: scope_context
         instruction: >-
           Reference to parent document (e.g. INV) if applicable, or origin of the change.
-        placeholder: "<reference to parent document or origin of this change>"
         default: null
 
       scope_changes:
@@ -126,7 +122,6 @@ nodes:
         type: text
         key: scope_changes
         instruction: High-level description of what will change.
-        placeholder: "<high-level description of what will change>"
         default: null
 
       scope_files:
@@ -134,7 +129,6 @@ nodes:
         type: text
         key: scope_files
         instruction: List of files or documents to be modified or created.
-        placeholder: "<list of files or documents to be modified or created>"
         default: null
 
       current_state:
@@ -142,7 +136,6 @@ nodes:
         type: text
         key: current_state
         instruction: Concise present-tense description of what exists now.
-        placeholder: "<concise present-tense description of what exists now>"
         default: null
 
       proposed_state:
@@ -150,7 +143,6 @@ nodes:
         type: text
         key: proposed_state
         instruction: Concise present-tense description of what will exist after the change.
-        placeholder: "<concise present-tense description of what will exist after the change>"
         default: null
 
       change_description:
@@ -160,7 +152,6 @@ nodes:
         instruction: >-
           Full technical details of the change. May include subsections,
           code snippets, or other explanatory content.
-        placeholder: "<full technical details of the change>"
         default: null
 
       justification:
@@ -170,7 +161,6 @@ nodes:
         instruction: >-
           Why is this change needed? The problem being solved, impact of not changing,
           and how the solution addresses root cause.
-        placeholder: "<why is this change needed? problem being solved, impact of not changing, how solution addresses root cause>"
         default: null
 
       impact_files:
@@ -178,7 +168,6 @@ nodes:
         type: text
         key: impact_files
         instruction: Code files, configuration files affected.
-        placeholder: "<code files, configuration files affected>"
         default: null
 
       impact_documents:
@@ -186,7 +175,6 @@ nodes:
         type: text
         key: impact_documents
         instruction: SOPs, specifications, other controlled documents affected.
-        placeholder: "<SOPs, specifications, other controlled documents affected>"
         default: null
 
       impact_other:
@@ -194,7 +182,6 @@ nodes:
         type: text
         key: impact_other
         instruction: External systems, interfaces, dependencies affected.
-        placeholder: "<external systems, interfaces, dependencies affected>"
         default: null
 
       testing_summary:
@@ -205,7 +192,6 @@ nodes:
           How will the implementation be verified? Address automated verification
           and integration verification for code changes; procedural verification
           for document-only CRs.
-        placeholder: "<how will the implementation be verified? automated tests, integration checks, procedural verification>"
         default: null
 
   preflight:
