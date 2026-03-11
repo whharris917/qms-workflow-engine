@@ -88,7 +88,7 @@
         <span style="color:#333;margin:0 0.3rem;">|</span>
         <div class="mode-toggle" id="view-toggle">
             <button class="mode-btn active" id="btn-fov" onclick="setViewMode('fov')">FoV</button>
-            <button class="mode-btn" id="btn-impact" onclick="setViewMode('impact')">Impact</button>
+            <button class="mode-btn" id="btn-feedback" onclick="setViewMode('feedback')">Feedback</button>
         </div>
     </div>
     <div class="panels">
@@ -120,8 +120,8 @@ var activeRenderer = null; // currently active renderer id
 var agentState = null;     // latest parsed page JSON
 var lastRaw = null;        // latest raw content string
 var lastMessage = '';
-var currentImpact = null;  // latest Impact from POST result
-var viewMode = 'fov';      // 'fov' or 'impact'
+var currentFeedback = null;  // latest Feedback from POST result
+var viewMode = 'fov';        // 'fov' or 'feedback'
 
 /* Renderer availability is declared by the workflow, not guessed from data shape. */
 var allowedRenderers = {{ renderers|safe }};
@@ -147,10 +147,10 @@ function registerRenderer(r) {
 
 function setMode(id) {
     /* Non-raw renderers force FoV mode */
-    if (id !== 'raw' && viewMode === 'impact') {
+    if (id !== 'raw' && viewMode === 'feedback') {
         viewMode = 'fov';
         document.getElementById('btn-fov').classList.add('active');
-        document.getElementById('btn-impact').classList.remove('active');
+        document.getElementById('btn-feedback').classList.remove('active');
     }
     if (activeRenderer === id) return;
     /* Deactivate previous */
@@ -171,9 +171,9 @@ function setMode(id) {
 function setViewMode(mode) {
     viewMode = mode;
     document.getElementById('btn-fov').classList.toggle('active', mode === 'fov');
-    document.getElementById('btn-impact').classList.toggle('active', mode === 'impact');
-    /* Impact forces Raw renderer */
-    if (mode === 'impact' && activeRenderer !== 'raw') {
+    document.getElementById('btn-feedback').classList.toggle('active', mode === 'feedback');
+    /* Feedback forces Raw renderer */
+    if (mode === 'feedback' && activeRenderer !== 'raw') {
         setMode('raw');
         return; /* setMode already calls dispatchRender */
     }
@@ -186,29 +186,29 @@ function setViewMode(mode) {
 function dispatchRender() {
     var r = renderers[activeRenderer];
     if (!r) return;
-    if (viewMode === 'impact' && currentImpact && activeRenderer === 'raw') {
-        r.update(currentImpact, currentImpact.echo || '', null);
+    if (viewMode === 'feedback' && currentFeedback && activeRenderer === 'raw') {
+        r.update(currentFeedback, currentFeedback.attempted_action || '', null);
     } else {
-        r.update(agentState, lastMessage, currentImpact);
+        r.update(agentState, lastMessage, currentFeedback);
     }
 }
 
-function broadcastState(state, msg, impact) {
+function broadcastState(state, msg, feedback) {
     agentState = state;
     lastMessage = msg;
-    currentImpact = impact || null;
+    currentFeedback = feedback || null;
     if (activeRenderer && renderers[activeRenderer]) {
         dispatchRender();
     }
 }
 
 /* ── State extraction from SSE payloads ── */
-function extractState(raw, impact) {
+function extractState(raw, feedback) {
     var obj;
     try { obj = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { return; }
     if (!obj || !obj.state) return;
     lastRaw = typeof raw === 'string' ? raw : JSON.stringify(raw);
-    broadcastState(obj, obj.message || '', impact);
+    broadcastState(obj, obj.message || '', feedback);
 }
 
 /* ======================================================================
@@ -732,18 +732,24 @@ registerRenderer({
         return html + '</div>';
     }
 
-    function render(state, msg, impact) {
+    function render(state, msg, feedback) {
         if (!container || !state) return;
 
-        /* Merge confirmation + effects into a single set of highlighted fields */
+        /* Merge outcome + effects fields into a single set of highlighted fields */
         var highlightedFields = {};
-        if (impact) {
-            var conf = impact.confirmation || {};
-            var eff = impact.effects || {};
-            for (var k in conf) highlightedFields[k] = conf[k];
-            for (var k in eff) highlightedFields[k] = eff[k];
+        var highlightedAffs = [];
+        if (feedback) {
+            var out = feedback.outcome || {};
+            var eff = feedback.effects || {};
+            var nf = eff.new_fields || {};
+            var mf = eff.modified_fields || {};
+            for (var k in out) highlightedFields[k] = out[k];
+            for (var k in nf) highlightedFields[k] = nf[k];
+            for (var k in mf) highlightedFields[k] = mf[k];
+            var na = eff.new_affordances || [];
+            var ma = eff.modified_affordances || [];
+            highlightedAffs = na.concat(ma).map(function(a){ return a.label; });
         }
-        var newAffLabels = (impact && impact.new_affordances) ? impact.new_affordances.map(function(a){ return a.label; }) : [];
 
         var html = '';
 
@@ -803,7 +809,7 @@ registerRenderer({
                 if (/Proceed|Submit/.test(a.label)) cls += ' wf-aff-primary';
                 else if (/Go back/.test(a.label)) cls += ' wf-aff-nav';
                 else if (/\[Selected\]/.test(a.label)) cls += ' wf-aff-selected';
-                if (newAffLabels.indexOf(a.label) >= 0) cls += ' wf-aff-focus';
+                if (highlightedAffs.indexOf(a.label) >= 0) cls += ' wf-aff-focus';
                 html += '<div class="' + cls + '">';
                 html += '<div class="wf-aff-top">';
                 html += '<span class="wf-aff-id">' + a.id + '</span>';
@@ -913,7 +919,7 @@ registerRenderer({
             document.head.appendChild(style);
             container = c;
         },
-        update: function(state, msg, impact) { render(state, msg, impact); },
+        update: function(state, msg, feedback) { render(state, msg, feedback); },
         activate: function() {},
         deactivate: function() {}
     });
@@ -955,17 +961,17 @@ function connect() {
             addLog(ev);
             var pageState = (ev.page && ev.page.state) || {};
             pathEl.textContent = pageState.node || pageState.position || ev.current_path || '\u2014';
-            /* Recover impact from the most recent result event in history */
+            /* Recover feedback from the most recent result event in history */
             var hist = ev.history || [];
-            var lastImpact = null;
+            var lastFeedback = null;
             for (var i = hist.length - 1; i >= 0; i--) {
-                if (hist[i].type === 'result' && hist[i].impact) {
-                    lastImpact = hist[i].impact;
+                if (hist[i].type === 'result' && hist[i].feedback) {
+                    lastFeedback = hist[i].feedback;
                     break;
                 }
             }
-            /* Render the current page state immediately (with recovered impact) */
-            if (ev.page) extractState(ev.page, lastImpact);
+            /* Render the current page state immediately (with recovered feedback) */
+            if (ev.page) extractState(ev.page, lastFeedback);
             /* Replay recent history into the event log */
             hist.slice(-20).forEach(addLog);
             return;
@@ -978,7 +984,7 @@ function connect() {
         if (ev.type === 'result' && ev.result) {
             var s = ev.result.state || {};
             pathEl.textContent = s.node || s.position || '';
-            extractState(ev.result, ev.impact || null);
+            extractState(ev.result, ev.feedback || null);
         }
     };
 }

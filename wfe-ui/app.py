@@ -423,14 +423,17 @@ def _wf_notify(workflow_id: str, event: dict):
         _workflow_observers[workflow_id].remove(q)
 
 
-def _compute_impact(before: dict, after: dict, action_body: dict) -> dict:
-    """Compute the Impact — structured response to an agent action.
+def _compute_feedback(before: dict, after: dict, action_body: dict) -> dict:
+    """Compute the Feedback — structured response to an agent action.
 
     Returns a dict with:
-      echo            — human-readable summary of what the agent attempted
-      confirmation    — the direct result: the field that was set (or error)
-      effects         — cascading changes: fields that appeared or changed as a consequence
-      new_affordances — affordance objects that became available
+      attempted_action — human-readable summary of what the agent attempted
+      outcome          — the direct result: the field that was set (or error)
+      effects          — cascading changes:
+        new_fields          — fields that appeared as a consequence
+        modified_fields     — fields that changed value as a consequence
+        new_affordances     — affordance objects that became available
+        modified_affordances — affordances whose presentation changed
     """
     before_fields = (before.get("state") or {}).get("fields", {})
     after_fields = (after.get("state") or {}).get("fields", {})
@@ -444,15 +447,21 @@ def _compute_impact(before: dict, after: dict, action_body: dict) -> dict:
                 acted_label = fdef["label"]
                 break
 
-    confirmation = {}
-    effects = {}
+    outcome = {}
+    new_fields = {}
+    modified_fields = {}
     for label, field in after_fields.items():
         old = before_fields.get(label)
-        if old is None or old.get("value") != field.get("value"):
+        if old is None:
             if label == acted_label:
-                confirmation[label] = field
+                outcome[label] = field
             else:
-                effects[label] = field
+                new_fields[label] = field
+        elif old.get("value") != field.get("value"):
+            if label == acted_label:
+                outcome[label] = field
+            else:
+                modified_fields[label] = field
 
     def _aff_key(a):
         """Stable identity for an affordance — action + field for set_field, else action."""
@@ -462,17 +471,25 @@ def _compute_impact(before: dict, after: dict, action_body: dict) -> dict:
             return (action, b.get("field", ""))
         return (action, b.get("node", b.get("label", "")))
 
-    before_keys = {_aff_key(a) for a in before.get("affordances", [])}
+    before_aff = {_aff_key(a): a for a in before.get("affordances", [])}
     new_affordances = []
+    modified_affordances = []
     for a in after.get("affordances", []):
-        if _aff_key(a) not in before_keys:
+        key = _aff_key(a)
+        if key not in before_aff:
             new_affordances.append(a)
+        elif a.get("label") != before_aff[key].get("label"):
+            modified_affordances.append(a)
 
     return {
-        "echo": after.get("message"),
-        "confirmation": confirmation,
-        "effects": effects,
-        "new_affordances": new_affordances,
+        "attempted_action": after.get("message"),
+        "outcome": outcome,
+        "effects": {
+            "new_fields": new_fields,
+            "modified_fields": modified_fields,
+            "new_affordances": new_affordances,
+            "modified_affordances": modified_affordances,
+        },
     }
 
 
@@ -1538,36 +1555,40 @@ def agent_workflow_post(workflow_id):
     result = _process_agent_action(workflow_id, body)
 
     if "error" in result:
-        # Build echo from the action body
+        # Build attempted_action from the action body
         action = body.get("action", "?")
         field = body.get("field", "")
         value = body.get("value", "")
         if action == "set_field":
-            echo = f"Set {field} = \"{_trunc(str(value), 60)}\""
+            attempted = f"Set {field} = \"{_trunc(str(value), 60)}\""
         else:
-            echo = action
-        impact = {
-            "echo": echo,
-            "confirmation": {"error": result["error"]},
-            "effects": {},
-            "new_affordances": [],
+            attempted = action
+        feedback = {
+            "attempted_action": attempted,
+            "outcome": {"error": result["error"]},
+            "effects": {
+                "new_fields": {},
+                "modified_fields": {},
+                "new_affordances": [],
+                "modified_affordances": [],
+            },
         }
-        _wf_notify(workflow_id, {"type": "result", "path": workflow_id, "result": before_fov, "impact": impact})
-        return jsonify(impact), 422
+        _wf_notify(workflow_id, {"type": "result", "path": workflow_id, "result": before_fov, "feedback": feedback})
+        return jsonify(feedback), 422
 
     # result is the after-FoV (returned by the action processor)
     after_fov = result
-    impact = _compute_impact(before_fov, after_fov, body)
+    feedback = _compute_feedback(before_fov, after_fov, body)
 
     # Track current node
     node = (after_fov.get("state") or {}).get("node") or (after_fov.get("state") or {}).get("position") or workflow_id
     _workflow_current_path[workflow_id] = node
 
-    # Push full FoV + Impact to Observer via SSE
-    _wf_notify(workflow_id, {"type": "result", "path": workflow_id, "result": after_fov, "impact": impact})
+    # Push full FoV + Feedback to Observer via SSE
+    _wf_notify(workflow_id, {"type": "result", "path": workflow_id, "result": after_fov, "feedback": feedback})
 
-    # Return Impact to agent
-    return jsonify(impact)
+    # Return Feedback to agent
+    return jsonify(feedback)
 
 
 @app.route("/manual")
