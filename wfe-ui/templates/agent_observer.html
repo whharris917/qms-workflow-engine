@@ -88,7 +88,7 @@
         <span style="color:#333;margin:0 0.3rem;">|</span>
         <div class="mode-toggle" id="view-toggle">
             <button class="mode-btn active" id="btn-fov" onclick="setViewMode('fov')">FoV</button>
-            <button class="mode-btn" id="btn-focus" onclick="setViewMode('focus')">Focus</button>
+            <button class="mode-btn" id="btn-impact" onclick="setViewMode('impact')">Impact</button>
         </div>
     </div>
     <div class="panels">
@@ -120,8 +120,8 @@ var activeRenderer = null; // currently active renderer id
 var agentState = null;     // latest parsed page JSON
 var lastRaw = null;        // latest raw content string
 var lastMessage = '';
-var currentFocus = null;   // latest Focus from POST result
-var viewMode = 'fov';      // 'fov' or 'focus'
+var currentImpact = null;  // latest Impact from POST result
+var viewMode = 'fov';      // 'fov' or 'impact'
 
 /* Renderer availability is declared by the workflow, not guessed from data shape. */
 var allowedRenderers = {{ renderers|safe }};
@@ -147,10 +147,10 @@ function registerRenderer(r) {
 
 function setMode(id) {
     /* Non-raw renderers force FoV mode */
-    if (id !== 'raw' && viewMode === 'focus') {
+    if (id !== 'raw' && viewMode === 'impact') {
         viewMode = 'fov';
         document.getElementById('btn-fov').classList.add('active');
-        document.getElementById('btn-focus').classList.remove('active');
+        document.getElementById('btn-impact').classList.remove('active');
     }
     if (activeRenderer === id) return;
     /* Deactivate previous */
@@ -171,9 +171,9 @@ function setMode(id) {
 function setViewMode(mode) {
     viewMode = mode;
     document.getElementById('btn-fov').classList.toggle('active', mode === 'fov');
-    document.getElementById('btn-focus').classList.toggle('active', mode === 'focus');
-    /* Focus forces Raw renderer */
-    if (mode === 'focus' && activeRenderer !== 'raw') {
+    document.getElementById('btn-impact').classList.toggle('active', mode === 'impact');
+    /* Impact forces Raw renderer */
+    if (mode === 'impact' && activeRenderer !== 'raw') {
         setMode('raw');
         return; /* setMode already calls dispatchRender */
     }
@@ -186,29 +186,29 @@ function setViewMode(mode) {
 function dispatchRender() {
     var r = renderers[activeRenderer];
     if (!r) return;
-    if (viewMode === 'focus' && currentFocus && activeRenderer === 'raw') {
-        r.update(currentFocus, currentFocus.message || '', null);
+    if (viewMode === 'impact' && currentImpact && activeRenderer === 'raw') {
+        r.update(currentImpact, currentImpact.echo || '', null);
     } else {
-        r.update(agentState, lastMessage, currentFocus);
+        r.update(agentState, lastMessage, currentImpact);
     }
 }
 
-function broadcastState(state, msg, focus) {
+function broadcastState(state, msg, impact) {
     agentState = state;
     lastMessage = msg;
-    currentFocus = focus || null;
+    currentImpact = impact || null;
     if (activeRenderer && renderers[activeRenderer]) {
         dispatchRender();
     }
 }
 
 /* ── State extraction from SSE payloads ── */
-function extractState(raw, focus) {
+function extractState(raw, impact) {
     var obj;
     try { obj = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { return; }
     if (!obj || !obj.state) return;
     lastRaw = typeof raw === 'string' ? raw : JSON.stringify(raw);
-    broadcastState(obj, obj.message || '', focus);
+    broadcastState(obj, obj.message || '', impact);
 }
 
 /* ======================================================================
@@ -679,14 +679,14 @@ registerRenderer({
     }
 
     /* Render fields — each field is {value, instruction?} */
-    function renderFields(fields, changedFields) {
+    function renderFields(fields, highlightedFields) {
         var keys = Object.keys(fields);
         if (!keys.length) return '<span class="wf-empty-obj">(empty)</span>';
         var html = '<div class="wf-fields">';
         for (var i = 0; i < keys.length; i++) {
             var k = keys[i];
             var f = fields[k];
-            var focused = changedFields && (k in changedFields);
+            var focused = highlightedFields && (k in highlightedFields);
             html += '<div class="wf-field' + (focused ? ' wf-focus' : '') + '">';
             html += '<div class="wf-field-label">' + esc(k) + '</div>';
             if (f && typeof f === 'object' && 'value' in f) {
@@ -732,11 +732,18 @@ registerRenderer({
         return html + '</div>';
     }
 
-    function render(state, msg, focus) {
+    function render(state, msg, impact) {
         if (!container || !state) return;
 
-        var changedFields = (focus && focus.changed) ? focus.changed : {};
-        var newAffLabels = (focus && focus.new_affordances) ? focus.new_affordances.map(function(a){ return a.label; }) : [];
+        /* Merge confirmation + effects into a single set of highlighted fields */
+        var highlightedFields = {};
+        if (impact) {
+            var conf = impact.confirmation || {};
+            var eff = impact.effects || {};
+            for (var k in conf) highlightedFields[k] = conf[k];
+            for (var k in eff) highlightedFields[k] = eff[k];
+        }
+        var newAffLabels = (impact && impact.new_affordances) ? impact.new_affordances.map(function(a){ return a.label; }) : [];
 
         var html = '';
 
@@ -774,7 +781,7 @@ registerRenderer({
         if (s.fields) {
             html += '<div class="wf-card">';
             html += '<div class="wf-card-head">state.fields</div>';
-            html += renderFields(s.fields, changedFields);
+            html += renderFields(s.fields, highlightedFields);
             html += '</div>';
         }
 
@@ -906,7 +913,7 @@ registerRenderer({
             document.head.appendChild(style);
             container = c;
         },
-        update: function(state, msg, focus) { render(state, msg, focus); },
+        update: function(state, msg, impact) { render(state, msg, impact); },
         activate: function() {},
         deactivate: function() {}
     });
@@ -948,17 +955,17 @@ function connect() {
             addLog(ev);
             var pageState = (ev.page && ev.page.state) || {};
             pathEl.textContent = pageState.node || pageState.position || ev.current_path || '\u2014';
-            /* Recover focus from the most recent result event in history */
+            /* Recover impact from the most recent result event in history */
             var hist = ev.history || [];
-            var lastFocus = null;
+            var lastImpact = null;
             for (var i = hist.length - 1; i >= 0; i--) {
-                if (hist[i].type === 'result' && hist[i].focus) {
-                    lastFocus = hist[i].focus;
+                if (hist[i].type === 'result' && hist[i].impact) {
+                    lastImpact = hist[i].impact;
                     break;
                 }
             }
-            /* Render the current page state immediately (with recovered focus) */
-            if (ev.page) extractState(ev.page, lastFocus);
+            /* Render the current page state immediately (with recovered impact) */
+            if (ev.page) extractState(ev.page, lastImpact);
             /* Replay recent history into the event log */
             hist.slice(-20).forEach(addLog);
             return;
@@ -971,7 +978,7 @@ function connect() {
         if (ev.type === 'result' && ev.result) {
             var s = ev.result.state || {};
             pathEl.textContent = s.node || s.position || '';
-            extractState(ev.result, ev.focus || null);
+            extractState(ev.result, ev.impact || null);
         }
     };
 }

@@ -423,22 +423,36 @@ def _wf_notify(workflow_id: str, event: dict):
         _workflow_observers[workflow_id].remove(q)
 
 
-def _compute_focus(before: dict, after: dict) -> dict:
-    """Compute the Focus — the subset of the FoV that changed between two renders.
+def _compute_impact(before: dict, after: dict, action_body: dict) -> dict:
+    """Compute the Impact — structured response to an agent action.
 
     Returns a dict with:
-      message   — the action confirmation message (from the after FoV)
-      changed   — fields whose value changed (same shape as state.fields)
-      new_affordances — the full affordance objects for newly available affordances
+      echo            — human-readable summary of what the agent attempted
+      confirmation    — the direct result: the field that was set (or error)
+      effects         — cascading changes: fields that appeared or changed as a consequence
+      new_affordances — affordance objects that became available
     """
     before_fields = (before.get("state") or {}).get("fields", {})
     after_fields = (after.get("state") or {}).get("fields", {})
 
-    changed = {}
+    # Determine which field label was directly acted upon
+    acted_field_key = action_body.get("field") if action_body.get("action") == "set_field" else None
+    acted_label = None
+    if acted_field_key:
+        for fdef in _CR_ALL_FIELDS.values():
+            if fdef.get("key") == acted_field_key:
+                acted_label = fdef["label"]
+                break
+
+    confirmation = {}
+    effects = {}
     for label, field in after_fields.items():
         old = before_fields.get(label)
         if old is None or old.get("value") != field.get("value"):
-            changed[label] = field
+            if label == acted_label:
+                confirmation[label] = field
+            else:
+                effects[label] = field
 
     def _aff_key(a):
         """Stable identity for an affordance — action + field for set_field, else action."""
@@ -455,8 +469,9 @@ def _compute_focus(before: dict, after: dict) -> dict:
             new_affordances.append(a)
 
     return {
-        "message": after.get("message"),
-        "changed": changed,
+        "echo": after.get("message"),
+        "confirmation": confirmation,
+        "effects": effects,
         "new_affordances": new_affordances,
     }
 
@@ -1523,22 +1538,36 @@ def agent_workflow_post(workflow_id):
     result = _process_agent_action(workflow_id, body)
 
     if "error" in result:
-        _wf_notify(workflow_id, {"type": "result", "path": workflow_id, "result": result})
-        return jsonify(result), 422
+        # Build echo from the action body
+        action = body.get("action", "?")
+        field = body.get("field", "")
+        value = body.get("value", "")
+        if action == "set_field":
+            echo = f"Set {field} = \"{_trunc(str(value), 60)}\""
+        else:
+            echo = action
+        impact = {
+            "echo": echo,
+            "confirmation": {"error": result["error"]},
+            "effects": {},
+            "new_affordances": [],
+        }
+        _wf_notify(workflow_id, {"type": "result", "path": workflow_id, "result": before_fov, "impact": impact})
+        return jsonify(impact), 422
 
     # result is the after-FoV (returned by the action processor)
     after_fov = result
-    focus = _compute_focus(before_fov, after_fov)
+    impact = _compute_impact(before_fov, after_fov, body)
 
     # Track current node
     node = (after_fov.get("state") or {}).get("node") or (after_fov.get("state") or {}).get("position") or workflow_id
     _workflow_current_path[workflow_id] = node
 
-    # Push full FoV + Focus to Observer via SSE
-    _wf_notify(workflow_id, {"type": "result", "path": workflow_id, "result": after_fov, "focus": focus})
+    # Push full FoV + Impact to Observer via SSE
+    _wf_notify(workflow_id, {"type": "result", "path": workflow_id, "result": after_fov, "impact": impact})
 
-    # Return Focus to agent
-    return jsonify(focus)
+    # Return Impact to agent
+    return jsonify(impact)
 
 
 @app.route("/manual")
