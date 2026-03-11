@@ -867,7 +867,6 @@ _CR_SUBMODULES = _CR_DEF["submodules"]
 _CR_SDLC_GOVERNED = set(_CR_DEF["sdlc_governed"])
 _CR_NODES = list(_CR_DEF["nodes"].keys())
 _CR_LIFECYCLE = _CR_DEF["lifecycle_banner"]
-_CR_OBJECTIVE = _CR_DEF["objective"]
 
 # Derived from the nodes dict
 _CR_NODE_INFO = {
@@ -1116,7 +1115,6 @@ def _render_cr_node(workflow_id: str, node=None):
             "workflow": "Create Change Record",
             "node": node,
             "node_title": info["title"],
-            "progress": f"{node_idx + 1}/{len(_CR_NODES)}",
             "lifecycle": _CR_LIFECYCLE,
             "lifecycle_current": lifecycle_current,
             "lifecycle_completed": lifecycle_completed,
@@ -1126,9 +1124,6 @@ def _render_cr_node(workflow_id: str, node=None):
         "instructions": info["instruction"],
         "affordances": affordances,
     }
-
-    if node != "submitted":
-        result["objective"] = "Complete all required fields and submit this Change Record for review."
 
     return result
 

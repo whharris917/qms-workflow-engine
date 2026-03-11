@@ -758,7 +758,6 @@ registerRenderer({
         var s = state.state || {};
         html += '<div class="wf-header">';
         html += '<h1 class="wf-title">' + esc(s.workflow || 'Workflow') + '</h1>';
-        html += '<span class="wf-progress">' + esc(s.progress || '') + '</span>';
         html += '</div>';
 
         /* ── Node banner (derived from state.completed_nodes + state.node) ── */
@@ -772,16 +771,6 @@ registerRenderer({
         /* ── description ── */
         if (state.instructions) {
             html += '<div class="wf-desc">' + esc(state.instructions) + '</div>';
-        }
-
-        /* ── message (if present) ── */
-        if (msg) {
-            html += '<div class="wf-msg">' + esc(msg) + '</div>';
-        }
-
-        /* ── objective (if present) ── */
-        if (state.objective) {
-            html += '<div class="wf-objective"><span class="wf-obj-label">objective</span> ' + esc(state.objective) + '</div>';
         }
 
         /* ── state.state.fields ── */
@@ -803,7 +792,7 @@ registerRenderer({
         /* ── affordances ── */
         if (state.affordances && state.affordances.length) {
             html += '<div class="wf-card">';
-            html += '<div class="wf-card-head">affordances <span class="wf-count">' + state.affordances.length + '</span></div>';
+            html += '<div class="wf-card-head">affordances</div>';
             for (var i = 0; i < state.affordances.length; i++) {
                 var a = state.affordances[i];
                 var cls = 'wf-aff';
@@ -843,7 +832,6 @@ registerRenderer({
                 /* Header */
                 + '.wf-header { display:flex; align-items:baseline; justify-content:space-between; padding:1.25rem 1.5rem 0.25rem; }'
                 + '.wf-title { font-size:1.4rem; font-weight:600; color:#1a1a2e; margin:0; }'
-                + '.wf-progress { font-size:0.85rem; color:#888; }'
 
                 /* Stage banner — matches create_cr.html style */
                 + '.wf-banner { display:flex; align-items:center; margin:0.75rem 1.5rem; padding:0.75rem 1rem; background:#f8f9fb; border-radius:8px; border:1px solid #e8e8e8; overflow-x:auto; }'
@@ -864,18 +852,10 @@ registerRenderer({
                 /* Description */
                 + '.wf-desc { padding:0.25rem 1.5rem 0.75rem; font-size:0.9rem; color:#666; line-height:1.5; }'
 
-                /* Message */
-                + '.wf-msg { margin:0 1.5rem 0.75rem; padding:0.5rem 0.75rem; background:#fff3cd; border-left:3px solid #ffc107; color:#856404; font-size:0.85rem; border-radius:0 6px 6px 0; }'
-
-                /* Objective */
-                + '.wf-objective { margin:0 1.5rem 0.75rem; padding:0.5rem 0.75rem; background:#e8f5e9; border-left:3px solid #81c784; color:#2e7d32; font-size:0.85rem; border-radius:0 6px 6px 0; }'
-                + '.wf-obj-label { font-weight:600; text-transform:uppercase; font-size:0.7rem; letter-spacing:0.05em; }'
-
                 /* Cards */
                 + '.wf-card { margin:0.5rem 1.5rem; padding:0.75rem; background:#fff; border:1px solid #e8e8e8; border-radius:8px; }'
                 + '.wf-card-review { border-color:#2a6bcf; }'
                 + '.wf-card-head { font-size:0.75rem; font-weight:600; color:#7f8fa6; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem; }'
-                + '.wf-count { display:inline-block; background:#e8e8e8; color:#555; font-size:0.65rem; padding:0.1rem 0.4rem; border-radius:10px; margin-left:0.3rem; }'
 
                 /* Key-value tables */
                 + '.wf-tbl { width:100%; border-collapse:collapse; }'
@@ -919,8 +899,8 @@ registerRenderer({
                 + '.wf-fb-outcome { border-left:3px solid #2a6bcf; background:#f0f5ff; }'
                 + '.wf-fb-new { border-left:3px solid #4caf50; background:#f0faf0; }'
                 + '.wf-fb-modified { border-left:3px solid #e6a817; background:#fdf8ed; }'
-                + '.wf-aff-new { border-left:3px solid #4caf50; }'
-                + '.wf-aff-modified { border-left:3px solid #e6a817; }'
+                + '.wf-aff-new { border-left:3px solid #4caf50; background:#f0faf0; }'
+                + '.wf-aff-modified { border-left:3px solid #e6a817; background:#fdf8ed; }'
                 + '.wf-tag-outcome { font-size:0.6em; font-weight:700; color:#2a6bcf; vertical-align:super; margin-left:0.5em; letter-spacing:0.05em; }'
                 + '.wf-tag-new { font-size:0.6em; font-weight:700; color:#4caf50; vertical-align:super; margin-left:0.5em; letter-spacing:0.05em; }'
                 + '.wf-tag-modified { font-size:0.6em; font-weight:700; color:#e6a817; vertical-align:super; margin-left:0.5em; letter-spacing:0.05em; }'
