@@ -703,6 +703,9 @@ registerRenderer({
                 } else {
                     html += '<div class="wf-field-value">' + esc(f.value) + '</div>';
                 }
+                if (f.options) {
+                    html += '<div class="wf-field-options">' + esc(f.options.join(', ')) + '</div>';
+                }
             } else {
                 /* Plain value (fallback) */
                 html += '<div class="wf-field-value">' + renderValue(f) + '</div>';
@@ -760,12 +763,19 @@ registerRenderer({
         html += '<h1 class="wf-title">' + esc(s.workflow || 'Workflow') + '</h1>';
         html += '</div>';
 
-        /* ── Node banner (derived from state.completed_nodes + state.node) ── */
+        /* ── state.lifecycle / state.lifecycle_current / state.lifecycle_completed ── */
         html += renderNodeBanner(state);
 
-        /* ── state.state.node_title ── */
+        /* ── state.completed_nodes ── */
+        html += '<div class="wf-meta">';
+        html += '<span class="wf-meta-key">state.completed_nodes:</span> ';
+        html += '<span class="wf-meta-val">' + esc(JSON.stringify(s.completed_nodes || [])) + '</span>';
+        html += '</div>';
+
+        /* ── state.node_title + state.node ── */
         html += '<div class="wf-section">';
         html += '<div class="wf-section-head">' + esc(s.node_title || s.node) + '</div>';
+        html += '<div class="wf-node-id">state.node: ' + esc(s.node) + '</div>';
         html += '</div>';
 
         /* ── description ── */
@@ -778,14 +788,6 @@ registerRenderer({
             html += '<div class="wf-card">';
             html += '<div class="wf-card-head">state.fields</div>';
             html += renderFields(s.fields, fieldCategory);
-            html += '</div>';
-        }
-
-        /* ── review (preflight full dump, if present) ── */
-        if (state.review) {
-            html += '<div class="wf-card wf-card-review">';
-            html += '<div class="wf-card-head">review</div>';
-            html += renderObject(state.review);
             html += '</div>';
         }
 
@@ -809,6 +811,9 @@ registerRenderer({
                 html += '<span class="wf-aff-method">' + esc(a.method) + '</span>';
                 html += '</div>';
                 html += '<div class="wf-aff-detail">' + esc(a.url) + ' &nbsp; ' + esc(JSON.stringify(a.body)) + '</div>';
+                if (a.options) {
+                    html += '<div class="wf-aff-options">options: ' + esc(JSON.stringify(a.options)) + '</div>';
+                }
                 html += '</div>';
             }
             html += '</div>';
@@ -845,16 +850,21 @@ registerRenderer({
                 + '.wf-conn { flex:1; height:2px; background:#dde1e6; margin:0 0.25rem; min-width:12px; align-self:center; margin-bottom:1rem; }'
                 + '.wf-conn-active { background:#4caf50; }'
 
+                /* Metadata (state.completed_nodes, etc.) */
+                + '.wf-meta { padding:0.1rem 1.5rem; font-size:0.72rem; font-family:Consolas,Monaco,monospace; }'
+                + '.wf-meta-key { color:#999; }'
+                + '.wf-meta-val { color:#7f8fa6; }'
+
                 /* Section heading */
                 + '.wf-section { padding:0.5rem 1.5rem 0; }'
                 + '.wf-section-head { font-size:1.1rem; font-weight:600; color:#1a1a2e; }'
+                + '.wf-node-id { font-size:0.72rem; color:#999; font-family:Consolas,Monaco,monospace; margin-top:0.1rem; }'
 
                 /* Description */
                 + '.wf-desc { padding:0.25rem 1.5rem 0.75rem; font-size:0.9rem; color:#666; line-height:1.5; }'
 
                 /* Cards */
                 + '.wf-card { margin:0.5rem 1.5rem; padding:0.75rem; background:#fff; border:1px solid #e8e8e8; border-radius:8px; }'
-                + '.wf-card-review { border-color:#2a6bcf; }'
                 + '.wf-card-head { font-size:0.75rem; font-weight:600; color:#7f8fa6; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem; }'
 
                 /* Key-value tables */
@@ -878,6 +888,7 @@ registerRenderer({
                 + '.wf-field-instruction { font-size:0.75rem; color:#999; font-style:italic; margin-bottom:0.2rem; line-height:1.3; }'
                 + '.wf-field-value { font-size:0.85rem; color:#333; }'
                 + '.wf-field-empty { color:#bbb; font-style:italic; font-size:0.8rem; }'
+                + '.wf-field-options { font-size:0.72rem; color:#7f8fa6; font-family:Consolas,Monaco,monospace; margin-top:0.15rem; }'
 
                 /* Affordances */
                 + '.wf-aff { margin-bottom:0.4rem; padding:0.5rem 0.6rem; background:#f8f9fb; border:1px solid #e8e8e8; border-radius:6px; }'
@@ -886,6 +897,7 @@ registerRenderer({
                 + '.wf-aff-label { flex:1; font-size:0.85rem; color:#333; }'
                 + '.wf-aff-method { font-size:0.65rem; font-weight:600; color:#7f8fa6; background:#eef1f5; padding:0.15rem 0.4rem; border-radius:3px; }'
                 + '.wf-aff-detail { font-size:0.72rem; color:#999; margin-top:0.2rem; padding-left:2rem; font-family:Consolas,Monaco,monospace; word-break:break-all; }'
+                + '.wf-aff-options { font-size:0.72rem; color:#7f8fa6; margin-top:0.15rem; padding-left:2rem; font-family:Consolas,Monaco,monospace; }'
                 + '.wf-aff-primary { border-color:#2a6bcf; background:#f0f5ff; }'
                 + '.wf-aff-primary .wf-aff-label { color:#2a6bcf; font-weight:600; }'
                 + '.wf-aff-primary .wf-aff-id { background:#2a6bcf; color:#fff; }'
