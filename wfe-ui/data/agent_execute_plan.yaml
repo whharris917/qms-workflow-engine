@@ -1,0 +1,33 @@
+## Agent workflow definition: Execute Implementation Plan
+
+nodes:
+  loading:
+    title: Load Plan
+    lifecycle_label: Loading
+    instruction: >-
+      Select a Change Record to execute. The CR must have a valid
+      implementation plan with at least one column and one row.
+      Set the CR ID, then start execution.
+
+  executing:
+    title: Execution
+    lifecycle_label: In Progress
+    instruction: >-
+      Execute the implementation plan by filling cells, signing,
+      and recording evidence. Work through EIs in order if sequential
+      execution is enabled. Each row's acceptance criteria are
+      evaluated automatically. All acceptance criteria must pass
+      to complete execution.
+
+  completed:
+    title: Execution Complete
+    lifecycle_label: Complete
+    instruction: >-
+      All execution items have passed acceptance criteria. Review
+      the execution summary. You may go back to make corrections
+      or start a new execution.
+
+lifecycle_banner:
+  - Loading
+  - In Progress
+  - Complete

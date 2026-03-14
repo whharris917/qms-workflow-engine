@@ -11,6 +11,7 @@ from flask import Flask, render_template, abort, request, redirect, url_for, jso
 
 import table_handler
 import cr_handler
+import execution_handler
 
 app = Flask(__name__)
 
@@ -491,6 +492,12 @@ _WORKFLOWS = {
         "handler": table_handler,
         "title": table_handler.WORKFLOW_TITLE,
         "description": "Build an execution item table for a Change Record.",
+        "renderers": ["raw", "light", "dark", "exp-a", "exp-b", "exp-c", "exp-d"],
+    },
+    "execute-plan": {
+        "handler": execution_handler,
+        "title": execution_handler.WORKFLOW_TITLE,
+        "description": "Execute a Change Record's implementation plan — advance through EIs, record evidence, track pass/fail.",
         "renderers": ["raw", "light", "dark", "exp-a", "exp-b", "exp-c", "exp-d"],
     },
 }
