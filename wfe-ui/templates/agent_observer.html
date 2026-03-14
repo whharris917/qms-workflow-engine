@@ -310,7 +310,7 @@ function wfRenderBanner(state) {
         var isCurrent = label === current;
         var isDone = completed.indexOf(label) !== -1;
         var isPast = i < currentIdx;
-        if (i > 0) html += '<div class="wf-conn' + ((isDone || isPast) ? ' wf-conn-active' : '') + '"></div>';
+        if (i > 0) html += '<div class="wf-conn' + ((isDone || isPast || isCurrent) ? ' wf-conn-active' : '') + '"></div>';
         html += '<div class="wf-step' + (isCurrent ? ' wf-step-active' : '') + (isDone ? ' wf-step-done' : '') + '">';
         html += '<span class="wf-dot">' + (isDone ? '&#10003;' : (i + 1)) + '</span>';
         html += '<span class="wf-step-label">' + wfEsc(label) + '</span>';
@@ -943,7 +943,8 @@ var WF_STRUCTURAL_CSS = ''
         var lifecycle = s.lifecycle || [];
         var current = s.lifecycle_current || '';
         var completed = s.lifecycle_completed || [];
-        var pct = lifecycle.length ? Math.round((completed.length / lifecycle.length) * 100) : 0;
+        var progressCount = completed.length + (current && completed.indexOf(current) === -1 ? 1 : 0);
+        var pct = lifecycle.length ? Math.round((progressCount / lifecycle.length) * 100) : 0;
 
         html += '<div class="gb-header">';
         html += '<div class="gb-title">' + wfEsc(s.workflow || 'Workflow') + '</div>';
@@ -1436,7 +1437,8 @@ var WF_STRUCTURAL_CSS = ''
         html += '<div class="ds-stats">';
         html += '<div class="ds-stat"><span class="ds-stat-val">' + wfEsc(s.workflow || '—') + '</span><span class="ds-stat-lbl">workflow</span></div>';
         html += '<div class="ds-stat"><span class="ds-stat-val">' + wfEsc(s.node_title || s.node || '—') + '</span><span class="ds-stat-lbl">node</span></div>';
-        html += '<div class="ds-stat"><span class="ds-stat-val ds-stat-num">' + completed.length + '/' + lifecycle.length + '</span><span class="ds-stat-lbl">phases</span></div>';
+        var dsProgressCount = completed.length + (current && completed.indexOf(current) === -1 ? 1 : 0);
+        html += '<div class="ds-stat"><span class="ds-stat-val ds-stat-num">' + dsProgressCount + '/' + lifecycle.length + '</span><span class="ds-stat-lbl">phases</span></div>';
         html += '<div class="ds-stat"><span class="ds-stat-val ds-stat-num">' + filledCount + '/' + fkeys.length + '</span><span class="ds-stat-lbl">fields filled</span></div>';
         html += '<div class="ds-stat"><span class="ds-stat-val ds-stat-num">' + affCount + '</span><span class="ds-stat-lbl">actions</span></div>';
         html += '</div>';
