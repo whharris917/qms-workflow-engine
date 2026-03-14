@@ -1,0 +1,65 @@
+## Agent workflow definition: Create Implementation Plan
+##
+## Defines the table-based implementation plan authoring workflow.
+## The table structure (columns, rows, cells) is managed by the
+## table_handler.py Python module. This YAML declares the workflow
+## shell: nodes, lifecycle, and column type catalog.
+##
+## The table lives at state.table in the rendered page, not in
+## state.fields. Renderers project it as a visual table; the agent
+## interacts via structural affordances (add_column, set_cell, etc.).
+
+nodes:
+  construction:
+    title: Table Construction
+    lifecycle_label: Construction
+    instruction: >-
+      Build an implementation plan table. Add columns to define the
+      structure, then add rows and fill in cell values. Each column
+      has a name and a type that determines how it behaves during
+      execution.
+    proceed:
+      label: Proceed to Review
+      # Gate: requires at least one column and one row (enforced in Python)
+
+  review:
+    title: Review
+    lifecycle_label: Review
+    instruction: >-
+      Review the complete implementation plan. Go back to make changes,
+      or finalize to complete the plan.
+
+lifecycle_banner:
+  - Construction
+  - Review
+  - Done
+
+column_types:
+  ne-free-text:
+    label: Free Text
+    category: non-executable
+    description: Plain text content, not executed.
+  ne-prerequisite:
+    label: Prerequisite
+    category: non-executable
+    description: References to rows that must complete before this row.
+  ex-free-text:
+    label: Free Text
+    category: executable
+    description: Free-form text filled during execution.
+  ex-choice-list:
+    label: Choice List
+    category: executable
+    description: Selection from predefined options.
+  ex-cross-reference:
+    label: Cross Reference
+    category: executable
+    description: Link to an external document or artifact.
+  ex-signature:
+    label: Signature
+    category: executable
+    description: Electronic signature capture.
+  ae-acceptance-criteria:
+    label: Acceptance Criteria
+    category: auto-executed
+    description: Boolean expression evaluated automatically.

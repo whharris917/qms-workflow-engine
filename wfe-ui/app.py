@@ -9,6 +9,8 @@ import yaml
 import markdown
 from flask import Flask, render_template, abort, request, redirect, url_for, jsonify, Response
 
+import table_handler
+
 app = Flask(__name__)
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
@@ -419,7 +421,8 @@ def _wf_notify(workflow_id: str, event: dict):
         _workflow_observers[workflow_id].remove(q)
 
 
-def _compute_feedback(before: dict, after: dict, acted_field_key: str = None) -> dict:
+def _compute_feedback(before: dict, after: dict, acted_field_key: str = None,
+                      acted_label: str = None) -> dict:
     """Compute the Feedback — structured response to an agent action.
 
     Returns a dict with:
@@ -435,8 +438,7 @@ def _compute_feedback(before: dict, after: dict, acted_field_key: str = None) ->
     after_fields = (after.get("state") or {}).get("fields", {})
 
     # Determine which field label was directly acted upon
-    acted_label = None
-    if acted_field_key:
+    if acted_label is None and acted_field_key:
         for fdef in _CR_ALL_FIELDS.values():
             if fdef.get("key") == acted_field_key:
                 acted_label = fdef["label"]
@@ -522,6 +524,12 @@ _WORKFLOWS = {
         "type": "create-cr",
         "title": "Create Change Record",
         "description": "Author a Change Record through the full pre-approval lifecycle.",
+        "renderers": ["raw", "light", "dark", "exp-a", "exp-b", "exp-c", "exp-d"],
+    },
+    "create-implementation-plan": {
+        "type": "create-implementation-plan",
+        "title": table_handler.WORKFLOW_TITLE,
+        "description": "Build an execution item table for a Change Record.",
         "renderers": ["raw", "light", "dark", "exp-a", "exp-b", "exp-c", "exp-d"],
     },
 }
@@ -854,6 +862,13 @@ def _render_agent_node(workflow_id: str):
     if wf_type == "create-cr":
         return _render_cr_node(workflow_id)
 
+    if wf_type == "create-implementation-plan":
+        data = _wf_load_state(workflow_id)
+        if not data or "node" not in data:
+            data = table_handler.default_data()
+            _wf_save_state(workflow_id, data)
+        return table_handler.render_node(data, workflow_id)
+
     return {"error": f"Unknown workflow: {workflow_id}"}
 
 
@@ -877,6 +892,15 @@ def _process_agent_action(workflow_id: str, body):
 
     if wf_type == "create-cr":
         return _process_cr_action(workflow_id, body)
+
+    if wf_type == "create-implementation-plan":
+        data = _wf_load_state(workflow_id)
+        if not data or "node" not in data:
+            data = table_handler.default_data()
+        result = table_handler.process_action(data, workflow_id, body)
+        if "error" not in result:
+            _wf_save_state(workflow_id, data)
+        return result
 
     return {"error": f"Unknown workflow: {workflow_id}"}
 
@@ -982,12 +1006,13 @@ def _build_attempted_action(internal_body):
     return action
 
 
-def _execute_and_feedback(workflow_id, internal_body, acted_field_key=None):
+def _execute_and_feedback(workflow_id, internal_body, acted_field_key=None,
+                          acted_label=None):
     """Execute an agent action, compute feedback, notify observers.
 
     Returns (feedback_dict, http_status_code).
     """
-    attempted = _build_attempted_action(internal_body)
+    attempted = acted_label or _build_attempted_action(internal_body)
     before_full = _render_agent_node(workflow_id)
     _wf_notify(workflow_id, {"type": "action", "path": workflow_id, "body": internal_body})
     result = _process_agent_action(workflow_id, internal_body)
@@ -1008,7 +1033,8 @@ def _execute_and_feedback(workflow_id, internal_body, acted_field_key=None):
         return feedback, 422
 
     after_full = result
-    feedback = _compute_feedback(before_full, after_full, acted_field_key=acted_field_key)
+    feedback = _compute_feedback(before_full, after_full, acted_field_key=acted_field_key,
+                                 acted_label=acted_label)
     feedback["attempted_action"] = attempted
 
     node = (after_full.get("state") or {}).get("node") or (after_full.get("state") or {}).get("position") or workflow_id
@@ -1031,6 +1057,7 @@ def agent_resource_post(workflow_id, resource):
     body = request.get_json(silent=True) or {}
     wf_type = _WORKFLOWS[workflow_id]["type"]
     acted_field_key = None
+    acted_label = None
 
     if wf_type == "create-cr":
         if resource in _CR_FIELD_KEYS:
@@ -1043,10 +1070,18 @@ def agent_resource_post(workflow_id, resource):
         else:
             return jsonify({"error": f"Unknown resource: {resource}"}), 404
 
+    elif wf_type == "create-implementation-plan":
+        resolved = table_handler.resolve_resource(resource, body)
+        if resolved is None:
+            return jsonify({"error": f"Unknown resource: {resource}"}), 404
+        internal_body, acted_label = resolved
+
     else:
         return jsonify({"error": f"Unknown workflow type"}), 404
 
-    feedback, status = _execute_and_feedback(workflow_id, internal_body, acted_field_key=acted_field_key)
+    feedback, status = _execute_and_feedback(workflow_id, internal_body,
+                                             acted_field_key=acted_field_key,
+                                             acted_label=acted_label)
     return jsonify(feedback), status
 
 

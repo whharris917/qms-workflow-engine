@@ -32,10 +32,6 @@
         .panel-view {
             flex: 1; display: flex; flex-direction: column;
         }
-        .panel-title {
-            padding: 0.4rem 0.75rem; background: #151515; border-bottom: 1px solid #222;
-            font-size: 0.75rem; color: #4a9eff; text-transform: uppercase; letter-spacing: 0.08em;
-        }
         .view-frame {
             flex: 1; background: #111; overflow: hidden;
             color: #ccc; font-size: 0.85rem; position: relative;
@@ -72,7 +68,6 @@
     </div>
     <div class="panels">
         <div class="panel-view">
-            <div class="panel-title">Agent View</div>
             <div class="view-frame" id="view-frame">
                 <!-- Renderer containers are injected here by JS -->
             </div>
@@ -161,8 +156,12 @@ function setViewMode(mode) {
 function dispatchRender() {
     var r = renderers[activeRenderer];
     if (!r) return;
-    if (viewMode === 'feedback' && currentFeedback && activeRenderer === 'raw') {
-        r.update(currentFeedback, currentFeedback.attempted_action || '', null);
+    if (viewMode === 'feedback' && activeRenderer === 'raw') {
+        if (currentFeedback) {
+            r.update(currentFeedback, currentFeedback.attempted_action || '', null);
+        } else {
+            r.update({}, '(no feedback yet — perform an action to see feedback)', null);
+        }
     } else {
         r.update(agentState, lastMessage, currentFeedback);
     }
@@ -301,6 +300,59 @@ function wfRenderBanner(state) {
     return html + '</div>';
 }
 
+function wfRenderTable(table) {
+    if (!table) return '';
+    var cols = table.columns || [];
+    var rows = table.rows || [];
+    var props = table.properties || {};
+
+    var html = '<div class="wf-card">';
+    html += '<div class="wf-card-head">state.table</div>';
+
+    if (table.summary) {
+        html += '<div class="wf-table-summary">' + wfEsc(table.summary) + '</div>';
+    }
+
+    if (cols.length) {
+        html += '<div class="wf-table-wrap"><table class="wf-table"><thead><tr>';
+        html += '<th class="wf-table-rownum">#</th>';
+        for (var ci = 0; ci < cols.length; ci++) {
+            var c = cols[ci];
+            html += '<th><div class="wf-table-colname">' + wfEsc(c.name) + '</div>';
+            html += '<div class="wf-table-coltype">' + wfEsc(c.type) + '</div></th>';
+        }
+        html += '</tr></thead><tbody>';
+        if (rows.length) {
+            for (var ri = 0; ri < rows.length; ri++) {
+                html += '<tr><td class="wf-table-rownum">' + ri + '</td>';
+                for (var ci = 0; ci < cols.length; ci++) {
+                    var val = (ri < rows.length && ci < rows[ri].length) ? rows[ri][ci] : '';
+                    html += '<td>' + (val ? wfEsc(val) : '<span class="wf-table-empty">&mdash;</span>') + '</td>';
+                }
+                html += '</tr>';
+            }
+        } else {
+            html += '<tr><td colspan="' + (cols.length + 1) + '" class="wf-table-empty">(no rows)</td></tr>';
+        }
+        html += '</tbody></table></div>';
+    } else {
+        html += '<div class="wf-table-empty">(no columns defined)</div>';
+    }
+
+    /* Properties */
+    var propKeys = Object.keys(props);
+    if (propKeys.length) {
+        html += '<div class="wf-table-props">';
+        for (var i = 0; i < propKeys.length; i++) {
+            html += '<span class="wf-table-prop">' + wfEsc(propKeys[i]) + ': ' + wfEsc(String(props[propKeys[i]])) + '</span>';
+        }
+        html += '</div>';
+    }
+
+    html += '</div>';
+    return html;
+}
+
 function wfRenderPage(container, state, msg, feedback) {
     if (!container || !state) return;
 
@@ -338,6 +390,10 @@ function wfRenderPage(container, state, msg, feedback) {
         html += '<div class="wf-card-head">state.fields</div>';
         html += wfRenderFields(s.fields, fieldCategory);
         html += '</div>';
+    }
+
+    if (s.table) {
+        html += wfRenderTable(s.table);
     }
 
     if (state.affordances && state.affordances.length) {
@@ -409,6 +465,16 @@ var WF_STRUCTURAL_CSS = ''
     + '.wf-tag-outcome { font-size:0.6em; font-weight:700; vertical-align:super; margin-left:0.5em; letter-spacing:0.05em; }'
     + '.wf-tag-new { font-size:0.6em; font-weight:700; vertical-align:super; margin-left:0.5em; letter-spacing:0.05em; }'
     + '.wf-tag-modified { font-size:0.6em; font-weight:700; vertical-align:super; margin-left:0.5em; letter-spacing:0.05em; }'
+    + '.wf-table-summary { font-size:0.78rem; margin-bottom:0.5rem; font-style:italic; }'
+    + '.wf-table-wrap { overflow-x:auto; }'
+    + '.wf-table { width:100%; border-collapse:collapse; font-size:0.82rem; }'
+    + '.wf-table th, .wf-table td { padding:0.4rem 0.6rem; border:1px solid; text-align:left; vertical-align:top; }'
+    + '.wf-table-rownum { width:40px; text-align:center; font-size:0.75rem; font-weight:600; }'
+    + '.wf-table-colname { font-weight:600; font-size:0.82rem; }'
+    + '.wf-table-coltype { font-size:0.68rem; font-weight:400; }'
+    + '.wf-table-empty { font-style:italic; font-size:0.8rem; text-align:center; padding:0.75rem; }'
+    + '.wf-table-props { display:flex; gap:1rem; margin-top:0.5rem; font-size:0.72rem; }'
+    + '.wf-table-prop { font-family:Consolas,Monaco,monospace; }'
     ;
 
 /* ======================================================================
@@ -474,6 +540,13 @@ var WF_STRUCTURAL_CSS = ''
                 + '#rc-light .wf-tag-outcome { color:#2a6bcf; }'
                 + '#rc-light .wf-tag-new { color:#4caf50; }'
                 + '#rc-light .wf-tag-modified { color:#e6a817; }'
+                + '#rc-light .wf-table th { background:#f4f6f9; border-color:#e8e8e8; }'
+                + '#rc-light .wf-table td { border-color:#e8e8e8; }'
+                + '#rc-light .wf-table-rownum { color:#aaa; background:#fafbfc; }'
+                + '#rc-light .wf-table-coltype { color:#7f8fa6; }'
+                + '#rc-light .wf-table-empty { color:#bbb; }'
+                + '#rc-light .wf-table-summary { color:#7f8fa6; }'
+                + '#rc-light .wf-table-prop { color:#7f8fa6; }'
                 ;
             document.head.appendChild(style);
             container = c;
@@ -547,6 +620,13 @@ var WF_STRUCTURAL_CSS = ''
                 + '#rc-dark .wf-tag-outcome { color:#4a9eff; }'
                 + '#rc-dark .wf-tag-new { color:#4caf50; }'
                 + '#rc-dark .wf-tag-modified { color:#e6a817; }'
+                + '#rc-dark .wf-table th { background:#1a1a1a; border-color:#2a2a2a; }'
+                + '#rc-dark .wf-table td { border-color:#2a2a2a; }'
+                + '#rc-dark .wf-table-rownum { color:#555; background:#141414; }'
+                + '#rc-dark .wf-table-coltype { color:#666; }'
+                + '#rc-dark .wf-table-empty { color:#555; }'
+                + '#rc-dark .wf-table-summary { color:#666; }'
+                + '#rc-dark .wf-table-prop { color:#666; }'
                 ;
             document.head.appendChild(style);
             container = c;
@@ -610,6 +690,11 @@ var WF_STRUCTURAL_CSS = ''
         /* ── Instructions ── */
         if (state.instructions) {
             html += '<div class="ex-instructions">' + wfEsc(state.instructions) + '</div>';
+        }
+
+        /* ── Table (if present) ── */
+        if (s.table) {
+            html += wfRenderTable(s.table);
         }
 
         /* ── Two-column body ── */
@@ -784,6 +869,13 @@ var WF_STRUCTURAL_CSS = ''
         + '#rc-exp-a .wf-val { color:#b0c4d8; }'
         + '#rc-exp-a .wf-arr { display:flex; flex-direction:column; gap:0.1rem; }'
         + '#rc-exp-a .wf-arr-item { padding-left:0.4rem; border-left:2px solid #1e3a5f; }'
+        + '#rc-exp-a .wf-table th { background:#0d1e30; border-color:#1e3a5f; color:#7fdbff; }'
+        + '#rc-exp-a .wf-table td { border-color:#1e3a5f; }'
+        + '#rc-exp-a .wf-table-rownum { color:#3a6a8f; background:#0b1622; }'
+        + '#rc-exp-a .wf-table-coltype { color:#3a6a8f; }'
+        + '#rc-exp-a .wf-table-empty { color:#2a4a6b; }'
+        + '#rc-exp-a .wf-table-summary { color:#3a6a8f; }'
+        + '#rc-exp-a .wf-table-prop { color:#3a6a8f; }'
         ;
 
     registerRenderer({
@@ -854,6 +946,11 @@ var WF_STRUCTURAL_CSS = ''
 
         if (state.instructions) {
             html += '<div class="gb-instr">' + wfEsc(state.instructions) + '</div>';
+        }
+
+        /* ── Table (if present) ── */
+        if (s.table) {
+            html += wfRenderTable(s.table);
         }
 
         /* ── Field cards in a grid ── */
@@ -986,6 +1083,13 @@ var WF_STRUCTURAL_CSS = ''
         + '#rc-exp-b .wf-val { color:#d4c8e8; }'
         + '#rc-exp-b .wf-arr { display:flex; flex-direction:column; gap:0.1rem; }'
         + '#rc-exp-b .wf-arr-item { padding-left:0.4rem; border-left:2px solid #2e2444; }'
+        + '#rc-exp-b .wf-table th { background:#221a33; border-color:#2e2444; color:#c084fc; }'
+        + '#rc-exp-b .wf-table td { border-color:#2e2444; }'
+        + '#rc-exp-b .wf-table-rownum { color:#5a4a70; background:#1a1226; }'
+        + '#rc-exp-b .wf-table-coltype { color:#6a5a80; }'
+        + '#rc-exp-b .wf-table-empty { color:#4a3a60; }'
+        + '#rc-exp-b .wf-table-summary { color:#6a5a80; }'
+        + '#rc-exp-b .wf-table-prop { color:#6a5a80; }'
         ;
 
     registerRenderer({
@@ -1107,9 +1211,9 @@ var WF_STRUCTURAL_CSS = ''
         /* Fields */
         if (s.fields) {
             var fkeys = Object.keys(s.fields);
-            var hasAffs = state.affordances && state.affordances.length;
-            var fieldBranch = hasAffs ? '\u251c\u2500 ' : '\u2514\u2500 ';
-            var fieldCont = hasAffs ? '\u2502  ' : '   ';
+            var hasMore = s.table || (state.affordances && state.affordances.length);
+            var fieldBranch = hasMore ? '\u251c\u2500 ' : '\u2514\u2500 ';
+            var fieldCont = hasMore ? '\u2502  ' : '   ';
             lines.push(fieldBranch + '<span class="tc-key">state.fields</span>');
             if (fkeys.length) {
                 for (var i = 0; i < fkeys.length; i++) {
@@ -1140,6 +1244,52 @@ var WF_STRUCTURAL_CSS = ''
                 }
             } else {
                 lines.push(fieldCont + '\u2514\u2500 <span class="tc-null">(empty)</span>');
+            }
+        }
+
+        /* Table */
+        if (s.table) {
+            var hasAffs = state.affordances && state.affordances.length;
+            var tblBranch = hasAffs ? '\u251c\u2500 ' : '\u2514\u2500 ';
+            var tblCont = hasAffs ? '\u2502  ' : '   ';
+            lines.push(tblBranch + '<span class="tc-key">state.table</span>');
+            var tbl = s.table;
+            var cols = tbl.columns || [];
+            var rows = tbl.rows || [];
+            if (tbl.summary) {
+                lines.push(tblCont + '\u251c\u2500 summary: <span class="tc-str">' + wfEsc(tbl.summary) + '</span>');
+            }
+            lines.push(tblCont + '\u251c\u2500 <span class="tc-key">columns</span>');
+            for (var ci = 0; ci < cols.length; ci++) {
+                var cLast = ci === cols.length - 1;
+                var cb = cLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
+                lines.push(tblCont + '\u2502  ' + cb + '<span class="tc-fname">' + wfEsc(cols[ci].name) + '</span> <span class="tc-opts">(' + wfEsc(cols[ci].type) + ')</span>');
+            }
+            if (!cols.length) lines.push(tblCont + '\u2502  \u2514\u2500 <span class="tc-null">(none)</span>');
+            var hasProps = tbl.properties && Object.keys(tbl.properties).length;
+            var rowBranch = hasProps ? '\u251c\u2500 ' : '\u2514\u2500 ';
+            lines.push(tblCont + rowBranch + '<span class="tc-key">rows</span> (' + rows.length + ')');
+            for (var ri = 0; ri < rows.length; ri++) {
+                var rLast = ri === rows.length - 1;
+                var rb = rLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
+                var rc = rLast ? '   ' : '\u2502  ';
+                var rowPfx = tblCont + (hasProps ? '\u2502  ' : '   ');
+                lines.push(rowPfx + rb + '<span class="tc-fname">row ' + ri + '</span>');
+                for (var ci2 = 0; ci2 < rows[ri].length; ci2++) {
+                    var cLast2 = ci2 === rows[ri].length - 1;
+                    var cn = cols[ci2] ? cols[ci2].name : 'col-' + ci2;
+                    var cv = rows[ri][ci2];
+                    lines.push(rowPfx + rc + (cLast2 ? '\u2514\u2500 ' : '\u251c\u2500 ') + wfEsc(cn) + ': ' + (cv ? '<span class="tc-str">' + wfEsc(cv) + '</span>' : '<span class="tc-null">\u2014</span>'));
+                }
+            }
+            if (!rows.length) lines.push(tblCont + (hasProps ? '\u2502  ' : '   ') + '\u2514\u2500 <span class="tc-null">(none)</span>');
+            if (hasProps) {
+                lines.push(tblCont + '\u2514\u2500 <span class="tc-key">properties</span>');
+                var pk = Object.keys(tbl.properties);
+                for (var pi = 0; pi < pk.length; pi++) {
+                    var pLast = pi === pk.length - 1;
+                    lines.push(tblCont + '   ' + (pLast ? '\u2514\u2500 ' : '\u251c\u2500 ') + wfEsc(pk[pi]) + ': <span class="tc-str">' + wfEsc(String(tbl.properties[pk[pi]])) + '</span>');
+                }
             }
         }
 
@@ -1285,6 +1435,11 @@ var WF_STRUCTURAL_CSS = ''
             html += '<div class="ds-instr">' + wfEsc(state.instructions) + '</div>';
         }
 
+        /* ── Table (if present) ── */
+        if (s.table) {
+            html += wfRenderTable(s.table);
+        }
+
         /* ── Fields as dense key=value rows ── */
         html += '<div class="ds-section">';
         html += '<div class="ds-section-head">state.fields</div>';
@@ -1419,6 +1574,13 @@ var WF_STRUCTURAL_CSS = ''
         + '#rc-exp-d .wf-val { color:#3a3530; }'
         + '#rc-exp-d .wf-arr { display:flex; flex-direction:column; gap:0.1rem; }'
         + '#rc-exp-d .wf-arr-item { padding-left:0.4rem; border-left:2px solid #e8e0d5; }'
+        + '#rc-exp-d .wf-table th { background:#f0ece5; border-color:#e8e0d5; color:#c05030; }'
+        + '#rc-exp-d .wf-table td { border-color:#e8e0d5; }'
+        + '#rc-exp-d .wf-table-rownum { color:#a09080; background:#faf8f5; }'
+        + '#rc-exp-d .wf-table-coltype { color:#a09080; }'
+        + '#rc-exp-d .wf-table-empty { color:#c0b8a8; }'
+        + '#rc-exp-d .wf-table-summary { color:#a09080; }'
+        + '#rc-exp-d .wf-table-prop { color:#a09080; }'
         ;
 
     registerRenderer({
