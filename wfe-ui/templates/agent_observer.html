@@ -209,113 +209,365 @@ registerRenderer({
 
 
 /* ======================================================================
-   RENDERER: RENDERED — 1:1 projection of JSON in WFE UI style
-   Every key in the JSON maps to a visible element. Nothing hidden, nothing added.
+   SHARED SIMPLE RENDERER — rendering logic used by Light and Dark modes
+   ====================================================================== */
+
+function wfEsc(s) {
+    var d = document.createElement('div');
+    d.textContent = String(s == null ? '' : s);
+    return d.innerHTML;
+}
+
+function wfRenderValue(v) {
+    if (v == null) return '<span class="wf-null">(null)</span>';
+    if (typeof v === 'boolean') return '<span class="wf-bool">' + v + '</span>';
+    if (typeof v === 'number') return '<span class="wf-num">' + v + '</span>';
+    if (Array.isArray(v)) {
+        if (v.length === 0) return '<span class="wf-empty-arr">(empty)</span>';
+        var html = '<div class="wf-arr">';
+        for (var i = 0; i < v.length; i++) {
+            html += '<div class="wf-arr-item">' + wfRenderValue(v[i]) + '</div>';
+        }
+        return html + '</div>';
+    }
+    if (typeof v === 'object') return wfRenderObject(v);
+    return '<span class="wf-str">' + wfEsc(v) + '</span>';
+}
+
+function wfRenderObject(obj) {
+    var keys = Object.keys(obj);
+    if (!keys.length) return '<span class="wf-empty-obj">(empty)</span>';
+    var html = '<table class="wf-tbl">';
+    for (var i = 0; i < keys.length; i++) {
+        html += '<tr><td class="wf-key">' + wfEsc(keys[i]) + '</td><td class="wf-val">' + wfRenderValue(obj[keys[i]]) + '</td></tr>';
+    }
+    return html + '</table>';
+}
+
+function wfRenderFields(fields, fieldCategory) {
+    var keys = Object.keys(fields);
+    if (!keys.length) return '<span class="wf-empty-obj">(empty)</span>';
+    var html = '<div class="wf-fields">';
+    for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        var f = fields[k];
+        var cat = fieldCategory[k] || null;
+        var catCls = cat ? ' wf-fb-' + cat : '';
+        html += '<div class="wf-field' + catCls + '">';
+        var tagMap = {outcome:'SET', 'new':'NEW', modified:'CHANGED'};
+        var tagCls = {outcome:'wf-tag-outcome', 'new':'wf-tag-new', modified:'wf-tag-modified'};
+        var tag = cat ? '<span class="' + tagCls[cat] + '">' + tagMap[cat] + '</span>' : '';
+        html += '<div class="wf-field-label">' + wfEsc(k) + tag + '</div>';
+        if (f && typeof f === 'object' && 'value' in f) {
+            if (f.instruction) {
+                html += '<div class="wf-field-instruction">' + wfEsc(f.instruction) + '</div>';
+            }
+            if (f.value == null) {
+                html += '<div class="wf-field-value wf-field-empty">(not set)</div>';
+            } else {
+                html += '<div class="wf-field-value">' + wfEsc(f.value) + '</div>';
+            }
+            if (f.options) {
+                html += '<div class="wf-field-options">' + wfEsc(f.options.join(', ')) + '</div>';
+            }
+        } else {
+            html += '<div class="wf-field-value">' + wfRenderValue(f) + '</div>';
+        }
+        html += '</div>';
+    }
+    return html + '</div>';
+}
+
+function wfRenderBanner(state) {
+    var s = state.state || {};
+    var lifecycle = s.lifecycle || [];
+    var current = s.lifecycle_current || '';
+    var completed = s.lifecycle_completed || [];
+    if (!lifecycle.length) return '';
+
+    var currentIdx = lifecycle.indexOf(current);
+    var html = '<div class="wf-banner">';
+    for (var i = 0; i < lifecycle.length; i++) {
+        var label = lifecycle[i];
+        var isCurrent = label === current;
+        var isDone = completed.indexOf(label) !== -1;
+        var isPast = i < currentIdx;
+        if (i > 0) html += '<div class="wf-conn' + ((isDone || isPast) ? ' wf-conn-active' : '') + '"></div>';
+        html += '<div class="wf-step' + (isCurrent ? ' wf-step-active' : '') + (isDone ? ' wf-step-done' : '') + '">';
+        html += '<span class="wf-dot">' + (isDone ? '&#10003;' : (i + 1)) + '</span>';
+        html += '<span class="wf-step-label">' + wfEsc(label) + '</span>';
+        html += '</div>';
+    }
+    return html + '</div>';
+}
+
+function wfRenderPage(container, state, msg, feedback) {
+    if (!container || !state) return;
+
+    var fieldCategory = {};
+    var affCategory = {};
+    if (feedback) {
+        var out = feedback.outcome || {};
+        var eff = feedback.effects || {};
+        for (var k in out) fieldCategory[k] = 'outcome';
+        for (var k in (eff.new_fields || {})) fieldCategory[k] = 'new';
+        for (var k in (eff.modified_fields || {})) fieldCategory[k] = 'modified';
+        (eff.new_affordances || []).forEach(function(a){ affCategory[a.label] = 'new'; });
+        (eff.modified_affordances || []).forEach(function(a){ affCategory[a.label] = 'modified'; });
+    }
+
+    var html = '';
+    var s = state.state || {};
+
+    html += '<div class="wf-header">';
+    html += '<h1 class="wf-title">' + wfEsc(s.workflow || 'Workflow') + '</h1>';
+    html += '</div>';
+
+    html += wfRenderBanner(state);
+
+    html += '<div class="wf-section">';
+    html += '<div class="wf-section-head">' + wfEsc(s.node_title || s.node) + '</div>';
+    html += '</div>';
+
+    if (state.instructions) {
+        html += '<div class="wf-desc">' + wfEsc(state.instructions) + '</div>';
+    }
+
+    if (s.fields) {
+        html += '<div class="wf-card">';
+        html += '<div class="wf-card-head">state.fields</div>';
+        html += wfRenderFields(s.fields, fieldCategory);
+        html += '</div>';
+    }
+
+    if (state.affordances && state.affordances.length) {
+        html += '<div class="wf-card">';
+        html += '<div class="wf-card-head">affordances</div>';
+        for (var i = 0; i < state.affordances.length; i++) {
+            var a = state.affordances[i];
+            var cls = 'wf-aff';
+            if (/Proceed|Submit/.test(a.label)) cls += ' wf-aff-primary';
+            else if (/Go back/.test(a.label)) cls += ' wf-aff-nav';
+            else if (/\[Selected\]/.test(a.label)) cls += ' wf-aff-selected';
+            if (affCategory[a.label]) cls += ' wf-aff-' + affCategory[a.label];
+            html += '<div class="' + cls + '">';
+            html += '<div class="wf-aff-top">';
+            html += '<span class="wf-aff-id">' + a.id + '</span>';
+            var ac = affCategory[a.label];
+            var affTag = ac === 'new' ? '<span class="wf-tag-new">NEW</span>' : ac === 'modified' ? '<span class="wf-tag-modified">CHANGED</span>' : '';
+            html += '<span class="wf-aff-label">' + wfEsc(a.label) + affTag + '</span>';
+            html += '<span class="wf-aff-method">' + wfEsc(a.method) + '</span>';
+            html += '</div>';
+            html += '<div class="wf-aff-detail">' + wfEsc(a.url) + ' &nbsp; ' + wfEsc(JSON.stringify(a.body)) + '</div>';
+            if (a.options) {
+                html += '<div class="wf-aff-options">options: ' + wfEsc(JSON.stringify(a.options)) + '</div>';
+            }
+            html += '</div>';
+        }
+        html += '</div>';
+    }
+
+    container.innerHTML = html;
+}
+
+/* Shared structural CSS (layout, sizing, typography — no colors) */
+var WF_STRUCTURAL_CSS = ''
+    + '.wf-header { display:flex; align-items:baseline; justify-content:space-between; padding:1.25rem 1.5rem 0.25rem; }'
+    + '.wf-title { font-size:1.4rem; font-weight:600; margin:0; }'
+    + '.wf-banner { display:flex; align-items:center; margin:0.75rem 1.5rem; padding:0.75rem 1rem; border-radius:8px; border:1px solid; overflow-x:auto; }'
+    + '.wf-step { display:flex; flex-direction:column; align-items:center; gap:0.2rem; flex-shrink:0; }'
+    + '.wf-dot { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; font-size:0.7rem; font-weight:600; }'
+    + '.wf-step-label { font-size:0.68rem; font-weight:500; text-align:center; white-space:nowrap; }'
+    + '.wf-conn { flex:1; height:2px; margin:0 0.25rem; min-width:12px; align-self:center; margin-bottom:1rem; }'
+    + '.wf-section { padding:0.5rem 1.5rem 0; }'
+    + '.wf-section-head { font-size:1.1rem; font-weight:600; }'
+    + '.wf-desc { padding:0.25rem 1.5rem 0.75rem; font-size:0.9rem; line-height:1.5; }'
+    + '.wf-card { margin:0.5rem 1.5rem; padding:0.75rem; border:1px solid; border-radius:8px; }'
+    + '.wf-card-head { font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem; }'
+    + '.wf-tbl { width:100%; border-collapse:collapse; }'
+    + '.wf-tbl td { padding:0.35rem 0.5rem; font-size:0.85rem; vertical-align:top; }'
+    + '.wf-key { width:160px; white-space:nowrap; font-weight:500; font-size:0.8rem; }'
+    + '.wf-val { word-break:break-word; }'
+    + '.wf-null, .wf-empty-arr, .wf-empty-obj { font-style:italic; font-size:0.8rem; }'
+    + '.wf-arr { display:flex; flex-direction:column; gap:0.15rem; }'
+    + '.wf-arr-item { padding-left:0.5rem; border-left:2px solid; }'
+    + '.wf-fields { display:flex; flex-direction:column; gap:0.15rem; }'
+    + '.wf-field { padding:0.5rem 0.6rem; }'
+    + '.wf-field:last-child { border-bottom:none; }'
+    + '.wf-field-label { font-size:0.8rem; font-weight:600; margin-bottom:0.15rem; }'
+    + '.wf-field-instruction { font-size:0.75rem; font-style:italic; margin-bottom:0.2rem; line-height:1.3; }'
+    + '.wf-field-value { font-size:0.85rem; }'
+    + '.wf-field-empty { font-style:italic; font-size:0.8rem; }'
+    + '.wf-field-options { font-size:0.72rem; font-family:Consolas,Monaco,monospace; margin-top:0.15rem; }'
+    + '.wf-aff { margin-bottom:0.4rem; padding:0.5rem 0.6rem; border:1px solid; border-radius:6px; }'
+    + '.wf-aff-top { display:flex; align-items:center; gap:0.5rem; }'
+    + '.wf-aff-id { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; font-size:0.7rem; font-weight:600; flex-shrink:0; }'
+    + '.wf-aff-label { flex:1; font-size:0.85rem; }'
+    + '.wf-aff-method { font-size:0.65rem; font-weight:600; padding:0.15rem 0.4rem; border-radius:3px; }'
+    + '.wf-aff-detail { font-size:0.72rem; margin-top:0.2rem; padding-left:2rem; font-family:Consolas,Monaco,monospace; word-break:break-all; }'
+    + '.wf-aff-options { font-size:0.72rem; margin-top:0.15rem; padding-left:2rem; font-family:Consolas,Monaco,monospace; }'
+    + '.wf-tag-outcome { font-size:0.6em; font-weight:700; vertical-align:super; margin-left:0.5em; letter-spacing:0.05em; }'
+    + '.wf-tag-new { font-size:0.6em; font-weight:700; vertical-align:super; margin-left:0.5em; letter-spacing:0.05em; }'
+    + '.wf-tag-modified { font-size:0.6em; font-weight:700; vertical-align:super; margin-left:0.5em; letter-spacing:0.05em; }'
+    ;
+
+/* ======================================================================
+   RENDERER: LIGHT MODE — Simple
+   ====================================================================== */
+(function() {
+    var container;
+    registerRenderer({
+        id: 'light',
+        label: 'Light Mode - Simple',
+        init: function(c) {
+            c.style.cssText = 'overflow-y:auto;padding:0;';
+            var style = document.createElement('style');
+            style.textContent = WF_STRUCTURAL_CSS
+
+                + '#rc-light { background:#f5f5f5; color:#333; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
+                + '#rc-light .wf-title { color:#1a1a2e; }'
+                + '#rc-light .wf-banner { background:#f8f9fb; border-color:#e8e8e8; }'
+                + '#rc-light .wf-dot { background:#dde1e6; color:#888; }'
+                + '#rc-light .wf-step-label { color:#888; }'
+                + '#rc-light .wf-step-active .wf-dot { background:#2a6bcf; color:#fff; }'
+                + '#rc-light .wf-step-active .wf-step-label { color:#1a1a2e; font-weight:600; }'
+                + '#rc-light .wf-step-done .wf-dot { background:#4caf50; color:#fff; }'
+                + '#rc-light .wf-step-done .wf-step-label { color:#555; }'
+                + '#rc-light .wf-conn { background:#dde1e6; }'
+                + '#rc-light .wf-conn-active { background:#4caf50; }'
+                + '#rc-light .wf-section-head { color:#1a1a2e; }'
+                + '#rc-light .wf-desc { color:#666; }'
+                + '#rc-light .wf-card { background:#fff; border-color:#e8e8e8; }'
+                + '#rc-light .wf-card-head { color:#7f8fa6; }'
+                + '#rc-light .wf-tbl td { border-bottom:1px solid #f0f0f0; }'
+                + '#rc-light .wf-key { color:#7f8fa6; }'
+                + '#rc-light .wf-val { color:#333; }'
+                + '#rc-light .wf-null, #rc-light .wf-empty-arr, #rc-light .wf-empty-obj { color:#bbb; }'
+                + '#rc-light .wf-bool, #rc-light .wf-num { color:#2a6bcf; }'
+                + '#rc-light .wf-str { color:#333; }'
+                + '#rc-light .wf-arr-item { border-left-color:#e8e8e8; }'
+                + '#rc-light .wf-field { border-bottom:1px solid #f0f0f0; }'
+                + '#rc-light .wf-field-label { color:#555; }'
+                + '#rc-light .wf-field-instruction { color:#999; }'
+                + '#rc-light .wf-field-value { color:#333; }'
+                + '#rc-light .wf-field-empty { color:#bbb; }'
+                + '#rc-light .wf-field-options { color:#7f8fa6; }'
+                + '#rc-light .wf-aff { background:#f8f9fb; border-color:#e8e8e8; }'
+                + '#rc-light .wf-aff-id { background:#dde1e6; color:#555; }'
+                + '#rc-light .wf-aff-label { color:#333; }'
+                + '#rc-light .wf-aff-method { color:#7f8fa6; background:#eef1f5; }'
+                + '#rc-light .wf-aff-detail { color:#999; }'
+                + '#rc-light .wf-aff-options { color:#7f8fa6; }'
+                + '#rc-light .wf-aff-primary { border-color:#2a6bcf; background:#f0f5ff; }'
+                + '#rc-light .wf-aff-primary .wf-aff-label { color:#2a6bcf; font-weight:600; }'
+                + '#rc-light .wf-aff-primary .wf-aff-id { background:#2a6bcf; color:#fff; }'
+                + '#rc-light .wf-aff-nav { border-color:#dde1e6; background:#fafafa; }'
+                + '#rc-light .wf-aff-nav .wf-aff-label { color:#888; }'
+                + '#rc-light .wf-aff-selected { border-color:#4caf50; background:#f0fff0; }'
+                + '#rc-light .wf-aff-selected .wf-aff-label { color:#2e7d32; }'
+                + '#rc-light .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; }'
+                + '#rc-light .wf-fb-outcome { border-left:3px solid #2a6bcf; background:#f0f5ff; }'
+                + '#rc-light .wf-fb-new { border-left:3px solid #4caf50; background:#f0faf0; }'
+                + '#rc-light .wf-fb-modified { border-left:3px solid #e6a817; background:#fdf8ed; }'
+                + '#rc-light .wf-aff-new { border-left:3px solid #4caf50; background:#f0faf0; }'
+                + '#rc-light .wf-aff-modified { border-left:3px solid #e6a817; background:#fdf8ed; }'
+                + '#rc-light .wf-tag-outcome { color:#2a6bcf; }'
+                + '#rc-light .wf-tag-new { color:#4caf50; }'
+                + '#rc-light .wf-tag-modified { color:#e6a817; }'
+                ;
+            document.head.appendChild(style);
+            container = c;
+        },
+        update: function(state, msg, feedback) { wfRenderPage(container, state, msg, feedback); },
+        activate: function() {},
+        deactivate: function() {}
+    });
+})();
+
+/* ======================================================================
+   RENDERER: DARK MODE — Simple
+   ====================================================================== */
+(function() {
+    var container;
+    registerRenderer({
+        id: 'dark',
+        label: 'Dark Mode - Simple',
+        init: function(c) {
+            c.style.cssText = 'overflow-y:auto;padding:0;';
+            var style = document.createElement('style');
+            style.textContent = WF_STRUCTURAL_CSS
+
+                + '#rc-dark { background:#0e0e0e; color:#c8c8c8; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
+                + '#rc-dark .wf-title { color:#e0e0e0; }'
+                + '#rc-dark .wf-banner { background:#1a1a1a; border-color:#2a2a2a; }'
+                + '#rc-dark .wf-dot { background:#333; color:#888; }'
+                + '#rc-dark .wf-step-label { color:#777; }'
+                + '#rc-dark .wf-step-active .wf-dot { background:#4a9eff; color:#fff; }'
+                + '#rc-dark .wf-step-active .wf-step-label { color:#e0e0e0; font-weight:600; }'
+                + '#rc-dark .wf-step-done .wf-dot { background:#4caf50; color:#fff; }'
+                + '#rc-dark .wf-step-done .wf-step-label { color:#888; }'
+                + '#rc-dark .wf-conn { background:#333; }'
+                + '#rc-dark .wf-conn-active { background:#4caf50; }'
+                + '#rc-dark .wf-section-head { color:#e0e0e0; }'
+                + '#rc-dark .wf-desc { color:#999; }'
+                + '#rc-dark .wf-card { background:#141414; border-color:#2a2a2a; }'
+                + '#rc-dark .wf-card-head { color:#666; }'
+                + '#rc-dark .wf-tbl td { border-bottom:1px solid #1e1e1e; }'
+                + '#rc-dark .wf-key { color:#666; }'
+                + '#rc-dark .wf-val { color:#c8c8c8; }'
+                + '#rc-dark .wf-null, #rc-dark .wf-empty-arr, #rc-dark .wf-empty-obj { color:#555; }'
+                + '#rc-dark .wf-bool, #rc-dark .wf-num { color:#4a9eff; }'
+                + '#rc-dark .wf-str { color:#c8c8c8; }'
+                + '#rc-dark .wf-arr-item { border-left-color:#2a2a2a; }'
+                + '#rc-dark .wf-field { border-bottom:1px solid #1e1e1e; }'
+                + '#rc-dark .wf-field-label { color:#999; }'
+                + '#rc-dark .wf-field-instruction { color:#666; }'
+                + '#rc-dark .wf-field-value { color:#c8c8c8; }'
+                + '#rc-dark .wf-field-empty { color:#555; }'
+                + '#rc-dark .wf-field-options { color:#666; }'
+                + '#rc-dark .wf-aff { background:#1a1a1a; border-color:#2a2a2a; }'
+                + '#rc-dark .wf-aff-id { background:#333; color:#aaa; }'
+                + '#rc-dark .wf-aff-label { color:#c8c8c8; }'
+                + '#rc-dark .wf-aff-method { color:#666; background:#1e1e1e; }'
+                + '#rc-dark .wf-aff-detail { color:#555; }'
+                + '#rc-dark .wf-aff-options { color:#666; }'
+                + '#rc-dark .wf-aff-primary { border-color:#4a9eff; background:#0d1a2e; }'
+                + '#rc-dark .wf-aff-primary .wf-aff-label { color:#4a9eff; font-weight:600; }'
+                + '#rc-dark .wf-aff-primary .wf-aff-id { background:#4a9eff; color:#fff; }'
+                + '#rc-dark .wf-aff-nav { border-color:#2a2a2a; background:#111; }'
+                + '#rc-dark .wf-aff-nav .wf-aff-label { color:#666; }'
+                + '#rc-dark .wf-aff-selected { border-color:#4caf50; background:#0d1a0d; }'
+                + '#rc-dark .wf-aff-selected .wf-aff-label { color:#4caf50; }'
+                + '#rc-dark .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; }'
+                + '#rc-dark .wf-fb-outcome { border-left:3px solid #4a9eff; background:#0d1a2e; }'
+                + '#rc-dark .wf-fb-new { border-left:3px solid #4caf50; background:#0d1a0d; }'
+                + '#rc-dark .wf-fb-modified { border-left:3px solid #e6a817; background:#1a1500; }'
+                + '#rc-dark .wf-aff-new { border-left:3px solid #4caf50; background:#0d1a0d; }'
+                + '#rc-dark .wf-aff-modified { border-left:3px solid #e6a817; background:#1a1500; }'
+                + '#rc-dark .wf-tag-outcome { color:#4a9eff; }'
+                + '#rc-dark .wf-tag-new { color:#4caf50; }'
+                + '#rc-dark .wf-tag-modified { color:#e6a817; }'
+                ;
+            document.head.appendChild(style);
+            container = c;
+        },
+        update: function(state, msg, feedback) { wfRenderPage(container, state, msg, feedback); },
+        activate: function() {},
+        deactivate: function() {}
+    });
+})();
+
+/* ======================================================================
+   RENDERER: EXPERIMENTAL A — two-column blueprint layout
    ====================================================================== */
 (function() {
     var container;
 
-    function esc(s) {
-        var d = document.createElement('div');
-        d.textContent = String(s == null ? '' : s);
-        return d.innerHTML;
-    }
+    function expARenderPage(c, state, msg, feedback) {
+        if (!c || !state) return;
 
-    /* Render a JSON value as HTML — scalars, arrays, objects all handled */
-    function renderValue(v) {
-        if (v == null) return '<span class="wf-null">(null)</span>';
-        if (typeof v === 'boolean') return '<span class="wf-bool">' + v + '</span>';
-        if (typeof v === 'number') return '<span class="wf-num">' + v + '</span>';
-        if (Array.isArray(v)) {
-            if (v.length === 0) return '<span class="wf-empty-arr">(empty)</span>';
-            var html = '<div class="wf-arr">';
-            for (var i = 0; i < v.length; i++) {
-                html += '<div class="wf-arr-item">' + renderValue(v[i]) + '</div>';
-            }
-            return html + '</div>';
-        }
-        if (typeof v === 'object') return renderObject(v);
-        return '<span class="wf-str">' + esc(v) + '</span>';
-    }
-
-    /* Render a JSON object as a key-value table */
-    function renderObject(obj) {
-        var keys = Object.keys(obj);
-        if (!keys.length) return '<span class="wf-empty-obj">(empty)</span>';
-        var html = '<table class="wf-tbl">';
-        for (var i = 0; i < keys.length; i++) {
-            html += '<tr><td class="wf-key">' + esc(keys[i]) + '</td><td class="wf-val">' + renderValue(obj[keys[i]]) + '</td></tr>';
-        }
-        return html + '</table>';
-    }
-
-    /* Render fields — each field is {value, instruction?} */
-    function renderFields(fields, fieldCategory) {
-        var keys = Object.keys(fields);
-        if (!keys.length) return '<span class="wf-empty-obj">(empty)</span>';
-        var html = '<div class="wf-fields">';
-        for (var i = 0; i < keys.length; i++) {
-            var k = keys[i];
-            var f = fields[k];
-            var cat = fieldCategory[k] || null;
-            var catCls = cat ? ' wf-fb-' + cat : '';
-            html += '<div class="wf-field' + catCls + '">';
-            var tagMap = {outcome:'SET', 'new':'NEW', modified:'CHANGED'};
-            var tagCls = {outcome:'wf-tag-outcome', 'new':'wf-tag-new', modified:'wf-tag-modified'};
-            var tag = cat ? '<span class="' + tagCls[cat] + '">' + tagMap[cat] + '</span>' : '';
-            html += '<div class="wf-field-label">' + esc(k) + tag + '</div>';
-            if (f && typeof f === 'object' && 'value' in f) {
-                /* Structured field: {value, instruction?} */
-                if (f.instruction) {
-                    html += '<div class="wf-field-instruction">' + esc(f.instruction) + '</div>';
-                }
-                if (f.value == null) {
-                    html += '<div class="wf-field-value wf-field-empty">(not set)</div>';
-                } else {
-                    html += '<div class="wf-field-value">' + esc(f.value) + '</div>';
-                }
-                if (f.options) {
-                    html += '<div class="wf-field-options">' + esc(f.options.join(', ')) + '</div>';
-                }
-            } else {
-                /* Plain value (fallback) */
-                html += '<div class="wf-field-value">' + renderValue(f) + '</div>';
-            }
-            html += '</div>';
-        }
-        return html + '</div>';
-    }
-
-    /* Build the node banner from state.lifecycle, state.lifecycle_current, state.lifecycle_completed */
-    function renderNodeBanner(state) {
-        var s = state.state || {};
-        var lifecycle = s.lifecycle || [];
-        var current = s.lifecycle_current || '';
-        var completed = s.lifecycle_completed || [];
-        if (!lifecycle.length) return '';
-
-        var currentIdx = lifecycle.indexOf(current);
-        var html = '<div class="wf-banner">';
-        for (var i = 0; i < lifecycle.length; i++) {
-            var label = lifecycle[i];
-            var isCurrent = label === current;
-            var isDone = completed.indexOf(label) !== -1;
-            var isPast = i < currentIdx;
-            if (i > 0) html += '<div class="wf-conn' + ((isDone || isPast) ? ' wf-conn-active' : '') + '"></div>';
-            html += '<div class="wf-step' + (isCurrent ? ' wf-step-active' : '') + (isDone ? ' wf-step-done' : '') + '">';
-            html += '<span class="wf-dot">' + (isDone ? '&#10003;' : (i + 1)) + '</span>';
-            html += '<span class="wf-step-label">' + esc(label) + '</span>';
-            html += '</div>';
-        }
-        return html + '</div>';
-    }
-
-    function render(state, msg, feedback) {
-        if (!container || !state) return;
-
-        /* Categorize feedback into distinct highlight buckets */
-        var fieldCategory = {};   // label → 'outcome' | 'new' | 'modified'
-        var affCategory = {};     // label → 'new' | 'modified'
+        var fieldCategory = {};
+        var affCategory = {};
         if (feedback) {
             var out = feedback.outcome || {};
             var eff = feedback.effects || {};
@@ -326,172 +578,860 @@ registerRenderer({
             (eff.modified_affordances || []).forEach(function(a){ affCategory[a.label] = 'modified'; });
         }
 
+        var s = state.state || {};
         var html = '';
 
-        /* ── state.state.workflow — page header ── */
-        var s = state.state || {};
-        html += '<div class="wf-header">';
-        html += '<h1 class="wf-title">' + esc(s.workflow || 'Workflow') + '</h1>';
+        /* ── Top bar: workflow title + node as breadcrumb ── */
+        html += '<div class="ex-topbar">';
+        html += '<span class="ex-crumb">' + wfEsc(s.workflow || 'Workflow') + '</span>';
+        html += '<span class="ex-sep">&rsaquo;</span>';
+        html += '<span class="ex-crumb ex-crumb-active">' + wfEsc(s.node_title || s.node) + '</span>';
         html += '</div>';
 
-        /* ── state.lifecycle / state.lifecycle_current / state.lifecycle_completed ── */
-        html += renderNodeBanner(state);
-
-        /* ── state.completed_nodes ── */
-        html += '<div class="wf-meta">';
-        html += '<span class="wf-meta-key">state.completed_nodes:</span> ';
-        html += '<span class="wf-meta-val">' + esc(JSON.stringify(s.completed_nodes || [])) + '</span>';
-        html += '</div>';
-
-        /* ── state.node_title + state.node ── */
-        html += '<div class="wf-section">';
-        html += '<div class="wf-section-head">' + esc(s.node_title || s.node) + '</div>';
-        html += '<div class="wf-node-id">state.node: ' + esc(s.node) + '</div>';
-        html += '</div>';
-
-        /* ── description ── */
-        if (state.instructions) {
-            html += '<div class="wf-desc">' + esc(state.instructions) + '</div>';
-        }
-
-        /* ── state.state.fields ── */
-        if (s.fields) {
-            html += '<div class="wf-card">';
-            html += '<div class="wf-card-head">state.fields</div>';
-            html += renderFields(s.fields, fieldCategory);
+        /* ── Progress breadcrumb ── */
+        var lifecycle = s.lifecycle || [];
+        var current = s.lifecycle_current || '';
+        var completed = s.lifecycle_completed || [];
+        if (lifecycle.length) {
+            html += '<div class="ex-progress">';
+            for (var i = 0; i < lifecycle.length; i++) {
+                var label = lifecycle[i];
+                var isCurrent = label === current;
+                var isDone = completed.indexOf(label) !== -1;
+                if (i > 0) html += '<span class="ex-arrow">&rarr;</span>';
+                var cls = 'ex-phase';
+                if (isCurrent) cls += ' ex-phase-current';
+                else if (isDone) cls += ' ex-phase-done';
+                html += '<span class="' + cls + '">' + wfEsc(label) + '</span>';
+            }
             html += '</div>';
         }
 
-        /* ── affordances ── */
+        /* ── Instructions ── */
+        if (state.instructions) {
+            html += '<div class="ex-instructions">' + wfEsc(state.instructions) + '</div>';
+        }
+
+        /* ── Two-column body ── */
+        html += '<div class="ex-columns">';
+
+        /* Left column: fields */
+        html += '<div class="ex-col ex-col-fields">';
+        html += '<div class="ex-col-head">state.fields</div>';
+        if (s.fields) {
+            var fkeys = Object.keys(s.fields);
+            if (fkeys.length) {
+                html += '<table class="ex-ftable"><thead><tr>';
+                html += '<th>Field</th><th>Value</th><th>Options</th><th>Status</th>';
+                html += '</tr></thead><tbody>';
+                for (var i = 0; i < fkeys.length; i++) {
+                    var k = fkeys[i];
+                    var f = s.fields[k];
+                    var cat = fieldCategory[k] || null;
+                    var rowCls = cat ? ' ex-row-' + cat : '';
+                    html += '<tr class="' + rowCls + '">';
+                    html += '<td class="ex-fname">' + wfEsc(k) + '</td>';
+                    if (f && typeof f === 'object' && 'value' in f) {
+                        html += '<td class="ex-fval">';
+                        if (f.value == null) html += '<span class="ex-unset">—</span>';
+                        else html += wfEsc(f.value);
+                        if (f.instruction) html += '<div class="ex-finstr">' + wfEsc(f.instruction) + '</div>';
+                        html += '</td>';
+                        html += '<td class="ex-fopts">';
+                        if (f.options) html += wfEsc(f.options.join(', '));
+                        html += '</td>';
+                    } else {
+                        html += '<td class="ex-fval">' + wfRenderValue(f) + '</td>';
+                        html += '<td class="ex-fopts"></td>';
+                    }
+                    var tagMap = {outcome:'SET', 'new':'NEW', modified:'CHG'};
+                    html += '<td class="ex-fstatus">';
+                    if (cat) html += '<span class="ex-tag ex-tag-' + cat + '">' + tagMap[cat] + '</span>';
+                    html += '</td>';
+                    html += '</tr>';
+                }
+                html += '</tbody></table>';
+            } else {
+                html += '<span class="ex-empty">(empty)</span>';
+            }
+        } else {
+            html += '<span class="ex-empty">(no fields)</span>';
+        }
+        html += '</div>';
+
+        /* Right column: affordances */
+        html += '<div class="ex-col ex-col-affs">';
+        html += '<div class="ex-col-head">affordances</div>';
         if (state.affordances && state.affordances.length) {
-            html += '<div class="wf-card">';
-            html += '<div class="wf-card-head">affordances</div>';
+            html += '<div class="ex-aff-grid">';
             for (var i = 0; i < state.affordances.length; i++) {
                 var a = state.affordances[i];
-                var cls = 'wf-aff';
-                if (/Proceed|Submit/.test(a.label)) cls += ' wf-aff-primary';
-                else if (/Go back/.test(a.label)) cls += ' wf-aff-nav';
-                else if (/\[Selected\]/.test(a.label)) cls += ' wf-aff-selected';
-                if (affCategory[a.label]) cls += ' wf-aff-' + affCategory[a.label];
+                var cls = 'ex-aff';
+                if (/Proceed|Submit/.test(a.label)) cls += ' ex-aff-primary';
+                else if (/Go back/.test(a.label)) cls += ' ex-aff-nav';
+                else if (/\[Selected\]/.test(a.label)) cls += ' ex-aff-selected';
+                if (affCategory[a.label]) cls += ' ex-aff-fb-' + affCategory[a.label];
                 html += '<div class="' + cls + '">';
-                html += '<div class="wf-aff-top">';
-                html += '<span class="wf-aff-id">' + a.id + '</span>';
+                html += '<div class="ex-aff-head">';
+                html += '<span class="ex-aff-idx">' + a.id + '</span>';
+                html += '<span class="ex-aff-lbl">' + wfEsc(a.label);
                 var ac = affCategory[a.label];
-                var affTag = ac === 'new' ? '<span class="wf-tag-new">NEW</span>' : ac === 'modified' ? '<span class="wf-tag-modified">CHANGED</span>' : '';
-                html += '<span class="wf-aff-label">' + esc(a.label) + affTag + '</span>';
-                html += '<span class="wf-aff-method">' + esc(a.method) + '</span>';
+                if (ac === 'new') html += ' <span class="ex-tag ex-tag-new">NEW</span>';
+                else if (ac === 'modified') html += ' <span class="ex-tag ex-tag-modified">CHG</span>';
+                html += '</span>';
                 html += '</div>';
-                html += '<div class="wf-aff-detail">' + esc(a.url) + ' &nbsp; ' + esc(JSON.stringify(a.body)) + '</div>';
+                html += '<div class="ex-aff-meta">';
+                html += '<span class="ex-aff-verb">' + wfEsc(a.method) + '</span> ';
+                html += '<span class="ex-aff-url">' + wfEsc(a.url) + '</span>';
+                html += '</div>';
+                html += '<div class="ex-aff-body">' + wfEsc(JSON.stringify(a.body)) + '</div>';
                 if (a.options) {
-                    html += '<div class="wf-aff-options">options: ' + esc(JSON.stringify(a.options)) + '</div>';
+                    html += '<div class="ex-aff-opts">opts: ' + wfEsc(JSON.stringify(a.options)) + '</div>';
                 }
+                html += '</div>';
+            }
+            html += '</div>';
+        } else {
+            html += '<span class="ex-empty">(none)</span>';
+        }
+        html += '</div>';
+
+        html += '</div>'; /* close ex-columns */
+
+        c.innerHTML = html;
+    }
+
+    var EXP_CSS = ''
+        /* Container */
+        + '#rc-exp-a { background:#0b1622; color:#b0c4d8; font-family:Consolas,Monaco,"Courier New",monospace; overflow-y:auto; padding:0; }'
+
+        /* Top bar */
+        + '#rc-exp-a .ex-topbar { display:flex; align-items:center; gap:0.4rem; padding:0.8rem 1.2rem 0.3rem; border-bottom:1px dashed #1e3a5f; }'
+        + '#rc-exp-a .ex-crumb { font-size:0.9rem; color:#4a7a9b; }'
+        + '#rc-exp-a .ex-crumb-active { color:#7fdbff; font-weight:700; }'
+        + '#rc-exp-a .ex-sep { color:#2a4a6b; font-size:1rem; }'
+
+        /* Progress breadcrumb */
+        + '#rc-exp-a .ex-progress { display:flex; align-items:center; gap:0.3rem; padding:0.5rem 1.2rem; flex-wrap:wrap; }'
+        + '#rc-exp-a .ex-phase { font-size:0.72rem; padding:0.2rem 0.5rem; border:1px solid #1e3a5f; border-radius:2px; color:#4a7a9b; background:#0d1e30; }'
+        + '#rc-exp-a .ex-phase-current { border-color:#7fdbff; color:#7fdbff; background:#0d2a40; box-shadow:0 0 6px rgba(127,219,255,0.15); }'
+        + '#rc-exp-a .ex-phase-done { border-color:#2ecc71; color:#2ecc71; background:#0d2a1a; }'
+        + '#rc-exp-a .ex-arrow { color:#1e3a5f; font-size:0.8rem; }'
+
+        /* Instructions */
+        + '#rc-exp-a .ex-instructions { padding:0.4rem 1.2rem 0.6rem; font-size:0.82rem; color:#6a8fa8; line-height:1.5; border-bottom:1px dashed #1e3a5f; font-style:italic; }'
+
+        /* Two-column layout */
+        + '#rc-exp-a .ex-columns { display:flex; gap:0; min-height:0; }'
+        + '#rc-exp-a .ex-col { flex:1; padding:0.6rem 0.8rem; }'
+        + '#rc-exp-a .ex-col-fields { border-right:1px dashed #1e3a5f; }'
+        + '#rc-exp-a .ex-col-head { font-size:0.68rem; text-transform:uppercase; letter-spacing:0.1em; color:#3a6a8f; margin-bottom:0.5rem; padding-bottom:0.25rem; border-bottom:1px solid #1e3a5f; }'
+
+        /* Fields table */
+        + '#rc-exp-a .ex-ftable { width:100%; border-collapse:collapse; font-size:0.78rem; }'
+        + '#rc-exp-a .ex-ftable th { text-align:left; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.08em; color:#3a6a8f; padding:0.3rem 0.4rem; border-bottom:1px solid #1e3a5f; font-weight:500; }'
+        + '#rc-exp-a .ex-ftable td { padding:0.35rem 0.4rem; border-bottom:1px solid #0f2236; vertical-align:top; }'
+        + '#rc-exp-a .ex-fname { color:#7fdbff; white-space:nowrap; font-weight:600; width:120px; }'
+        + '#rc-exp-a .ex-fval { color:#b0c4d8; word-break:break-word; }'
+        + '#rc-exp-a .ex-unset { color:#2a4a6b; }'
+        + '#rc-exp-a .ex-finstr { font-size:0.7rem; color:#4a6a80; font-style:italic; margin-top:0.15rem; }'
+        + '#rc-exp-a .ex-fopts { color:#4a6a80; font-size:0.72rem; }'
+        + '#rc-exp-a .ex-fstatus { width:40px; text-align:center; }'
+        + '#rc-exp-a .ex-empty { color:#2a4a6b; font-style:italic; font-size:0.8rem; }'
+
+        /* Feedback row highlights */
+        + '#rc-exp-a .ex-row-outcome { background:rgba(127,219,255,0.06); }'
+        + '#rc-exp-a .ex-row-new { background:rgba(46,204,113,0.06); }'
+        + '#rc-exp-a .ex-row-modified { background:rgba(230,168,23,0.06); }'
+
+        /* Tags */
+        + '#rc-exp-a .ex-tag { font-size:0.6rem; font-weight:700; letter-spacing:0.06em; padding:0.1rem 0.3rem; border-radius:2px; }'
+        + '#rc-exp-a .ex-tag-outcome { color:#7fdbff; background:rgba(127,219,255,0.12); }'
+        + '#rc-exp-a .ex-tag-new { color:#2ecc71; background:rgba(46,204,113,0.12); }'
+        + '#rc-exp-a .ex-tag-modified { color:#e6a817; background:rgba(230,168,23,0.12); }'
+
+        /* Affordance grid */
+        + '#rc-exp-a .ex-aff-grid { display:grid; grid-template-columns:1fr; gap:0.4rem; }'
+        + '#rc-exp-a .ex-aff { border:1px solid #1e3a5f; border-radius:3px; padding:0.4rem 0.5rem; background:#0d1e30; }'
+        + '#rc-exp-a .ex-aff-head { display:flex; align-items:center; gap:0.4rem; }'
+        + '#rc-exp-a .ex-aff-idx { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:2px; font-size:0.65rem; font-weight:700; background:#1e3a5f; color:#7fdbff; flex-shrink:0; }'
+        + '#rc-exp-a .ex-aff-lbl { font-size:0.8rem; color:#b0c4d8; }'
+        + '#rc-exp-a .ex-aff-meta { font-size:0.68rem; margin-top:0.2rem; }'
+        + '#rc-exp-a .ex-aff-verb { color:#3a6a8f; font-weight:600; }'
+        + '#rc-exp-a .ex-aff-url { color:#4a7a9b; }'
+        + '#rc-exp-a .ex-aff-body { font-size:0.68rem; color:#3a5a70; margin-top:0.1rem; word-break:break-all; }'
+        + '#rc-exp-a .ex-aff-opts { font-size:0.68rem; color:#3a5a70; margin-top:0.1rem; }'
+
+        /* Affordance variants */
+        + '#rc-exp-a .ex-aff-primary { border-color:#7fdbff; background:#0d2a40; box-shadow:0 0 8px rgba(127,219,255,0.08); }'
+        + '#rc-exp-a .ex-aff-primary .ex-aff-lbl { color:#7fdbff; font-weight:700; }'
+        + '#rc-exp-a .ex-aff-primary .ex-aff-idx { background:#7fdbff; color:#0b1622; }'
+        + '#rc-exp-a .ex-aff-nav { border-color:#1e3a5f; background:#0b1622; border-style:dashed; }'
+        + '#rc-exp-a .ex-aff-nav .ex-aff-lbl { color:#4a6a80; }'
+        + '#rc-exp-a .ex-aff-selected { border-color:#2ecc71; background:#0d2a1a; }'
+        + '#rc-exp-a .ex-aff-selected .ex-aff-lbl { color:#2ecc71; }'
+        + '#rc-exp-a .ex-aff-selected .ex-aff-idx { background:#2ecc71; color:#0b1622; }'
+        + '#rc-exp-a .ex-aff-fb-new { border-left:3px solid #2ecc71; }'
+        + '#rc-exp-a .ex-aff-fb-modified { border-left:3px solid #e6a817; }'
+
+        /* Value types (reused from shared wfRenderValue) */
+        + '#rc-exp-a .wf-null, #rc-exp-a .wf-empty-arr, #rc-exp-a .wf-empty-obj { color:#2a4a6b; font-style:italic; font-size:0.75rem; }'
+        + '#rc-exp-a .wf-bool, #rc-exp-a .wf-num { color:#7fdbff; }'
+        + '#rc-exp-a .wf-str { color:#b0c4d8; }'
+        + '#rc-exp-a .wf-tbl { width:100%; border-collapse:collapse; }'
+        + '#rc-exp-a .wf-tbl td { padding:0.2rem 0.3rem; font-size:0.75rem; border-bottom:1px solid #0f2236; }'
+        + '#rc-exp-a .wf-key { color:#4a7a9b; font-weight:500; width:100px; }'
+        + '#rc-exp-a .wf-val { color:#b0c4d8; }'
+        + '#rc-exp-a .wf-arr { display:flex; flex-direction:column; gap:0.1rem; }'
+        + '#rc-exp-a .wf-arr-item { padding-left:0.4rem; border-left:2px solid #1e3a5f; }'
+        ;
+
+    registerRenderer({
+        id: 'exp-a',
+        label: 'Experimental - A',
+        init: function(c) {
+            c.style.cssText = 'overflow-y:auto;padding:0;';
+            var style = document.createElement('style');
+            style.textContent = EXP_CSS;
+            document.head.appendChild(style);
+            container = c;
+        },
+        update: function(state, msg, feedback) { expARenderPage(container, state, msg, feedback); },
+        activate: function() {},
+        deactivate: function() {}
+    });
+})();
+
+/* ======================================================================
+   RENDERER: EXPERIMENTAL B — card grid layout
+   ====================================================================== */
+(function() {
+    var container;
+
+    function expBRenderPage(c, state, msg, feedback) {
+        if (!c || !state) return;
+
+        var fieldCategory = {};
+        var affCategory = {};
+        if (feedback) {
+            var out = feedback.outcome || {};
+            var eff = feedback.effects || {};
+            for (var k in out) fieldCategory[k] = 'outcome';
+            for (var k in (eff.new_fields || {})) fieldCategory[k] = 'new';
+            for (var k in (eff.modified_fields || {})) fieldCategory[k] = 'modified';
+            (eff.new_affordances || []).forEach(function(a){ affCategory[a.label] = 'new'; });
+            (eff.modified_affordances || []).forEach(function(a){ affCategory[a.label] = 'modified'; });
+        }
+
+        var s = state.state || {};
+        var html = '';
+
+        /* ── Header with filled progress bar ── */
+        var lifecycle = s.lifecycle || [];
+        var current = s.lifecycle_current || '';
+        var completed = s.lifecycle_completed || [];
+        var pct = lifecycle.length ? Math.round((completed.length / lifecycle.length) * 100) : 0;
+
+        html += '<div class="gb-header">';
+        html += '<div class="gb-title">' + wfEsc(s.workflow || 'Workflow') + '</div>';
+        html += '<div class="gb-node">' + wfEsc(s.node_title || s.node) + '</div>';
+        html += '</div>';
+
+        if (lifecycle.length) {
+            html += '<div class="gb-bar-wrap">';
+            html += '<div class="gb-bar-track">';
+            html += '<div class="gb-bar-fill" style="width:' + Math.max(pct, 4) + '%"></div>';
+            html += '</div>';
+            html += '<div class="gb-bar-labels">';
+            for (var i = 0; i < lifecycle.length; i++) {
+                var isCurrent = lifecycle[i] === current;
+                var isDone = completed.indexOf(lifecycle[i]) !== -1;
+                html += '<span class="gb-bar-lbl' + (isCurrent ? ' gb-bar-lbl-cur' : '') + (isDone ? ' gb-bar-lbl-done' : '') + '">' + wfEsc(lifecycle[i]) + '</span>';
+            }
+            html += '</div>';
+            html += '</div>';
+        }
+
+        if (state.instructions) {
+            html += '<div class="gb-instr">' + wfEsc(state.instructions) + '</div>';
+        }
+
+        /* ── Field cards in a grid ── */
+        if (s.fields) {
+            html += '<div class="gb-section-label">state.fields</div>';
+            var fkeys = Object.keys(s.fields);
+            if (fkeys.length) {
+                html += '<div class="gb-grid">';
+                for (var i = 0; i < fkeys.length; i++) {
+                    var k = fkeys[i];
+                    var f = s.fields[k];
+                    var cat = fieldCategory[k] || null;
+                    var cls = 'gb-fcard' + (cat ? ' gb-fc-' + cat : '');
+                    html += '<div class="' + cls + '">';
+                    var tagMap = {outcome:'SET', 'new':'NEW', modified:'CHG'};
+                    html += '<div class="gb-fc-head">';
+                    html += '<span class="gb-fc-name">' + wfEsc(k) + '</span>';
+                    if (cat) html += '<span class="gb-tag gb-tag-' + cat + '">' + tagMap[cat] + '</span>';
+                    html += '</div>';
+                    if (f && typeof f === 'object' && 'value' in f) {
+                        if (f.instruction) html += '<div class="gb-fc-instr">' + wfEsc(f.instruction) + '</div>';
+                        if (f.value == null) html += '<div class="gb-fc-val gb-fc-empty">not set</div>';
+                        else html += '<div class="gb-fc-val">' + wfEsc(f.value) + '</div>';
+                        if (f.options) html += '<div class="gb-fc-opts">' + wfEsc(f.options.join(' | ')) + '</div>';
+                    } else {
+                        html += '<div class="gb-fc-val">' + wfRenderValue(f) + '</div>';
+                    }
+                    html += '</div>';
+                }
+                html += '</div>';
+            } else {
+                html += '<div class="gb-empty">(empty)</div>';
+            }
+        }
+
+        /* ── Affordances as pill toolbar ── */
+        if (state.affordances && state.affordances.length) {
+            html += '<div class="gb-section-label">affordances</div>';
+            html += '<div class="gb-toolbar">';
+            for (var i = 0; i < state.affordances.length; i++) {
+                var a = state.affordances[i];
+                var cls = 'gb-pill';
+                if (/Proceed|Submit/.test(a.label)) cls += ' gb-pill-primary';
+                else if (/Go back/.test(a.label)) cls += ' gb-pill-nav';
+                else if (/\[Selected\]/.test(a.label)) cls += ' gb-pill-selected';
+                var ac = affCategory[a.label];
+                if (ac) cls += ' gb-pill-fb-' + ac;
+                html += '<div class="' + cls + '">';
+                html += '<span class="gb-pill-id">' + a.id + '</span>';
+                html += '<span class="gb-pill-label">' + wfEsc(a.label);
+                if (ac === 'new') html += ' <span class="gb-tag gb-tag-new">NEW</span>';
+                else if (ac === 'modified') html += ' <span class="gb-tag gb-tag-modified">CHG</span>';
+                html += '</span>';
+                html += '<div class="gb-pill-detail">';
+                html += '<span class="gb-pill-method">' + wfEsc(a.method) + '</span> ';
+                html += wfEsc(a.url) + ' ' + wfEsc(JSON.stringify(a.body));
+                html += '</div>';
+                if (a.options) html += '<div class="gb-pill-opts">opts: ' + wfEsc(JSON.stringify(a.options)) + '</div>';
                 html += '</div>';
             }
             html += '</div>';
         }
 
-        container.innerHTML = html;
+        c.innerHTML = html;
     }
 
+    var EXP_B_CSS = ''
+        + '#rc-exp-b { background:#1a1226; color:#d4c8e8; font-family:"Segoe UI",Roboto,sans-serif; overflow-y:auto; padding:0; }'
+        + '#rc-exp-b .gb-header { padding:1rem 1.2rem 0.3rem; }'
+        + '#rc-exp-b .gb-title { font-size:0.78rem; text-transform:uppercase; letter-spacing:0.12em; color:#8b6cc1; }'
+        + '#rc-exp-b .gb-node { font-size:1.3rem; font-weight:700; color:#e8ddf5; margin-top:0.15rem; }'
+
+        + '#rc-exp-b .gb-bar-wrap { padding:0.5rem 1.2rem; }'
+        + '#rc-exp-b .gb-bar-track { height:6px; background:#2a1e3e; border-radius:3px; overflow:hidden; }'
+        + '#rc-exp-b .gb-bar-fill { height:100%; background:linear-gradient(90deg,#8b6cc1,#c084fc); border-radius:3px; transition:width 0.3s; }'
+        + '#rc-exp-b .gb-bar-labels { display:flex; justify-content:space-between; margin-top:0.3rem; }'
+        + '#rc-exp-b .gb-bar-lbl { font-size:0.62rem; color:#5a4a70; }'
+        + '#rc-exp-b .gb-bar-lbl-cur { color:#c084fc; font-weight:700; }'
+        + '#rc-exp-b .gb-bar-lbl-done { color:#8b6cc1; }'
+
+        + '#rc-exp-b .gb-instr { padding:0.3rem 1.2rem 0.6rem; font-size:0.82rem; color:#9a8ab0; line-height:1.5; }'
+
+        + '#rc-exp-b .gb-section-label { padding:0.3rem 1.2rem; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.1em; color:#5a4a70; }'
+
+        + '#rc-exp-b .gb-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; padding:0.3rem 1.2rem 0.8rem; }'
+        + '#rc-exp-b .gb-fcard { background:#221a33; border:1px solid #2e2444; border-radius:8px; padding:0.6rem 0.7rem; display:flex; flex-direction:column; gap:0.2rem; }'
+        + '#rc-exp-b .gb-fc-head { display:flex; align-items:center; justify-content:space-between; }'
+        + '#rc-exp-b .gb-fc-name { font-size:0.78rem; font-weight:600; color:#c084fc; }'
+        + '#rc-exp-b .gb-fc-instr { font-size:0.7rem; color:#6a5a80; font-style:italic; }'
+        + '#rc-exp-b .gb-fc-val { font-size:0.85rem; color:#d4c8e8; }'
+        + '#rc-exp-b .gb-fc-empty { color:#4a3a60; font-style:italic; }'
+        + '#rc-exp-b .gb-fc-opts { font-size:0.68rem; color:#6a5a80; font-family:Consolas,monospace; }'
+
+        + '#rc-exp-b .gb-fc-outcome { border-left:3px solid #8b6cc1; background:#251d38; }'
+        + '#rc-exp-b .gb-fc-new { border-left:3px solid #4caf50; background:#1a2a1a; }'
+        + '#rc-exp-b .gb-fc-modified { border-left:3px solid #e6a817; background:#2a2210; }'
+
+        + '#rc-exp-b .gb-tag { font-size:0.55rem; font-weight:700; letter-spacing:0.06em; padding:0.1rem 0.3rem; border-radius:3px; }'
+        + '#rc-exp-b .gb-tag-outcome { color:#c084fc; background:rgba(192,132,252,0.15); }'
+        + '#rc-exp-b .gb-tag-new { color:#4caf50; background:rgba(76,175,80,0.15); }'
+        + '#rc-exp-b .gb-tag-modified { color:#e6a817; background:rgba(230,168,23,0.15); }'
+
+        + '#rc-exp-b .gb-toolbar { display:flex; flex-direction:column; gap:0.35rem; padding:0.3rem 1.2rem 1rem; }'
+        + '#rc-exp-b .gb-pill { display:flex; flex-wrap:wrap; align-items:center; gap:0.4rem; padding:0.5rem 0.7rem; background:#221a33; border:1px solid #2e2444; border-radius:20px; }'
+        + '#rc-exp-b .gb-pill-id { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; font-size:0.65rem; font-weight:700; background:#2e2444; color:#8b6cc1; flex-shrink:0; }'
+        + '#rc-exp-b .gb-pill-label { font-size:0.82rem; color:#d4c8e8; flex:1; }'
+        + '#rc-exp-b .gb-pill-detail { width:100%; font-size:0.65rem; color:#5a4a70; font-family:Consolas,monospace; padding-left:1.8rem; word-break:break-all; }'
+        + '#rc-exp-b .gb-pill-method { font-weight:600; color:#6a5a80; }'
+        + '#rc-exp-b .gb-pill-opts { width:100%; font-size:0.65rem; color:#5a4a70; font-family:Consolas,monospace; padding-left:1.8rem; }'
+
+        + '#rc-exp-b .gb-pill-primary { border-color:#8b6cc1; background:#251d38; }'
+        + '#rc-exp-b .gb-pill-primary .gb-pill-label { color:#c084fc; font-weight:700; }'
+        + '#rc-exp-b .gb-pill-primary .gb-pill-id { background:#8b6cc1; color:#fff; }'
+        + '#rc-exp-b .gb-pill-nav { border-style:dashed; border-color:#2e2444; }'
+        + '#rc-exp-b .gb-pill-nav .gb-pill-label { color:#6a5a80; }'
+        + '#rc-exp-b .gb-pill-selected { border-color:#4caf50; background:#1a2a1a; }'
+        + '#rc-exp-b .gb-pill-selected .gb-pill-label { color:#4caf50; }'
+        + '#rc-exp-b .gb-pill-selected .gb-pill-id { background:#4caf50; color:#fff; }'
+        + '#rc-exp-b .gb-pill-fb-new { border-left:3px solid #4caf50; }'
+        + '#rc-exp-b .gb-pill-fb-modified { border-left:3px solid #e6a817; }'
+
+        + '#rc-exp-b .gb-empty { padding:0.5rem 1.2rem; color:#4a3a60; font-style:italic; font-size:0.8rem; }'
+
+        + '#rc-exp-b .wf-null, #rc-exp-b .wf-empty-arr, #rc-exp-b .wf-empty-obj { color:#4a3a60; font-style:italic; font-size:0.8rem; }'
+        + '#rc-exp-b .wf-bool, #rc-exp-b .wf-num { color:#c084fc; }'
+        + '#rc-exp-b .wf-str { color:#d4c8e8; }'
+        + '#rc-exp-b .wf-tbl { width:100%; border-collapse:collapse; }'
+        + '#rc-exp-b .wf-tbl td { padding:0.2rem 0.3rem; font-size:0.78rem; border-bottom:1px solid #2e2444; }'
+        + '#rc-exp-b .wf-key { color:#8b6cc1; font-weight:500; }'
+        + '#rc-exp-b .wf-val { color:#d4c8e8; }'
+        + '#rc-exp-b .wf-arr { display:flex; flex-direction:column; gap:0.1rem; }'
+        + '#rc-exp-b .wf-arr-item { padding-left:0.4rem; border-left:2px solid #2e2444; }'
+        ;
+
     registerRenderer({
-        id: 'rendered',
-        label: 'Rendered',
-        /* renderer availability declared by the workflow definition */
+        id: 'exp-b',
+        label: 'Experimental - B',
         init: function(c) {
             c.style.cssText = 'overflow-y:auto;padding:0;';
-            /* Style goes in <head> so container.innerHTML can't destroy it */
             var style = document.createElement('style');
-            style.textContent = ''
-                /* Light background matching WFE UI */
-                + '#rc-rendered { background:#f5f5f5; color:#333; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
-
-                /* Header */
-                + '.wf-header { display:flex; align-items:baseline; justify-content:space-between; padding:1.25rem 1.5rem 0.25rem; }'
-                + '.wf-title { font-size:1.4rem; font-weight:600; color:#1a1a2e; margin:0; }'
-
-                /* Stage banner — matches create_cr.html style */
-                + '.wf-banner { display:flex; align-items:center; margin:0.75rem 1.5rem; padding:0.75rem 1rem; background:#f8f9fb; border-radius:8px; border:1px solid #e8e8e8; overflow-x:auto; }'
-                + '.wf-step { display:flex; flex-direction:column; align-items:center; gap:0.2rem; flex-shrink:0; }'
-                + '.wf-dot { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; font-size:0.7rem; font-weight:600; background:#dde1e6; color:#888; }'
-                + '.wf-step-label { font-size:0.68rem; color:#888; font-weight:500; text-align:center; white-space:nowrap; }'
-                + '.wf-step-active .wf-dot { background:#2a6bcf; color:#fff; }'
-                + '.wf-step-active .wf-step-label { color:#1a1a2e; font-weight:600; }'
-                + '.wf-step-done .wf-dot { background:#4caf50; color:#fff; }'
-                + '.wf-step-done .wf-step-label { color:#555; }'
-                + '.wf-conn { flex:1; height:2px; background:#dde1e6; margin:0 0.25rem; min-width:12px; align-self:center; margin-bottom:1rem; }'
-                + '.wf-conn-active { background:#4caf50; }'
-
-                /* Metadata (state.completed_nodes, etc.) */
-                + '.wf-meta { padding:0.1rem 1.5rem; font-size:0.72rem; font-family:Consolas,Monaco,monospace; }'
-                + '.wf-meta-key { color:#999; }'
-                + '.wf-meta-val { color:#7f8fa6; }'
-
-                /* Section heading */
-                + '.wf-section { padding:0.5rem 1.5rem 0; }'
-                + '.wf-section-head { font-size:1.1rem; font-weight:600; color:#1a1a2e; }'
-                + '.wf-node-id { font-size:0.72rem; color:#999; font-family:Consolas,Monaco,monospace; margin-top:0.1rem; }'
-
-                /* Description */
-                + '.wf-desc { padding:0.25rem 1.5rem 0.75rem; font-size:0.9rem; color:#666; line-height:1.5; }'
-
-                /* Cards */
-                + '.wf-card { margin:0.5rem 1.5rem; padding:0.75rem; background:#fff; border:1px solid #e8e8e8; border-radius:8px; }'
-                + '.wf-card-head { font-size:0.75rem; font-weight:600; color:#7f8fa6; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem; }'
-
-                /* Key-value tables */
-                + '.wf-tbl { width:100%; border-collapse:collapse; }'
-                + '.wf-tbl td { padding:0.35rem 0.5rem; border-bottom:1px solid #f0f0f0; font-size:0.85rem; vertical-align:top; }'
-                + '.wf-key { color:#7f8fa6; width:160px; white-space:nowrap; font-weight:500; font-size:0.8rem; }'
-                + '.wf-val { color:#333; word-break:break-word; }'
-                + '.wf-null { color:#bbb; font-style:italic; font-size:0.8rem; }'
-                + '.wf-bool { color:#2a6bcf; }'
-                + '.wf-num { color:#2a6bcf; }'
-                + '.wf-str { color:#333; }'
-                + '.wf-empty-arr, .wf-empty-obj { color:#bbb; font-style:italic; font-size:0.8rem; }'
-                + '.wf-arr { display:flex; flex-direction:column; gap:0.15rem; }'
-                + '.wf-arr-item { padding-left:0.5rem; border-left:2px solid #e8e8e8; }'
-
-                /* Structured fields */
-                + '.wf-fields { display:flex; flex-direction:column; gap:0.15rem; }'
-                + '.wf-field { padding:0.5rem 0.6rem; border-bottom:1px solid #f0f0f0; }'
-                + '.wf-field:last-child { border-bottom:none; }'
-                + '.wf-field-label { font-size:0.8rem; font-weight:600; color:#555; margin-bottom:0.15rem; }'
-                + '.wf-field-instruction { font-size:0.75rem; color:#999; font-style:italic; margin-bottom:0.2rem; line-height:1.3; }'
-                + '.wf-field-value { font-size:0.85rem; color:#333; }'
-                + '.wf-field-empty { color:#bbb; font-style:italic; font-size:0.8rem; }'
-                + '.wf-field-options { font-size:0.72rem; color:#7f8fa6; font-family:Consolas,Monaco,monospace; margin-top:0.15rem; }'
-
-                /* Affordances */
-                + '.wf-aff { margin-bottom:0.4rem; padding:0.5rem 0.6rem; background:#f8f9fb; border:1px solid #e8e8e8; border-radius:6px; }'
-                + '.wf-aff-top { display:flex; align-items:center; gap:0.5rem; }'
-                + '.wf-aff-id { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:#dde1e6; color:#555; font-size:0.7rem; font-weight:600; flex-shrink:0; }'
-                + '.wf-aff-label { flex:1; font-size:0.85rem; color:#333; }'
-                + '.wf-aff-method { font-size:0.65rem; font-weight:600; color:#7f8fa6; background:#eef1f5; padding:0.15rem 0.4rem; border-radius:3px; }'
-                + '.wf-aff-detail { font-size:0.72rem; color:#999; margin-top:0.2rem; padding-left:2rem; font-family:Consolas,Monaco,monospace; word-break:break-all; }'
-                + '.wf-aff-options { font-size:0.72rem; color:#7f8fa6; margin-top:0.15rem; padding-left:2rem; font-family:Consolas,Monaco,monospace; }'
-                + '.wf-aff-primary { border-color:#2a6bcf; background:#f0f5ff; }'
-                + '.wf-aff-primary .wf-aff-label { color:#2a6bcf; font-weight:600; }'
-                + '.wf-aff-primary .wf-aff-id { background:#2a6bcf; color:#fff; }'
-                + '.wf-aff-nav { border-color:#dde1e6; background:#fafafa; }'
-                + '.wf-aff-nav .wf-aff-label { color:#888; }'
-                + '.wf-aff-selected { border-color:#4caf50; background:#f0fff0; }'
-                + '.wf-aff-selected .wf-aff-label { color:#2e7d32; }'
-                + '.wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; }'
-
-                /* Focus highlights */
-                + '.wf-fb-outcome { border-left:3px solid #2a6bcf; background:#f0f5ff; }'
-                + '.wf-fb-new { border-left:3px solid #4caf50; background:#f0faf0; }'
-                + '.wf-fb-modified { border-left:3px solid #e6a817; background:#fdf8ed; }'
-                + '.wf-aff-new { border-left:3px solid #4caf50; background:#f0faf0; }'
-                + '.wf-aff-modified { border-left:3px solid #e6a817; background:#fdf8ed; }'
-                + '.wf-tag-outcome { font-size:0.6em; font-weight:700; color:#2a6bcf; vertical-align:super; margin-left:0.5em; letter-spacing:0.05em; }'
-                + '.wf-tag-new { font-size:0.6em; font-weight:700; color:#4caf50; vertical-align:super; margin-left:0.5em; letter-spacing:0.05em; }'
-                + '.wf-tag-modified { font-size:0.6em; font-weight:700; color:#e6a817; vertical-align:super; margin-left:0.5em; letter-spacing:0.05em; }'
-                ;
+            style.textContent = EXP_B_CSS;
             document.head.appendChild(style);
             container = c;
         },
-        update: function(state, msg, feedback) { render(state, msg, feedback); },
+        update: function(state, msg, feedback) { expBRenderPage(container, state, msg, feedback); },
+        activate: function() {},
+        deactivate: function() {}
+    });
+})();
+
+/* ======================================================================
+   RENDERER: EXPERIMENTAL C — tree outline
+   ====================================================================== */
+(function() {
+    var container;
+
+    function treeVal(v, indent) {
+        var pfx = indent;
+        if (v == null) return pfx + '(null)\n';
+        if (typeof v === 'boolean' || typeof v === 'number') return pfx + String(v) + '\n';
+        if (typeof v === 'string') return pfx + '"' + v.replace(/"/g, '\\"') + '"\n';
+        if (Array.isArray(v)) {
+            if (!v.length) return pfx + '(empty list)\n';
+            var out = '';
+            for (var i = 0; i < v.length; i++) {
+                var isLast = i === v.length - 1;
+                var branch = isLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
+                var childPfx = indent + (isLast ? '   ' : '\u2502  ');
+                if (typeof v[i] === 'object' && v[i] !== null) {
+                    out += indent + branch + '[' + i + ']\n';
+                    out += treeObj(v[i], childPfx);
+                } else {
+                    out += indent + branch + treeVal(v[i], '').trim() + '\n';
+                }
+            }
+            return out;
+        }
+        if (typeof v === 'object') return '\n' + treeObj(v, indent);
+        return pfx + String(v) + '\n';
+    }
+
+    function treeObj(obj, indent) {
+        var keys = Object.keys(obj);
+        if (!keys.length) return indent + '(empty)\n';
+        var out = '';
+        for (var i = 0; i < keys.length; i++) {
+            var k = keys[i];
+            var isLast = i === keys.length - 1;
+            var branch = isLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
+            var childPfx = indent + (isLast ? '   ' : '\u2502  ');
+            var val = obj[k];
+            if (val && typeof val === 'object' && !Array.isArray(val)) {
+                out += indent + branch + k + '\n';
+                out += treeObj(val, childPfx);
+            } else if (Array.isArray(val)) {
+                out += indent + branch + k + '\n';
+                out += treeVal(val, childPfx);
+            } else {
+                out += indent + branch + k + ': ' + treeVal(val, '').trim() + '\n';
+            }
+        }
+        return out;
+    }
+
+    function expCRenderPage(c, state, msg, feedback) {
+        if (!c || !state) return;
+
+        var fieldCategory = {};
+        var affCategory = {};
+        if (feedback) {
+            var out = feedback.outcome || {};
+            var eff = feedback.effects || {};
+            for (var k in out) fieldCategory[k] = 'outcome';
+            for (var k in (eff.new_fields || {})) fieldCategory[k] = 'new';
+            for (var k in (eff.modified_fields || {})) fieldCategory[k] = 'modified';
+            (eff.new_affordances || []).forEach(function(a){ affCategory[a.label] = 'new'; });
+            (eff.modified_affordances || []).forEach(function(a){ affCategory[a.label] = 'modified'; });
+        }
+
+        var s = state.state || {};
+        var lines = [];
+
+        /* Root */
+        lines.push('<span class="tc-root">' + wfEsc(s.workflow || 'Workflow') + '</span>');
+
+        /* Lifecycle */
+        var lifecycle = s.lifecycle || [];
+        var current = s.lifecycle_current || '';
+        var completed = s.lifecycle_completed || [];
+        if (lifecycle.length) {
+            lines.push('\u251c\u2500 <span class="tc-key">lifecycle</span>');
+            for (var i = 0; i < lifecycle.length; i++) {
+                var label = lifecycle[i];
+                var isLast = i === lifecycle.length - 1;
+                var branch = isLast ? '   \u2514\u2500 ' : '   \u251c\u2500 ';
+                var cls = 'tc-phase';
+                if (label === current) cls = 'tc-phase-cur';
+                else if (completed.indexOf(label) !== -1) cls = 'tc-phase-done';
+                lines.push(branch + '<span class="' + cls + '">' + wfEsc(label) + '</span>');
+            }
+        }
+
+        /* Node */
+        lines.push('\u251c\u2500 <span class="tc-key">node</span>: <span class="tc-node">' + wfEsc(s.node_title || s.node) + '</span>');
+
+        /* Instructions */
+        if (state.instructions) {
+            lines.push('\u251c\u2500 <span class="tc-key">instructions</span>: <span class="tc-str">' + wfEsc(state.instructions) + '</span>');
+        }
+
+        /* Fields */
+        if (s.fields) {
+            var fkeys = Object.keys(s.fields);
+            var hasAffs = state.affordances && state.affordances.length;
+            var fieldBranch = hasAffs ? '\u251c\u2500 ' : '\u2514\u2500 ';
+            var fieldCont = hasAffs ? '\u2502  ' : '   ';
+            lines.push(fieldBranch + '<span class="tc-key">state.fields</span>');
+            if (fkeys.length) {
+                for (var i = 0; i < fkeys.length; i++) {
+                    var k = fkeys[i];
+                    var f = s.fields[k];
+                    var isLast = i === fkeys.length - 1;
+                    var fb = isLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
+                    var fc = isLast ? '   ' : '\u2502  ';
+                    var cat = fieldCategory[k] || null;
+                    var tagStr = '';
+                    var tagMap = {outcome:'SET', 'new':'NEW', modified:'CHG'};
+                    if (cat) tagStr = ' <span class="tc-tag tc-tag-' + cat + '">[' + tagMap[cat] + ']</span>';
+                    lines.push(fieldCont + fb + '<span class="tc-fname' + (cat ? ' tc-f-' + cat : '') + '">' + wfEsc(k) + '</span>' + tagStr);
+                    if (f && typeof f === 'object' && 'value' in f) {
+                        var subPfx = fieldCont + fc;
+                        var subParts = [];
+                        if (f.value == null) subParts.push('value: <span class="tc-null">(not set)</span>');
+                        else subParts.push('value: <span class="tc-str">' + wfEsc(f.value) + '</span>');
+                        if (f.instruction) subParts.push('instruction: <span class="tc-instr">' + wfEsc(f.instruction) + '</span>');
+                        if (f.options) subParts.push('options: <span class="tc-opts">' + wfEsc(f.options.join(', ')) + '</span>');
+                        for (var j = 0; j < subParts.length; j++) {
+                            var sIsLast = j === subParts.length - 1;
+                            lines.push(subPfx + (sIsLast ? '\u2514\u2500 ' : '\u251c\u2500 ') + subParts[j]);
+                        }
+                    } else {
+                        lines.push(fieldCont + fc + '\u2514\u2500 ' + treeVal(f, '').trim());
+                    }
+                }
+            } else {
+                lines.push(fieldCont + '\u2514\u2500 <span class="tc-null">(empty)</span>');
+            }
+        }
+
+        /* Affordances */
+        if (state.affordances && state.affordances.length) {
+            lines.push('\u2514\u2500 <span class="tc-key">affordances</span>');
+            for (var i = 0; i < state.affordances.length; i++) {
+                var a = state.affordances[i];
+                var isLast = i === state.affordances.length - 1;
+                var ab = isLast ? '   \u2514\u2500 ' : '   \u251c\u2500 ';
+                var ac2 = isLast ? '      ' : '   \u2502  ';
+                var acCat = affCategory[a.label] || null;
+                var acTag = '';
+                if (acCat === 'new') acTag = ' <span class="tc-tag tc-tag-new">[NEW]</span>';
+                else if (acCat === 'modified') acTag = ' <span class="tc-tag tc-tag-modified">[CHG]</span>';
+                var affCls = 'tc-aff';
+                if (/Proceed|Submit/.test(a.label)) affCls += ' tc-aff-primary';
+                else if (/Go back/.test(a.label)) affCls += ' tc-aff-nav';
+                else if (/\[Selected\]/.test(a.label)) affCls += ' tc-aff-selected';
+                lines.push(ab + '<span class="tc-aff-id">[' + a.id + ']</span> <span class="' + affCls + '">' + wfEsc(a.label) + '</span>' + acTag);
+                lines.push(ac2 + '\u251c\u2500 <span class="tc-aff-m">' + wfEsc(a.method) + '</span> <span class="tc-aff-url">' + wfEsc(a.url) + '</span>');
+                var bodyLine = ac2 + (a.options ? '\u251c\u2500 ' : '\u2514\u2500 ') + 'body: <span class="tc-aff-body">' + wfEsc(JSON.stringify(a.body)) + '</span>';
+                lines.push(bodyLine);
+                if (a.options) {
+                    lines.push(ac2 + '\u2514\u2500 options: <span class="tc-opts">' + wfEsc(JSON.stringify(a.options)) + '</span>');
+                }
+            }
+        }
+
+        c.querySelector('.tc-content').innerHTML = lines.join('\n');
+    }
+
+    var EXP_C_CSS = ''
+        + '#rc-exp-c { background:#0a100a; color:#88b888; font-family:Consolas,"Courier New",monospace; overflow-y:auto; padding:0.8rem 1rem; }'
+        + '#rc-exp-c .tc-content { white-space:pre; line-height:1.6; font-size:0.82rem; }'
+        + '#rc-exp-c .tc-root { font-size:1rem; font-weight:700; color:#50fa7b; }'
+        + '#rc-exp-c .tc-key { color:#6abf6a; font-weight:600; }'
+        + '#rc-exp-c .tc-node { color:#f1fa8c; font-weight:600; }'
+        + '#rc-exp-c .tc-phase { color:#4a6a4a; }'
+        + '#rc-exp-c .tc-phase-cur { color:#50fa7b; font-weight:700; text-decoration:underline; }'
+        + '#rc-exp-c .tc-phase-done { color:#6abf6a; }'
+        + '#rc-exp-c .tc-str { color:#c8e8c8; }'
+        + '#rc-exp-c .tc-null { color:#4a6a4a; font-style:italic; }'
+        + '#rc-exp-c .tc-instr { color:#6a8a6a; font-style:italic; }'
+        + '#rc-exp-c .tc-opts { color:#6a8a6a; }'
+        + '#rc-exp-c .tc-fname { color:#8be88b; font-weight:600; }'
+        + '#rc-exp-c .tc-f-outcome { color:#6abf6a; }'
+        + '#rc-exp-c .tc-f-new { color:#50fa7b; }'
+        + '#rc-exp-c .tc-f-modified { color:#f1fa8c; }'
+        + '#rc-exp-c .tc-tag { font-size:0.7em; font-weight:700; }'
+        + '#rc-exp-c .tc-tag-outcome { color:#6abf6a; }'
+        + '#rc-exp-c .tc-tag-new { color:#50fa7b; }'
+        + '#rc-exp-c .tc-tag-modified { color:#f1fa8c; }'
+        + '#rc-exp-c .tc-aff-id { color:#50fa7b; font-weight:700; }'
+        + '#rc-exp-c .tc-aff { color:#88b888; }'
+        + '#rc-exp-c .tc-aff-primary { color:#50fa7b; font-weight:700; }'
+        + '#rc-exp-c .tc-aff-nav { color:#4a6a4a; }'
+        + '#rc-exp-c .tc-aff-selected { color:#8be88b; text-decoration:underline; }'
+        + '#rc-exp-c .tc-aff-m { color:#6abf6a; font-weight:600; }'
+        + '#rc-exp-c .tc-aff-url { color:#88b888; }'
+        + '#rc-exp-c .tc-aff-body { color:#6a8a6a; }'
+        ;
+
+    registerRenderer({
+        id: 'exp-c',
+        label: 'Experimental - C',
+        init: function(c) {
+            c.style.cssText = 'overflow-y:auto;padding:0;';
+            var style = document.createElement('style');
+            style.textContent = EXP_C_CSS;
+            document.head.appendChild(style);
+            var pre = document.createElement('pre');
+            pre.className = 'tc-content';
+            c.appendChild(pre);
+            container = c;
+        },
+        update: function(state, msg, feedback) { expCRenderPage(container, state, msg, feedback); },
+        activate: function() {},
+        deactivate: function() {}
+    });
+})();
+
+/* ======================================================================
+   RENDERER: EXPERIMENTAL D — stats dashboard + command palette
+   ====================================================================== */
+(function() {
+    var container;
+
+    function expDRenderPage(c, state, msg, feedback) {
+        if (!c || !state) return;
+
+        var fieldCategory = {};
+        var affCategory = {};
+        if (feedback) {
+            var out = feedback.outcome || {};
+            var eff = feedback.effects || {};
+            for (var k in out) fieldCategory[k] = 'outcome';
+            for (var k in (eff.new_fields || {})) fieldCategory[k] = 'new';
+            for (var k in (eff.modified_fields || {})) fieldCategory[k] = 'modified';
+            (eff.new_affordances || []).forEach(function(a){ affCategory[a.label] = 'new'; });
+            (eff.modified_affordances || []).forEach(function(a){ affCategory[a.label] = 'modified'; });
+        }
+
+        var s = state.state || {};
+        var html = '';
+
+        /* ── Stats header ── */
+        var lifecycle = s.lifecycle || [];
+        var current = s.lifecycle_current || '';
+        var completed = s.lifecycle_completed || [];
+        var fields = s.fields || {};
+        var fkeys = Object.keys(fields);
+        var filledCount = 0;
+        for (var i = 0; i < fkeys.length; i++) {
+            var fv = fields[fkeys[i]];
+            if (fv && typeof fv === 'object' && 'value' in fv && fv.value != null) filledCount++;
+            else if (fv != null && typeof fv !== 'object') filledCount++;
+        }
+        var affCount = (state.affordances || []).length;
+
+        html += '<div class="ds-stats">';
+        html += '<div class="ds-stat"><span class="ds-stat-val">' + wfEsc(s.workflow || '—') + '</span><span class="ds-stat-lbl">workflow</span></div>';
+        html += '<div class="ds-stat"><span class="ds-stat-val">' + wfEsc(s.node_title || s.node || '—') + '</span><span class="ds-stat-lbl">node</span></div>';
+        html += '<div class="ds-stat"><span class="ds-stat-val ds-stat-num">' + completed.length + '/' + lifecycle.length + '</span><span class="ds-stat-lbl">phases</span></div>';
+        html += '<div class="ds-stat"><span class="ds-stat-val ds-stat-num">' + filledCount + '/' + fkeys.length + '</span><span class="ds-stat-lbl">fields filled</span></div>';
+        html += '<div class="ds-stat"><span class="ds-stat-val ds-stat-num">' + affCount + '</span><span class="ds-stat-lbl">actions</span></div>';
+        html += '</div>';
+
+        /* ── Phase chips ── */
+        if (lifecycle.length) {
+            html += '<div class="ds-phases">';
+            for (var i = 0; i < lifecycle.length; i++) {
+                var cls = 'ds-chip';
+                if (lifecycle[i] === current) cls += ' ds-chip-cur';
+                else if (completed.indexOf(lifecycle[i]) !== -1) cls += ' ds-chip-done';
+                html += '<span class="' + cls + '">' + (i+1) + '. ' + wfEsc(lifecycle[i]) + '</span>';
+            }
+            html += '</div>';
+        }
+
+        /* ── Instructions ── */
+        if (state.instructions) {
+            html += '<div class="ds-instr">' + wfEsc(state.instructions) + '</div>';
+        }
+
+        /* ── Fields as dense key=value rows ── */
+        html += '<div class="ds-section">';
+        html += '<div class="ds-section-head">state.fields</div>';
+        if (fkeys.length) {
+            html += '<div class="ds-kvgrid">';
+            for (var i = 0; i < fkeys.length; i++) {
+                var k = fkeys[i];
+                var f = fields[k];
+                var cat = fieldCategory[k] || null;
+                var cls = 'ds-kv' + (cat ? ' ds-kv-' + cat : '');
+                html += '<div class="' + cls + '">';
+                var tagMap = {outcome:'SET', 'new':'NEW', modified:'CHG'};
+                html += '<span class="ds-k">' + wfEsc(k) + '</span>';
+                if (cat) html += '<span class="ds-tag ds-tag-' + cat + '">' + tagMap[cat] + '</span>';
+                html += '<span class="ds-eq">=</span>';
+                if (f && typeof f === 'object' && 'value' in f) {
+                    if (f.value == null) html += '<span class="ds-v ds-v-null">null</span>';
+                    else html += '<span class="ds-v">' + wfEsc(f.value) + '</span>';
+                    if (f.instruction) html += '<span class="ds-hint">' + wfEsc(f.instruction) + '</span>';
+                    if (f.options) html += '<span class="ds-opt">[' + wfEsc(f.options.join('|')) + ']</span>';
+                } else {
+                    html += '<span class="ds-v">' + wfRenderValue(f) + '</span>';
+                }
+                html += '</div>';
+            }
+            html += '</div>';
+        } else {
+            html += '<div class="ds-empty">(empty)</div>';
+        }
+        html += '</div>';
+
+        /* ── Affordances as command palette ── */
+        if (state.affordances && state.affordances.length) {
+            html += '<div class="ds-section">';
+            html += '<div class="ds-section-head">affordances</div>';
+            html += '<div class="ds-cmds">';
+            for (var i = 0; i < state.affordances.length; i++) {
+                var a = state.affordances[i];
+                var cls = 'ds-cmd';
+                if (/Proceed|Submit/.test(a.label)) cls += ' ds-cmd-primary';
+                else if (/Go back/.test(a.label)) cls += ' ds-cmd-nav';
+                else if (/\[Selected\]/.test(a.label)) cls += ' ds-cmd-selected';
+                var ac = affCategory[a.label] || null;
+                if (ac) cls += ' ds-cmd-fb-' + ac;
+                html += '<div class="' + cls + '">';
+                html += '<span class="ds-cmd-key">' + a.id + '</span>';
+                html += '<span class="ds-cmd-lbl">' + wfEsc(a.label);
+                if (ac === 'new') html += ' <span class="ds-tag ds-tag-new">NEW</span>';
+                else if (ac === 'modified') html += ' <span class="ds-tag ds-tag-modified">CHG</span>';
+                html += '</span>';
+                html += '<span class="ds-cmd-url">' + wfEsc(a.method) + ' ' + wfEsc(a.url) + '</span>';
+                html += '<span class="ds-cmd-body">' + wfEsc(JSON.stringify(a.body)) + '</span>';
+                if (a.options) html += '<span class="ds-cmd-opts">opts: ' + wfEsc(JSON.stringify(a.options)) + '</span>';
+                html += '</div>';
+            }
+            html += '</div>';
+            html += '</div>';
+        }
+
+        c.innerHTML = html;
+    }
+
+    var EXP_D_CSS = ''
+        + '#rc-exp-d { background:#faf8f5; color:#3a3530; font-family:"IBM Plex Mono",Consolas,monospace; overflow-y:auto; padding:0; }'
+
+        /* Stats bar */
+        + '#rc-exp-d .ds-stats { display:flex; gap:0; border-bottom:2px solid #e8e0d5; }'
+        + '#rc-exp-d .ds-stat { flex:1; padding:0.7rem 0.8rem; border-right:1px solid #e8e0d5; display:flex; flex-direction:column; align-items:center; }'
+        + '#rc-exp-d .ds-stat:last-child { border-right:none; }'
+        + '#rc-exp-d .ds-stat-val { font-size:0.82rem; font-weight:600; color:#3a3530; text-align:center; }'
+        + '#rc-exp-d .ds-stat-num { font-size:1.3rem; color:#c05030; }'
+        + '#rc-exp-d .ds-stat-lbl { font-size:0.6rem; text-transform:uppercase; letter-spacing:0.1em; color:#a09080; margin-top:0.15rem; }'
+
+        /* Phase chips */
+        + '#rc-exp-d .ds-phases { display:flex; gap:0.3rem; padding:0.6rem 1rem; flex-wrap:wrap; border-bottom:1px solid #e8e0d5; }'
+        + '#rc-exp-d .ds-chip { font-size:0.68rem; padding:0.2rem 0.5rem; border:1px solid #d8d0c5; border-radius:3px; color:#a09080; background:#f0ece5; }'
+        + '#rc-exp-d .ds-chip-cur { border-color:#c05030; color:#c05030; background:#fdf0ec; font-weight:700; }'
+        + '#rc-exp-d .ds-chip-done { border-color:#6a8a55; color:#6a8a55; background:#f0f5ec; }'
+
+        + '#rc-exp-d .ds-instr { padding:0.5rem 1rem; font-size:0.82rem; color:#7a7060; line-height:1.5; border-bottom:1px solid #e8e0d5; }'
+
+        /* Sections */
+        + '#rc-exp-d .ds-section { padding:0.5rem 1rem; }'
+        + '#rc-exp-d .ds-section-head { font-size:0.65rem; text-transform:uppercase; letter-spacing:0.1em; color:#a09080; border-bottom:1px solid #e8e0d5; padding-bottom:0.3rem; margin-bottom:0.4rem; }'
+
+        /* Key=value grid */
+        + '#rc-exp-d .ds-kvgrid { display:flex; flex-direction:column; gap:0.15rem; }'
+        + '#rc-exp-d .ds-kv { display:flex; align-items:baseline; gap:0.3rem; padding:0.3rem 0.4rem; border-radius:3px; flex-wrap:wrap; }'
+        + '#rc-exp-d .ds-k { font-weight:600; color:#c05030; font-size:0.8rem; min-width:100px; }'
+        + '#rc-exp-d .ds-eq { color:#c0b8a8; font-weight:300; }'
+        + '#rc-exp-d .ds-v { color:#3a3530; font-size:0.82rem; }'
+        + '#rc-exp-d .ds-v-null { color:#c0b8a8; font-style:italic; }'
+        + '#rc-exp-d .ds-hint { font-size:0.7rem; color:#a09080; font-style:italic; width:100%; padding-left:calc(100px + 1.6rem); }'
+        + '#rc-exp-d .ds-opt { font-size:0.68rem; color:#8a7a65; margin-left:0.3rem; }'
+        + '#rc-exp-d .ds-empty { color:#c0b8a8; font-style:italic; font-size:0.8rem; }'
+
+        + '#rc-exp-d .ds-kv-outcome { background:#eef2fa; border-left:3px solid #4a7acc; }'
+        + '#rc-exp-d .ds-kv-new { background:#eef5ee; border-left:3px solid #6a8a55; }'
+        + '#rc-exp-d .ds-kv-modified { background:#fdf5e8; border-left:3px solid #d4a020; }'
+
+        + '#rc-exp-d .ds-tag { font-size:0.55rem; font-weight:700; letter-spacing:0.06em; padding:0.1rem 0.25rem; border-radius:2px; vertical-align:super; }'
+        + '#rc-exp-d .ds-tag-outcome { color:#4a7acc; background:rgba(74,122,204,0.1); }'
+        + '#rc-exp-d .ds-tag-new { color:#6a8a55; background:rgba(106,138,85,0.1); }'
+        + '#rc-exp-d .ds-tag-modified { color:#d4a020; background:rgba(212,160,32,0.1); }'
+
+        /* Command palette */
+        + '#rc-exp-d .ds-cmds { display:flex; flex-direction:column; gap:0.2rem; }'
+        + '#rc-exp-d .ds-cmd { display:grid; grid-template-columns:28px 1fr auto auto; gap:0.4rem; align-items:center; padding:0.4rem 0.5rem; border:1px solid #e8e0d5; border-radius:4px; background:#f5f0ea; }'
+        + '#rc-exp-d .ds-cmd-key { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border:1px solid #d8d0c5; border-radius:4px; font-size:0.65rem; font-weight:700; color:#8a7a65; background:#faf8f5; font-family:inherit; }'
+        + '#rc-exp-d .ds-cmd-lbl { font-size:0.82rem; color:#3a3530; }'
+        + '#rc-exp-d .ds-cmd-url { font-size:0.65rem; color:#a09080; text-align:right; }'
+        + '#rc-exp-d .ds-cmd-body { font-size:0.65rem; color:#b0a898; grid-column:2/5; word-break:break-all; }'
+        + '#rc-exp-d .ds-cmd-opts { font-size:0.65rem; color:#b0a898; grid-column:2/5; }'
+
+        + '#rc-exp-d .ds-cmd-primary { border-color:#c05030; background:#fdf0ec; }'
+        + '#rc-exp-d .ds-cmd-primary .ds-cmd-lbl { color:#c05030; font-weight:700; }'
+        + '#rc-exp-d .ds-cmd-primary .ds-cmd-key { border-color:#c05030; color:#c05030; background:#fdf5f0; }'
+        + '#rc-exp-d .ds-cmd-nav { border-style:dashed; background:#faf8f5; }'
+        + '#rc-exp-d .ds-cmd-nav .ds-cmd-lbl { color:#a09080; }'
+        + '#rc-exp-d .ds-cmd-selected { border-color:#6a8a55; background:#eef5ee; }'
+        + '#rc-exp-d .ds-cmd-selected .ds-cmd-lbl { color:#6a8a55; }'
+        + '#rc-exp-d .ds-cmd-selected .ds-cmd-key { border-color:#6a8a55; color:#6a8a55; }'
+        + '#rc-exp-d .ds-cmd-fb-new { border-left:3px solid #6a8a55; }'
+        + '#rc-exp-d .ds-cmd-fb-modified { border-left:3px solid #d4a020; }'
+
+        + '#rc-exp-d .wf-null, #rc-exp-d .wf-empty-arr, #rc-exp-d .wf-empty-obj { color:#c0b8a8; font-style:italic; font-size:0.8rem; }'
+        + '#rc-exp-d .wf-bool, #rc-exp-d .wf-num { color:#c05030; }'
+        + '#rc-exp-d .wf-str { color:#3a3530; }'
+        + '#rc-exp-d .wf-tbl { width:100%; border-collapse:collapse; }'
+        + '#rc-exp-d .wf-tbl td { padding:0.2rem 0.3rem; font-size:0.78rem; border-bottom:1px solid #e8e0d5; }'
+        + '#rc-exp-d .wf-key { color:#c05030; font-weight:500; }'
+        + '#rc-exp-d .wf-val { color:#3a3530; }'
+        + '#rc-exp-d .wf-arr { display:flex; flex-direction:column; gap:0.1rem; }'
+        + '#rc-exp-d .wf-arr-item { padding-left:0.4rem; border-left:2px solid #e8e0d5; }'
+        ;
+
+    registerRenderer({
+        id: 'exp-d',
+        label: 'Experimental - D',
+        init: function(c) {
+            c.style.cssText = 'overflow-y:auto;padding:0;';
+            var style = document.createElement('style');
+            style.textContent = EXP_D_CSS;
+            document.head.appendChild(style);
+            container = c;
+        },
+        update: function(state, msg, feedback) { expDRenderPage(container, state, msg, feedback); },
         activate: function() {},
         deactivate: function() {}
     });

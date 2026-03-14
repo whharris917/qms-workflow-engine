@@ -522,7 +522,7 @@ _WORKFLOWS = {
         "type": "create-cr",
         "title": "Create Change Record",
         "description": "Author a Change Record through the full pre-approval lifecycle.",
-        "renderers": ["raw", "rendered"],
+        "renderers": ["raw", "light", "dark", "exp-a", "exp-b", "exp-c", "exp-d"],
     },
 }
 
