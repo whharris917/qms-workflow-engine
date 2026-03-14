@@ -374,15 +374,15 @@ def sandbox():
 
 # ── Agent Portal ──
 
-# -- Workflow registry: per-workflow state, observers, history --
+# -- Workflow registry: per-workflow state, observers --
 
 _WORKFLOW_STATE_DIR = DATA_DIR / "workflows"
 _WORKFLOW_STATE_DIR.mkdir(exist_ok=True)
 
-# In-memory state per workflow: observers and event history (not persisted)
+# In-memory state per workflow (not persisted)
 _workflow_observers: dict[str, list[Queue]] = {}
-_workflow_history: dict[str, list[dict]] = {}
 _workflow_current_path: dict[str, str | None] = {}
+_workflow_last_feedback: dict[str, dict] = {}
 
 
 def _wf_state_path(workflow_id: str) -> Path:
@@ -407,12 +407,8 @@ def _wf_save_state(workflow_id: str, data: dict):
 
 
 def _wf_notify(workflow_id: str, event: dict):
-    """Append event to history and push to all SSE observers for a workflow."""
+    """Push event to all SSE observers for a workflow."""
     event.setdefault("timestamp", _time.time())
-    hist = _workflow_history.setdefault(workflow_id, [])
-    hist.append(event)
-    if len(hist) > 500:
-        _workflow_history[workflow_id] = hist[-500:]
     dead = []
     for q in _workflow_observers.get(workflow_id, []):
         try:
@@ -488,367 +484,6 @@ def _compute_feedback(before: dict, after: dict, acted_field_key: str = None) ->
 
 
 # ---------------------------------------------------------------------------
-# Dungeon Puzzle — rooms, items, hazards, combat, locked doors
-# ---------------------------------------------------------------------------
-
-_MAZE = {
-    "entrance": {
-        "title": "Entrance Hall",
-        "description": "You stand in a cold stone entrance hall. Dim torchlight flickers across rough-hewn walls. A heavy wooden door is set into the east wall. To the south, a narrow staircase descends into darkness. A rusty iron torch sits in a bracket on the wall.",
-        "exits": {"east": "corridor", "south": "cellar"},
-        "items": ["torch"],
-    },
-    "corridor": {
-        "title": "Stone Corridor",
-        "description": "A long corridor stretches before you. Faded tapestries line the walls. You hear dripping water somewhere below. To the north, an archway opens into a larger space. East, a reinforced door stands ajar. A locked iron gate blocks the passage south — it has a large keyhole.",
-        "exits": {"west": "entrance", "north": "gallery", "east": "armory"},
-        "locked_exits": {"south": {"dest": "crypt", "key": "rusty_key", "desc": "Go south through the iron gate"}},
-    },
-    "gallery": {
-        "title": "Portrait Gallery",
-        "description": "Oil paintings line the walls; the portraits seem to watch you. Dust motes drift in shafts of light from high windows. A door to the east is marked 'LIBRARY'. A small glass bottle filled with red liquid sits on a shelf.",
-        "exits": {"south": "corridor", "east": "library"},
-        "items": ["potion"],
-    },
-    "library": {
-        "title": "The Library",
-        "description": "Floor-to-ceiling bookshelves crammed with moldering volumes. A reading desk holds an open journal. The last entry reads: 'The treasure lies beyond water and stone. Descend from the entrance, not from the armory — that way lies only the pit. The crypt key is hidden in the armory.'",
-        "exits": {"west": "gallery", "south": "armory"},
-    },
-    "armory": {
-        "title": "The Armory",
-        "description": "Racks of rusted weapons line the walls. A few shields bear faded crests. The air smells of old iron. A heavy gate to the south has a warning scratched into the frame: 'BEWARE'. A sturdy sword leans against the far wall, and a battered shield hangs from a peg. Under a loose stone you spot a rusty key.",
-        "exits": {"west": "corridor", "north": "library", "south": "guardroom"},
-        "items": ["sword", "shield", "rusty_key"],
-    },
-    "guardroom": {
-        "title": "The Guardroom",
-        "description": "An abandoned guardpost. A table holds dice and empty tankards. The east passage slopes steeply downward — you feel a draft of warm, stale air. A dusty first-aid pouch sits on a chair.",
-        "exits": {"north": "armory", "east": "pit"},
-        "items": ["bandage"],
-    },
-    "pit": {
-        "title": "The Pit",
-        "description": "The floor gives way! You slide down a smooth stone chute, tumbling in darkness, and land hard on a pile of rubble.",
-        "auto_move": "entrance",
-        "damage": 3,
-        "damage_msg": "The fall bruises you badly.",
-    },
-    "cellar": {
-        "title": "The Cellar",
-        "description": "A damp cellar. Broken barrels line the walls and the floor is slick with moisture. Water trickles east through a low archway. It is pitch dark here — you can barely see your own hands.",
-        "exits": {"north": "entrance", "east": "cistern"},
-        "dark": True,
-        "dark_description": "It is too dark to see. You can feel a passage north (back up) and hear water to the east. There might be something on the ground, but you can't make it out.",
-        "items": ["amulet"],
-    },
-    "cistern": {
-        "title": "The Cistern",
-        "description": "A circular chamber half-filled with dark, still water. The water channel feeds in from the west. Condensation covers the stone walls. A tunnel entrance sits just above the waterline to the south. The water looks clean enough to drink.",
-        "exits": {"west": "cellar", "south": "tunnel"},
-        "drink": True,
-    },
-    "tunnel": {
-        "title": "The Tunnel",
-        "description": "A narrow tunnel through bedrock. Loose rocks line the ceiling — this passage looks unstable. A faint breeze from the east carries a metallic scent.",
-        "exits": {"north": "cistern", "east": "vault"},
-        "hazard": "rocks",
-        "hazard_damage": 2,
-        "hazard_shield": True,
-        "hazard_msg": "Rocks fall from the ceiling, striking you!",
-        "hazard_shield_msg": "Rocks fall, but your shield deflects them.",
-    },
-    "crypt": {
-        "title": "The Crypt",
-        "description": "A cold, vaulted crypt. Stone sarcophagi line the walls. At the far end, a skeletal warrior stands motionless, gripping a notched blade. Its eye sockets glow faintly. It blocks the passage east.",
-        "exits": {"north": "corridor"},
-        "enemy": "skeleton",
-        "enemy_hp": 2,
-        "enemy_damage": 3,
-        "enemy_desc_alive": "The skeleton warrior blocks the eastern passage, its empty eyes fixed on you.",
-        "enemy_desc_dead": "The skeleton lies in a heap of bones. The eastern passage is clear.",
-        "enemy_exit": {"east": "shrine"},
-    },
-    "shrine": {
-        "title": "The Shrine",
-        "description": "A small, peaceful chamber. A stone altar holds a glowing crystal that pulses with warm light. You feel your wounds beginning to close. A passage leads south to the vault.",
-        "exits": {"west": "crypt", "south": "vault"},
-        "heal": 5,
-        "heal_msg": "The crystal's light washes over you, restoring your vitality.",
-        "heal_once": True,
-    },
-    "vault": {
-        "title": "The Treasure Vault",
-        "description": "A vaulted chamber. Light pours from a crack in the ceiling, illuminating a stone pedestal. On it rests a single gold coin, glinting in the light. This is it — the treasure vault.",
-        "exits": {"west": "tunnel", "north": "shrine"},
-    },
-}
-
-_ITEMS = {
-    "torch": {"name": "Torch", "desc": "A rusty iron torch. It burns with a steady flame."},
-    "sword": {"name": "Sword", "desc": "A sturdy steel sword. Good for fighting."},
-    "shield": {"name": "Shield", "desc": "A battered wooden shield. Blocks falling debris."},
-    "rusty_key": {"name": "Rusty Key", "desc": "An old iron key. Fits a large lock."},
-    "potion": {"name": "Healing Potion", "desc": "A glass bottle of red liquid. Restores 4 HP.", "consumable": True, "heal": 4},
-    "bandage": {"name": "Bandage", "desc": "A dusty first-aid pouch. Restores 2 HP.", "consumable": True, "heal": 2},
-    "amulet": {"name": "Amulet of Warding", "desc": "A silver amulet. Reduces all damage by 1."},
-    "treasure": {"name": "Gold Coin", "desc": "A heavy gold coin. The objective of your quest."},
-}
-
-_MAX_HP = 10
-_START_HP = 7
-
-
-def _maze_default_data():
-    """Return a fresh agent data dict for the maze."""
-    return {
-        "position": "entrance",
-        "hp": _START_HP,
-        "max_hp": _MAX_HP,
-        "inventory": [],
-        "picked_up": [],       # items permanently removed from rooms
-        "flags": {},           # skeleton_defeated, cistern_drunk, shrine_healed, etc.
-    }
-
-
-def _maze_data(workflow_id: str) -> dict:
-    """Return the current maze data for a workflow, initializing if needed."""
-    d = _wf_load_state(workflow_id)
-    if "hp" not in d:
-        d = _maze_default_data()
-        _wf_save_state(workflow_id, d)
-    return d
-
-
-def _maze_items_here(room_id, data):
-    """Return list of item IDs present in a room (not yet picked up)."""
-    room = _MAZE.get(room_id, {})
-    return [i for i in room.get("items", []) if i not in data["picked_up"]]
-
-
-def _render_maze_room(room_id, workflow_id: str):
-    """Render the agent's current maze room as a JSON-serializable dict."""
-    room = _MAZE.get(room_id)
-    if room is None:
-        return None
-
-    data = _maze_data(workflow_id)
-    api_url = f"/agent/{workflow_id}"
-
-    # Handle pit auto-move + damage
-    if "auto_move" in room:
-        dmg = room.get("damage", 0)
-        if dmg and "amulet" in data["inventory"]:
-            dmg = max(0, dmg - 1)
-        data["hp"] = max(0, data["hp"] - dmg)
-        dest = room["auto_move"]
-        data["position"] = dest
-        _wf_save_state(workflow_id, data)
-        msg = room.get("damage_msg", "")
-        if data["hp"] <= 0:
-            return _render_death(workflow_id, msg)
-        _wf_notify(workflow_id, {"type": "navigate", "path": dest, "content": f"(auto-moved to {dest})"})
-        page = _render_maze_room(dest, workflow_id)
-        if msg:
-            page["message"] = msg + f" (-{room.get('damage', 0)} HP)"
-        return page
-
-    # Handle tunnel hazard (on entry)
-    if "hazard" in room and not data["flags"].get(f"hazard_{room_id}"):
-        data["flags"][f"hazard_{room_id}"] = True
-        has_shield = "shield" in data["inventory"]
-        if room.get("hazard_shield") and has_shield:
-            msg = room.get("hazard_shield_msg", "")
-        else:
-            dmg = room.get("hazard_damage", 0)
-            if "amulet" in data["inventory"]:
-                dmg = max(0, dmg - 1)
-            data["hp"] = max(0, data["hp"] - dmg)
-            msg = room.get("hazard_msg", "") + f" (-{dmg} HP)"
-            if data["hp"] <= 0:
-                return _render_death(workflow_id, msg)
-
-    # Handle shrine heal
-    if room.get("heal") and not data["flags"].get(f"healed_{room_id}"):
-        if room.get("heal_once"):
-            data["flags"][f"healed_{room_id}"] = True
-        heal = room["heal"]
-        old_hp = data["hp"]
-        data["hp"] = min(data["max_hp"], data["hp"] + heal)
-        actual = data["hp"] - old_hp
-        if actual > 0:
-            msg = room.get("heal_msg", f"You recover {actual} HP.")
-
-    # Persist any mutations from hazard/heal processing
-    _wf_save_state(workflow_id, data)
-
-    # Determine description
-    is_dark = room.get("dark") and "torch" not in data["inventory"]
-    desc = room.get("dark_description", room["description"]) if is_dark else room["description"]
-
-    # Enemy overlay
-    enemy = room.get("enemy")
-    if enemy and not data["flags"].get(f"{enemy}_defeated"):
-        desc += " " + room.get("enemy_desc_alive", "")
-    elif enemy and data["flags"].get(f"{enemy}_defeated"):
-        desc += " " + room.get("enemy_desc_dead", "")
-
-    # Build affordances
-    affordances = []
-    n = 1
-
-    # Movement
-    for direction, dest in room.get("exits", {}).items():
-        affordances.append({
-            "id": n, "label": f"Move {direction}",
-            "method": "POST", "url": f"{api_url}/move",
-            "body": {"direction": direction},
-        })
-        n += 1
-
-    # Locked exits
-    for direction, lock in room.get("locked_exits", {}).items():
-        if data["flags"].get(f"unlocked_{room_id}_{direction}"):
-            affordances.append({
-                "id": n, "label": f"Move {direction} (unlocked)",
-                "method": "POST", "url": f"{api_url}/move",
-                "body": {"direction": direction},
-            })
-            n += 1
-        elif lock["key"] in data["inventory"]:
-            affordances.append({
-                "id": n, "label": f"Unlock {direction} gate with {_ITEMS[lock['key']]['name']}",
-                "method": "POST", "url": f"{api_url}/unlock",
-                "body": {"direction": direction},
-            })
-            n += 1
-        else:
-            affordances.append({
-                "id": n, "label": f"[Locked] {lock['desc']} (need a key)",
-                "method": "POST", "url": f"{api_url}/move",
-                "body": {"direction": direction},
-            })
-            n += 1
-
-    # Enemy exit (only available after defeating enemy)
-    if enemy and data["flags"].get(f"{enemy}_defeated"):
-        for direction, dest in room.get("enemy_exit", {}).items():
-            affordances.append({
-                "id": n, "label": f"Move {direction}",
-                "method": "POST", "url": f"{api_url}/move",
-                "body": {"direction": direction},
-            })
-            n += 1
-
-    # Pick up items
-    items_here = _maze_items_here(room_id, data) if not is_dark else []
-    for item_id in items_here:
-        item = _ITEMS[item_id]
-        affordances.append({
-            "id": n, "label": f"Pick up {item['name']}",
-            "method": "POST", "url": f"{api_url}/pick_up",
-            "body": {"item": item_id},
-        })
-        n += 1
-
-    # Dark room — hint about light
-    if is_dark:
-        items_here = []  # can't see items
-
-    # Use consumables
-    for item_id in data["inventory"]:
-        item = _ITEMS.get(item_id, {})
-        if item.get("consumable"):
-            affordances.append({
-                "id": n, "label": f"Use {item['name']}",
-                "method": "POST", "url": f"{api_url}/use",
-                "body": {"item": item_id},
-            })
-            n += 1
-
-    # Drink from cistern
-    if room.get("drink") and not data["flags"].get(f"drunk_{room_id}"):
-        affordances.append({
-            "id": n, "label": "Drink from the cistern",
-            "method": "POST", "url": f"{api_url}/drink",
-            "body": {},
-        })
-        n += 1
-
-    # Attack enemy
-    if enemy and not data["flags"].get(f"{enemy}_defeated"):
-        if "sword" in data["inventory"]:
-            affordances.append({
-                "id": n, "label": f"Attack the {enemy} with your sword",
-                "method": "POST", "url": f"{api_url}/attack",
-                "body": {},
-            })
-            n += 1
-        else:
-            affordances.append({
-                "id": n, "label": f"Attack the {enemy} (bare-handed — risky!)",
-                "method": "POST", "url": f"{api_url}/attack",
-                "body": {},
-            })
-            n += 1
-
-    # Take treasure
-    if room_id == "vault" and "treasure" not in data["picked_up"]:
-        affordances.append({
-            "id": n, "label": "Take the gold coin",
-            "method": "POST", "url": f"{api_url}/take_treasure",
-            "body": {},
-        })
-        n += 1
-
-    # Items visible on ground
-    visible_items = [_ITEMS[i]["name"] for i in items_here]
-    if room_id == "vault" and "treasure" not in data["picked_up"]:
-        visible_items.append("Gold Coin (on pedestal)")
-
-    result = {
-        "state": {
-            "position": room_id,
-            "room": room["title"],
-            "hp": f"{data['hp']}/{data['max_hp']}",
-            "inventory": [_ITEMS[i]["name"] for i in data["inventory"]],
-            "items_here": visible_items,
-        },
-        "instructions": desc,
-        "affordances": affordances,
-    }
-
-    if not data["flags"].get("won"):
-        result["objective"] = "Find the treasure vault and take the gold coin. Explore carefully — there are hazards, locked doors, enemies, and useful items."
-
-    return result
-
-
-def _render_death(workflow_id: str, reason=""):
-    """Render the death screen."""
-    data = _maze_data(workflow_id)
-    api_url = f"/agent/{workflow_id}"
-    msg = "You have perished."
-    if reason:
-        msg = reason + " " + msg
-    return {
-        "state": {
-            "position": data["position"],
-            "room": "DEATH",
-            "hp": "0/" + str(data["max_hp"]),
-            "inventory": [_ITEMS[i]["name"] for i in data["inventory"]],
-            "items_here": [],
-        },
-        "instructions": msg,
-        "affordances": [{
-            "id": 1, "label": "Restart from entrance",
-            "method": "POST", "url": f"{api_url}/restart",
-            "body": {},
-        }],
-    }
-
-
-# ---------------------------------------------------------------------------
 # Create Change Record Workflow
 # ---------------------------------------------------------------------------
 
@@ -883,17 +518,11 @@ for _nid, _ndef in _CR_DEF["nodes"].items():
 # Each entry maps a workflow_id to its type and display metadata.
 # The type determines which render/process functions handle it.
 _WORKFLOWS = {
-    "maze": {
-        "type": "maze",
-        "title": "Dungeon Maze",
-        "description": "Navigate a 13-room dungeon. Find the treasure, avoid the traps.",
-        "renderers": ["raw", "map", "terminal"],
-    },
     "create-cr": {
         "type": "create-cr",
         "title": "Create Change Record",
         "description": "Author a Change Record through the full pre-approval lifecycle.",
-        "renderers": ["raw", "workflow"],
+        "renderers": ["raw", "rendered"],
     },
 }
 
@@ -1221,11 +850,6 @@ def _process_cr_action(workflow_id: str, body):
 def _render_agent_node(workflow_id: str):
     """Render the current state of a workflow as a JSON-serializable dict."""
     wf_type = _WORKFLOWS.get(workflow_id, {}).get("type")
-    if wf_type == "maze":
-        data = _maze_data(workflow_id)
-        if data["hp"] <= 0:
-            return _render_death(workflow_id)
-        return _render_maze_room(data["position"], workflow_id)
 
     if wf_type == "create-cr":
         return _render_cr_node(workflow_id)
@@ -1254,178 +878,7 @@ def _process_agent_action(workflow_id: str, body):
     if wf_type == "create-cr":
         return _process_cr_action(workflow_id, body)
 
-    if wf_type != "maze":
-        return {"error": f"Unknown workflow: {workflow_id}"}
-
-    data = _maze_data(workflow_id)
-    pos = data["position"]
-    room = _MAZE.get(pos)
-    if room is None:
-        return {"error": "Invalid position"}
-
-    action = body.get("action")
-
-    # --- restart ---
-    if action == "restart":
-        data = _maze_default_data()
-        _wf_save_state(workflow_id, data)
-        page = _render_maze_room("entrance", workflow_id)
-        page["message"] = "You awaken at the entrance, memories of your demise fading like a dream."
-        _wf_notify(workflow_id, {"type": "navigate", "path": "entrance", "content": json.dumps(page)})
-        return page
-
-    # --- dead check ---
-    if data["hp"] <= 0:
-        return _render_death(workflow_id)
-
-    # --- move ---
-    if action == "move":
-        direction = body.get("direction", "").lower()
-
-        # Check locked exits
-        locked = room.get("locked_exits", {}).get(direction)
-        if locked:
-            if data["flags"].get(f"unlocked_{pos}_{direction}"):
-                dest = locked["dest"]
-            else:
-                return {"error": f"The {direction} gate is locked. You need a key."}
-        # Check enemy-gated exits
-        elif direction in (room.get("enemy_exit") or {}):
-            enemy = room.get("enemy")
-            if enemy and not data["flags"].get(f"{enemy}_defeated"):
-                return {"error": f"The {enemy} blocks your path. You must defeat it first."}
-            dest = room["enemy_exit"][direction]
-        # Normal exits
-        elif direction in room.get("exits", {}):
-            dest = room["exits"][direction]
-        else:
-            valid = list(room.get("exits", {}).keys())
-            valid += [d for d in room.get("locked_exits", {}).keys()
-                      if data["flags"].get(f"unlocked_{pos}_{d}")]
-            if room.get("enemy") and data["flags"].get(f"{room['enemy']}_defeated"):
-                valid += list((room.get("enemy_exit") or {}).keys())
-            return {"error": f"Cannot go {direction}. Valid exits: {', '.join(valid) or 'none'}"}
-
-        data["position"] = dest
-        data["flags"].pop(f"hazard_{dest}", None)
-        _wf_save_state(workflow_id, data)
-        page = _render_maze_room(data["position"], workflow_id)
-        _wf_notify(workflow_id, {"type": "navigate", "path": data["position"], "content": json.dumps(page)})
-        return page
-
-    # --- unlock ---
-    if action == "unlock":
-        direction = body.get("direction", "").lower()
-        locked = room.get("locked_exits", {}).get(direction)
-        if not locked:
-            return {"error": f"Nothing to unlock in direction: {direction}"}
-        if locked["key"] not in data["inventory"]:
-            return {"error": f"You don't have the required key."}
-        data["flags"][f"unlocked_{pos}_{direction}"] = True
-        _wf_save_state(workflow_id, data)
-        page = _render_maze_room(pos, workflow_id)
-        page["message"] = f"You unlock the {direction} gate with the {_ITEMS[locked['key']]['name']}. The way is open."
-        return page
-
-    # --- pick_up ---
-    if action == "pick_up":
-        item_id = body.get("item", "")
-        is_dark = room.get("dark") and "torch" not in data["inventory"]
-        items_here = _maze_items_here(pos, data)
-        if is_dark:
-            return {"error": "It's too dark to see what's here. You need a light source."}
-        if item_id not in items_here:
-            return {"error": f"No '{item_id}' here to pick up."}
-        data["inventory"].append(item_id)
-        data["picked_up"].append(item_id)
-        _wf_save_state(workflow_id, data)
-        page = _render_maze_room(pos, workflow_id)
-        page["message"] = f"You pick up the {_ITEMS[item_id]['name']}. {_ITEMS[item_id]['desc']}"
-        return page
-
-    # --- use (consumables) ---
-    if action == "use":
-        item_id = body.get("item", "")
-        if item_id not in data["inventory"]:
-            return {"error": f"You don't have '{item_id}' in your inventory."}
-        item = _ITEMS.get(item_id, {})
-        if not item.get("consumable"):
-            return {"error": f"You can't use {item.get('name', item_id)} that way."}
-        heal = item.get("heal", 0)
-        old_hp = data["hp"]
-        data["hp"] = min(data["max_hp"], data["hp"] + heal)
-        actual = data["hp"] - old_hp
-        data["inventory"].remove(item_id)
-        _wf_save_state(workflow_id, data)
-        page = _render_maze_room(pos, workflow_id)
-        page["message"] = f"You use the {item['name']}. Restored {actual} HP."
-        return page
-
-    # --- drink (cistern) ---
-    if action == "drink":
-        if not room.get("drink"):
-            return {"error": "There's nothing to drink here."}
-        if data["flags"].get(f"drunk_{pos}"):
-            return {"error": "You've already drunk from this water source."}
-        data["flags"][f"drunk_{pos}"] = True
-        old_hp = data["hp"]
-        data["hp"] = min(data["max_hp"], data["hp"] + 2)
-        actual = data["hp"] - old_hp
-        _wf_save_state(workflow_id, data)
-        page = _render_maze_room(pos, workflow_id)
-        page["message"] = f"You drink the cool water. Restored {actual} HP."
-        return page
-
-    # --- attack ---
-    if action == "attack":
-        enemy = room.get("enemy")
-        if not enemy:
-            return {"error": "Nothing to attack here."}
-        if data["flags"].get(f"{enemy}_defeated"):
-            return {"error": f"The {enemy} is already defeated."}
-        has_sword = "sword" in data["inventory"]
-        enemy_dmg = room.get("enemy_damage", 2)
-        if "amulet" in data["inventory"]:
-            enemy_dmg = max(0, enemy_dmg - 1)
-        if has_sword:
-            dmg_taken = max(0, enemy_dmg - 2)
-            data["hp"] = max(0, data["hp"] - dmg_taken)
-            data["flags"][f"{enemy}_defeated"] = True
-            _wf_save_state(workflow_id, data)
-            if data["hp"] <= 0:
-                return _render_death(workflow_id, f"You slay the {enemy}, but its dying blow fells you.")
-            page = _render_maze_room(pos, workflow_id)
-            msg = f"You strike the {enemy} with your sword and it crumbles to dust!"
-            if dmg_taken > 0:
-                msg += f" It managed to wound you in the fight. (-{dmg_taken} HP)"
-            page["message"] = msg
-            return page
-        else:
-            data["hp"] = max(0, data["hp"] - enemy_dmg)
-            data["flags"][f"{enemy}_defeated"] = True
-            _wf_save_state(workflow_id, data)
-            if data["hp"] <= 0:
-                return _render_death(workflow_id, f"You wrestle the {enemy} to pieces, but its claws tear you apart.")
-            page = _render_maze_room(pos, workflow_id)
-            page["message"] = f"You wrestle the {enemy} apart with your bare hands! But it wounds you grievously. (-{enemy_dmg} HP)"
-            return page
-
-    # --- take_treasure ---
-    if action == "take_treasure":
-        if pos != "vault":
-            return {"error": "There's no treasure here."}
-        if "treasure" in data["picked_up"]:
-            return {"error": "You already have the treasure."}
-        data["inventory"].append("treasure")
-        data["picked_up"].append("treasure")
-        data["flags"]["won"] = True
-        _wf_save_state(workflow_id, data)
-        page = _render_maze_room(pos, workflow_id)
-        page["message"] = "You take the gold coin from the pedestal. It is heavy and warm in your hand. Congratulations — you have completed the dungeon!"
-        page["completed"] = True
-        return page
-
-    return {"error": f"Unknown action: {action}"}
+    return {"error": f"Unknown workflow: {workflow_id}"}
 
 
 @app.route("/agent")
@@ -1473,7 +926,7 @@ def agent_stream(workflow_id):
                 "type": "init",
                 "current_path": _workflow_current_path.get(workflow_id),
                 "page": page,
-                "history": _workflow_history.get(workflow_id, [])[-100:],
+                "last_feedback": _workflow_last_feedback.get(workflow_id),
             }
             yield f"data: {json.dumps(init)}\n\n"
             while True:
@@ -1501,8 +954,8 @@ def agent_reset(workflow_id):
     p = _wf_state_path(workflow_id)
     if p.exists():
         p.unlink()
-    _workflow_history.pop(workflow_id, None)
     _workflow_current_path.pop(workflow_id, None)
+    _workflow_last_feedback.pop(workflow_id, None)
     return jsonify({"message": f"Workflow '{workflow_id}' reset."})
 
 
@@ -1535,7 +988,7 @@ def _execute_and_feedback(workflow_id, internal_body, acted_field_key=None):
     Returns (feedback_dict, http_status_code).
     """
     attempted = _build_attempted_action(internal_body)
-    before_fov = _render_agent_node(workflow_id)
+    before_full = _render_agent_node(workflow_id)
     _wf_notify(workflow_id, {"type": "action", "path": workflow_id, "body": internal_body})
     result = _process_agent_action(workflow_id, internal_body)
 
@@ -1550,16 +1003,18 @@ def _execute_and_feedback(workflow_id, internal_body, acted_field_key=None):
                 "modified_affordances": [],
             },
         }
-        _wf_notify(workflow_id, {"type": "result", "path": workflow_id, "result": before_fov, "feedback": feedback})
+        _workflow_last_feedback[workflow_id] = feedback
+        _wf_notify(workflow_id, {"type": "result", "path": workflow_id, "result": before_full, "feedback": feedback})
         return feedback, 422
 
-    after_fov = result
-    feedback = _compute_feedback(before_fov, after_fov, acted_field_key=acted_field_key)
+    after_full = result
+    feedback = _compute_feedback(before_full, after_full, acted_field_key=acted_field_key)
     feedback["attempted_action"] = attempted
 
-    node = (after_fov.get("state") or {}).get("node") or (after_fov.get("state") or {}).get("position") or workflow_id
+    node = (after_full.get("state") or {}).get("node") or (after_full.get("state") or {}).get("position") or workflow_id
     _workflow_current_path[workflow_id] = node
-    _wf_notify(workflow_id, {"type": "result", "path": workflow_id, "result": after_fov, "feedback": feedback})
+    _workflow_last_feedback[workflow_id] = feedback
+    _wf_notify(workflow_id, {"type": "result", "path": workflow_id, "result": after_full, "feedback": feedback})
 
     return feedback, 200
 
@@ -1585,20 +1040,6 @@ def agent_resource_post(workflow_id, resource):
             internal_body = {"action": resource}
         elif resource == "go_to":
             internal_body = {"action": "go_to", "node": body.get("node")}
-        else:
-            return jsonify({"error": f"Unknown resource: {resource}"}), 404
-
-    elif wf_type == "maze":
-        if resource == "move":
-            internal_body = {"action": "move", "direction": body.get("direction")}
-        elif resource == "unlock":
-            internal_body = {"action": "unlock", "direction": body.get("direction")}
-        elif resource == "pick_up":
-            internal_body = {"action": "pick_up", "item": body.get("item")}
-        elif resource == "use":
-            internal_body = {"action": "use", "item": body.get("item")}
-        elif resource in ("drink", "attack", "take_treasure", "restart"):
-            internal_body = {"action": resource}
         else:
             return jsonify({"error": f"Unknown resource: {resource}"}), 404
 

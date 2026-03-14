@@ -31,11 +31,6 @@
         .panels { display: flex; height: calc(100vh - 2.2rem); }
         .panel-view {
             flex: 1; display: flex; flex-direction: column;
-            border-right: 1px solid #222;
-        }
-        .panel-log {
-            width: 380px; display: flex; flex-direction: column;
-            flex-shrink: 0;
         }
         .panel-title {
             padding: 0.4rem 0.75rem; background: #151515; border-bottom: 1px solid #222;
@@ -45,22 +40,6 @@
             flex: 1; background: #111; overflow: hidden;
             color: #ccc; font-size: 0.85rem; position: relative;
         }
-        .view-empty {
-            display: flex; align-items: center; justify-content: center;
-            height: 100%; color: #333; font-size: 0.85rem;
-        }
-        .log-entries { flex: 1; overflow-y: auto; padding: 0.25rem 0; }
-        .log-entry {
-            padding: 0.25rem 0.75rem; border-bottom: 1px solid #151515;
-            font-size: 0.75rem; line-height: 1.5; word-break: break-all;
-        }
-        .log-time { color: #444; }
-        .log-type { font-weight: bold; display: inline-block; width: 70px; }
-        .log-type.navigate { color: #4a9eff; }
-        .log-type.action { color: #e6a817; }
-        .log-type.result { color: #4caf50; }
-        .log-type.init { color: #888; }
-        .log-detail { color: #777; }
 
         /* Renderer containers — each renderer owns its container fully */
         .renderer-container {
@@ -87,7 +66,7 @@
         <div class="mode-toggle" id="mode-toggle"></div>
         <span style="color:#333;margin:0 0.3rem;">|</span>
         <div class="mode-toggle" id="view-toggle">
-            <button class="mode-btn active" id="btn-fov" onclick="setViewMode('fov')">FoV</button>
+            <button class="mode-btn active" id="btn-full" onclick="setViewMode('full')">Full</button>
             <button class="mode-btn" id="btn-feedback" onclick="setViewMode('feedback')">Feedback</button>
         </div>
     </div>
@@ -97,10 +76,6 @@
             <div class="view-frame" id="view-frame">
                 <!-- Renderer containers are injected here by JS -->
             </div>
-        </div>
-        <div class="panel-log">
-            <div class="panel-title">Event Log</div>
-            <div class="log-entries" id="log"></div>
         </div>
     </div>
 <script>
@@ -121,7 +96,7 @@ var agentState = null;     // latest parsed page JSON
 var lastRaw = null;        // latest raw content string
 var lastMessage = '';
 var currentFeedback = null;  // latest Feedback from POST result
-var viewMode = 'fov';        // 'fov' or 'feedback'
+var viewMode = 'full';        // 'full' or 'feedback'
 
 /* Renderer availability is declared by the workflow, not guessed from data shape. */
 var allowedRenderers = {{ renderers|safe }};
@@ -146,10 +121,10 @@ function registerRenderer(r) {
 }
 
 function setMode(id) {
-    /* Non-raw renderers force FoV mode */
+    /* Non-raw renderers force Full mode */
     if (id !== 'raw' && viewMode === 'feedback') {
-        viewMode = 'fov';
-        document.getElementById('btn-fov').classList.add('active');
+        viewMode = 'full';
+        document.getElementById('btn-full').classList.add('active');
         document.getElementById('btn-feedback').classList.remove('active');
     }
     if (activeRenderer === id) return;
@@ -170,7 +145,7 @@ function setMode(id) {
 
 function setViewMode(mode) {
     viewMode = mode;
-    document.getElementById('btn-fov').classList.toggle('active', mode === 'fov');
+    document.getElementById('btn-full').classList.toggle('active', mode === 'full');
     document.getElementById('btn-feedback').classList.toggle('active', mode === 'feedback');
     /* Feedback forces Raw renderer */
     if (mode === 'feedback' && activeRenderer !== 'raw') {
@@ -232,413 +207,9 @@ registerRenderer({
     deactivate: function() {}
 });
 
-/* ======================================================================
-   RENDERER: MAP — 2D spatial dungeon map (canvas)
-   ====================================================================== */
-(function() {
-    var ROOMS = {
-        entrance:  { col:0, row:1, label:'Entrance',  type:'normal', items:['torch'] },
-        corridor:  { col:1, row:1, label:'Corridor',   type:'normal' },
-        gallery:   { col:1, row:0, label:'Gallery',    type:'normal', items:['potion'] },
-        library:   { col:2, row:0, label:'Library',    type:'normal' },
-        armory:    { col:2, row:1, label:'Armory',     type:'normal', items:['sword','shield','key'] },
-        guardroom: { col:2, row:2, label:'Guardroom',  type:'normal', items:['bandage'] },
-        pit:       { col:3, row:2, label:'Pit',        type:'hazard' },
-        cellar:    { col:0, row:2, label:'Cellar',     type:'dark',   items:['amulet'] },
-        cistern:   { col:0, row:3, label:'Cistern',    type:'heal' },
-        tunnel:    { col:0, row:4, label:'Tunnel',     type:'hazard' },
-        crypt:     { col:1, row:2, label:'Crypt',      type:'enemy' },
-        shrine:    { col:1, row:3, label:'Shrine',     type:'heal' },
-        vault:     { col:1, row:4, label:'Vault',      type:'goal' },
-    };
-    var EDGES = [
-        ['entrance','corridor','normal'],
-        ['entrance','cellar','normal'],
-        ['corridor','gallery','normal'],
-        ['corridor','armory','normal'],
-        ['corridor','crypt','locked'],
-        ['gallery','library','normal'],
-        ['library','armory','normal'],
-        ['armory','guardroom','normal'],
-        ['guardroom','pit','trap'],
-        ['cellar','cistern','normal'],
-        ['cistern','tunnel','normal'],
-        ['tunnel','vault','normal'],
-        ['crypt','shrine','enemy'],
-        ['shrine','vault','normal'],
-    ];
-    var CELL=100, PAD=60, RW=72, RH=40;
-    var canvas, ctx, hpBar, hpText, invText, roomHud, msgEl, animId;
-
-    function itemName(id) {
-        var n={torch:'Torch',sword:'Sword',shield:'Shield',rusty_key:'Rusty Key',
-               potion:'Healing Potion',bandage:'Bandage',amulet:'Amulet of Warding',key:'Rusty Key',treasure:'Gold Coin'};
-        return n[id]||id;
-    }
-    function rc(id){ var r=ROOMS[id]; return {x:PAD+r.col*CELL+CELL/2, y:PAD+r.row*CELL+CELL/2}; }
-
-    function draw(state, msg) {
-        if (!canvas) return;
-        var w = canvas.width, h = canvas.height;
-        ctx.clearRect(0,0,w,h);
-        ctx.fillStyle='#0d0d0d'; ctx.fillRect(0,0,w,h);
-        var pos = state ? state.state.position : null;
-        var itemsHere = state ? (state.state.items_here||[]) : [];
-        var isDead = state && state.state.room === 'DEATH';
-
-        /* Edges */
-        for (var i=0;i<EDGES.length;i++){
-            var e=EDGES[i], a=rc(e[0]), b=rc(e[1]);
-            ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
-            if(e[2]==='locked'){ctx.setLineDash([4,4]);ctx.strokeStyle='#f39c12';ctx.lineWidth=2;}
-            else if(e[2]==='enemy'){ctx.setLineDash([6,3]);ctx.strokeStyle='#9b59b6';ctx.lineWidth=2;}
-            else if(e[2]==='trap'){ctx.setLineDash([2,4]);ctx.strokeStyle='#c0392b';ctx.lineWidth=1.5;}
-            else{ctx.setLineDash([]);ctx.strokeStyle='#2a2a2a';ctx.lineWidth=1.5;}
-            ctx.stroke(); ctx.setLineDash([]);
-            if(e[2]==='locked'||e[2]==='enemy'){
-                var mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
-                ctx.fillStyle='#0d0d0d'; ctx.fillRect(mx-7,my-7,14,14);
-                ctx.fillStyle=e[2]==='locked'?'#f39c12':'#9b59b6';
-                ctx.font='11px Consolas,monospace'; ctx.textAlign='center'; ctx.textBaseline='middle';
-                ctx.fillText(e[2]==='locked'?'\u{1F512}':'\u2620',mx,my);
-            }
-        }
-        /* Pit arc */
-        var pc=rc('pit'),ec=rc('entrance');
-        ctx.beginPath();ctx.setLineDash([3,5]);ctx.strokeStyle='#c0392b44';ctx.lineWidth=1;
-        ctx.moveTo(pc.x,pc.y);ctx.bezierCurveTo(pc.x+60,pc.y-80,ec.x-60,ec.y+80,ec.x,ec.y);
-        ctx.stroke();ctx.setLineDash([]);
-
-        /* Rooms */
-        for(var id in ROOMS){
-            var r=ROOMS[id], c=rc(id), x=c.x-RW/2, y=c.y-RH/2, here=(id===pos);
-            var fill='#151515';
-            if(r.type==='hazard')fill='#1a0d0d';else if(r.type==='dark')fill='#0a0a0a';
-            else if(r.type==='heal')fill='#0d1a0d';else if(r.type==='enemy')fill='#150d1a';
-            else if(r.type==='goal')fill='#1a1a0d';
-            if(here&&!isDead){ctx.shadowColor='#4a9eff';ctx.shadowBlur=16;}
-            ctx.fillStyle=fill;ctx.strokeStyle=here?'#4a9eff':'#333';ctx.lineWidth=here?2:1;
-            ctx.beginPath();ctx.roundRect(x,y,RW,RH,4);ctx.fill();ctx.stroke();
-            ctx.shadowColor='transparent';ctx.shadowBlur=0;
-            ctx.fillStyle=here?'#fff':'#666';ctx.font=(here?'bold ':'')+'10px Consolas,monospace';
-            ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(r.label,c.x,c.y);
-            var dc=null;
-            if(r.type==='hazard')dc='#c0392b';else if(r.type==='heal')dc='#4caf50';
-            else if(r.type==='enemy')dc='#9b59b6';else if(r.type==='goal')dc='#f1c40f';
-            else if(r.type==='dark')dc='#555';
-            if(dc){ctx.fillStyle=dc;ctx.beginPath();ctx.arc(x+RW-6,y+6,3,0,Math.PI*2);ctx.fill();}
-            var ri=r.items||[];
-            if(ri.length){var sx=c.x-(ri.length*8)/2+4;for(var j=0;j<ri.length;j++){
-                var pu=here&&itemsHere.indexOf(ri[j])===-1&&itemsHere.indexOf(itemName(ri[j]))===-1;
-                ctx.fillStyle=pu?'#2a2200':'#e6a817';ctx.beginPath();ctx.arc(sx+j*8,y+RH+8,3,0,Math.PI*2);ctx.fill();
-            }}
-            if(here&&!isDead){
-                ctx.fillStyle='#4a9eff';ctx.beginPath();
-                ctx.moveTo(c.x,c.y-RH/2-14);ctx.lineTo(c.x-6,c.y-RH/2-6);ctx.lineTo(c.x+6,c.y-RH/2-6);ctx.closePath();ctx.fill();
-                var pulse=(Date.now()%2000)/2000;
-                ctx.strokeStyle='rgba(74,158,255,'+(0.6-pulse*0.6)+')';ctx.lineWidth=1.5;
-                ctx.beginPath();ctx.arc(c.x,c.y-RH/2-10,6+pulse*8,0,Math.PI*2);ctx.stroke();
-            }
-            if(here&&isDead){
-                ctx.fillStyle='#c0392b';ctx.font='bold 18px Consolas,monospace';
-                ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('\u2620',c.x,c.y-RH/2-12);
-            }
-        }
-    }
-
-    function updateHud(state, msg) {
-        if (!state) return;
-        var s = state.state;
-        roomHud.textContent = s.room || s.position || '---';
-        hpText.textContent = s.hp || '?/?';
-        var parts = (s.hp||'0/10').split('/');
-        var pct = (parseInt(parts[0])/parseInt(parts[1]))*100;
-        hpBar.style.width = pct+'%';
-        hpBar.style.background = pct>50?'#4caf50':pct>25?'#e6a817':'#c0392b';
-        invText.textContent = (s.inventory||[]).length ? s.inventory.join(', ') : 'empty';
-        msgEl.textContent = msg || '';
-    }
-
-    function tick(){ draw(agentState, lastMessage); animId=requestAnimationFrame(tick); }
-
-    registerRenderer({
-        id: 'map',
-        label: 'Map',
-        /* renderer availability declared by workflow, not matched here */
-        init: function(c) {
-            c.innerHTML = '<canvas id="map-canvas"></canvas>'
-                + '<div style="position:absolute;top:0;left:0;right:0;padding:0.6rem 0.8rem;display:flex;gap:1.2rem;align-items:center;background:rgba(10,10,10,0.85);border-bottom:1px solid #222;">'
-                +   '<div style="display:flex;align-items:center;gap:0.5rem;">'
-                +     '<span style="font-size:0.75rem;color:#c0392b;font-weight:bold;">HP</span>'
-                +     '<div style="width:120px;height:14px;background:#1a0a0a;border:1px solid #333;border-radius:2px;overflow:hidden;"><div id="map-hp-bar" style="height:100%;background:#c0392b;transition:width 0.4s;"></div></div>'
-                +     '<span id="map-hp-text" style="font-size:0.7rem;color:#888;">?/?</span>'
-                +   '</div>'
-                +   '<span style="font-size:0.75rem;color:#e6a817;font-weight:bold;">INV</span>'
-                +   '<span id="map-inv" style="font-size:0.7rem;color:#999;">empty</span>'
-                +   '<span id="map-room" style="font-size:0.8rem;color:#4a9eff;font-weight:bold;margin-left:auto;">---</span>'
-                + '</div>'
-                + '<div id="map-msg" style="position:absolute;bottom:0;left:0;right:0;padding:0.5rem 0.8rem;font-size:0.75rem;color:#ccc;background:rgba(10,10,10,0.9);border-top:1px solid #222;max-height:4rem;overflow-y:auto;"></div>'
-                + '<div style="position:absolute;bottom:3.5rem;right:0.5rem;padding:0.4rem 0.6rem;font-size:0.65rem;color:#555;background:rgba(10,10,10,0.8);border:1px solid #1a1a1a;border-radius:3px;line-height:1.6;">'
-                +   '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#4a9eff;vertical-align:middle;margin-right:4px;"></span>Agent '
-                +   '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e6a817;vertical-align:middle;margin-right:4px;margin-left:6px;"></span>Item '
-                +   '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#c0392b;vertical-align:middle;margin-right:4px;margin-left:6px;"></span>Hazard '
-                +   '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#4caf50;vertical-align:middle;margin-right:4px;margin-left:6px;"></span>Heal '
-                +   '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#9b59b6;vertical-align:middle;margin-right:4px;margin-left:6px;"></span>Enemy '
-                +   '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f39c12;vertical-align:middle;margin-right:4px;margin-left:6px;border-radius:1px;"></span>Locked'
-                + '</div>';
-            c.style.position = 'relative';
-            canvas = c.querySelector('#map-canvas');
-            ctx = canvas.getContext('2d');
-            hpBar = c.querySelector('#map-hp-bar');
-            hpText = c.querySelector('#map-hp-text');
-            invText = c.querySelector('#map-inv');
-            roomHud = c.querySelector('#map-room');
-            msgEl = c.querySelector('#map-msg');
-            var maxC=0,maxR=0;
-            for(var k in ROOMS){maxC=Math.max(maxC,ROOMS[k].col);maxR=Math.max(maxR,ROOMS[k].row);}
-            canvas.width=(maxC+1)*CELL+PAD*2; canvas.height=(maxR+1)*CELL+PAD*2;
-        },
-        update: function(state, msg) { updateHud(state, msg); draw(state, msg); },
-        activate: function() { animId = requestAnimationFrame(tick); },
-        deactivate: function() { if(animId) cancelAnimationFrame(animId); animId=null; }
-    });
-})();
 
 /* ======================================================================
-   RENDERER: TERMINAL — green phosphor CRT first-person view
-   ====================================================================== */
-(function() {
-    var el;  // root element inside container
-
-    /* ASCII art for each room type */
-    var ART = {
-        normal: [
-            '  _____________________________',
-            ' /                             \\',
-            '|   .       .       .       .   |',
-            '|          ___________          |',
-            '|         |           |         |',
-            '|         |           |         |',
-            '|_________|           |_________|',
-            '          |           |          ',
-            '          |___________|          ',
-        ],
-        dark: [
-            '  _____________________________',
-            ' /. . . . . . . . . . . . . . .\\',
-            '|. . . . . . . . . . . . . . . .|',
-            '|. . . . . . . . . . . . . . . .|',
-            '|. . . . . . . . . . . . . . . .|',
-            '|. . . . DARKNESS . . . . . . . .|',
-            '|. . . . . . . . . . . . . . . .|',
-            '|. . . . . . . . . . . . . . . .|',
-            ' \\. . . . . . . . . . . . . . ./',
-        ],
-        hazard: [
-            '  _____________________________',
-            ' / ! ! ! ! ! ! ! ! ! ! ! ! ! ! \\',
-            '|  /\\    /\\    /\\    /\\    /\\   |',
-            '| /  \\  /  \\  /  \\  /  \\  /  \\  |',
-            '|/ !! \\/    \\/    \\/    \\/ !! \\|',
-            '|   DANGER     DANGER     DANGER |',
-            '|\\    /\\    /\\    /\\    /\\    /|',
-            '| \\  /  \\  /  \\  /  \\  /  \\  / |',
-            ' \\_\\/__\\/__\\/__\\/__\\/__\\/__\\/_/',
-        ],
-        heal: [
-            '  _____________________________',
-            ' /  ~  ~  ~  ~  ~  ~  ~  ~  ~  \\',
-            '|    ~    +    ~    +    ~    +   |',
-            '|  ~   ~    ~   ~    ~   ~    ~  |',
-            '|       +         +         +    |',
-            '|  ~ SANCTUARY ~  ~ SANCTUARY ~  |',
-            '|    +    ~    +    ~    +    ~   |',
-            '|  ~   ~    ~   ~    ~   ~    ~  |',
-            ' \\__~__~__~__~__~__~__~__~__~__/',
-        ],
-        enemy: [
-            '  _____________________________',
-            ' /                             \\',
-            '|     _    _                    |',
-            '|    (o)  (o)     ___           |',
-            '|      \\__/      /   \\         |',
-            '|      |  |     | ! ! |         |',
-            '|     /|  |\\    |_____|         |',
-            '|    / |  | \\                   |',
-            ' \\__/__|__|__\\_________________/',
-        ],
-        goal: [
-            '  _____________________________',
-            ' /  *  .  *  .  *  .  *  .  *  \\',
-            '|    .   *   .   *   .   *   .   |',
-            '|  *        ___________      *   |',
-            '|    .     |  $$$$$$  |    .     |',
-            '|  *   .   |  $$$$$$  |  *   .   |',
-            '|    .     |___________|    .    |',
-            '|  *   .   *   .   *   .   *   . |',
-            ' \\__*__.__*__.__*__.__*__.__*__/',
-        ],
-        death: [
-            '          ___________           ',
-            '         /           \\          ',
-            '        |   X     X   |         ',
-            '        |      ^      |         ',
-            '        |    \\___/    |         ',
-            '        |             |          ',
-            '         \\___________/          ',
-            '              |||                ',
-            '         YOU HAVE DIED           ',
-        ],
-    };
-
-    /* room id -> type for art lookup */
-    var ROOM_TYPES = {
-        entrance:'normal', corridor:'normal', gallery:'normal', library:'normal',
-        armory:'normal', guardroom:'normal', pit:'hazard', cellar:'dark',
-        cistern:'heal', tunnel:'hazard', crypt:'enemy', shrine:'heal', vault:'goal',
-    };
-
-    function hpBarAscii(hp, max) {
-        var filled = Math.round((hp / max) * 20);
-        var empty = 20 - filled;
-        var ch = hp/max > 0.5 ? '#' : hp/max > 0.25 ? '=' : '!';
-        return '[' + ch.repeat(filled) + '.'.repeat(empty) + '] ' + hp + '/' + max;
-    }
-
-    function invAscii(inv) {
-        if (!inv || !inv.length) return '  (empty)';
-        return inv.map(function(item) { return '  [' + item + ']'; }).join('\n');
-    }
-
-    function exitsAscii(affordances) {
-        var lines = [];
-        for (var i = 0; i < affordances.length; i++) {
-            var a = affordances[i];
-            var prefix = '  ' + a.id + '. ';
-            lines.push(prefix + a.label);
-        }
-        return lines.join('\n');
-    }
-
-    function render(state, msg) {
-        if (!el || !state) return;
-        var s = state.state;
-        var pos = s.position || '???';
-        var isDead = s.room === 'DEATH';
-        var roomType = isDead ? 'death' : (ROOM_TYPES[pos] || 'normal');
-        var art = ART[roomType] || ART.normal;
-        var parts = (s.hp || '0/10').split('/');
-        var hp = parseInt(parts[0]), max = parseInt(parts[1]);
-
-        var lines = [];
-        lines.push('');
-        lines.push('  +======================================+');
-        lines.push('  |  ' + (s.room || pos).toUpperCase());
-        lines.push('  +======================================+');
-        lines.push('');
-        for (var i = 0; i < art.length; i++) lines.push('  ' + art[i]);
-        lines.push('');
-        lines.push('  HP: ' + hpBarAscii(hp, max));
-        lines.push('');
-
-        /* Description — word-wrap at ~50 chars */
-        var desc = state.instructions || '';
-        var words = desc.split(' ');
-        var line = '  ';
-        for (var i = 0; i < words.length; i++) {
-            if (line.length + words[i].length > 55) {
-                lines.push(line);
-                line = '  ' + words[i] + ' ';
-            } else {
-                line += words[i] + ' ';
-            }
-        }
-        if (line.trim()) lines.push(line);
-        lines.push('');
-
-        /* Items on ground */
-        var itemsHere = s.items_here || [];
-        if (itemsHere.length) {
-            lines.push('  ITEMS ON GROUND:');
-            for (var i = 0; i < itemsHere.length; i++) {
-                lines.push('    * ' + itemsHere[i]);
-            }
-            lines.push('');
-        }
-
-        /* Inventory */
-        lines.push('  INVENTORY:');
-        lines.push(invAscii(s.inventory || []));
-        lines.push('');
-
-        /* Affordances */
-        if (state.affordances && state.affordances.length) {
-            lines.push('  ACTIONS:');
-            lines.push(exitsAscii(state.affordances));
-            lines.push('');
-        }
-
-        /* Message */
-        if (msg) {
-            lines.push('  >> ' + msg);
-            lines.push('');
-        }
-
-        /* Objective */
-        if (state.objective) {
-            lines.push('  OBJECTIVE: ' + state.objective);
-            lines.push('');
-        }
-
-        lines.push('  _');
-        el.textContent = lines.join('\n');
-        el.scrollTop = el.scrollHeight;
-    }
-
-    registerRenderer({
-        id: 'terminal',
-        label: 'Terminal',
-        /* renderer availability declared by workflow, not matched here */
-        init: function(c) {
-            c.style.cssText = 'position:relative;overflow:hidden;';
-            /* CRT scanline overlay + phosphor glow */
-            var screen = document.createElement('div');
-            screen.style.cssText = 'width:100%;height:100%;position:relative;background:#020a02;overflow:hidden;';
-            /* Scanline overlay */
-            var scanlines = document.createElement('div');
-            scanlines.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:2;'
-                + 'background:repeating-linear-gradient(to bottom, transparent 0px, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 4px);';
-            /* Vignette */
-            var vignette = document.createElement('div');
-            vignette.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:3;'
-                + 'background:radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.6) 100%);';
-            /* Text area */
-            var pre = document.createElement('pre');
-            pre.style.cssText = 'position:relative;z-index:1;margin:0;padding:1rem;width:100%;height:100%;'
-                + 'overflow-y:auto;color:#33ff33;font-family:"Consolas","Monaco",monospace;font-size:14px;'
-                + 'line-height:1.4;text-shadow:0 0 8px rgba(51,255,51,0.4), 0 0 2px rgba(51,255,51,0.8);'
-                + 'white-space:pre;';
-            screen.appendChild(pre);
-            screen.appendChild(scanlines);
-            screen.appendChild(vignette);
-            c.appendChild(screen);
-
-            /* Flicker animation */
-            var style = document.createElement('style');
-            style.textContent = '@keyframes crt-flicker { 0%{opacity:0.97} 5%{opacity:1} 10%{opacity:0.98} 100%{opacity:1} }'
-                + ' #rc-terminal pre { animation: crt-flicker 0.1s infinite; }';
-            c.appendChild(style);
-
-            el = pre;
-        },
-        update: function(state, msg) { render(state, msg); },
-        activate: function() {},
-        deactivate: function() {}
-    });
-})();
-
-/* ======================================================================
-   RENDERER: WORKFLOW — 1:1 projection of JSON in WFE UI style
+   RENDERER: RENDERED — 1:1 projection of JSON in WFE UI style
    Every key in the JSON maps to a visible element. Nothing hidden, nothing added.
    ====================================================================== */
 (function() {
@@ -823,16 +394,16 @@ registerRenderer({
     }
 
     registerRenderer({
-        id: 'workflow',
-        label: 'Workflow',
-        /* renderer availability declared by workflow, not matched here */
+        id: 'rendered',
+        label: 'Rendered',
+        /* renderer availability declared by the workflow definition */
         init: function(c) {
             c.style.cssText = 'overflow-y:auto;padding:0;';
             /* Style goes in <head> so container.innerHTML can't destroy it */
             var style = document.createElement('style');
             style.textContent = ''
                 /* Light background matching WFE UI */
-                + '#rc-workflow { background:#f5f5f5; color:#333; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
+                + '#rc-rendered { background:#f5f5f5; color:#333; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
 
                 /* Header */
                 + '.wf-header { display:flex; align-items:baseline; justify-content:space-between; padding:1.25rem 1.5rem 0.25rem; }'
@@ -927,31 +498,11 @@ registerRenderer({
 })();
 
 /* ======================================================================
-   EVENT LOG (shared across all renderers)
+   SSE CONNECTION
    ====================================================================== */
 var connEl = document.getElementById('conn');
 var pathEl = document.getElementById('path');
-var logEl = document.getElementById('log');
 
-function addLog(event) {
-    var div = document.createElement('div');
-    div.className = 'log-entry';
-    var t = event.timestamp ? new Date(event.timestamp * 1000).toLocaleTimeString() : '';
-    var detail = '';
-    if (event.type === 'navigate') detail = event.path || '';
-    else if (event.type === 'action') detail = (event.path||'') + ' ' + JSON.stringify(event.body||{}).substring(0,200);
-    else if (event.type === 'result') detail = JSON.stringify(event.result||{}).substring(0,200);
-    else if (event.type === 'init') detail = 'connected, history: ' + (event.history||[]).length;
-    div.innerHTML = '<span class="log-time">'+t+'</span> '
-        + '<span class="log-type '+(event.type||'')+'">'+(event.type||'?')+'</span> '
-        + '<span class="log-detail">'+detail+'</span>';
-    logEl.prepend(div);
-    while (logEl.children.length > 300) logEl.removeChild(logEl.lastChild);
-}
-
-/* ======================================================================
-   SSE CONNECTION
-   ====================================================================== */
 function connect() {
     var es = new EventSource('{{ stream_url }}');
     es.onopen = function() { connEl.textContent='live'; connEl.className='connected'; };
@@ -959,25 +510,11 @@ function connect() {
     es.onmessage = function(e) {
         var ev = JSON.parse(e.data);
         if (ev.type === 'init') {
-            addLog(ev);
             var pageState = (ev.page && ev.page.state) || {};
             pathEl.textContent = pageState.node || pageState.position || ev.current_path || '\u2014';
-            /* Recover feedback from the most recent result event in history */
-            var hist = ev.history || [];
-            var lastFeedback = null;
-            for (var i = hist.length - 1; i >= 0; i--) {
-                if (hist[i].type === 'result' && hist[i].feedback) {
-                    lastFeedback = hist[i].feedback;
-                    break;
-                }
-            }
-            /* Render the current page state immediately (with recovered feedback) */
-            if (ev.page) extractState(ev.page, lastFeedback);
-            /* Replay recent history into the event log */
-            hist.slice(-20).forEach(addLog);
+            if (ev.page) extractState(ev.page, ev.last_feedback || null);
             return;
         }
-        addLog(ev);
         if (ev.type === 'navigate') {
             pathEl.textContent = ev.path || '';
             if (ev.content) extractState(ev.content);
