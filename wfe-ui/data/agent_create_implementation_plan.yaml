@@ -15,9 +15,16 @@ nodes:
     lifecycle_label: Construction
     instruction: >-
       Build an implementation plan table. Add columns to define the
-      structure, then add rows and fill in cell values. Each column
-      has a name and a type that determines how it behaves during
-      execution.
+      structure, then add rows and fill in cell values. Column types
+      fall into three categories: Non-executable (ne-) columns are
+      filled now during construction and become read-only during
+      execution -- use these for task descriptions, prerequisites, and
+      other plan content. Executable (ex-) columns are left empty now
+      and filled during execution -- use these for evidence, outcomes,
+      signatures, and other execution artifacts. Auto-executed (ae-)
+      columns are evaluated automatically by the system during
+      execution based on rules you define -- use these for acceptance
+      criteria.
     proceed:
       label: Proceed to Review
       # Gate: requires at least one column and one row (enforced in Python)

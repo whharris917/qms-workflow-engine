@@ -296,6 +296,25 @@ function wfRenderFields(fields, fieldCategory) {
     return html + '</div>';
 }
 
+function wfRenderStateProps(state) {
+    /* Renders state-level properties that don't have dedicated visual elements:
+       node (raw ID), completed_nodes, plan_status, progress */
+    var s = state.state || {};
+    var html = '<div class="wf-card wf-state-props">';
+    html += '<div class="wf-card-head">state</div>';
+    html += '<div class="wf-state-row"><span class="wf-state-key">node:</span> ' + wfEsc(s.node || '') + '</div>';
+    html += '<div class="wf-state-row"><span class="wf-state-key">node_title:</span> ' + wfEsc(s.node_title || '') + '</div>';
+    html += '<div class="wf-state-row"><span class="wf-state-key">completed_nodes:</span> ' + wfEsc(JSON.stringify(s.completed_nodes || [])) + '</div>';
+    if (s.plan_status !== undefined) {
+        html += '<div class="wf-state-row"><span class="wf-state-key">plan_status:</span> ' + wfEsc(s.plan_status) + '</div>';
+    }
+    if (s.progress) {
+        html += '<div class="wf-state-row"><span class="wf-state-key">progress:</span> ' + wfEsc(JSON.stringify(s.progress)) + '</div>';
+    }
+    html += '</div>';
+    return html;
+}
+
 function wfRenderBanner(state) {
     var s = state.state || {};
     var lifecycle = s.lifecycle || [];
@@ -338,7 +357,10 @@ function wfRenderTable(table) {
         for (var ci = 0; ci < cols.length; ci++) {
             var c = cols[ci];
             html += '<th><div class="wf-table-colname">' + wfEsc(c.name) + '</div>';
-            html += '<div class="wf-table-coltype">' + wfEsc(c.type) + '</div></th>';
+            html += '<div class="wf-table-coltype">' + wfEsc(c.type) + '</div>';
+            if (c.choices) html += '<div class="wf-table-colmeta">choices: ' + wfEsc(JSON.stringify(c.choices)) + '</div>';
+            if (c.rule) html += '<div class="wf-table-colmeta">rule: ' + wfEsc(JSON.stringify(c.rule)) + '</div>';
+            html += '</th>';
         }
         html += '</tr></thead><tbody>';
         if (rows.length) {
@@ -372,6 +394,82 @@ function wfRenderTable(table) {
     return html;
 }
 
+function wfRenderExecTable(et) {
+    if (!et) return '';
+    var cols = et.columns || [];
+    var rows = et.rows || [];
+
+    var html = '<div class="wf-card">';
+    html += '<div class="wf-card-head">state.execution_table</div>';
+
+    if (!cols.length) {
+        html += '<div class="wf-table-empty">(no columns)</div></div>';
+        return html;
+    }
+
+    /* Column definitions */
+    html += '<div class="wf-table-wrap"><table class="wf-table"><thead><tr>';
+    html += '<th class="wf-table-rownum">row_id</th>';
+    for (var ci = 0; ci < cols.length; ci++) {
+        var c = cols[ci];
+        html += '<th><div class="wf-table-colname">' + wfEsc(c.name) + '</div>';
+        html += '<div class="wf-table-coltype">' + wfEsc(c.type) + '</div>';
+        if (c.choices) html += '<div class="wf-table-colmeta">choices: ' + wfEsc(JSON.stringify(c.choices)) + '</div>';
+        if (c.rule) html += '<div class="wf-table-colmeta">rule: ' + wfEsc(JSON.stringify(c.rule)) + '</div>';
+        html += '</th>';
+    }
+    html += '</tr></thead><tbody>';
+
+    /* Rows */
+    for (var ri = 0; ri < rows.length; ri++) {
+        var r = rows[ri];
+        var rowCls = r.gated ? ' class="wf-row-gated"' : '';
+        html += '<tr' + rowCls + '>';
+        /* row_id + row-level properties */
+        html += '<td class="wf-table-rownum">';
+        html += wfEsc(r.row_id || String(r.row));
+        html += '<div class="wf-exec-reason">gated: ' + r.gated + '</div>';
+        if (r.gated_by && r.gated_by.length) {
+            html += '<div class="wf-exec-reason">gated_by: ' + wfEsc(JSON.stringify(r.gated_by)) + '</div>';
+        }
+        var acc = r.acceptance || {};
+        html += '<div class="wf-exec-reason ' + (acc.passed ? 'wf-exec-pass' : 'wf-exec-pending') + '">acceptance.passed: ' + acc.passed + '</div>';
+        if (acc.reason) {
+            html += '<div class="wf-exec-reason">acceptance.reason: ' + wfEsc(acc.reason) + '</div>';
+        }
+        html += '</td>';
+
+        /* Cells */
+        var cells = r.cells || [];
+        for (var ci = 0; ci < cells.length; ci++) {
+            var cell = cells[ci];
+            var cls = 'wf-exec-cell wf-exec-' + (cell.status || 'empty');
+            html += '<td class="' + cls + '">';
+            /* display_value */
+            html += '<div>' + (cell.display_value ? wfEsc(cell.display_value) : '<span class="wf-table-empty">&mdash;</span>') + '</div>';
+            /* status */
+            html += '<div class="wf-exec-reason">status: ' + wfEsc(cell.status || '') + '</div>';
+            /* value (when different from display_value or non-empty) */
+            if (cell.value && cell.value !== cell.display_value) {
+                html += '<div class="wf-exec-reason">value: ' + wfEsc(cell.value) + '</div>';
+            }
+            /* available_actions */
+            if (cell.available_actions && cell.available_actions.length) {
+                html += '<div class="wf-exec-reason">actions: ' + wfEsc(JSON.stringify(cell.available_actions)) + '</div>';
+            }
+            /* locked_reason */
+            if (cell.locked_reason) {
+                html += '<div class="wf-exec-reason">locked_reason: ' + wfEsc(cell.locked_reason) + '</div>';
+            }
+            html += '</td>';
+        }
+        html += '</tr>';
+    }
+
+    html += '</tbody></table></div></div>';
+    return html;
+}
+
 function wfRenderPage(container, state, msg, feedback) {
     if (!container || !state) return;
 
@@ -395,6 +493,7 @@ function wfRenderPage(container, state, msg, feedback) {
     html += '</div>';
 
     html += wfRenderBanner(state);
+    html += wfRenderStateProps(state);
 
     html += '<div class="wf-section">';
     html += '<div class="wf-section-head">' + wfEsc(s.node_title || s.node) + '</div>';
@@ -411,7 +510,9 @@ function wfRenderPage(container, state, msg, feedback) {
         html += '</div>';
     }
 
-    if (s.table) {
+    if (s.execution_table) {
+        html += wfRenderExecTable(s.execution_table);
+    } else if (s.table) {
         html += wfRenderTable(s.table);
     }
 
@@ -495,6 +596,17 @@ var WF_STRUCTURAL_CSS = ''
     + '.wf-table-empty { font-style:italic; font-size:0.8rem; text-align:center; padding:0.75rem; }'
     + '.wf-table-props { display:flex; gap:1rem; margin-top:0.5rem; font-size:0.72rem; }'
     + '.wf-table-prop { font-family:Consolas,Monaco,monospace; }'
+    + '.wf-state-props { font-size:0.78rem; }'
+    + '.wf-state-row { padding:0.1rem 0; }'
+    + '.wf-state-key { font-weight:600; font-family:Consolas,Monaco,monospace; }'
+    + '.wf-table-colmeta { font-size:0.68rem; word-break:break-all; max-width:200px; overflow:hidden; }'
+    + '.wf-exec-cell { font-size:0.8rem; }'
+    + '.wf-exec-pass { font-weight:600; }'
+    + '.wf-exec-pending { font-style:italic; }'
+    + '.wf-exec-gated { opacity:0.5; }'
+    + '.wf-exec-locked { opacity:0.5; }'
+    + '.wf-exec-reason { font-size:0.7rem; font-style:italic; margin-top:0.15rem; }'
+    + '.wf-row-gated { opacity:0.6; }'
     ;
 
 /* ======================================================================
@@ -567,6 +679,11 @@ var WF_STRUCTURAL_CSS = ''
                 + '#rc-light .wf-table-empty { color:#bbb; }'
                 + '#rc-light .wf-table-summary { color:#7f8fa6; }'
                 + '#rc-light .wf-table-prop { color:#7f8fa6; }'
+                + '#rc-light .wf-exec-pass { color:#2e7d32; }'
+                + '#rc-light .wf-exec-pending { color:#b0b0b0; }'
+                + '#rc-light .wf-exec-filled { background:#e8f5e9; }'
+                + '#rc-light .wf-exec-signed { background:#e8f5e9; }'
+                + '#rc-light .wf-exec-reason { color:#999; }'
                 ;
             document.head.appendChild(style);
             container = c;
@@ -647,6 +764,11 @@ var WF_STRUCTURAL_CSS = ''
                 + '#rc-dark .wf-table-empty { color:#555; }'
                 + '#rc-dark .wf-table-summary { color:#666; }'
                 + '#rc-dark .wf-table-prop { color:#666; }'
+                + '#rc-dark .wf-exec-pass { color:#66bb6a; }'
+                + '#rc-dark .wf-exec-pending { color:#666; }'
+                + '#rc-dark .wf-exec-filled { background:#1b3a1b; }'
+                + '#rc-dark .wf-exec-signed { background:#1b3a1b; }'
+                + '#rc-dark .wf-exec-reason { color:#666; }'
                 ;
             document.head.appendChild(style);
             container = c;
@@ -712,8 +834,12 @@ var WF_STRUCTURAL_CSS = ''
             html += '<div class="ex-instructions">' + wfEsc(state.instructions) + '</div>';
         }
 
+        html += wfRenderStateProps(state);
+
         /* ── Table (if present) ── */
-        if (s.table) {
+        if (s.execution_table) {
+            html += wfRenderExecTable(s.execution_table);
+        } else if (s.table) {
             html += wfRenderTable(s.table);
         }
 
@@ -970,8 +1096,12 @@ var WF_STRUCTURAL_CSS = ''
             html += '<div class="gb-instr">' + wfEsc(state.instructions) + '</div>';
         }
 
+        html += wfRenderStateProps(state);
+
         /* ── Table (if present) ── */
-        if (s.table) {
+        if (s.execution_table) {
+            html += wfRenderExecTable(s.execution_table);
+        } else if (s.table) {
             html += wfRenderTable(s.table);
         }
 
@@ -1223,8 +1353,16 @@ var WF_STRUCTURAL_CSS = ''
             }
         }
 
-        /* Node */
-        lines.push('\u251c\u2500 <span class="tc-key">node</span>: <span class="tc-node">' + wfEsc(s.node_title || s.node) + '</span>');
+        /* Node & state properties */
+        lines.push('\u251c\u2500 <span class="tc-key">node</span>: <span class="tc-node">' + wfEsc(s.node || '') + '</span>');
+        lines.push('\u251c\u2500 <span class="tc-key">node_title</span>: <span class="tc-str">' + wfEsc(s.node_title || '') + '</span>');
+        lines.push('\u251c\u2500 <span class="tc-key">completed_nodes</span>: <span class="tc-str">' + wfEsc(JSON.stringify(s.completed_nodes || [])) + '</span>');
+        if (s.plan_status !== undefined) {
+            lines.push('\u251c\u2500 <span class="tc-key">plan_status</span>: <span class="tc-str">' + wfEsc(s.plan_status) + '</span>');
+        }
+        if (s.progress) {
+            lines.push('\u251c\u2500 <span class="tc-key">progress</span>: <span class="tc-str">' + wfEsc(JSON.stringify(s.progress)) + '</span>');
+        }
 
         /* Instructions */
         if (state.instructions) {
@@ -1270,48 +1408,101 @@ var WF_STRUCTURAL_CSS = ''
             }
         }
 
-        /* Table */
-        if (s.table) {
+        /* Table — prefer execution_table during execution, fall back to construction table */
+        var showExec = !!s.execution_table;
+        var tblData = showExec ? s.execution_table : s.table;
+        if (tblData) {
             var hasAffs = state.affordances && state.affordances.length;
             var tblBranch = hasAffs ? '\u251c\u2500 ' : '\u2514\u2500 ';
             var tblCont = hasAffs ? '\u2502  ' : '   ';
-            lines.push(tblBranch + '<span class="tc-key">state.table</span>');
-            var tbl = s.table;
-            var cols = tbl.columns || [];
-            var rows = tbl.rows || [];
-            if (tbl.summary) {
-                lines.push(tblCont + '\u251c\u2500 summary: <span class="tc-str">' + wfEsc(tbl.summary) + '</span>');
-            }
-            lines.push(tblCont + '\u251c\u2500 <span class="tc-key">columns</span>');
-            for (var ci = 0; ci < cols.length; ci++) {
-                var cLast = ci === cols.length - 1;
-                var cb = cLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
-                lines.push(tblCont + '\u2502  ' + cb + '<span class="tc-fname">' + wfEsc(cols[ci].name) + '</span> <span class="tc-opts">(' + wfEsc(cols[ci].type) + ')</span>');
-            }
-            if (!cols.length) lines.push(tblCont + '\u2502  \u2514\u2500 <span class="tc-null">(none)</span>');
-            var hasProps = tbl.properties && Object.keys(tbl.properties).length;
-            var rowBranch = hasProps ? '\u251c\u2500 ' : '\u2514\u2500 ';
-            lines.push(tblCont + rowBranch + '<span class="tc-key">rows</span> (' + rows.length + ')');
-            for (var ri = 0; ri < rows.length; ri++) {
-                var rLast = ri === rows.length - 1;
-                var rb = rLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
-                var rc = rLast ? '   ' : '\u2502  ';
-                var rowPfx = tblCont + (hasProps ? '\u2502  ' : '   ');
-                lines.push(rowPfx + rb + '<span class="tc-fname">row ' + ri + '</span>');
-                for (var ci2 = 0; ci2 < rows[ri].length; ci2++) {
-                    var cLast2 = ci2 === rows[ri].length - 1;
-                    var cn = cols[ci2] ? cols[ci2].name : 'col-' + ci2;
-                    var cv = rows[ri][ci2];
-                    lines.push(rowPfx + rc + (cLast2 ? '\u2514\u2500 ' : '\u251c\u2500 ') + wfEsc(cn) + ': ' + (cv ? '<span class="tc-str">' + wfEsc(cv) + '</span>' : '<span class="tc-null">\u2014</span>'));
+            var tblKey = showExec ? 'state.execution_table' : 'state.table';
+            lines.push(tblBranch + '<span class="tc-key">' + tblKey + '</span>');
+
+            if (showExec) {
+                /* Execution table: rows are objects with cells, acceptance, gating */
+                var etCols = tblData.columns || [];
+                var etRows = tblData.rows || [];
+                lines.push(tblCont + '\u251c\u2500 <span class="tc-key">columns</span>');
+                for (var ci = 0; ci < etCols.length; ci++) {
+                    var cLast = ci === etCols.length - 1;
+                    var colExtra = '';
+                    if (etCols[ci].choices) colExtra += ' choices=' + JSON.stringify(etCols[ci].choices);
+                    if (etCols[ci].rule) colExtra += ' rule=' + JSON.stringify(etCols[ci].rule);
+                    lines.push(tblCont + '\u2502  ' + (cLast ? '\u2514\u2500 ' : '\u251c\u2500 ') + '<span class="tc-fname">' + wfEsc(etCols[ci].name) + '</span> <span class="tc-opts">(' + wfEsc(etCols[ci].type) + ')</span>' + (colExtra ? ' <span class="tc-opts">' + wfEsc(colExtra) + '</span>' : ''));
                 }
-            }
-            if (!rows.length) lines.push(tblCont + (hasProps ? '\u2502  ' : '   ') + '\u2514\u2500 <span class="tc-null">(none)</span>');
-            if (hasProps) {
-                lines.push(tblCont + '\u2514\u2500 <span class="tc-key">properties</span>');
-                var pk = Object.keys(tbl.properties);
-                for (var pi = 0; pi < pk.length; pi++) {
-                    var pLast = pi === pk.length - 1;
-                    lines.push(tblCont + '   ' + (pLast ? '\u2514\u2500 ' : '\u251c\u2500 ') + wfEsc(pk[pi]) + ': <span class="tc-str">' + wfEsc(String(tbl.properties[pk[pi]])) + '</span>');
+                if (!etCols.length) lines.push(tblCont + '\u2502  \u2514\u2500 <span class="tc-null">(none)</span>');
+                lines.push(tblCont + '\u2514\u2500 <span class="tc-key">rows</span> (' + etRows.length + ')');
+                for (var ri = 0; ri < etRows.length; ri++) {
+                    var rLast = ri === etRows.length - 1;
+                    var rb = rLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
+                    var rc = rLast ? '   ' : '\u2502  ';
+                    var r = etRows[ri];
+                    var acc = r.acceptance || {};
+                    var gTag = r.gated ? ' <span class="tc-null">[gated:true]</span>' : '';
+                    var aTag = acc.passed ? ' <span class="tc-f-new">[acceptance.passed:true]</span>' : ' <span class="tc-null">[acceptance.passed:false]</span>';
+                    lines.push(tblCont + '   ' + rb + '<span class="tc-fname">' + wfEsc(r.row_id || 'row ' + r.row) + '</span>' + gTag + aTag);
+                    if (r.gated_by && r.gated_by.length) {
+                        lines.push(tblCont + '   ' + rc + '\u251c\u2500 <span class="tc-key">gated_by</span>: <span class="tc-str">' + wfEsc(JSON.stringify(r.gated_by)) + '</span>');
+                    }
+                    if (acc.reason) {
+                        lines.push(tblCont + '   ' + rc + '\u251c\u2500 <span class="tc-key">acceptance.reason</span>: <span class="tc-str">' + wfEsc(acc.reason) + '</span>');
+                    }
+                    var cells = r.cells || [];
+                    for (var ci2 = 0; ci2 < cells.length; ci2++) {
+                        var cLast2 = ci2 === cells.length - 1;
+                        var cell = cells[ci2];
+                        var dv = cell.display_value || '';
+                        var statusTag = '<span class="tc-opts">[' + (cell.status || '?') + ']</span>';
+                        var cellLine = wfEsc(cell.column_name) + ' <span class="tc-opts">(' + wfEsc(cell.column_type) + ')</span> ' + statusTag + ': ' + (dv ? '<span class="tc-str">' + wfEsc(dv) + '</span>' : '<span class="tc-null">\u2014</span>');
+                        if (cell.value && cell.value !== cell.display_value) cellLine += ' <span class="tc-opts">value=' + wfEsc(cell.value) + '</span>';
+                        if (cell.available_actions && cell.available_actions.length) cellLine += ' <span class="tc-opts">actions=' + wfEsc(JSON.stringify(cell.available_actions)) + '</span>';
+                        if (cell.locked_reason) cellLine += ' <span class="tc-opts">locked_reason=' + wfEsc(cell.locked_reason) + '</span>';
+                        lines.push(tblCont + '   ' + rc + (cLast2 ? '\u2514\u2500 ' : '\u251c\u2500 ') + cellLine);
+                    }
+                }
+                if (!etRows.length) lines.push(tblCont + '   \u2514\u2500 <span class="tc-null">(none)</span>');
+            } else {
+                /* Construction table: rows are flat arrays */
+                var tbl = tblData;
+                var cols = tbl.columns || [];
+                var rows = tbl.rows || [];
+                if (tbl.summary) {
+                    lines.push(tblCont + '\u251c\u2500 summary: <span class="tc-str">' + wfEsc(tbl.summary) + '</span>');
+                }
+                lines.push(tblCont + '\u251c\u2500 <span class="tc-key">columns</span>');
+                for (var ci = 0; ci < cols.length; ci++) {
+                    var cLast = ci === cols.length - 1;
+                    var cb = cLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
+                    var cExtra = '';
+                    if (cols[ci].choices) cExtra += ' choices=' + JSON.stringify(cols[ci].choices);
+                    if (cols[ci].rule) cExtra += ' rule=' + JSON.stringify(cols[ci].rule);
+                    lines.push(tblCont + '\u2502  ' + cb + '<span class="tc-fname">' + wfEsc(cols[ci].name) + '</span> <span class="tc-opts">(' + wfEsc(cols[ci].type) + ')</span>' + (cExtra ? ' <span class="tc-opts">' + wfEsc(cExtra) + '</span>' : ''));
+                }
+                if (!cols.length) lines.push(tblCont + '\u2502  \u2514\u2500 <span class="tc-null">(none)</span>');
+                var hasProps = tbl.properties && Object.keys(tbl.properties).length;
+                var rowBranch = hasProps ? '\u251c\u2500 ' : '\u2514\u2500 ';
+                lines.push(tblCont + rowBranch + '<span class="tc-key">rows</span> (' + rows.length + ')');
+                for (var ri = 0; ri < rows.length; ri++) {
+                    var rLast = ri === rows.length - 1;
+                    var rb = rLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
+                    var rc = rLast ? '   ' : '\u2502  ';
+                    var rowPfx = tblCont + (hasProps ? '\u2502  ' : '   ');
+                    lines.push(rowPfx + rb + '<span class="tc-fname">row ' + ri + '</span>');
+                    for (var ci2 = 0; ci2 < rows[ri].length; ci2++) {
+                        var cLast2 = ci2 === rows[ri].length - 1;
+                        var cn = cols[ci2] ? cols[ci2].name : 'col-' + ci2;
+                        var cv = rows[ri][ci2];
+                        lines.push(rowPfx + rc + (cLast2 ? '\u2514\u2500 ' : '\u251c\u2500 ') + wfEsc(cn) + ': ' + (cv ? '<span class="tc-str">' + wfEsc(cv) + '</span>' : '<span class="tc-null">\u2014</span>'));
+                    }
+                }
+                if (!rows.length) lines.push(tblCont + (hasProps ? '\u2502  ' : '   ') + '\u2514\u2500 <span class="tc-null">(none)</span>');
+                if (hasProps) {
+                    lines.push(tblCont + '\u2514\u2500 <span class="tc-key">properties</span>');
+                    var pk = Object.keys(tbl.properties);
+                    for (var pi = 0; pi < pk.length; pi++) {
+                        var pLast = pi === pk.length - 1;
+                        lines.push(tblCont + '   ' + (pLast ? '\u2514\u2500 ' : '\u251c\u2500 ') + wfEsc(pk[pi]) + ': <span class="tc-str">' + wfEsc(String(tbl.properties[pk[pi]])) + '</span>');
+                    }
                 }
             }
         }
@@ -1460,8 +1651,12 @@ var WF_STRUCTURAL_CSS = ''
             html += '<div class="ds-instr">' + wfEsc(state.instructions) + '</div>';
         }
 
+        html += wfRenderStateProps(state);
+
         /* ── Table (if present) ── */
-        if (s.table) {
+        if (s.execution_table) {
+            html += wfRenderExecTable(s.execution_table);
+        } else if (s.table) {
             html += wfRenderTable(s.table);
         }
 

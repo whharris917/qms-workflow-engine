@@ -147,13 +147,23 @@ def _build_affordances(data: dict, workflow_id: str) -> list[dict]:
         col_labels = [c["name"] for c in cols]
 
         # -- Add column --
+        # Build type options with descriptions from YAML catalog
+        type_options_info = [
+            {"value": t, "label": info.get("label", t),
+             "category": info.get("category", ""),
+             "description": info.get("description", "")}
+            for t, info in _COLUMN_TYPES.items()
+        ]
         affordances.append({
             "id": n, "label": "Add column",
             "method": "POST", "url": f"{api}/add_column",
             "body": {"name": "<name>", "type": "<type>"},
             "parameters": {
                 "name": {},
-                "type": {"options": _VALID_COLUMN_TYPES},
+                "type": {
+                    "options": _VALID_COLUMN_TYPES,
+                    "descriptions": type_options_info,
+                },
             },
         })
         n += 1
@@ -200,6 +210,70 @@ def _build_affordances(data: dict, workflow_id: str) -> list[dict]:
                 },
             })
             n += 1
+
+            # -- Choice-list column management --
+            choice_cols = [(i, c) for i, c in enumerate(cols) if c["type"] in ("ex-choice-list", "choice-list")]
+            if choice_cols:
+                choice_indices = [i for i, _ in choice_cols]
+                choice_labels = [c["name"] for _, c in choice_cols]
+                affordances.append({
+                    "id": n, "label": "Set choices for column",
+                    "method": "POST", "url": f"{api}/set_choices",
+                    "body": {"col": "<col>", "choices": "<choices>"},
+                    "parameters": {
+                        "col": {"options": choice_indices, "labels": choice_labels},
+                        "choices": {"description": "Array of valid option strings, e.g. [\"Pass\", \"Fail\", \"N/A\"]"},
+                    },
+                })
+                n += 1
+
+            # -- Acceptance criteria rule management --
+            ae_cols = [(i, c) for i, c in enumerate(cols) if c["type"] == "ae-acceptance-criteria"]
+            if ae_cols:
+                ae_indices = [i for i, _ in ae_cols]
+                ae_labels = [c["name"] for _, c in ae_cols]
+                # Build available conditions based on executable columns
+                exec_col_info = [
+                    {"index": i, "name": c["name"], "type": c["type"]}
+                    for i, c in enumerate(cols)
+                    if c["type"] in ("ex-free-text", "ex-choice-list", "ex-cross-reference",
+                                     "ex-signature", "free-text", "choice-list",
+                                     "cross-reference", "signature")
+                ]
+                affordances.append({
+                    "id": n, "label": "Set acceptance rule for column",
+                    "method": "POST", "url": f"{api}/set_rule",
+                    "body": {"col": "<col>", "rule": "<rule>"},
+                    "parameters": {
+                        "col": {"options": ae_indices, "labels": ae_labels},
+                        "rule": {
+                            "description": "Boolean expression tree. Structure: {\"op\": \"AND\"|\"OR\", \"conditions\": [...]}. "
+                                           "Leaf conditions: {\"type\": \"all-executed\"} checks all executable columns are filled; "
+                                           "{\"type\": \"column\", \"column\": <col_index>, \"operator\": \"is-filled\"|\"is-signed\"|\"equals\"|\"ref-status\", \"value\": \"...\"} "
+                                           "checks a specific column. Example: {\"op\": \"AND\", \"conditions\": [{\"type\": \"all-executed\"}]}",
+                            "executable_columns": exec_col_info,
+                        },
+                    },
+                })
+                n += 1
+
+            # -- Prerequisite cell management --
+            prereq_cols = [(i, c) for i, c in enumerate(cols) if c["type"] == "ne-prerequisite"]
+            if prereq_cols and rows:
+                prereq_col_indices = [i for i, _ in prereq_cols]
+                prereq_col_labels = [c["name"] for _, c in prereq_cols]
+                row_ids = [f"EI-{i+1}" for i in range(len(rows))]
+                affordances.append({
+                    "id": n, "label": "Set prerequisites for cell",
+                    "method": "POST", "url": f"{api}/set_prerequisites",
+                    "body": {"row": "<row>", "col": "<col>", "prerequisites": "<prerequisites>"},
+                    "parameters": {
+                        "row": {"options": list(range(len(rows))), "labels": row_ids},
+                        "col": {"options": prereq_col_indices, "labels": prereq_col_labels},
+                        "prerequisites": {"description": "Array of row indices that must pass acceptance before this row can execute, e.g. [0, 1]"},
+                    },
+                })
+                n += 1
 
         # -- Cell editing (parameterized) --
         if cols and rows:
@@ -494,6 +568,65 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         data["rows"].pop(ri)
         return render_node(data, workflow_id)
 
+    # -- set_choices (choice-list column options) --
+    if action == "set_choices":
+        ci = body.get("col")
+        choices = body.get("choices")
+        if not isinstance(ci, int) or ci < 0 or ci >= len(data["columns"]):
+            return {"error": "Invalid column index."}
+        col = data["columns"][ci]
+        if col["type"] not in ("ex-choice-list", "choice-list"):
+            return {"error": f"Column {ci} ({col['name']}) is not a choice-list column."}
+        if not isinstance(choices, list):
+            return {"error": "choices must be an array of strings."}
+        if not all(isinstance(c, str) for c in choices):
+            return {"error": "All choices must be strings."}
+        col["choices"] = choices
+        return render_node(data, workflow_id)
+
+    # -- set_rule (acceptance criteria rule) --
+    if action == "set_rule":
+        ci = body.get("col")
+        rule = body.get("rule")
+        if not isinstance(ci, int) or ci < 0 or ci >= len(data["columns"]):
+            return {"error": "Invalid column index."}
+        col = data["columns"][ci]
+        if col["type"] != "ae-acceptance-criteria":
+            return {"error": f"Column {ci} ({col['name']}) is not an acceptance-criteria column."}
+        if not isinstance(rule, dict):
+            return {"error": "rule must be an object with 'op' and 'conditions' keys."}
+        if rule.get("op") not in ("AND", "OR"):
+            return {"error": "rule.op must be 'AND' or 'OR'."}
+        if not isinstance(rule.get("conditions"), list):
+            return {"error": "rule.conditions must be an array."}
+        col["rule"] = rule
+        return render_node(data, workflow_id)
+
+    # -- set_prerequisites (prerequisite cell dependencies) --
+    if action == "set_prerequisites":
+        ri = body.get("row")
+        ci = body.get("col")
+        prereqs = body.get("prerequisites")
+        if not isinstance(ri, int) or not isinstance(ci, int):
+            return {"error": "row and col must be integers."}
+        if ri < 0 or ri >= len(data["rows"]):
+            return {"error": f"Row {ri} out of range (0-{len(data['rows'])-1})."}
+        if ci < 0 or ci >= len(data["columns"]):
+            return {"error": f"Column {ci} out of range (0-{len(data['columns'])-1})."}
+        col = data["columns"][ci]
+        if col["type"] != "ne-prerequisite":
+            return {"error": f"Column {ci} ({col['name']}) is not a prerequisite column."}
+        if not isinstance(prereqs, list):
+            return {"error": "prerequisites must be an array of row indices."}
+        for p in prereqs:
+            if not isinstance(p, int) or p < 0 or p >= len(data["rows"]):
+                return {"error": f"Invalid prerequisite row index: {p}. Valid range: 0-{len(data['rows'])-1}."}
+            if p == ri:
+                return {"error": "A row cannot be a prerequisite of itself."}
+        # Store as JSON array string (matches edit_plan.html format)
+        data["rows"][ri][ci] = json.dumps(prereqs)
+        return render_node(data, workflow_id)
+
     # -- set_property --
     if action == "set_property":
         key = body.get("key", "")
@@ -606,6 +739,7 @@ _SIMPLE_ACTIONS = {"proceed", "go_back", "submit", "restart", "complete"}
 _BODY_ACTIONS = {
     "add_column", "add_row", "set_cell", "rename_column",
     "set_column_type", "remove_column", "remove_row", "set_property",
+    "set_choices", "set_rule", "set_prerequisites",
     "cell_action",
 }
 
@@ -648,6 +782,12 @@ def _action_label(action: str, body: dict) -> str | None:
         return f"Remove row {body.get('row')}"
     if action == "set_property":
         return f"Set {body.get('key')} = {body.get('value')}"
+    if action == "set_choices":
+        return f"Set choices for column {body.get('col')}"
+    if action == "set_rule":
+        return f"Set acceptance rule for column {body.get('col')}"
+    if action == "set_prerequisites":
+        return f"Set prerequisites for cell [{body.get('row')}, {body.get('col')}]"
     if action == "cell_action":
         cell_act = body.get("cell_action", "?")
         row = body.get("row", "?")
