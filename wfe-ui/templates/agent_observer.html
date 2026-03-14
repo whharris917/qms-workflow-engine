@@ -305,12 +305,6 @@ function wfRenderStateProps(state) {
     html += '<div class="wf-state-row"><span class="wf-state-key">node:</span> ' + wfEsc(s.node || '') + '</div>';
     html += '<div class="wf-state-row"><span class="wf-state-key">node_title:</span> ' + wfEsc(s.node_title || '') + '</div>';
     html += '<div class="wf-state-row"><span class="wf-state-key">completed_nodes:</span> ' + wfEsc(JSON.stringify(s.completed_nodes || [])) + '</div>';
-    if (s.plan_status !== undefined) {
-        html += '<div class="wf-state-row"><span class="wf-state-key">plan_status:</span> ' + wfEsc(s.plan_status) + '</div>';
-    }
-    if (s.progress) {
-        html += '<div class="wf-state-row"><span class="wf-state-key">progress:</span> ' + wfEsc(JSON.stringify(s.progress)) + '</div>';
-    }
     html += '</div>';
     return html;
 }
@@ -1357,12 +1351,6 @@ var WF_STRUCTURAL_CSS = ''
         lines.push('\u251c\u2500 <span class="tc-key">node</span>: <span class="tc-node">' + wfEsc(s.node || '') + '</span>');
         lines.push('\u251c\u2500 <span class="tc-key">node_title</span>: <span class="tc-str">' + wfEsc(s.node_title || '') + '</span>');
         lines.push('\u251c\u2500 <span class="tc-key">completed_nodes</span>: <span class="tc-str">' + wfEsc(JSON.stringify(s.completed_nodes || [])) + '</span>');
-        if (s.plan_status !== undefined) {
-            lines.push('\u251c\u2500 <span class="tc-key">plan_status</span>: <span class="tc-str">' + wfEsc(s.plan_status) + '</span>');
-        }
-        if (s.progress) {
-            lines.push('\u251c\u2500 <span class="tc-key">progress</span>: <span class="tc-str">' + wfEsc(JSON.stringify(s.progress)) + '</span>');
-        }
 
         /* Instructions */
         if (state.instructions) {

@@ -99,28 +99,6 @@ def _load_engine(data: dict):
     return PlanEngine(plan, state)
 
 
-def _execution_progress(engine) -> dict:
-    """Compute execution progress stats."""
-    from engine.types import EXECUTABLE_TYPES
-    ps = engine.get_plan_state()
-    total_cells = 0
-    filled_cells = 0
-    completed_rows = 0
-    for rs in ps.rows:
-        if rs.acceptance and rs.acceptance.passed:
-            completed_rows += 1
-        for cs in rs.cells:
-            if cs.column_type in EXECUTABLE_TYPES:
-                total_cells += 1
-                if cs.value:
-                    filled_cells += 1
-    return {
-        "total_rows": len(ps.rows),
-        "completed_rows": completed_rows,
-        "total_cells": total_cells,
-        "filled_cells": filled_cells,
-    }
-
 
 # ---------------------------------------------------------------------------
 # Rendering
@@ -455,8 +433,6 @@ def render_node(data: dict, workflow_id: str) -> dict:
     if node in ("executing", "done") and data.get("execution"):
         engine = _load_engine(data)
         ps = engine.get_plan_state()
-        state["plan_status"] = ps.status
-        state["progress"] = _execution_progress(engine)
         state["execution_table"] = {
             "columns": ps.columns,
             "rows": [r.to_dict() for r in ps.rows],
