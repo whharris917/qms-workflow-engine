@@ -262,6 +262,37 @@ function wfRenderObject(obj) {
     return html + '</table>';
 }
 
+function wfRuleToExpr(rule, columns) {
+    /* Translate a rule JSON tree into a human-readable boolean expression.
+       columns is the columns array (for resolving column index to name). */
+    if (!rule || !rule.conditions) return JSON.stringify(rule);
+    var parts = [];
+    for (var i = 0; i < rule.conditions.length; i++) {
+        var c = rule.conditions[i];
+        if (c.op) {
+            /* Nested group */
+            parts.push('(' + wfRuleToExpr(c, columns) + ')');
+        } else if (c.type === 'all-executed') {
+            parts.push('all-executed');
+        } else if (c.type === 'column' && c.column !== undefined) {
+            var colName = (columns && columns[c.column]) ? columns[c.column].name : 'col ' + c.column;
+            var op = c.operator || '?';
+            if (op === 'is-filled' || op === 'is-signed') {
+                parts.push(colName + ' ' + op);
+            } else if (op === 'equals' || op === 'ref-status') {
+                parts.push(colName + ' ' + op + ' "' + (c.value || '') + '"');
+            } else {
+                parts.push(colName + ' ' + op);
+            }
+        } else {
+            parts.push(JSON.stringify(c));
+        }
+    }
+    if (parts.length === 0) return '(empty)';
+    if (parts.length === 1) return parts[0];
+    return parts.join(' ' + (rule.op || 'AND') + ' ');
+}
+
 function wfRenderFields(fields, fieldCategory) {
     var keys = Object.keys(fields);
     if (!keys.length) return '<span class="wf-empty-obj">(empty)</span>';
@@ -345,7 +376,7 @@ function wfRenderTable(table) {
             html += '<th><div class="wf-table-colname">' + wfEsc(c.name) + '</div>';
             html += '<div class="wf-table-coltype">' + wfEsc(c.type) + '</div>';
             if (c.choices) html += '<div class="wf-table-colmeta">choices: ' + wfEsc(JSON.stringify(c.choices)) + '</div>';
-            if (c.rule) html += '<div class="wf-table-colmeta">rule: ' + wfEsc(JSON.stringify(c.rule)) + '</div>';
+            if (c.rule) html += '<div class="wf-table-colmeta">rule: ' + wfEsc(wfRuleToExpr(c.rule, cols)) + '</div>';
             html += '</th>';
         }
         html += '</tr></thead><tbody>';
@@ -401,7 +432,7 @@ function wfRenderExecTable(et) {
         html += '<th><div class="wf-table-colname">' + wfEsc(c.name) + '</div>';
         html += '<div class="wf-table-coltype">' + wfEsc(c.type) + '</div>';
         if (c.choices) html += '<div class="wf-table-colmeta">choices: ' + wfEsc(JSON.stringify(c.choices)) + '</div>';
-        if (c.rule) html += '<div class="wf-table-colmeta">rule: ' + wfEsc(JSON.stringify(c.rule)) + '</div>';
+        if (c.rule) html += '<div class="wf-table-colmeta">rule: ' + wfEsc(wfRuleToExpr(c.rule, cols)) + '</div>';
         html += '</th>';
     }
     html += '</tr></thead><tbody>';
@@ -544,7 +575,7 @@ var WF_STRUCTURAL_CSS = ''
     + '.wf-conn { flex:1; height:2px; margin:0 0.25rem; min-width:12px; align-self:center; margin-bottom:1rem; }'
     + '.wf-section { padding:0.5rem 1.5rem 0; }'
     + '.wf-section-head { font-size:1.1rem; font-weight:600; }'
-    + '.wf-desc { padding:0.25rem 1.5rem 0.75rem; font-size:0.9rem; line-height:1.5; }'
+    + '.wf-desc { padding:0.25rem 1.5rem 0.75rem; font-size:0.9rem; line-height:1.5; white-space:pre-line; }'
     + '.wf-card { margin:0.5rem 1.5rem; padding:0.75rem; border:1px solid; border-radius:8px; }'
     + '.wf-card-head { font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem; }'
     + '.wf-tbl { width:100%; border-collapse:collapse; }'
@@ -934,7 +965,7 @@ var WF_STRUCTURAL_CSS = ''
         + '#rc-exp-a .ex-arrow { color:#1e3a5f; font-size:0.8rem; }'
 
         /* Instructions */
-        + '#rc-exp-a .ex-instructions { padding:0.4rem 1.2rem 0.6rem; font-size:0.82rem; color:#6a8fa8; line-height:1.5; border-bottom:1px dashed #1e3a5f; font-style:italic; }'
+        + '#rc-exp-a .ex-instructions { padding:0.4rem 1.2rem 0.6rem; font-size:0.82rem; color:#6a8fa8; line-height:1.5; border-bottom:1px dashed #1e3a5f; font-style:italic; white-space:pre-line; }'
 
         /* Two-column layout */
         + '#rc-exp-a .ex-columns { display:flex; gap:0; min-height:0; }'
@@ -1167,7 +1198,7 @@ var WF_STRUCTURAL_CSS = ''
         + '#rc-exp-b .gb-bar-lbl-cur { color:#c084fc; font-weight:700; }'
         + '#rc-exp-b .gb-bar-lbl-done { color:#8b6cc1; }'
 
-        + '#rc-exp-b .gb-instr { padding:0.3rem 1.2rem 0.6rem; font-size:0.82rem; color:#9a8ab0; line-height:1.5; }'
+        + '#rc-exp-b .gb-instr { padding:0.3rem 1.2rem 0.6rem; font-size:0.82rem; color:#9a8ab0; line-height:1.5; white-space:pre-line; }'
 
         + '#rc-exp-b .gb-section-label { padding:0.3rem 1.2rem; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.1em; color:#5a4a70; }'
 
@@ -1402,7 +1433,7 @@ var WF_STRUCTURAL_CSS = ''
                     var cLast = ci === etCols.length - 1;
                     var colExtra = '';
                     if (etCols[ci].choices) colExtra += ' choices=' + JSON.stringify(etCols[ci].choices);
-                    if (etCols[ci].rule) colExtra += ' rule=' + JSON.stringify(etCols[ci].rule);
+                    if (etCols[ci].rule) colExtra += ' rule=' + wfRuleToExpr(etCols[ci].rule, etCols);
                     lines.push(tblCont + '\u2502  ' + (cLast ? '\u2514\u2500 ' : '\u251c\u2500 ') + '<span class="tc-fname">' + wfEsc(etCols[ci].name) + '</span> <span class="tc-opts">(' + wfEsc(etCols[ci].type) + ')</span>' + (colExtra ? ' <span class="tc-opts">' + wfEsc(colExtra) + '</span>' : ''));
                 }
                 if (!etCols.length) lines.push(tblCont + '\u2502  \u2514\u2500 <span class="tc-null">(none)</span>');
@@ -1450,7 +1481,7 @@ var WF_STRUCTURAL_CSS = ''
                     var cb = cLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
                     var cExtra = '';
                     if (cols[ci].choices) cExtra += ' choices=' + JSON.stringify(cols[ci].choices);
-                    if (cols[ci].rule) cExtra += ' rule=' + JSON.stringify(cols[ci].rule);
+                    if (cols[ci].rule) cExtra += ' rule=' + wfRuleToExpr(cols[ci].rule, cols);
                     lines.push(tblCont + '\u2502  ' + cb + '<span class="tc-fname">' + wfEsc(cols[ci].name) + '</span> <span class="tc-opts">(' + wfEsc(cols[ci].type) + ')</span>' + (cExtra ? ' <span class="tc-opts">' + wfEsc(cExtra) + '</span>' : ''));
                 }
                 if (!cols.length) lines.push(tblCont + '\u2502  \u2514\u2500 <span class="tc-null">(none)</span>');
@@ -1715,7 +1746,7 @@ var WF_STRUCTURAL_CSS = ''
         + '#rc-exp-d .ds-chip-cur { border-color:#c05030; color:#c05030; background:#fdf0ec; font-weight:700; }'
         + '#rc-exp-d .ds-chip-done { border-color:#6a8a55; color:#6a8a55; background:#f0f5ec; }'
 
-        + '#rc-exp-d .ds-instr { padding:0.5rem 1rem; font-size:0.82rem; color:#7a7060; line-height:1.5; border-bottom:1px solid #e8e0d5; }'
+        + '#rc-exp-d .ds-instr { padding:0.5rem 1rem; font-size:0.82rem; color:#7a7060; line-height:1.5; border-bottom:1px solid #e8e0d5; white-space:pre-line; }'
 
         /* Sections */
         + '#rc-exp-d .ds-section { padding:0.5rem 1rem; }'

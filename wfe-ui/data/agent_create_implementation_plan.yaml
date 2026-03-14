@@ -13,18 +13,13 @@ nodes:
   construction:
     title: Table Construction
     lifecycle_label: Construction
-    instruction: >-
-      Build an implementation plan table. Add columns to define the
-      structure, then add rows and fill in cell values. Column types
-      fall into three categories: Non-executable (ne-) columns are
-      filled now during construction and become read-only during
-      execution -- use these for task descriptions, prerequisites, and
-      other plan content. Executable (ex-) columns are left empty now
-      and filled during execution -- use these for evidence, outcomes,
-      signatures, and other execution artifacts. Auto-executed (ae-)
-      columns are evaluated automatically by the system during
-      execution based on rules you define -- use these for acceptance
-      criteria.
+    instruction: |
+      Build an implementation plan table. Add columns to define the structure, then add rows and fill in cell values.
+
+      Column types fall into three categories:
+      - Non-executable (ne-): Filled now during construction, read-only during execution. Use for task descriptions, prerequisites, and other plan content.
+      - Executable (ex-): Left empty now, filled during execution. Use for evidence, outcomes, signatures, and other execution artifacts.
+      - Auto-executed (ae-): Evaluated automatically by the system during execution based on rules you define. Use for acceptance criteria.
     proceed:
       label: Proceed to Review
       # Gate: requires at least one column and one row (enforced in Python)
@@ -32,26 +27,22 @@ nodes:
   review:
     title: Review
     lifecycle_label: Review
-    instruction: >-
-      Review the complete implementation plan. Go back to make changes,
-      or proceed to execution.
+    instruction: |
+      Review the complete implementation plan. Go back to make changes, or proceed to execution.
 
   executing:
     title: Execution
     lifecycle_label: Execution
-    instruction: >-
-      Execute the implementation plan by filling cells, signing,
-      and recording evidence. Work through EIs in order if sequential
-      execution is enabled. Each row's acceptance criteria are
-      evaluated automatically. All acceptance criteria must pass
-      to complete execution.
+    instruction: |
+      Execute the implementation plan by filling cells, signing, and recording evidence.
+
+      Work through EIs in order if sequential execution is enabled. Each row's acceptance criteria are evaluated automatically. All acceptance criteria must pass to complete execution.
 
   done:
     title: Complete
     lifecycle_label: Done
-    instruction: >-
-      All execution items have passed acceptance criteria. You may
-      go back to make corrections or start a new plan.
+    instruction: |
+      All execution items have passed acceptance criteria. You may go back to make corrections or start a new plan.
 
 lifecycle_banner:
   - Construction
