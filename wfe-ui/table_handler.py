@@ -16,6 +16,9 @@ from pathlib import Path
 
 import yaml
 
+from engine import PlanEngine
+from engine.types import ColumnDef, PlanDefinition, ExecutionState, is_choice_list
+
 # ---------------------------------------------------------------------------
 # Load YAML definition
 # ---------------------------------------------------------------------------
@@ -65,6 +68,58 @@ def _ensure_data(data: dict) -> dict:
     data.setdefault("rows", [])
     data.setdefault("properties", {"sequential_execution": False})
     return data
+
+
+# ---------------------------------------------------------------------------
+# Execution engine bridge
+# ---------------------------------------------------------------------------
+
+
+def _build_plan_def(data: dict) -> PlanDefinition:
+    """Construct a PlanDefinition from the in-memory table data."""
+    columns = [ColumnDef.from_dict(c) for c in data["columns"]]
+    return PlanDefinition(
+        cr_id="WF",  # synthetic — no CR file on disk
+        columns=columns,
+        rows=data["rows"],
+        table_properties={
+            "sequentialExecution": data["properties"].get("sequential_execution", False),
+        },
+    )
+
+
+def _load_engine(data: dict):
+    """Hydrate a PlanEngine from the table data + persisted execution state."""
+    plan = _build_plan_def(data)
+    exec_state = data.get("execution")
+    if exec_state:
+        state = ExecutionState.from_dict(exec_state)
+    else:
+        state = ExecutionState(cr_id="WF")
+    return PlanEngine(plan, state)
+
+
+def _execution_progress(engine) -> dict:
+    """Compute execution progress stats."""
+    from engine.types import EXECUTABLE_TYPES
+    ps = engine.get_plan_state()
+    total_cells = 0
+    filled_cells = 0
+    completed_rows = 0
+    for rs in ps.rows:
+        if rs.acceptance and rs.acceptance.passed:
+            completed_rows += 1
+        for cs in rs.cells:
+            if cs.column_type in EXECUTABLE_TYPES:
+                total_cells += 1
+                if cs.value:
+                    filled_cells += 1
+    return {
+        "total_rows": len(ps.rows),
+        "completed_rows": completed_rows,
+        "total_cells": total_cells,
+        "filled_cells": filled_cells,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -204,15 +259,83 @@ def _build_affordances(data: dict, workflow_id: str) -> list[dict]:
         })
         n += 1
 
-        # Finalize
+        # Proceed to Execution
         affordances.append({
-            "id": n, "label": "Finalize Plan",
+            "id": n, "label": "Proceed to Execution",
             "method": "POST", "url": f"{api}/submit",
             "body": {},
         })
         n += 1
 
+    elif node == "executing":
+        engine = _load_engine(data)
+        ps = engine.get_plan_state()
+
+        # Dynamic cell affordances from engine
+        for act in ps.next_actions:
+            action = act["action"]
+            row = act["row"]
+            col = act["col"]
+            col_name = act["column_name"]
+            row_id = act["row_id"]
+
+            cell_body = {"row": row, "col": col, "cell_action": action}
+            params = {}
+
+            if action == "fill":
+                cell_body["value"] = "<value>"
+                col_def = engine.plan.columns[col]
+                if is_choice_list(col_def.type) and col_def.choices:
+                    params["value"] = {"options": col_def.choices}
+                else:
+                    params["value"] = {}
+                label = f"Fill {col_name} for {row_id}"
+            elif action == "sign":
+                label = f"Sign {col_name} for {row_id}"
+            elif action == "mark_na":
+                label = f"Mark {col_name} as N/A for {row_id}"
+            elif action == "initiate_issue":
+                cell_body["issue_type"] = "<issue_type>"
+                params["issue_type"] = {"options": ["VAR", "ER"]}
+                label = f"Initiate issue for {col_name} in {row_id}"
+            else:
+                label = act.get("description", action)
+
+            a = {
+                "id": n, "label": label,
+                "method": "POST", "url": f"{api}/cell_action",
+                "body": cell_body,
+            }
+            if params:
+                a["parameters"] = params
+            affordances.append(a)
+            n += 1
+
+        # Complete gate
+        if ps.status == "completed":
+            affordances.append({
+                "id": n, "label": "Complete Execution",
+                "method": "POST", "url": f"{api}/complete",
+                "body": {},
+            })
+            n += 1
+
+        # Go back to review
+        affordances.append({
+            "id": n, "label": "Go back to Review",
+            "method": "POST", "url": f"{api}/go_back",
+            "body": {},
+        })
+        n += 1
+
     elif node == "done":
+        affordances.append({
+            "id": n, "label": "Go back to Execution",
+            "method": "POST", "url": f"{api}/go_back",
+            "body": {},
+        })
+        n += 1
+
         affordances.append({
             "id": n, "label": "Start a new Implementation Plan",
             "method": "POST", "url": f"{api}/restart",
@@ -238,22 +361,35 @@ def render_node(data: dict, workflow_id: str) -> dict:
 
     affordances = _build_affordances(data, workflow_id)
 
-    return {
-        "state": {
-            "workflow": WORKFLOW_TITLE,
-            "node": node,
-            "node_title": info["title"],
-            "lifecycle": _LIFECYCLE,
-            "lifecycle_current": lifecycle_current,
-            "lifecycle_completed": lifecycle_completed,
-            "completed_nodes": data["completed_nodes"],
-            "table": {
-                "columns": data["columns"],
-                "rows": data["rows"],
-                "properties": data["properties"],
-                "summary": _table_summary(data),
-            },
+    state = {
+        "workflow": WORKFLOW_TITLE,
+        "node": node,
+        "node_title": info["title"],
+        "lifecycle": _LIFECYCLE,
+        "lifecycle_current": lifecycle_current,
+        "lifecycle_completed": lifecycle_completed,
+        "completed_nodes": data["completed_nodes"],
+        "table": {
+            "columns": data["columns"],
+            "rows": data["rows"],
+            "properties": data["properties"],
+            "summary": _table_summary(data),
         },
+    }
+
+    # Add execution state when in executing/done nodes
+    if node in ("executing", "done") and data.get("execution"):
+        engine = _load_engine(data)
+        ps = engine.get_plan_state()
+        state["plan_status"] = ps.status
+        state["progress"] = _execution_progress(engine)
+        state["execution_table"] = {
+            "columns": ps.columns,
+            "rows": [r.to_dict() for r in ps.rows],
+        }
+
+    return {
+        "state": state,
         "instructions": info["instruction"],
         "affordances": affordances,
     }
@@ -385,14 +521,74 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if node == "review":
             data["node"] = "construction"
             return render_node(data, workflow_id)
+        if node == "executing":
+            data["node"] = "review"
+            return render_node(data, workflow_id)
+        if node == "done":
+            data["node"] = "executing"
+            if "executing" in data["completed_nodes"]:
+                data["completed_nodes"].remove("executing")
+            return render_node(data, workflow_id)
         return {"error": "Cannot go back from this node."}
 
-    # -- submit / finalize --
+    # -- submit (review → executing) --
     if action == "submit":
         if node != "review":
-            return {"error": "Can only finalize from the Review node."}
+            return {"error": "Can only proceed to execution from the Review node."}
         if "review" not in data["completed_nodes"]:
             data["completed_nodes"].append("review")
+        # Initialize execution engine from table data
+        engine = _load_engine(data)
+        engine.start_execution("claude")
+        data["execution"] = engine.state.to_dict()
+        data["node"] = "executing"
+        return render_node(data, workflow_id)
+
+    # -- cell_action (fill, sign, mark_na, initiate_issue) --
+    if action == "cell_action":
+        if node != "executing":
+            return {"error": "Can only execute cells from the Execution node."}
+        engine = _load_engine(data)
+        row = body.get("row")
+        col = body.get("col")
+        cell_action = body.get("cell_action", "")
+
+        if not isinstance(row, int) or not isinstance(col, int):
+            return {"error": "row and col must be integers."}
+
+        if cell_action == "fill":
+            result = engine.fill_cell(row, col, body.get("value", ""), "claude")
+        elif cell_action == "sign":
+            result = engine.sign_cell(row, col, "claude")
+        elif cell_action == "mark_na":
+            result = engine.mark_na(row, col, "claude")
+        elif cell_action == "initiate_issue":
+            result = engine.initiate_issue(row, col, "claude", body.get("issue_type", "ER"))
+        else:
+            return {"error": f"Unknown cell action: {cell_action}"}
+
+        if not result.ok:
+            return {"error": result.error}
+
+        data["execution"] = engine.state.to_dict()
+
+        # Auto-advance to done if all acceptance criteria pass
+        if engine.state.status == "completed":
+            if "executing" not in data["completed_nodes"]:
+                data["completed_nodes"].append("executing")
+            data["node"] = "done"
+
+        return render_node(data, workflow_id)
+
+    # -- complete --
+    if action == "complete":
+        if node != "executing":
+            return {"error": "Can only complete from the Execution node."}
+        engine = _load_engine(data)
+        if engine.state.status != "completed":
+            return {"error": "Not all acceptance criteria have passed."}
+        if "executing" not in data["completed_nodes"]:
+            data["completed_nodes"].append("executing")
         data["node"] = "done"
         return render_node(data, workflow_id)
 
@@ -404,12 +600,13 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 # Actions that take no body parameters (just dispatch)
-_SIMPLE_ACTIONS = {"proceed", "go_back", "submit", "restart"}
+_SIMPLE_ACTIONS = {"proceed", "go_back", "submit", "restart", "complete"}
 
 # Actions that pass the body through (parameters in body)
 _BODY_ACTIONS = {
     "add_column", "add_row", "set_cell", "rename_column",
     "set_column_type", "remove_column", "remove_row", "set_property",
+    "cell_action",
 }
 
 VALID_RESOURCES = _SIMPLE_ACTIONS | _BODY_ACTIONS
@@ -451,4 +648,9 @@ def _action_label(action: str, body: dict) -> str | None:
         return f"Remove row {body.get('row')}"
     if action == "set_property":
         return f"Set {body.get('key')} = {body.get('value')}"
+    if action == "cell_action":
+        cell_act = body.get("cell_action", "?")
+        row = body.get("row", "?")
+        col = body.get("col", "?")
+        return f"{cell_act} on cell [{row}, {col}]"
     return action

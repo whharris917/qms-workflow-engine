@@ -27,11 +27,29 @@ nodes:
     lifecycle_label: Review
     instruction: >-
       Review the complete implementation plan. Go back to make changes,
-      or finalize to complete the plan.
+      or proceed to execution.
+
+  executing:
+    title: Execution
+    lifecycle_label: Execution
+    instruction: >-
+      Execute the implementation plan by filling cells, signing,
+      and recording evidence. Work through EIs in order if sequential
+      execution is enabled. Each row's acceptance criteria are
+      evaluated automatically. All acceptance criteria must pass
+      to complete execution.
+
+  done:
+    title: Complete
+    lifecycle_label: Done
+    instruction: >-
+      All execution items have passed acceptance criteria. You may
+      go back to make corrections or start a new plan.
 
 lifecycle_banner:
   - Construction
   - Review
+  - Execution
   - Done
 
 column_types:
