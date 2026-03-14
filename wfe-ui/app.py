@@ -645,8 +645,8 @@ def _cr_build_affordances(data, node, workflow_id: str):
 
     Affordance rules by field type:
       text     → "Set {label}" with placeholder as value template
-      boolean  → "Set {label}" with options: [true, false]
-      select   → "Set {label}" with options from YAML definition
+      boolean  → "Set {label}" with parameters.value.options: [true, false]
+      select   → "Set {label}" with parameters.value.options from YAML definition
       computed → no affordance (read-only)
 
     Node-level affordances (from nodes.{node} in YAML):
@@ -683,11 +683,11 @@ def _cr_build_affordances(data, node, workflow_id: str):
                  "method": "POST", "url": f"{api_url}/{key}",
                  "body": {"value": "<value>"}}
             if ftype == "boolean":
-                a["options"] = [True, False]
+                a["parameters"] = {"value": {"options": [True, False]}}
             elif ftype == "select":
                 options_ref = fdef.get("options_ref")
                 if options_ref:
-                    a["options"] = _CR_DEF.get(options_ref, [])
+                    a["parameters"] = {"value": {"options": _CR_DEF.get(options_ref, [])}}
             affordances.append(a)
             n += 1
 

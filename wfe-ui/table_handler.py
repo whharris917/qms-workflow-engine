@@ -86,16 +86,22 @@ def _build_affordances(data: dict, workflow_id: str) -> list[dict]:
     api = f"/agent/{workflow_id}"
 
     if node == "construction":
+        cols = data["columns"]
+        rows = data["rows"]
+        col_indices = list(range(len(cols)))
+        col_labels = [c["name"] for c in cols]
+
         # -- Add column --
         affordances.append({
             "id": n, "label": "Add column",
             "method": "POST", "url": f"{api}/add_column",
-            "body": {"name": "<column_name>", "type": "<column_type>"},
-            "options": _VALID_COLUMN_TYPES,
+            "body": {"name": "<name>", "type": "<type>"},
+            "parameters": {
+                "name": {},
+                "type": {"options": _VALID_COLUMN_TYPES},
+            },
         })
         n += 1
-
-        cols = data["columns"]
 
         # -- Add row (only if columns exist) --
         if cols:
@@ -106,54 +112,62 @@ def _build_affordances(data: dict, workflow_id: str) -> list[dict]:
             })
             n += 1
 
-        # -- Per-column management --
-        for ci, col in enumerate(cols):
+        # -- Column management (parameterized) --
+        if cols:
             affordances.append({
-                "id": n,
-                "label": f"Rename column {ci} (current: \"{col['name']}\")",
+                "id": n, "label": "Rename column",
                 "method": "POST", "url": f"{api}/rename_column",
-                "body": {"col": ci, "name": "<new_name>"},
+                "body": {"col": "<col>", "name": "<name>"},
+                "parameters": {
+                    "col": {"options": col_indices, "labels": col_labels},
+                    "name": {},
+                },
             })
             n += 1
 
             affordances.append({
-                "id": n,
-                "label": f"Set type of column {ci} (current: {col['type']})",
+                "id": n, "label": "Set column type",
                 "method": "POST", "url": f"{api}/set_column_type",
-                "body": {"col": ci, "type": "<column_type>"},
-                "options": _VALID_COLUMN_TYPES,
+                "body": {"col": "<col>", "type": "<type>"},
+                "parameters": {
+                    "col": {"options": col_indices, "labels": col_labels},
+                    "type": {"options": _VALID_COLUMN_TYPES},
+                },
             })
             n += 1
 
             affordances.append({
-                "id": n,
-                "label": f"Remove column {ci} (\"{col['name']}\")",
+                "id": n, "label": "Remove column",
                 "method": "POST", "url": f"{api}/remove_column",
-                "body": {"col": ci},
+                "body": {"col": "<col>"},
+                "parameters": {
+                    "col": {"options": col_indices, "labels": col_labels},
+                },
             })
             n += 1
 
-        # -- Per-cell set --
-        rows = data["rows"]
-        for ri, row in enumerate(rows):
-            for ci, val in enumerate(row):
-                col = cols[ci] if ci < len(cols) else {"name": f"col-{ci}"}
-                display = json.dumps(val) if val else "null"
-                affordances.append({
-                    "id": n,
-                    "label": f"Set cell [{ri}, {ci}] {col['name']} (current: {display})",
-                    "method": "POST", "url": f"{api}/set_cell",
-                    "body": {"row": ri, "col": ci, "value": "<value>"},
-                })
-                n += 1
-
-        # -- Per-row remove --
-        for ri in range(len(rows)):
+        # -- Cell editing (parameterized) --
+        if cols and rows:
+            row_indices = list(range(len(rows)))
             affordances.append({
-                "id": n,
-                "label": f"Remove row {ri}",
+                "id": n, "label": "Set cell",
+                "method": "POST", "url": f"{api}/set_cell",
+                "body": {"row": "<row>", "col": "<col>", "value": "<value>"},
+                "parameters": {
+                    "row": {"options": row_indices},
+                    "col": {"options": col_indices, "labels": col_labels},
+                    "value": {},
+                },
+            })
+            n += 1
+
+            affordances.append({
+                "id": n, "label": "Remove row",
                 "method": "POST", "url": f"{api}/remove_row",
-                "body": {"row": ri},
+                "body": {"row": "<row>"},
+                "parameters": {
+                    "row": {"options": row_indices},
+                },
             })
             n += 1
 
@@ -164,7 +178,9 @@ def _build_affordances(data: dict, workflow_id: str) -> list[dict]:
             "label": f"Set sequential execution (current: {json.dumps(seq)})",
             "method": "POST", "url": f"{api}/set_property",
             "body": {"key": "sequential_execution", "value": "<value>"},
-            "options": [True, False],
+            "parameters": {
+                "value": {"options": [True, False]},
+            },
         })
         n += 1
 

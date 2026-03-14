@@ -217,6 +217,25 @@ function wfEsc(s) {
     return d.innerHTML;
 }
 
+function wfRenderParams(a) {
+    /* Render affordance parameters (or legacy options) as a compact string. */
+    if (a.parameters) {
+        var parts = [];
+        var keys = Object.keys(a.parameters);
+        for (var ki = 0; ki < keys.length; ki++) {
+            var k = keys[ki];
+            var p = a.parameters[k];
+            var s = k;
+            if (p.options) s += '=' + JSON.stringify(p.options);
+            if (p.labels) s += ' (' + p.labels.join(', ') + ')';
+            parts.push(s);
+        }
+        return parts.join(' | ');
+    }
+    if (a.options) return JSON.stringify(a.options);
+    return '';
+}
+
 function wfRenderValue(v) {
     if (v == null) return '<span class="wf-null">(null)</span>';
     if (typeof v === 'boolean') return '<span class="wf-bool">' + v + '</span>';
@@ -415,8 +434,9 @@ function wfRenderPage(container, state, msg, feedback) {
             html += '<span class="wf-aff-method">' + wfEsc(a.method) + '</span>';
             html += '</div>';
             html += '<div class="wf-aff-detail">' + wfEsc(a.url) + ' &nbsp; ' + wfEsc(JSON.stringify(a.body)) + '</div>';
-            if (a.options) {
-                html += '<div class="wf-aff-options">options: ' + wfEsc(JSON.stringify(a.options)) + '</div>';
+            var pStr = wfRenderParams(a);
+            if (pStr) {
+                html += '<div class="wf-aff-options">' + wfEsc(pStr) + '</div>';
             }
             html += '</div>';
         }
@@ -770,8 +790,9 @@ var WF_STRUCTURAL_CSS = ''
                 html += '<span class="ex-aff-url">' + wfEsc(a.url) + '</span>';
                 html += '</div>';
                 html += '<div class="ex-aff-body">' + wfEsc(JSON.stringify(a.body)) + '</div>';
-                if (a.options) {
-                    html += '<div class="ex-aff-opts">opts: ' + wfEsc(JSON.stringify(a.options)) + '</div>';
+                var pStr = wfRenderParams(a);
+                if (pStr) {
+                    html += '<div class="ex-aff-opts">' + wfEsc(pStr) + '</div>';
                 }
                 html += '</div>';
             }
@@ -1008,7 +1029,8 @@ var WF_STRUCTURAL_CSS = ''
                 html += '<span class="gb-pill-method">' + wfEsc(a.method) + '</span> ';
                 html += wfEsc(a.url) + ' ' + wfEsc(JSON.stringify(a.body));
                 html += '</div>';
-                if (a.options) html += '<div class="gb-pill-opts">opts: ' + wfEsc(JSON.stringify(a.options)) + '</div>';
+                var pStr = wfRenderParams(a);
+                if (pStr) html += '<div class="gb-pill-opts">' + wfEsc(pStr) + '</div>';
                 html += '</div>';
             }
             html += '</div>';
@@ -1311,10 +1333,11 @@ var WF_STRUCTURAL_CSS = ''
                 else if (/\[Selected\]/.test(a.label)) affCls += ' tc-aff-selected';
                 lines.push(ab + '<span class="tc-aff-id">[' + a.id + ']</span> <span class="' + affCls + '">' + wfEsc(a.label) + '</span>' + acTag);
                 lines.push(ac2 + '\u251c\u2500 <span class="tc-aff-m">' + wfEsc(a.method) + '</span> <span class="tc-aff-url">' + wfEsc(a.url) + '</span>');
-                var bodyLine = ac2 + (a.options ? '\u251c\u2500 ' : '\u2514\u2500 ') + 'body: <span class="tc-aff-body">' + wfEsc(JSON.stringify(a.body)) + '</span>';
+                var pStr = wfRenderParams(a);
+                var bodyLine = ac2 + (pStr ? '\u251c\u2500 ' : '\u2514\u2500 ') + 'body: <span class="tc-aff-body">' + wfEsc(JSON.stringify(a.body)) + '</span>';
                 lines.push(bodyLine);
-                if (a.options) {
-                    lines.push(ac2 + '\u2514\u2500 options: <span class="tc-opts">' + wfEsc(JSON.stringify(a.options)) + '</span>');
+                if (pStr) {
+                    lines.push(ac2 + '\u2514\u2500 <span class="tc-opts">' + wfEsc(pStr) + '</span>');
                 }
             }
         }
@@ -1492,7 +1515,8 @@ var WF_STRUCTURAL_CSS = ''
                 html += '</span>';
                 html += '<span class="ds-cmd-url">' + wfEsc(a.method) + ' ' + wfEsc(a.url) + '</span>';
                 html += '<span class="ds-cmd-body">' + wfEsc(JSON.stringify(a.body)) + '</span>';
-                if (a.options) html += '<span class="ds-cmd-opts">opts: ' + wfEsc(JSON.stringify(a.options)) + '</span>';
+                var pStr = wfRenderParams(a);
+                if (pStr) html += '<span class="ds-cmd-opts">' + wfEsc(pStr) + '</span>';
                 html += '</div>';
             }
             html += '</div>';
