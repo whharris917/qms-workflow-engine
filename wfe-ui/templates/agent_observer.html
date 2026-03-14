@@ -297,16 +297,8 @@ function wfRenderFields(fields, fieldCategory) {
 }
 
 function wfRenderStateProps(state) {
-    /* Renders state-level properties that don't have dedicated visual elements:
-       node (raw ID), completed_nodes, plan_status, progress */
-    var s = state.state || {};
-    var html = '<div class="wf-card wf-state-props">';
-    html += '<div class="wf-card-head">state</div>';
-    html += '<div class="wf-state-row"><span class="wf-state-key">node:</span> ' + wfEsc(s.node || '') + '</div>';
-    html += '<div class="wf-state-row"><span class="wf-state-key">node_title:</span> ' + wfEsc(s.node_title || '') + '</div>';
-    html += '<div class="wf-state-row"><span class="wf-state-key">completed_nodes:</span> ' + wfEsc(JSON.stringify(s.completed_nodes || [])) + '</div>';
-    html += '</div>';
-    return html;
+    /* node, node_title rendered by section heading; completed_nodes rendered by lifecycle banner */
+    return '';
 }
 
 function wfRenderBanner(state) {
@@ -590,9 +582,6 @@ var WF_STRUCTURAL_CSS = ''
     + '.wf-table-empty { font-style:italic; font-size:0.8rem; text-align:center; padding:0.75rem; }'
     + '.wf-table-props { display:flex; gap:1rem; margin-top:0.5rem; font-size:0.72rem; }'
     + '.wf-table-prop { font-family:Consolas,Monaco,monospace; }'
-    + '.wf-state-props { font-size:0.78rem; }'
-    + '.wf-state-row { padding:0.1rem 0; }'
-    + '.wf-state-key { font-weight:600; font-family:Consolas,Monaco,monospace; }'
     + '.wf-table-colmeta { font-size:0.68rem; word-break:break-all; max-width:200px; overflow:hidden; }'
     + '.wf-exec-cell { font-size:0.8rem; }'
     + '.wf-exec-pass { font-weight:600; }'
@@ -1347,10 +1336,8 @@ var WF_STRUCTURAL_CSS = ''
             }
         }
 
-        /* Node & state properties */
-        lines.push('\u251c\u2500 <span class="tc-key">node</span>: <span class="tc-node">' + wfEsc(s.node || '') + '</span>');
-        lines.push('\u251c\u2500 <span class="tc-key">node_title</span>: <span class="tc-str">' + wfEsc(s.node_title || '') + '</span>');
-        lines.push('\u251c\u2500 <span class="tc-key">completed_nodes</span>: <span class="tc-str">' + wfEsc(JSON.stringify(s.completed_nodes || [])) + '</span>');
+        /* Node (node_title rendered here; node raw ID and completed_nodes rendered by lifecycle above) */
+        lines.push('\u251c\u2500 <span class="tc-key">node</span>: <span class="tc-node">' + wfEsc(s.node_title || s.node) + '</span>');
 
         /* Instructions */
         if (state.instructions) {
