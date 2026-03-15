@@ -19,12 +19,16 @@ nodes:
     instruction: |
       Design the nodes of your workflow. Each node is a step that the agent will pass through.
 
-      Start by adding nodes. Then select a node to focus on it — this scopes the field editing affordances to that node. For each node you can:
+      Start by adding nodes. Then select a node to focus on it — this scopes the editing affordances to that node. For each node you can:
       - Add fields (text, boolean, select) that the agent will fill in
       - Set a proceed gate (required fields that must be filled before advancing)
       - Add navigation links (go_back, go_to another node)
       - Add terminal actions (submit, restart)
       - Toggle show_all_fields to display all fields from all nodes (useful for review nodes)
+      - Set node mode: standard (fields + proceed), router (automatic conditional branching), or fork (parallel branches)
+
+      Router mode: the node evaluates conditions and auto-advances to the first matching target. No agent interaction.
+      Fork mode: the node splits into named parallel branches that run independently. Set a merge target where branches converge.
 
       You need at least one node with at least one field to proceed.
 

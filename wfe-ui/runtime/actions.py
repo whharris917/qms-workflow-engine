@@ -39,6 +39,9 @@ def dispatch(defn: WorkflowDef, data: dict, workflow_id: str, body: dict) -> dic
     if action == "submit":
         return _submit(defn, data, workflow_id)
 
+    if action == "switch_branch":
+        return _switch_branch(defn, data, workflow_id, body)
+
     # List actions
     if action in ("list_add", "list_edit", "list_remove", "list_reorder", "list_select"):
         return _list_action(defn, data, workflow_id, body, action)
@@ -126,6 +129,17 @@ def _get_raw_options(defn: WorkflowDef, fdef, data: dict = None) -> list[str]:
 def _proceed(defn: WorkflowDef, data: dict, workflow_id: str, body: dict = None) -> dict:
     node_id = data["node"]
     node = defn.nodes.get(node_id)
+
+    # --- Fork activation: node has fork instead of proceed ---
+    if node and node.fork:
+        return _activate_fork(defn, data, workflow_id, node)
+
+    # --- Branch-aware proceed: inside a fork ---
+    fork_state = data.get("fork_state")
+    if fork_state:
+        return _branch_proceed(defn, data, workflow_id, fork_state)
+
+    # --- Standard proceed ---
     if node_id not in data["completed_nodes"]:
         data["completed_nodes"].append(node_id)
 
@@ -146,25 +160,196 @@ def _proceed(defn: WorkflowDef, data: dict, workflow_id: str, body: dict = None)
             return {"error": "Already at the final node."}
         data["node"] = node_ids[idx + 1]
 
-    # Check if destination node allows auto-advance (pause=False)
-    dest_node = defn.nodes.get(data["node"])
-    if dest_node and not dest_node.pause:
-        # Auto-advance if gate passes (or no gate)
-        if dest_node.proceed:
-            gate = dest_node.proceed.gate
-            if gate:
-                from .evaluator import evaluate
-                passed, _ = evaluate(gate, data)
-            else:
-                passed = True
-            if passed:
-                return _proceed(defn, data, workflow_id)
+    return _enter_node(defn, data, workflow_id)
 
+
+def _enter_node(defn: WorkflowDef, data: dict, workflow_id: str, _depth: int = 0) -> dict:
+    """Handle arrival at a new node — auto-routing and auto-advance.
+
+    Called after any navigation that lands on a new node. Handles:
+    1. Router nodes: evaluate conditions and advance to matching target
+    2. Auto-advance (pause=False): proceed if gate passes
+    """
+    if _depth > 20:
+        return {"error": "Navigation depth limit exceeded (possible infinite loop)."}
+
+    dest_node = defn.nodes.get(data["node"])
+    if not dest_node:
+        return render_page(defn, data, workflow_id)
+
+    # Router: evaluate routes and auto-advance
+    if dest_node.router:
+        return _route(defn, data, workflow_id, dest_node, _depth)
+
+    # Auto-advance (pause=False) with proceed gate
+    if not dest_node.pause and dest_node.proceed:
+        gate = dest_node.proceed.gate
+        if gate:
+            passed, _ = evaluate(gate, data)
+        else:
+            passed = True
+        if passed:
+            if data["node"] not in data["completed_nodes"]:
+                data["completed_nodes"].append(data["node"])
+            target = dest_node.proceed.target
+            if target and target in defn.node_ids:
+                data["node"] = target
+            else:
+                node_ids = defn.node_ids
+                idx = node_ids.index(data["node"])
+                if idx < len(node_ids) - 1:
+                    data["node"] = node_ids[idx + 1]
+            return _enter_node(defn, data, workflow_id, _depth + 1)
+
+    return render_page(defn, data, workflow_id)
+
+
+def _route(defn: WorkflowDef, data: dict, workflow_id: str,
+           node, _depth: int = 0) -> dict:
+    """Evaluate a router node and advance to the first matching target."""
+    if node.id not in data["completed_nodes"]:
+        data["completed_nodes"].append(node.id)
+
+    for route in node.router:
+        if route.when:
+            passed, _ = evaluate(route.when, data)
+            if not passed:
+                continue
+        # Match found (or default route with no when)
+        if route.target not in defn.node_ids:
+            return {"error": f"Router target '{route.target}' not found."}
+        data["node"] = route.target
+        return _enter_node(defn, data, workflow_id, _depth + 1)
+
+    return {"error": "Router: no matching route and no default."}
+
+
+def _activate_fork(defn: WorkflowDef, data: dict, workflow_id: str,
+                   node) -> dict:
+    """Activate parallel branches from a fork node."""
+    if node.id not in data["completed_nodes"]:
+        data["completed_nodes"].append(node.id)
+
+    fork_def = node.fork
+    branches = {}
+    first_branch_id = None
+    for bid, bdef in fork_def.branches.items():
+        if not bdef.nodes:
+            return {"error": f"Fork branch '{bid}' has no nodes."}
+        for nid in bdef.nodes:
+            if nid not in defn.node_ids:
+                return {"error": f"Fork branch '{bid}' references unknown node '{nid}'."}
+        branches[bid] = {
+            "node": bdef.nodes[0],
+            "completed_nodes": [],
+            "completed": False,
+        }
+        if first_branch_id is None:
+            first_branch_id = bid
+
+    data["fork_state"] = {
+        "fork_node": node.id,
+        "merge_node": fork_def.merge,
+        "active_branch": first_branch_id,
+        "branches": branches,
+    }
+    data["node"] = branches[first_branch_id]["node"]
+
+    # Enter the first branch's first node (may be a router, etc.)
+    return _enter_node(defn, data, workflow_id)
+
+
+def _branch_proceed(defn: WorkflowDef, data: dict, workflow_id: str,
+                    fork_state: dict) -> dict:
+    """Proceed within a fork branch."""
+    active_bid = fork_state["active_branch"]
+    branch = fork_state["branches"][active_bid]
+    node_id = data["node"]
+    fork_def = defn.nodes[fork_state["fork_node"]].fork
+
+    # Mark current node completed (in branch tracking)
+    if node_id not in branch["completed_nodes"]:
+        branch["completed_nodes"].append(node_id)
+    if node_id not in data["completed_nodes"]:
+        data["completed_nodes"].append(node_id)
+
+    # Find position in branch sequence
+    branch_nodes = fork_def.branches[active_bid].nodes
+    try:
+        idx = branch_nodes.index(node_id)
+    except ValueError:
+        return {"error": f"Node '{node_id}' not in branch '{active_bid}'."}
+
+    if idx < len(branch_nodes) - 1:
+        # More nodes in this branch
+        next_node = branch_nodes[idx + 1]
+        branch["node"] = next_node
+        data["node"] = next_node
+        return _enter_node(defn, data, workflow_id)
+
+    # Branch complete
+    branch["completed"] = True
+    branch["node"] = None
+
+    # Check if all branches are complete
+    all_done = all(b["completed"] for b in fork_state["branches"].values())
+    if all_done:
+        # Advance to merge node, clear fork state
+        merge_node = fork_state["merge_node"]
+        del data["fork_state"]
+        data["node"] = merge_node
+        return _enter_node(defn, data, workflow_id)
+
+    # Auto-switch to next incomplete branch
+    for bid, b in fork_state["branches"].items():
+        if not b["completed"]:
+            fork_state["active_branch"] = bid
+            data["node"] = b["node"]
+            return render_page(defn, data, workflow_id)
+
+    # Shouldn't reach here, but safety net
+    return render_page(defn, data, workflow_id)
+
+
+def _switch_branch(defn: WorkflowDef, data: dict, workflow_id: str,
+                   body: dict) -> dict:
+    """Switch to a different branch within a fork."""
+    fork_state = data.get("fork_state")
+    if not fork_state:
+        return {"error": "Not in a fork."}
+
+    target_branch = body.get("branch", "")
+    if target_branch not in fork_state["branches"]:
+        return {"error": f"Unknown branch: {target_branch}"}
+
+    branch = fork_state["branches"][target_branch]
+    if branch["completed"]:
+        return {"error": f"Branch '{target_branch}' is already completed."}
+
+    fork_state["active_branch"] = target_branch
+    data["node"] = branch["node"]
     return render_page(defn, data, workflow_id)
 
 
 def _go_back(defn: WorkflowDef, data: dict, workflow_id: str) -> dict:
     node_id = data["node"]
+
+    # Fork-aware: if at first node in branch, go back to fork node
+    fork_state = data.get("fork_state")
+    if fork_state:
+        active_bid = fork_state["active_branch"]
+        fork_def = defn.nodes[fork_state["fork_node"]].fork
+        branch_nodes = fork_def.branches[active_bid].nodes
+        if node_id == branch_nodes[0]:
+            # At start of branch — can't go back further within branch
+            return {"error": "Already at the first node in this branch."}
+        # Go back within the branch
+        idx = branch_nodes.index(node_id)
+        prev_node = branch_nodes[idx - 1]
+        fork_state["branches"][active_bid]["node"] = prev_node
+        data["node"] = prev_node
+        return render_page(defn, data, workflow_id)
+
     node_ids = defn.node_ids
     idx = node_ids.index(node_id)
     if idx <= 0:

@@ -153,6 +153,55 @@ class ListDef:
 
 
 @dataclass
+class RouteDef:
+    """A single route in a router node — condition + target."""
+    target: str
+    when: dict | None = None  # expression (None = default/always matches)
+
+    @classmethod
+    def from_dict(cls, d: dict) -> RouteDef:
+        return cls(
+            target=d.get("target", ""),
+            when=d.get("when"),
+        )
+
+
+@dataclass
+class BranchDef:
+    """A named branch within a fork — label + ordered node sequence."""
+    label: str
+    nodes: list[str] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, d: dict) -> BranchDef:
+        return cls(
+            label=d.get("label", ""),
+            nodes=d.get("nodes", []),
+        )
+
+
+@dataclass
+class ForkDef:
+    """Parallel split definition — branches + merge target."""
+    branches: dict[str, BranchDef]  # ordered dict of named branches
+    merge: str                       # convergence node ID
+    gate: dict | None = None         # expression (optional gate before forking)
+    label: str = "Continue"          # fork affordance label
+
+    @classmethod
+    def from_dict(cls, d: dict) -> ForkDef:
+        branches = {}
+        for bid, bdef in (d.get("branches") or {}).items():
+            branches[bid] = BranchDef.from_dict(bdef)
+        return cls(
+            branches=branches,
+            merge=d.get("merge", ""),
+            gate=d.get("gate"),
+            label=d.get("label", "Continue"),
+        )
+
+
+@dataclass
 class NodeDef:
     """A discrete step in a workflow."""
     id: str
@@ -167,6 +216,8 @@ class NodeDef:
     navigation: list[NavigationDef] = field(default_factory=list)
     proceed: ProceedDef | None = None
     actions: list[ActionDef] = field(default_factory=list)
+    router: list[RouteDef] | None = None  # mutually exclusive with proceed/fork
+    fork: ForkDef | None = None            # mutually exclusive with proceed/router
 
     @classmethod
     def from_dict(cls, nid: str, d: dict) -> NodeDef:
@@ -189,6 +240,14 @@ class NodeDef:
         if d.get("proceed"):
             proceed = ProceedDef.from_dict(d["proceed"])
 
+        router = None
+        if d.get("router"):
+            router = [RouteDef.from_dict(r) for r in d["router"]]
+
+        fork = None
+        if d.get("fork"):
+            fork = ForkDef.from_dict(d["fork"])
+
         return cls(
             id=nid,
             title=d.get("title", nid),
@@ -202,6 +261,8 @@ class NodeDef:
             navigation=navigation,
             proceed=proceed,
             actions=actions,
+            router=router,
+            fork=fork,
         )
 
 

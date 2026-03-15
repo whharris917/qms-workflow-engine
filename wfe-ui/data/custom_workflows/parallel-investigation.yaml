@@ -1,0 +1,288 @@
+workflow_title: Parallel Investigation
+workflow_description: >
+  Multi-track investigation workflow exercising router (automatic conditional
+  branching), fork (parallel paths), and merge (convergence) primitives.
+
+option_sets:
+  severity_levels: [Low, Medium, High, Critical]
+  categories: [Infrastructure, Application, Security, Data]
+
+nodes:
+
+  intake:
+    title: Intake
+    instruction: >
+      Record the initial report. Severity determines the investigation path:
+      Low = fast-track, Medium/High = dual-track, Critical = triple-track.
+    fields:
+      title:
+        label: Investigation Title
+        type: text
+        key: title
+      description:
+        label: Description
+        type: text
+        key: description
+      severity:
+        label: Severity
+        type: select
+        key: severity
+        options_from: severity_levels
+        instruction: Determines investigation routing.
+      category:
+        label: Category
+        type: select
+        key: category
+        options_from: categories
+    proceed:
+      label: Submit Intake
+      gate:
+        op: AND
+        conditions:
+          - {type: field_truthy, key: title}
+          - {type: field_truthy, key: severity}
+          - {type: field_truthy, key: category}
+
+  severity_router:
+    title: Severity Router
+    instruction: Automatic routing based on severity level.
+    router:
+      - when: {type: field_equals, key: severity, value: Low}
+        target: fast_track
+      - when: {type: field_equals, key: severity, value: Critical}
+        target: critical_scope
+      - target: standard_scope
+
+  # Low severity path
+  fast_track:
+    title: Fast Track Resolution
+    instruction: Low-severity issue. Provide a brief resolution and close.
+    fields:
+      resolution_summary:
+        label: Resolution Summary
+        type: text
+        key: resolution_summary
+    proceed:
+      label: Close Investigation
+      target: final_review
+      gate: {type: field_truthy, key: resolution_summary}
+
+  # Medium/High severity path - dual-track fork
+  standard_scope:
+    title: Standard Investigation Scope
+    instruction: >
+      Medium or High severity. Define scope before parallel tracks begin.
+    fields:
+      scope_statement:
+        label: Scope Statement
+        type: text
+        key: scope_statement
+    fork:
+      label: Start Parallel Investigation
+      gate: {type: field_truthy, key: scope_statement}
+      merge: merge_standard
+      branches:
+        technical:
+          label: Technical Track
+          nodes: [std_tech_analysis, std_tech_findings]
+        compliance:
+          label: Compliance Track
+          nodes: [std_compliance_review, std_compliance_findings]
+
+  std_tech_analysis:
+    title: Technical Analysis
+    instruction: Investigate the technical root cause.
+    fields:
+      root_cause:
+        label: Root Cause
+        type: text
+        key: root_cause
+      affected_systems:
+        label: Affected Systems
+        type: text
+        key: affected_systems
+    proceed:
+      label: Continue to Findings
+      gate: {type: field_truthy, key: root_cause}
+
+  std_tech_findings:
+    title: Technical Findings
+    instruction: Document technical conclusions and recommended actions.
+    fields:
+      tech_recommendation:
+        label: Technical Recommendation
+        type: text
+        key: tech_recommendation
+    proceed:
+      label: Complete Technical Track
+      gate: {type: field_truthy, key: tech_recommendation}
+
+  std_compliance_review:
+    title: Compliance Review
+    instruction: Assess regulatory and policy impact.
+    fields:
+      regulatory_impact:
+        label: Regulatory Impact
+        type: text
+        key: regulatory_impact
+    proceed:
+      label: Continue to Findings
+      gate: {type: field_truthy, key: regulatory_impact}
+
+  std_compliance_findings:
+    title: Compliance Findings
+    instruction: Document compliance conclusions and required actions.
+    fields:
+      compliance_recommendation:
+        label: Compliance Recommendation
+        type: text
+        key: compliance_recommendation
+    proceed:
+      label: Complete Compliance Track
+      gate: {type: field_truthy, key: compliance_recommendation}
+
+  merge_standard:
+    title: Review Findings
+    instruction: Both investigation tracks are complete. Review all findings.
+    show_all_fields: true
+    proceed:
+      label: Proceed to Final Review
+      target: final_review
+
+  # Critical severity path - triple-track fork
+  critical_scope:
+    title: Critical Investigation Scope
+    instruction: >
+      Critical severity. All three tracks run in parallel.
+    fields:
+      crit_scope_statement:
+        label: Scope Statement
+        type: text
+        key: crit_scope_statement
+      escalation_contact:
+        label: Escalation Contact
+        type: text
+        key: escalation_contact
+    fork:
+      label: Start Critical Investigation
+      gate:
+        op: AND
+        conditions:
+          - {type: field_truthy, key: crit_scope_statement}
+          - {type: field_truthy, key: escalation_contact}
+      merge: merge_critical
+      branches:
+        technical:
+          label: Technical Track
+          nodes: [crit_tech_analysis, crit_tech_findings]
+        compliance:
+          label: Compliance Track
+          nodes: [crit_compliance_review, crit_compliance_findings]
+        executive:
+          label: Executive Track
+          nodes: [exec_briefing, exec_approval]
+
+  crit_tech_analysis:
+    title: Technical Analysis
+    instruction: Investigate the technical root cause (critical path).
+    fields:
+      crit_root_cause:
+        label: Root Cause
+        type: text
+        key: crit_root_cause
+    proceed:
+      label: Continue to Findings
+      gate: {type: field_truthy, key: crit_root_cause}
+
+  crit_tech_findings:
+    title: Technical Findings
+    instruction: Document technical conclusions (critical path).
+    fields:
+      crit_tech_recommendation:
+        label: Technical Recommendation
+        type: text
+        key: crit_tech_recommendation
+    proceed:
+      label: Complete Technical Track
+      gate: {type: field_truthy, key: crit_tech_recommendation}
+
+  crit_compliance_review:
+    title: Compliance Review
+    instruction: Assess regulatory and policy impact (critical path).
+    fields:
+      crit_regulatory_impact:
+        label: Regulatory Impact
+        type: text
+        key: crit_regulatory_impact
+    proceed:
+      label: Continue to Findings
+      gate: {type: field_truthy, key: crit_regulatory_impact}
+
+  crit_compliance_findings:
+    title: Compliance Findings
+    instruction: Document compliance conclusions (critical path).
+    fields:
+      crit_compliance_recommendation:
+        label: Compliance Recommendation
+        type: text
+        key: crit_compliance_recommendation
+    proceed:
+      label: Complete Compliance Track
+      gate: {type: field_truthy, key: crit_compliance_recommendation}
+
+  exec_briefing:
+    title: Executive Briefing
+    instruction: Prepare and deliver executive briefing on the incident.
+    fields:
+      briefing_summary:
+        label: Briefing Summary
+        type: text
+        key: briefing_summary
+      business_impact:
+        label: Business Impact Assessment
+        type: text
+        key: business_impact
+    proceed:
+      label: Continue to Approval
+      gate: {type: field_truthy, key: briefing_summary}
+
+  exec_approval:
+    title: Executive Approval
+    instruction: Obtain executive sign-off on the investigation direction.
+    fields:
+      exec_decision:
+        label: Executive Decision
+        type: select
+        key: exec_decision
+        options: [Approved, Approved with Conditions, Escalate Further]
+      exec_conditions:
+        label: Conditions (if any)
+        type: text
+        key: exec_conditions
+        visible_when:
+          exec_decision: "Approved with Conditions"
+    proceed:
+      label: Complete Executive Track
+      gate: {type: field_truthy, key: exec_decision}
+
+  merge_critical:
+    title: Critical Review
+    instruction: All three investigation tracks are complete.
+    show_all_fields: true
+    proceed:
+      label: Proceed to Final Review
+      target: final_review
+
+  final_review:
+    title: Final Review
+    instruction: Review the complete investigation and confirm closure.
+    show_all_fields: true
+    fields:
+      disposition:
+        label: Disposition
+        type: select
+        key: disposition
+        options: [Closed - No Further Action, Closed - CAPA Required, Closed - Monitoring]
+    actions:
+      - action: submit
+        label: Close Investigation

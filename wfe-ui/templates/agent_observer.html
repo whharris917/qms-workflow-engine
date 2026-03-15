@@ -637,7 +637,7 @@ function wfRenderStateProps(state) {
        Known keys (rendered elsewhere): workflow, node, node_title, completed_nodes,
        lifecycle, lifecycle_current, lifecycle_completed, fields, table, execution_table. */
     var s = state.state || {};
-    var known = ['workflow','node','node_title','completed_nodes','lifecycle','lifecycle_current','lifecycle_completed','fields','table','execution_table'];
+    var known = ['workflow','node','node_title','completed_nodes','lifecycle','lifecycle_current','lifecycle_completed','fields','table','execution_table','fork_state'];
     var extra = Object.keys(s).filter(function(k) { return known.indexOf(k) === -1; });
     if (!extra.length) return '';
     var html = '';
@@ -2466,45 +2466,183 @@ var WF_STRUCTURAL_CSS = ''
 
 /* ── Layout config ── */
 var _FC = {
-    nodeW: 630,        /* card width */
+    nodeW: 378,        /* card width */
     rowGap: 70,        /* vertical gap between cards */
     marginTop: 40,     /* top padding in graph */
     marginBot: 40,
     marginLeft: 140,   /* space for back-edge arcs + labels on the left */
-    marginRight: 140
+    marginRight: 140,
+    branchGap: 30      /* horizontal gap between parallel branch columns */
 };
 
-/* ── Collect edges from node data ── */
-function _fcEdges(nodes) {
+/* ── Build a condition label for router edges ── */
+function _fcCondLabel(when) {
+    if (!when) return 'default';
+    if (when.type === 'field_equals') return when.key + ' = ' + when.value;
+    if (when.type === 'field_truthy') return when.key;
+    if (when.op === 'NOT') return 'NOT(...)';
+    if (when.op) return when.op + '(...)';
+    return '?';
+}
+
+/* ── Build layout plan from flat node array ── */
+function _fcBuildLayout(nodes) {
+    var nodeIdMap = {};
+    for (var i = 0; i < nodes.length; i++) nodeIdMap[nodes[i].id] = i;
+
+    /* Identify nodes claimed by forks (branch nodes + merge targets) */
+    var claimed = {};  /* node_id -> true */
+    var mergeOf = {};  /* node_id -> fork_node_id */
+    for (var i = 0; i < nodes.length; i++) {
+        var nd = nodes[i];
+        if (nd.fork) {
+            var branches = nd.fork.branches || {};
+            for (var bid in branches) {
+                var bnodes = branches[bid].nodes || [];
+                for (var j = 0; j < bnodes.length; j++) claimed[bnodes[j]] = true;
+            }
+            if (nd.fork.merge) mergeOf[nd.fork.merge] = nd.id;
+        }
+    }
+
+    /* Build ordered layout items */
+    var items = [];
+    for (var i = 0; i < nodes.length; i++) {
+        var nd = nodes[i];
+        if (claimed[nd.id]) continue;
+        if (mergeOf[nd.id] !== undefined) continue;
+
+        if (nd.fork) {
+            var fg = {
+                type: 'fork_group', fork_idx: i,
+                branches: [], merge_idx: nodeIdMap[nd.fork.merge]
+            };
+            var forkBranches = nd.fork.branches || {};
+            for (var bid in forkBranches) {
+                var bnodeIds = forkBranches[bid].nodes || [];
+                fg.branches.push({
+                    id: bid,
+                    label: forkBranches[bid].label || bid,
+                    node_indices: bnodeIds.map(function(nid) { return nodeIdMap[nid]; })
+                });
+            }
+            items.push(fg);
+        } else if (nd.router) {
+            items.push({type: 'router', idx: i});
+        } else {
+            items.push({type: 'node', idx: i});
+        }
+    }
+    return items;
+}
+
+/* ── Collect edges from layout plan ── */
+function _fcEdges(nodes, items) {
     var nodeIdMap = {};
     for (var i = 0; i < nodes.length; i++) nodeIdMap[nodes[i].id] = i;
     var edges = [];
-    for (var i = 0; i < nodes.length; i++) {
-        if (i < nodes.length - 1) {
-            var lbl = (nodes[i].proceed && nodes[i].proceed.label) || '';
-            edges.push({from: i, to: i + 1, label: lbl, type: 'forward'});
+
+    for (var ii = 0; ii < items.length; ii++) {
+        var item = items[ii];
+        var nextItem = items[ii + 1];
+
+        /* Helper: index of next item's first node */
+        var nextIdx = nextItem
+            ? (nextItem.type === 'fork_group' ? nextItem.fork_idx : nextItem.idx)
+            : null;
+
+        if (item.type === 'node') {
+            var nd = nodes[item.idx];
+            /* Forward to next layout item (unless proceed has explicit target) */
+            if (nd.proceed && nd.proceed.target && nodeIdMap[nd.proceed.target] !== undefined) {
+                edges.push({from: item.idx, to: nodeIdMap[nd.proceed.target],
+                    label: nd.proceed.label || '', type: 'goto'});
+            } else if (nextIdx !== null) {
+                edges.push({from: item.idx, to: nextIdx, label: '', type: 'forward'});
+            }
+            /* Navigation edges */
+            var navs = nd.navigation || [];
+            for (var ni = 0; ni < navs.length; ni++) {
+                var nav = navs[ni];
+                if (nav.action === 'go_back') {
+                    var t = nav.node ? nodeIdMap[nav.node] : (item.idx > 0 ? item.idx - 1 : 0);
+                    if (t !== undefined) edges.push({from: item.idx, to: t, label: nav.label, type: 'back'});
+                } else if (nav.action === 'go_to' && nav.node && nodeIdMap[nav.node] !== undefined) {
+                    edges.push({from: item.idx, to: nodeIdMap[nav.node], label: nav.label, type: 'goto'});
+                }
+            }
         }
-        var navs = nodes[i].navigation || [];
-        for (var ni = 0; ni < navs.length; ni++) {
-            var nav = navs[ni];
-            if (nav.action === 'go_back') {
-                var t = nav.node ? nodeIdMap[nav.node] : (i > 0 ? i - 1 : 0);
-                if (t !== undefined) edges.push({from: i, to: t, label: nav.label, type: 'back'});
-            } else if (nav.action === 'go_to' && nav.node && nodeIdMap[nav.node] !== undefined) {
-                edges.push({from: i, to: nodeIdMap[nav.node], label: nav.label, type: 'goto'});
+        else if (item.type === 'router') {
+            var routes = nodes[item.idx].router || [];
+            for (var ri = 0; ri < routes.length; ri++) {
+                var route = routes[ri];
+                var targetIdx = nodeIdMap[route.target];
+                if (targetIdx !== undefined) {
+                    edges.push({from: item.idx, to: targetIdx,
+                        label: _fcCondLabel(route.when), type: 'router'});
+                }
+            }
+        }
+        else if (item.type === 'fork_group') {
+            /* Fork → branch first nodes */
+            for (var bi = 0; bi < item.branches.length; bi++) {
+                var branch = item.branches[bi];
+                if (branch.node_indices.length > 0) {
+                    edges.push({from: item.fork_idx, to: branch.node_indices[0],
+                        label: branch.label, type: 'fork'});
+                }
+            }
+            /* Branch internal forward edges */
+            for (var bi = 0; bi < item.branches.length; bi++) {
+                var branch = item.branches[bi];
+                for (var ni = 0; ni < branch.node_indices.length - 1; ni++) {
+                    edges.push({from: branch.node_indices[ni],
+                        to: branch.node_indices[ni + 1], label: '', type: 'forward'});
+                }
+                /* Last branch node → merge */
+                if (branch.node_indices.length > 0) {
+                    edges.push({from: branch.node_indices[branch.node_indices.length - 1],
+                        to: item.merge_idx, label: '', type: 'merge'});
+                }
+            }
+            /* Merge → next layout item (or merge proceed.target) */
+            var mergeNd = nodes[item.merge_idx];
+            if (mergeNd && mergeNd.proceed && mergeNd.proceed.target && nodeIdMap[mergeNd.proceed.target] !== undefined) {
+                edges.push({from: item.merge_idx, to: nodeIdMap[mergeNd.proceed.target],
+                    label: mergeNd.proceed.label || '', type: 'goto'});
+            } else if (nextIdx !== null) {
+                edges.push({from: item.merge_idx, to: nextIdx, label: '', type: 'forward'});
             }
         }
     }
     return edges;
 }
 
+/* ── Estimate card height for initial layout ── */
+function _fcEstimateHeight(nd) {
+    var eh = 36 + 16; /* header + padding */
+    if (nd.instruction) eh += Math.min(80, 20 + nd.instruction.length * 0.3);
+    var fields = nd.fields || [];
+    if (fields.length) eh += fields.length * 26 + 8;
+    if (nd.proceed) eh += 28;
+    if (nd.fork) eh += 38;
+    if (nd.router) eh += nd.router.length * 22 + 12;
+    if (nd.actions && nd.actions.length) eh += 28;
+    return Math.max(60, eh);
+}
+
 /* ── Render a single node card as an HTML string ── */
 function _fcNodeCard(nd, idx) {
-    var h = '<div class="fc-card">';
+    var isRouter = nd.router && nd.router.length > 0;
+    var isFork = nd.fork && nd.fork.branches;
+    var cardCls = 'fc-card' + (isRouter ? ' fc-card-router' : '') + (isFork ? ' fc-card-fork' : '');
+    var h = '<div class="' + cardCls + '">';
 
     /* Header */
     h += '<div class="fc-card-head">';
     h += '<span class="fc-num">' + (idx + 1) + '</span>';
+    if (isRouter) h += '<span class="fc-badge fc-badge-router">\u25C7 Router</span>';
+    else if (isFork) h += '<span class="fc-badge fc-badge-fork">\u2442 Fork</span>';
     h += '<span class="fc-card-title">' + wfEsc(nd.title || nd.id) + '</span>';
     h += '<code class="fc-card-id">' + wfEsc(nd.id) + '</code>';
     if (nd.show_all_fields) {
@@ -2532,11 +2670,44 @@ function _fcNodeCard(nd, idx) {
             h += '<span class="fc-field-name">' + wfEsc(fld.label || fld.key) + '</span>';
             h += '<code class="fc-field-key">' + wfEsc(fld.key) + '</code>';
             if (fld.type === 'select' && fld.options && fld.options.length) {
-                h += '<span class="fc-field-opts">' + wfEsc(fld.options.join(' | ')) + '</span>';
+                h += '<div class="fc-field-opts">';
+                for (var oi = 0; oi < fld.options.length; oi++) {
+                    h += '<div class="fc-field-opt">' + wfEsc(fld.options[oi]) + '</div>';
+                }
+                h += '</div>';
             }
             h += '</div>';
         }
         h += '</div>';
+    }
+
+    /* Router routes */
+    if (isRouter) {
+        h += '<div class="fc-routes">';
+        for (var ri = 0; ri < nd.router.length; ri++) {
+            var route = nd.router[ri];
+            var condLabel = route.when ? _fcCondLabel(route.when) : 'default';
+            h += '<div class="fc-route">';
+            h += '<span class="fc-route-arrow">\u2192</span>';
+            h += '<span class="fc-route-cond">' + wfEsc(condLabel) + '</span>';
+            h += '<code class="fc-route-target">' + wfEsc(route.target) + '</code>';
+            h += '</div>';
+        }
+        h += '</div>';
+    }
+
+    /* Fork definition */
+    if (isFork) {
+        h += '<div class="fc-fork-info">';
+        h += '<span class="fc-fork-label">\u2442 ' + wfEsc(nd.fork.label || 'Fork') + '</span>';
+        h += '<span class="fc-fork-merge">\u2192 merge: <code>' + wfEsc(nd.fork.merge || '?') + '</code></span>';
+        var bkeys = Object.keys(nd.fork.branches);
+        h += '<div class="fc-fork-branches">';
+        for (var bi = 0; bi < bkeys.length; bi++) {
+            var br = nd.fork.branches[bkeys[bi]];
+            h += '<span class="fc-fork-branch">' + wfEsc(br.label || bkeys[bi]) + '</span>';
+        }
+        h += '</div></div>';
     }
 
     /* Proceed gate */
@@ -2568,42 +2739,259 @@ function _fcNodeCard(nd, idx) {
     return h;
 }
 
-/* ── Build SVG edges ── */
+/* ── Build SVG edges (orthogonal only — vertical and horizontal segments) ── */
 function _fcBuildEdgeSvg(slots, edges, totalW, totalH) {
     var svg = '<svg xmlns="http://www.w3.org/2000/svg" class="fc-edge-svg" width="' + totalW + '" height="' + totalH + '" viewBox="0 0 ' + totalW + ' ' + totalH + '">';
     svg += '<defs>';
     svg += '<marker id="fc-af" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" class="fc-mf"/></marker>';
     svg += '<marker id="fc-ab" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" class="fc-mb"/></marker>';
     svg += '<marker id="fc-ag" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" class="fc-mg"/></marker>';
+    svg += '<marker id="fc-ak" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" class="fc-mk"/></marker>';
+    svg += '<marker id="fc-ar" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" class="fc-mr"/></marker>';
     svg += '</defs>';
 
+    /* ── Pre-group fork and merge edges by shared source/target ── */
+    var forkGroups = {};  /* key=fromIdx → [{edge, slot}...] */
+    var mergeGroups = {}; /* key=toIdx   → [{edge, slot}...] */
+    var otherEdges = [];
+
     for (var i = 0; i < edges.length; i++) {
-        var e = edges[i], fs = slots[e.from], ts = slots[e.to];
+        var e = edges[i];
+        if (e.type === 'fork') {
+            (forkGroups[e.from] = forkGroups[e.from] || []).push(e);
+        } else if (e.type === 'merge') {
+            (mergeGroups[e.to] = mergeGroups[e.to] || []).push(e);
+        } else {
+            otherEdges.push(e);
+        }
+    }
+
+    /* ── Render fork groups: trunk + bus bar + individual drops ── */
+    for (var forkIdx in forkGroups) {
+        var group = forkGroups[forkIdx];
+        var fs = slots[forkIdx];
+        if (!fs) continue;
+        var trunkX = fs.cx, trunkY1 = fs.y + fs.h;
+        var busY = trunkY1 + _FC.rowGap * 0.35;
+
+        /* Collect branch x-positions */
+        var branchXs = [];
+        for (var gi = 0; gi < group.length; gi++) {
+            var ts = slots[group[gi].to];
+            if (ts) branchXs.push(ts.cx);
+        }
+        if (!branchXs.length) continue;
+        var minX = Math.min.apply(null, branchXs);
+        var maxX = Math.max.apply(null, branchXs);
+
+        /* Trunk: vertical from fork bottom to bus bar */
+        svg += '<path d="M' + trunkX + ' ' + trunkY1 + ' V' + busY + '" class="fc-efk"/>';
+        /* Bus bar: horizontal spanning all branches */
+        svg += '<path d="M' + minX + ' ' + busY + ' H' + maxX + '" class="fc-efk"/>';
+        /* Individual drops: from bus bar down to each branch */
+        for (var gi = 0; gi < group.length; gi++) {
+            var e = group[gi], ts = slots[e.to];
+            if (!ts) continue;
+            svg += '<path d="M' + ts.cx + ' ' + busY + ' V' + ts.y + '" class="fc-efk" marker-end="url(#fc-ak)"/>';
+            if (e.label) {
+                svg += '<text x="' + (ts.cx + 6) + '" y="' + (ts.y - 14) + '" class="fc-el fc-el-fk" text-anchor="start" dominant-baseline="auto">' + wfEsc(e.label) + '</text>';
+            }
+        }
+    }
+
+    /* ── Render merge groups: individual rises + bus bar + trunk ── */
+    for (var mergeIdx in mergeGroups) {
+        var group = mergeGroups[mergeIdx];
+        var ts = slots[mergeIdx];
+        if (!ts) continue;
+        var trunkX = ts.cx, trunkY2 = ts.y;
+        var busY = trunkY2 - _FC.rowGap * 0.35;
+
+        /* Collect branch x-positions */
+        var branchXs = [];
+        for (var gi = 0; gi < group.length; gi++) {
+            var fs = slots[group[gi].from];
+            if (fs) branchXs.push(fs.cx);
+        }
+        if (!branchXs.length) continue;
+        var minX = Math.min.apply(null, branchXs);
+        var maxX = Math.max.apply(null, branchXs);
+
+        /* Individual rises: from each branch bottom up to bus bar */
+        for (var gi = 0; gi < group.length; gi++) {
+            var fs = slots[group[gi].from];
+            if (!fs) continue;
+            svg += '<path d="M' + fs.cx + ' ' + (fs.y + fs.h) + ' V' + busY + '" class="fc-emg"/>';
+        }
+        /* Bus bar: horizontal spanning all branches */
+        svg += '<path d="M' + minX + ' ' + busY + ' H' + maxX + '" class="fc-emg"/>';
+        /* Trunk: from bus bar down to merge */
+        svg += '<path d="M' + trunkX + ' ' + busY + ' V' + trunkY2 + '" class="fc-emg" marker-end="url(#fc-ak)"/>';
+    }
+
+    /* ── Render other edges (forward, router, goto, back) ── */
+
+    /* Count right-side edges per source/target so we can stagger Y positions */
+    var rightEdgesBySource = {};
+    var rightEdgesByTarget = {};
+    var rightEdges = [];
+    var plainEdges = [];
+
+    for (var i = 0; i < otherEdges.length; i++) {
+        var e = otherEdges[i];
+        if (e.type === 'router' || e.type === 'goto') {
+            var srcKey = e.from;
+            var tgtKey = e.to;
+            if (!rightEdgesBySource[srcKey]) rightEdgesBySource[srcKey] = [];
+            if (!rightEdgesByTarget[tgtKey]) rightEdgesByTarget[tgtKey] = [];
+            var srcIdx = rightEdgesBySource[srcKey].length;
+            var tgtIdx = rightEdgesByTarget[tgtKey].length;
+            rightEdgesBySource[srcKey].push(e);
+            rightEdgesByTarget[tgtKey].push(e);
+            rightEdges.push({edge: e, srcIdx: srcIdx, tgtIdx: tgtIdx, channel: rightEdges.length});
+        } else {
+            plainEdges.push(e);
+        }
+    }
+
+    /* Render plain edges (forward, back) */
+    for (var i = 0; i < plainEdges.length; i++) {
+        var e = plainEdges[i], fs = slots[e.from], ts = slots[e.to];
         if (!fs || !ts) continue;
 
         if (e.type === 'forward') {
             var x1 = fs.cx, y1 = fs.y + fs.h;
             var x2 = ts.cx, y2 = ts.y;
-            var my = (y1 + y2) / 2;
-            svg += '<path d="M' + x1 + ' ' + y1 + ' C' + x1 + ' ' + my + ' ' + x2 + ' ' + my + ' ' + x2 + ' ' + y2 + '" class="fc-ef" marker-end="url(#fc-af)"/>';
+            if (Math.abs(x1 - x2) < 2) {
+                svg += '<path d="M' + x1 + ' ' + y1 + ' V' + y2 + '" class="fc-ef" marker-end="url(#fc-af)"/>';
+            } else {
+                var midY = y1 + (y2 - y1) * 0.5;
+                svg += '<path d="M' + x1 + ' ' + y1 + ' V' + midY + ' H' + x2 + ' V' + y2 + '" class="fc-ef" marker-end="url(#fc-af)"/>';
+            }
         } else if (e.type === 'back') {
-            var x1 = fs.x - 6, y1 = fs.y;
-            var x2 = ts.x - 6, y2 = ts.y + ts.h;
-            var bulge = Math.max(35, Math.abs(y1 - y2) * 0.12 + 25);
-            var cx = Math.min(x1, x2) - bulge;
-            svg += '<path d="M' + x1 + ' ' + y1 + ' C' + cx + ' ' + y1 + ' ' + cx + ' ' + y2 + ' ' + x2 + ' ' + y2 + '" class="fc-eb" marker-end="url(#fc-ab)"/>';
-            svg += '<text x="' + (cx + 24) + '" y="' + ((y1 + y2) / 2) + '" class="fc-el fc-el-b" text-anchor="start" dominant-baseline="middle">' + wfEsc(e.label) + '</text>';
-        } else if (e.type === 'goto') {
-            var x1 = fs.x + fs.w + 6, y1 = fs.y + fs.h * 0.5;
-            var x2 = ts.x + ts.w + 6, y2 = ts.y + ts.h * 0.5;
-            var bulge = Math.max(35, Math.abs(y1 - y2) * 0.12 + 25);
-            var cx = Math.max(x1, x2) + bulge;
-            svg += '<path d="M' + x1 + ' ' + y1 + ' C' + cx + ' ' + y1 + ' ' + cx + ' ' + y2 + ' ' + x2 + ' ' + y2 + '" class="fc-eg" marker-end="url(#fc-ag)"/>';
-            svg += '<text x="' + (cx + 4) + '" y="' + ((y1 + y2) / 2) + '" class="fc-el fc-el-g" text-anchor="start" dominant-baseline="middle">' + wfEsc(e.label) + '</text>';
+            var channelX = 20;
+            var x1 = fs.x, y1 = fs.y + fs.h * 0.5;
+            var x2 = ts.x, y2 = ts.y + ts.h * 0.5;
+            svg += '<path d="M' + x1 + ' ' + y1 + ' H' + channelX + ' V' + y2 + ' H' + x2 + '" class="fc-eb" marker-end="url(#fc-ab)"/>';
+            if (e.label) {
+                svg += '<text x="' + (x2 + 6) + '" y="' + (y2 - 14) + '" class="fc-el fc-el-b" text-anchor="start" dominant-baseline="auto">' + wfEsc(e.label) + '</text>';
+            }
+        }
+    }
+
+    /* Assign per-node Y slots for all right-side connections (in + out) */
+    var nodeRightCount = {};  /* nodeIdx → total connections */
+    var nodeRightNext = {};   /* nodeIdx → next slot index */
+    for (var i = 0; i < rightEdges.length; i++) {
+        var e = rightEdges[i].edge;
+        nodeRightCount[e.from] = (nodeRightCount[e.from] || 0) + 1;
+        nodeRightCount[e.to] = (nodeRightCount[e.to] || 0) + 1;
+    }
+
+    /* Render right-side edges with per-node staggered Y and unique channels */
+    for (var i = 0; i < rightEdges.length; i++) {
+        var re = rightEdges[i], e = re.edge;
+        var fs = slots[e.from], ts = slots[e.to];
+        if (!fs || !ts) continue;
+
+        var channelX = totalW - 30 - re.channel * 16;
+
+        /* Get next Y slot for source and target nodes */
+        if (nodeRightNext[e.from] === undefined) nodeRightNext[e.from] = 0;
+        if (nodeRightNext[e.to] === undefined) nodeRightNext[e.to] = 0;
+        var srcSlot = nodeRightNext[e.from]++;
+        var tgtSlot = nodeRightNext[e.to]++;
+        var srcTotal = nodeRightCount[e.from];
+        var tgtTotal = nodeRightCount[e.to];
+
+        var srcFrac = srcTotal > 1 ? 0.2 + 0.6 * srcSlot / (srcTotal - 1) : 0.4;
+        var tgtFrac = tgtTotal > 1 ? 0.2 + 0.6 * tgtSlot / (tgtTotal - 1) : 0.4;
+
+        var x1 = fs.x + fs.w, y1 = fs.y + fs.h * srcFrac;
+        var x2 = ts.x + ts.w, y2 = ts.y + ts.h * tgtFrac;
+        var cls = e.type === 'router' ? 'fc-ert' : 'fc-eg';
+        var marker = e.type === 'router' ? 'url(#fc-ar)' : 'url(#fc-ag)';
+        svg += '<path d="M' + x1 + ' ' + y1 + ' H' + channelX + ' V' + y2 + ' H' + x2 + '" class="' + cls + '" marker-end="' + marker + '"/>';
+        if (e.label) {
+            svg += '<text x="' + (x2 + 6) + '" y="' + (y2 - 14) + '" class="fc-el fc-el-rt" text-anchor="start" dominant-baseline="auto">' + wfEsc(e.label) + '</text>';
         }
     }
     svg += '</svg>';
     return svg;
+}
+
+/* ── Compute slot positions from layout plan ── */
+function _fcComputeSlots(nodes, items) {
+    var slots = new Array(nodes.length);
+    var cy = _FC.marginTop;
+
+    /* First pass: find max columns needed to compute total width */
+    var maxCols = 1;
+    for (var ii = 0; ii < items.length; ii++) {
+        if (items[ii].type === 'fork_group' && items[ii].branches.length > maxCols)
+            maxCols = items[ii].branches.length;
+    }
+    var colStep = _FC.nodeW + _FC.branchGap;
+    var totalW = _FC.marginLeft + maxCols * _FC.nodeW + (maxCols - 1) * _FC.branchGap + _FC.marginRight;
+    /* Center single-column cards within the full width */
+    var singleX = _FC.marginLeft + ((maxCols * _FC.nodeW + (maxCols - 1) * _FC.branchGap) - _FC.nodeW) / 2;
+
+    for (var ii = 0; ii < items.length; ii++) {
+        var item = items[ii];
+
+        if (item.type === 'node' || item.type === 'router') {
+            var eh = _fcEstimateHeight(nodes[item.idx]);
+            slots[item.idx] = {x: singleX, y: cy, w: _FC.nodeW, h: eh, cx: singleX + _FC.nodeW / 2};
+            cy += eh + _FC.rowGap;
+        }
+        else if (item.type === 'fork_group') {
+            /* Fork card: centered at full nodeW */
+            var forkH = _fcEstimateHeight(nodes[item.fork_idx]);
+            slots[item.fork_idx] = {x: singleX, y: cy, w: _FC.nodeW, h: forkH, cx: singleX + _FC.nodeW / 2};
+            cy += forkH + _FC.rowGap;
+
+            /* Branch columns: each card is full nodeW, row-aligned across branches */
+            var nBranches = item.branches.length;
+            var branchGroupW = nBranches * _FC.nodeW + (nBranches - 1) * _FC.branchGap;
+            var branchGroupX = _FC.marginLeft + ((maxCols * _FC.nodeW + (maxCols - 1) * _FC.branchGap) - branchGroupW) / 2;
+
+            /* Find max rows across all branches */
+            var maxRows = 0;
+            for (var bi = 0; bi < nBranches; bi++) {
+                if (item.branches[bi].node_indices.length > maxRows)
+                    maxRows = item.branches[bi].node_indices.length;
+            }
+
+            /* Row-by-row: align tops, use tallest card in each row */
+            for (var ri = 0; ri < maxRows; ri++) {
+                var rowH = 0;
+                for (var bi = 0; bi < nBranches; bi++) {
+                    var branch = item.branches[bi];
+                    if (ri < branch.node_indices.length) {
+                        var h = _fcEstimateHeight(nodes[branch.node_indices[ri]]);
+                        if (h > rowH) rowH = h;
+                    }
+                }
+                for (var bi = 0; bi < nBranches; bi++) {
+                    var branch = item.branches[bi];
+                    if (ri < branch.node_indices.length) {
+                        var bIdx = branch.node_indices[ri];
+                        var bx = branchGroupX + bi * colStep;
+                        slots[bIdx] = {x: bx, y: cy, w: _FC.nodeW, h: _fcEstimateHeight(nodes[bIdx]), cx: bx + _FC.nodeW / 2};
+                    }
+                }
+                cy += rowH + _FC.rowGap;
+            }
+
+            /* Merge card: centered at full nodeW */
+            var mergeH = _fcEstimateHeight(nodes[item.merge_idx]);
+            slots[item.merge_idx] = {x: singleX, y: cy, w: _FC.nodeW, h: mergeH, cx: singleX + _FC.nodeW / 2};
+            cy += mergeH + _FC.rowGap;
+        }
+    }
+
+    var totalH = cy - _FC.rowGap + _FC.marginBot;
+    return {slots: slots, totalW: totalW, totalH: totalH};
 }
 
 /* ── Main definition renderer ── */
@@ -2620,51 +3008,26 @@ function expDRenderDefinition(defn) {
 
     if (!nodes.length) return '<div class="fc-wrap">' + h + '<div class="fc-empty">No nodes defined</div></div>';
 
-    var edges = _fcEdges(nodes);
+    /* Build topology-aware layout plan */
+    var items = _fcBuildLayout(nodes);
+    var edges = _fcEdges(nodes, items);
+    var layout = _fcComputeSlots(nodes, items);
+    var slots = layout.slots, totalW = layout.totalW, totalH = layout.totalH;
 
-    /* ── First pass: render cards to hidden container to measure heights ── */
-    /* We can't know card heights until the browser renders them, so we use
-       a two-phase approach: render cards, measure via a temp container,
-       compute layout, then render final output with absolute positions.
-       To avoid the async rAF dance, we estimate heights instead.
-       Each card's height is roughly: header(36) + instr(~40 if present) +
-       fields(28 each) + gate(28) + actions(28) + padding(16). */
-    var slots = [];
-    var cy = _FC.marginTop;
-    for (var i = 0; i < nodes.length; i++) {
-        var nd = nodes[i];
-        var eh = 36 + 16; /* header + padding */
-        if (nd.instruction) eh += Math.min(80, 20 + nd.instruction.length * 0.3);
-        var fields = nd.fields || [];
-        if (fields.length) eh += fields.length * 26 + 8;
-        if (nd.proceed) eh += 28;
-        if (nd.actions && nd.actions.length) eh += 28;
-        eh = Math.max(60, eh);
-
-        slots.push({
-            x: _FC.marginLeft,
-            y: cy,
-            w: _FC.nodeW,
-            h: eh,
-            cx: _FC.marginLeft + _FC.nodeW / 2
-        });
-        cy += eh + _FC.rowGap;
-    }
-    var totalW = _FC.marginLeft + _FC.nodeW + _FC.marginRight;
-    var totalH = cy - _FC.rowGap + _FC.marginBot;
-
-    /* ── Build edge SVG ── */
+    /* Build edge SVG */
     var edgeSvg = _fcBuildEdgeSvg(slots, edges, totalW, totalH);
 
-    /* ── Build graph container with absolutely-positioned cards ── */
-    var edgesB64 = btoa(JSON.stringify(edges));
-    h += '<div class="fc-graph" data-edges="' + edgesB64 + '" style="position:relative;width:' + totalW + 'px;min-height:' + totalH + 'px;">';
-    /* Edge SVG behind cards */
+    /* Encode layout plan + edges for post-render fixup */
+    var layoutData = {items: items, edges: edges, nodeCount: nodes.length};
+    var layoutB64 = btoa(JSON.stringify(layoutData));
+
+    h += '<div class="fc-graph" data-layout="' + layoutB64 + '" style="position:relative;width:' + totalW + 'px;min-height:' + totalH + 'px;">';
     h += '<div class="fc-edge-layer">' + edgeSvg + '</div>';
 
     for (var i = 0; i < nodes.length; i++) {
         var s = slots[i];
-        h += '<div class="fc-card-wrap" style="position:absolute;left:' + s.x + 'px;top:' + s.y + 'px;width:' + s.w + 'px;">';
+        if (!s) continue;
+        h += '<div class="fc-card-wrap" data-idx="' + i + '" style="position:absolute;left:' + s.x + 'px;top:' + s.y + 'px;width:' + s.w + 'px;">';
         h += _fcNodeCard(nodes[i], i);
         h += '</div>';
     }
@@ -2676,7 +3039,7 @@ function expDRenderDefinition(defn) {
 /* ── State props (definition-aware) ── */
 function expDRenderStateProps(state) {
     var s = state.state || {};
-    var known = ['workflow','node','node_title','completed_nodes','lifecycle','lifecycle_current','lifecycle_completed','fields','table','execution_table'];
+    var known = ['workflow','node','node_title','completed_nodes','lifecycle','lifecycle_current','lifecycle_completed','fields','table','execution_table','fork_state'];
     var extra = Object.keys(s).filter(function(k) { return known.indexOf(k) === -1; });
     if (!extra.length) return '';
     var html = '';
@@ -2744,37 +3107,112 @@ function _expDPage(container, state, msg, feedback, verbose) {
 function _fcFixLayout(container) {
     var graph = container.querySelector('.fc-graph');
     if (!graph) return;
-    var wraps = graph.querySelectorAll('.fc-card-wrap');
-    if (!wraps.length) return;
 
-    /* Measure actual card heights and reflow positions */
-    var cy = _FC.marginTop;
-    var slots = [];
-    for (var i = 0; i < wraps.length; i++) {
-        var wrap = wraps[i];
-        var card = wrap.querySelector('.fc-card');
-        var actualH = card ? card.offsetHeight : 60;
-        var x = parseFloat(wrap.style.left);
-        var nw = parseFloat(wrap.style.width);
-        wrap.style.top = cy + 'px';
-        slots.push({x: x, y: cy, w: nw, h: actualH, cx: x + nw / 2});
-        cy += actualH + _FC.rowGap;
+    /* Decode layout plan */
+    var layoutB64 = graph.getAttribute('data-layout');
+    if (!layoutB64) return;
+    var layoutData;
+    try { layoutData = JSON.parse(atob(layoutB64)); } catch(e) { return; }
+    var items = layoutData.items, edges = layoutData.edges, nodeCount = layoutData.nodeCount;
+
+    /* Build index of card-wrap elements by data-idx */
+    var wrapsByIdx = {};
+    var allWraps = graph.querySelectorAll('.fc-card-wrap');
+    for (var w = 0; w < allWraps.length; w++) {
+        var idx = parseInt(allWraps[w].getAttribute('data-idx'), 10);
+        if (!isNaN(idx)) wrapsByIdx[idx] = allWraps[w];
     }
 
-    var totalW = _FC.marginLeft + _FC.nodeW + _FC.marginRight;
+    /* Measure actual heights */
+    function measureHeight(idx) {
+        var wrap = wrapsByIdx[idx];
+        if (!wrap) return 60;
+        var card = wrap.querySelector('.fc-card');
+        return card ? card.offsetHeight : 60;
+    }
+
+    /* Compute max columns for total width */
+    var maxCols = 1;
+    for (var ii = 0; ii < items.length; ii++) {
+        if (items[ii].type === 'fork_group' && items[ii].branches.length > maxCols)
+            maxCols = items[ii].branches.length;
+    }
+    var colStep = _FC.nodeW + _FC.branchGap;
+    var totalW = _FC.marginLeft + maxCols * _FC.nodeW + (maxCols - 1) * _FC.branchGap + _FC.marginRight;
+    var singleX = _FC.marginLeft + ((maxCols * _FC.nodeW + (maxCols - 1) * _FC.branchGap) - _FC.nodeW) / 2;
+
+    /* Recompute slots with actual heights */
+    var slots = new Array(nodeCount);
+    var cy = _FC.marginTop;
+
+    for (var ii = 0; ii < items.length; ii++) {
+        var item = items[ii];
+
+        if (item.type === 'node' || item.type === 'router') {
+            var ah = measureHeight(item.idx);
+            var wrap = wrapsByIdx[item.idx];
+            slots[item.idx] = {x: singleX, y: cy, w: _FC.nodeW, h: ah, cx: singleX + _FC.nodeW / 2};
+            if (wrap) { wrap.style.top = cy + 'px'; wrap.style.left = singleX + 'px'; wrap.style.width = _FC.nodeW + 'px'; }
+            cy += ah + _FC.rowGap;
+        }
+        else if (item.type === 'fork_group') {
+            /* Fork card */
+            var forkH = measureHeight(item.fork_idx);
+            var forkWrap = wrapsByIdx[item.fork_idx];
+            slots[item.fork_idx] = {x: singleX, y: cy, w: _FC.nodeW, h: forkH, cx: singleX + _FC.nodeW / 2};
+            if (forkWrap) { forkWrap.style.top = cy + 'px'; forkWrap.style.left = singleX + 'px'; forkWrap.style.width = _FC.nodeW + 'px'; }
+            cy += forkH + _FC.rowGap;
+
+            /* Branches: uniform nodeW, row-aligned across branches */
+            var nBranches = item.branches.length;
+            var branchGroupW = nBranches * _FC.nodeW + (nBranches - 1) * _FC.branchGap;
+            var branchGroupX = _FC.marginLeft + ((maxCols * _FC.nodeW + (maxCols - 1) * _FC.branchGap) - branchGroupW) / 2;
+
+            var maxRows = 0;
+            for (var bi = 0; bi < nBranches; bi++) {
+                if (item.branches[bi].node_indices.length > maxRows)
+                    maxRows = item.branches[bi].node_indices.length;
+            }
+
+            for (var ri = 0; ri < maxRows; ri++) {
+                var rowH = 0;
+                for (var bi = 0; bi < nBranches; bi++) {
+                    var branch = item.branches[bi];
+                    if (ri < branch.node_indices.length) {
+                        var h = measureHeight(branch.node_indices[ri]);
+                        if (h > rowH) rowH = h;
+                    }
+                }
+                for (var bi = 0; bi < nBranches; bi++) {
+                    var branch = item.branches[bi];
+                    if (ri < branch.node_indices.length) {
+                        var bIdx = branch.node_indices[ri];
+                        var bx = branchGroupX + bi * colStep;
+                        var bh = measureHeight(bIdx);
+                        var bWrap = wrapsByIdx[bIdx];
+                        slots[bIdx] = {x: bx, y: cy, w: _FC.nodeW, h: bh, cx: bx + _FC.nodeW / 2};
+                        if (bWrap) { bWrap.style.top = cy + 'px'; bWrap.style.left = bx + 'px'; bWrap.style.width = _FC.nodeW + 'px'; }
+                    }
+                }
+                cy += rowH + _FC.rowGap;
+            }
+
+            /* Merge card */
+            var mergeH = measureHeight(item.merge_idx);
+            var mergeWrap = wrapsByIdx[item.merge_idx];
+            slots[item.merge_idx] = {x: singleX, y: cy, w: _FC.nodeW, h: mergeH, cx: singleX + _FC.nodeW / 2};
+            if (mergeWrap) { mergeWrap.style.top = cy + 'px'; mergeWrap.style.left = singleX + 'px'; mergeWrap.style.width = _FC.nodeW + 'px'; }
+            cy += mergeH + _FC.rowGap;
+        }
+    }
+
     var totalH = cy - _FC.rowGap + _FC.marginBot;
     graph.style.minHeight = totalH + 'px';
     graph.style.width = totalW + 'px';
 
-    /* Decode edges and rebuild SVG */
-    var edgesB64 = graph.getAttribute('data-edges');
-    if (!edgesB64) return;
-    var edges;
-    try { edges = JSON.parse(atob(edgesB64)); } catch(e) { return; }
-
+    /* Rebuild edge SVG */
     var edgeLayer = graph.querySelector('.fc-edge-layer');
-    if (!edgeLayer) return;
-    edgeLayer.innerHTML = _fcBuildEdgeSvg(slots, edges, totalW, totalH);
+    if (edgeLayer) edgeLayer.innerHTML = _fcBuildEdgeSvg(slots, edges, totalW, totalH);
 }
 
 /* ── CSS ── */
@@ -2806,7 +3244,8 @@ var EXP_D_FC_CSS = ''
     + '.fc-field-dot { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; font-size:0.6rem; font-weight:700; flex-shrink:0; border:1.5px solid; }'
     + '.fc-field-name { font-weight:600; }'
     + '.fc-field-key { font-size:0.62rem; margin-left:auto; }'
-    + '.fc-field-opts { font-size:0.62rem; font-family:Consolas,Monaco,monospace; }'
+    + '.fc-field-opts { margin-left:2.2rem; padding:0.1rem 0; }'
+    + '.fc-field-opt { font-size:0.62rem; font-family:Consolas,Monaco,monospace; padding:0.05rem 0; }'
     /* Gate */
     + '.fc-gate { display:flex; align-items:center; gap:0.3rem; padding:0.3rem 0.65rem; border-top:1px dashed; flex-wrap:wrap; font-size:0.78rem; }'
     + '.fc-gate-lock { font-size:0.8rem; }'
@@ -2815,10 +3254,27 @@ var EXP_D_FC_CSS = ''
     /* Actions */
     + '.fc-acts { display:flex; gap:0.3rem; padding:0.3rem 0.65rem; border-top:1px solid; flex-wrap:wrap; }'
     + '.fc-act { font-size:0.72rem; font-weight:600; padding:0.15rem 0.5rem; border-radius:4px; }'
+    /* Badge (router/fork) */
+    + '.fc-badge { font-size:0.58rem; font-weight:700; padding:0.1rem 0.35rem; border-radius:3px; text-transform:uppercase; letter-spacing:0.04em; }'
+    /* Router routes */
+    + '.fc-routes { padding:0.25rem 0.65rem; }'
+    + '.fc-route { display:flex; align-items:center; gap:0.3rem; padding:0.12rem 0; font-size:0.72rem; }'
+    + '.fc-route-arrow { font-weight:700; }'
+    + '.fc-route-cond { font-style:italic; }'
+    + '.fc-route-target { font-size:0.62rem; margin-left:auto; }'
+    /* Fork info */
+    + '.fc-fork-info { padding:0.3rem 0.65rem; border-top:1px dashed; }'
+    + '.fc-fork-label { font-size:0.78rem; font-weight:600; }'
+    + '.fc-fork-merge { font-size:0.68rem; margin-left:0.8rem; }'
+    + '.fc-fork-branches { display:flex; gap:0.4rem; margin-top:0.2rem; flex-wrap:wrap; }'
+    + '.fc-fork-branch { font-size:0.65rem; padding:0.1rem 0.4rem; border-radius:3px; border:1px solid; }'
     /* Edge SVG */
     + '.fc-ef { fill:none; stroke-width:2; }'
     + '.fc-eb { fill:none; stroke-width:1.5; stroke-dasharray:6 3; }'
     + '.fc-eg { fill:none; stroke-width:1.5; stroke-dasharray:8 3; }'
+    + '.fc-efk { fill:none; stroke-width:2; }'       /* fork edge */
+    + '.fc-emg { fill:none; stroke-width:2; }'       /* merge edge */
+    + '.fc-ert { fill:none; stroke-width:1.5; stroke-dasharray:4 4; }' /* router edge */
     + '.fc-el { font-size:11px; font-family:-apple-system,sans-serif; }'
     ;
 
@@ -2838,10 +3294,25 @@ var EXP_D_FC_LIGHT = ''
     + '.fc-acts { border-top-color:#f0f0f0; }'
     + '.fc-act-submit { background:#e8f5e9; color:#2e7d32; }'
     + '.fc-act-restart { background:#fff3e0; color:#e65100; }'
+    + '.fc-badge-router { background:#fff3e0; color:#e65100; }'
+    + '.fc-badge-fork { background:#e8f5e9; color:#2e7d32; }'
+    + '.fc-card-router .fc-card-head { background:linear-gradient(135deg,#fff3e0,#ffe0b2); }'
+    + '.fc-card-fork .fc-card-head { background:linear-gradient(135deg,#e8f5e9,#c8e6c9); }'
+    + '.fc-route-arrow { color:#e65100; }'
+    + '.fc-route-cond { color:#795548; }'
+    + '.fc-route-target { color:#1565c0; }'
+    + '.fc-fork-info { border-top-color:#c8e6c9; }'
+    + '.fc-fork-label { color:#2e7d32; }'
+    + '.fc-fork-merge { color:#666; }'
+    + '.fc-fork-branch { background:#e8f5e9; border-color:#a5d6a7; color:#2e7d32; }'
     + '.fc-ef { stroke:#4caf50; } .fc-mf { fill:#4caf50; }'
     + '.fc-eb { stroke:#2a6bcf; } .fc-mb { fill:#2a6bcf; }'
     + '.fc-eg { stroke:#7b1fa2; } .fc-mg { fill:#7b1fa2; }'
+    + '.fc-efk { stroke:#2e7d32; } .fc-mk { fill:#2e7d32; }'
+    + '.fc-emg { stroke:#2e7d32; }'
+    + '.fc-ert { stroke:#e65100; } .fc-mr { fill:#e65100; }'
     + '.fc-el-b { fill:#2a6bcf; } .fc-el-g { fill:#7b1fa2; }'
+    + '.fc-el-fk { fill:#2e7d32; } .fc-el-rt { fill:#e65100; }'
     ;
 
 /* ── Dark tokens ── */
@@ -2860,10 +3331,25 @@ var EXP_D_FC_DARK = ''
     + '.fc-acts { border-top-color:#1e1e1e; }'
     + '.fc-act-submit { background:#1b3a1b; color:#66bb6a; }'
     + '.fc-act-restart { background:#2a1a00; color:#ffb74d; }'
+    + '.fc-badge-router { background:#2a1a00; color:#ffb74d; }'
+    + '.fc-badge-fork { background:#1b3a1b; color:#66bb6a; }'
+    + '.fc-card-router .fc-card-head { background:linear-gradient(135deg,#2a1a00,#332200); }'
+    + '.fc-card-fork .fc-card-head { background:linear-gradient(135deg,#1b3a1b,#1f421f); }'
+    + '.fc-route-arrow { color:#ffb74d; }'
+    + '.fc-route-cond { color:#bcaaa4; }'
+    + '.fc-route-target { color:#64b5f6; }'
+    + '.fc-fork-info { border-top-color:#1b3a1b; }'
+    + '.fc-fork-label { color:#66bb6a; }'
+    + '.fc-fork-merge { color:#aaa; }'
+    + '.fc-fork-branch { background:#1b3a1b; border-color:#2e7d32; color:#66bb6a; }'
     + '.fc-ef { stroke:#4caf50; } .fc-mf { fill:#4caf50; }'
     + '.fc-eb { stroke:#4a9eff; } .fc-mb { fill:#4a9eff; }'
     + '.fc-eg { stroke:#ce93d8; } .fc-mg { fill:#ce93d8; }'
+    + '.fc-efk { stroke:#66bb6a; } .fc-mk { fill:#66bb6a; }'
+    + '.fc-emg { stroke:#66bb6a; }'
+    + '.fc-ert { stroke:#ffb74d; } .fc-mr { fill:#ffb74d; }'
     + '.fc-el-b { fill:#4a9eff; } .fc-el-g { fill:#ce93d8; }'
+    + '.fc-el-fk { fill:#66bb6a; } .fc-el-rt { fill:#ffb74d; }'
     ;
 
 function _scopeFC(sel, css) { return css.replace(/\.fc-/g, sel + ' .fc-'); }

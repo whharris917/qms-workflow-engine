@@ -23,6 +23,72 @@ from engine import PlanEngine
 from engine.types import ColumnDef, PlanDefinition, ExecutionState, is_choice_list
 
 
+def _serialize_definition(defn: WorkflowDef) -> dict:
+    """Serialize a WorkflowDef for the observer UI (Exp-D flowchart)."""
+    nodes = []
+    for nid, nd in defn.nodes.items():
+        entry = {
+            "id": nid,
+            "title": nd.title,
+            "instruction": nd.instruction,
+            "show_all_fields": nd.show_all_fields,
+        }
+        # Fields as array
+        if nd.fields:
+            entry["fields"] = [
+                {"key": f.key, "label": f.label, "type": f.type,
+                 "options": f.options}
+                for f in nd.fields.values()
+            ]
+        # Proceed
+        if nd.proceed:
+            p = {"label": nd.proceed.label}
+            if nd.proceed.gate:
+                p["requires"] = [
+                    c.get("key", "")
+                    for c in nd.proceed.gate.get("conditions", [])
+                    if c.get("type") == "field_truthy"
+                ] if nd.proceed.gate.get("op") == "AND" else []
+            if nd.proceed.target:
+                p["target"] = nd.proceed.target
+            entry["proceed"] = p
+        # Router
+        if nd.router:
+            entry["router"] = [
+                {"target": r.target, "when": r.when}
+                for r in nd.router
+            ]
+        # Fork
+        if nd.fork:
+            branches = {}
+            for bid, bdef in nd.fork.branches.items():
+                branches[bid] = {"label": bdef.label, "nodes": bdef.nodes}
+            entry["fork"] = {
+                "label": nd.fork.label,
+                "merge": nd.fork.merge,
+                "branches": branches,
+            }
+        # Navigation
+        if nd.navigation:
+            entry["navigation"] = [
+                {"action": nav.action, "label": nav.label, "node": nav.node}
+                for nav in nd.navigation
+            ]
+        # Actions
+        if nd.actions:
+            entry["actions"] = [
+                {"action": a.action, "label": a.label}
+                for a in nd.actions
+            ]
+        nodes.append(entry)
+    return {
+        "workflow_id": defn.workflow_id,
+        "workflow_title": defn.workflow_title,
+        "workflow_description": defn.workflow_description,
+        "nodes": nodes,
+    }
+
+
 def render_page(defn: WorkflowDef, data: dict, workflow_id: str) -> dict:
     """Render the current workflow state as the page dict."""
     node_id = data.get("node", defn.node_ids[0] if defn.node_ids else "")
@@ -48,6 +114,29 @@ def render_page(defn: WorkflowDef, data: dict, workflow_id: str) -> dict:
         "lifecycle_completed": lifecycle_completed,
         "completed_nodes": data.get("completed_nodes", []),
     }
+
+    # Fork state — expose branch tracking for UI
+    fork_state = data.get("fork_state")
+    if fork_state:
+        fork_node = defn.nodes.get(fork_state.get("fork_node"))
+        fork_def = fork_node.fork if fork_node else None
+        branch_display = {}
+        for bid, bdata in fork_state.get("branches", {}).items():
+            branch_label = bid
+            if fork_def and bid in fork_def.branches:
+                branch_label = fork_def.branches[bid].label
+            branch_display[bid] = {
+                "label": branch_label,
+                "completed": bdata.get("completed", False),
+                "current_node": bdata.get("node"),
+            }
+        state["fork_state"] = {
+            "active_branch": fork_state.get("active_branch"),
+            "branches": branch_display,
+        }
+
+    # Workflow definition for visual renderers (Exp-D flowchart)
+    state["definition"] = _serialize_definition(defn)
 
     # Fields
     fields_display = _build_fields(defn, node, data)
@@ -241,8 +330,26 @@ def _build_affordances(
         affordances.append(a)
         n += 1
 
-    # 4. Proceed gate (with optional target)
-    if node.proceed:
+    # 4a. Fork gate (mutually exclusive with proceed)
+    if node.fork:
+        gate = node.fork.gate
+        if gate:
+            passed, _ = evaluate(gate, data)
+        else:
+            passed = True
+        if passed:
+            a = {
+                "id": n,
+                "label": node.fork.label,
+                "method": "POST",
+                "url": f"{api}/proceed",
+                "body": {},
+            }
+            affordances.append(a)
+            n += 1
+
+    # 4b. Proceed gate (with optional target) — skip if node has fork
+    elif node.proceed:
         gate = node.proceed.gate
         if gate:
             passed, _ = evaluate(gate, data)
@@ -258,6 +365,28 @@ def _build_affordances(
                 "method": "POST",
                 "url": f"{api}/proceed",
                 "body": body,
+            }
+            affordances.append(a)
+            n += 1
+
+    # 4c. Branch switch affordances (when inside a fork)
+    fork_state = data.get("fork_state")
+    if fork_state:
+        fork_node = defn.nodes.get(fork_state.get("fork_node"))
+        fork_def = fork_node.fork if fork_node else None
+        active_bid = fork_state.get("active_branch")
+        for bid, bdata in fork_state.get("branches", {}).items():
+            if bid == active_bid or bdata.get("completed"):
+                continue
+            branch_label = bid
+            if fork_def and bid in fork_def.branches:
+                branch_label = fork_def.branches[bid].label
+            a = {
+                "id": n,
+                "label": f"Switch to {branch_label}",
+                "method": "POST",
+                "url": f"{api}/switch_branch",
+                "body": {"branch": bid},
             }
             affordances.append(a)
             n += 1

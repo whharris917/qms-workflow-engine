@@ -43,6 +43,8 @@ _VALID_FIELD_TYPES = ["text", "boolean", "select"]
 # ---------------------------------------------------------------------------
 
 
+_VALID_NODE_MODES = ["standard", "router", "fork"]
+
 def default_data() -> dict:
     return {
         "node": _NODES[0],
@@ -79,20 +81,44 @@ def _validate(data: dict) -> list[str]:
         return errors
 
     all_keys = []
-    has_proceed_or_action = False
+    has_exit = False
 
     for wn in wf_nodes:
+        nid = wn["id"]
         for fld in wn.get("fields", []):
             all_keys.append(fld["key"])
 
-        if wn.get("proceed"):
-            has_proceed_or_action = True
-        if wn.get("actions"):
-            has_proceed_or_action = True
+        if wn.get("proceed") or wn.get("actions") or wn.get("router") or wn.get("fork"):
+            has_exit = True
+
+        # Mutual exclusion: proceed / router / fork
+        exits = sum(1 for k in ("proceed", "router", "fork") if wn.get(k))
+        if exits > 1:
+            errors.append(f"Node '{nid}': cannot have more than one of proceed, router, fork.")
 
         for nav in wn.get("navigation", []):
             if "node" in nav and nav["node"] not in node_ids:
                 errors.append(f"Node '{nid}': navigation target '{nav['node']}' does not exist.")
+
+        # Router validation
+        if wn.get("router"):
+            for ri, route in enumerate(wn["router"]):
+                if route.get("target") and route["target"] not in node_ids:
+                    errors.append(f"Node '{nid}': router target '{route['target']}' does not exist.")
+            if not wn["router"]:
+                errors.append(f"Node '{nid}': router must have at least one route.")
+
+        # Fork validation
+        if wn.get("fork"):
+            fork = wn["fork"]
+            if not fork.get("branches"):
+                errors.append(f"Node '{nid}': fork must have at least one branch.")
+            if fork.get("merge") and fork["merge"] not in node_ids:
+                errors.append(f"Node '{nid}': fork merge target '{fork['merge']}' does not exist.")
+            for bid, bdef in (fork.get("branches") or {}).items():
+                for bnid in bdef.get("nodes", []):
+                    if bnid not in node_ids:
+                        errors.append(f"Node '{nid}': fork branch '{bid}' references unknown node '{bnid}'.")
 
     seen = set()
     for key in all_keys:
@@ -113,8 +139,8 @@ def _validate(data: dict) -> list[str]:
                     if vk not in seen:
                         errors.append(f"Field '{fld['key']}': visible_when references unknown key '{vk}'.")
 
-    if not has_proceed_or_action:
-        errors.append("No proceed gate or terminal action defined in any node.")
+    if not has_exit:
+        errors.append("No proceed gate, terminal action, router, or fork defined in any node.")
 
     return errors
 
@@ -156,6 +182,10 @@ def _publish(data: dict) -> str | None:
             nd["navigation"] = wn["navigation"]
         if wn.get("proceed"):
             nd["proceed"] = wn["proceed"]
+        if wn.get("router"):
+            nd["router"] = wn["router"]
+        if wn.get("fork"):
+            nd["fork"] = wn["fork"]
         if wn.get("actions"):
             nd["actions"] = wn["actions"]
         defn["nodes"][wn["id"]] = nd
@@ -174,22 +204,27 @@ def _publish(data: dict) -> str | None:
 
 
 def _summary(data: dict) -> dict:
+    nodes = []
+    for wn in data.get("wf_nodes", []):
+        nd = {
+            "id": wn["id"], "title": wn["title"],
+            "instruction": wn.get("instruction", ""),
+            "show_all_fields": wn.get("show_all_fields", False),
+            "fields": wn.get("fields", []),
+            "navigation": wn.get("navigation", []),
+            "proceed": wn.get("proceed"),
+            "actions": wn.get("actions", []),
+        }
+        if wn.get("router"):
+            nd["router"] = wn["router"]
+        if wn.get("fork"):
+            nd["fork"] = wn["fork"]
+        nodes.append(nd)
     return {
         "workflow_id": data.get("workflow_id"),
         "workflow_title": data.get("workflow_title"),
         "workflow_description": data.get("workflow_description"),
-        "nodes": [
-            {
-                "id": wn["id"], "title": wn["title"],
-                "instruction": wn.get("instruction", ""),
-                "show_all_fields": wn.get("show_all_fields", False),
-                "fields": wn.get("fields", []),
-                "navigation": wn.get("navigation", []),
-                "proceed": wn.get("proceed"),
-                "actions": wn.get("actions", []),
-            }
-            for wn in data.get("wf_nodes", [])
-        ],
+        "nodes": nodes,
     }
 
 
@@ -330,6 +365,57 @@ def _build_affordances(data: dict, workflow_id: str) -> list[dict]:
             affs.append({"id": n, "label": f"Set show_all_fields for '{fn['id']}' (current: {fn.get('show_all_fields', False)})",
                           "method": "POST", "url": f"{api}/set_show_all_fields", "body": {"value": "<value>"}, "parameters": {"value": {"options": [True, False]}}})
             n += 1
+
+            # Node mode selector
+            current_mode = "router" if fn.get("router") is not None else ("fork" if fn.get("fork") else "standard")
+            affs.append({"id": n, "label": f"Set node mode for '{fn['id']}' (current: {current_mode})",
+                          "method": "POST", "url": f"{api}/set_node_mode", "body": {"mode": "<mode>"},
+                          "parameters": {"mode": {"options": _VALID_NODE_MODES, "description": "standard=fields+proceed, router=auto-routing, fork=parallel branches"}}})
+            n += 1
+
+            # Router affordances
+            if fn.get("router") is not None:
+                routes = fn["router"]
+                node_options = [w["id"] for w in wf_nodes if w["id"] != fn["id"]]
+                affs.append({"id": n, "label": f"Add route to '{fn['id']}'", "method": "POST", "url": f"{api}/add_route",
+                              "body": {"target": "<target>"},
+                              "parameters": {"target": {"options": node_options}, "when": {"description": "Optional condition dict, e.g. {\"type\":\"field_equals\",\"key\":\"severity\",\"value\":\"Low\"}"}}})
+                n += 1
+                if routes:
+                    ri = list(range(len(routes)))
+                    rl = [f"{r.get('target', '?')} ({_fcCondLabelPy(r.get('when'))})" for r in routes]
+                    affs.append({"id": n, "label": f"Remove route from '{fn['id']}'", "method": "POST", "url": f"{api}/remove_route",
+                                  "body": {"route_index": "<route_index>"}, "parameters": {"route_index": {"options": ri, "labels": rl}}})
+                    n += 1
+
+            # Fork affordances
+            if fn.get("fork") is not None:
+                fork = fn["fork"]
+                node_options = [w["id"] for w in wf_nodes if w["id"] != fn["id"]]
+                affs.append({"id": n, "label": f"Set fork merge target (current: {json.dumps(fork.get('merge'))})",
+                              "method": "POST", "url": f"{api}/set_fork_merge", "body": {"merge": "<merge>"},
+                              "parameters": {"merge": {"options": node_options}}})
+                n += 1
+                affs.append({"id": n, "label": f"Set fork label (current: {json.dumps(fork.get('label'))})",
+                              "method": "POST", "url": f"{api}/set_fork_label", "body": {"label": "<label>"}, "parameters": {"label": {}}})
+                n += 1
+                affs.append({"id": n, "label": f"Add branch to '{fn['id']}'", "method": "POST", "url": f"{api}/add_branch",
+                              "body": {"branch_id": "<branch_id>", "label": "<label>", "nodes": "<nodes>"},
+                              "parameters": {"branch_id": {"description": "Lowercase, underscores"}, "label": {},
+                                             "nodes": {"description": f"Array of node IDs. Available: {node_options}"}}})
+                n += 1
+                branches = fork.get("branches", {})
+                if branches:
+                    bl = list(branches.keys())
+                    affs.append({"id": n, "label": f"Remove branch from '{fn['id']}'", "method": "POST", "url": f"{api}/remove_branch",
+                                  "body": {"branch_id": "<branch_id>"}, "parameters": {"branch_id": {"options": bl}}})
+                    n += 1
+                if all_fk:
+                    affs.append({"id": n, "label": f"Set fork gate for '{fn['id']}' (requires before forking)",
+                                  "method": "POST", "url": f"{api}/set_fork_gate",
+                                  "body": {"requires": "<requires>"},
+                                  "parameters": {"requires": {"description": f"Array of required field keys. Available: {all_fk}"}}})
+                    n += 1
 
         affs.append({"id": n, "label": "Go back to Lifecycle", "method": "POST", "url": f"{api}/go_back", "body": {}})
         n += 1
@@ -585,6 +671,147 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         data["wf_nodes"][focused]["show_all_fields"] = v
         return render_node(data, workflow_id)
 
+    # Set node mode (standard / router / fork)
+    if action == "set_node_mode":
+        focused = data.get("focused_node")
+        if focused is None or focused >= len(data["wf_nodes"]):
+            return {"error": "No node is focused."}
+        mode = body.get("mode", "").strip()
+        if mode not in _VALID_NODE_MODES:
+            return {"error": f"Invalid mode. Choose: {', '.join(_VALID_NODE_MODES)}"}
+        fn = data["wf_nodes"][focused]
+        # Clear conflicting properties
+        if mode == "router":
+            fn.pop("proceed", None)
+            fn.pop("fork", None)
+            fn.setdefault("router", [])
+        elif mode == "fork":
+            fn.pop("proceed", None)
+            fn.pop("router", None)
+            fn.setdefault("fork", {"label": "Continue", "merge": "", "branches": {}})
+        else:  # standard
+            fn.pop("router", None)
+            fn.pop("fork", None)
+        return render_node(data, workflow_id)
+
+    # Router: add route
+    if action == "add_route":
+        focused = data.get("focused_node")
+        if focused is None or focused >= len(data["wf_nodes"]):
+            return {"error": "No node is focused."}
+        fn = data["wf_nodes"][focused]
+        if not fn.get("router") and not isinstance(fn.get("router"), list):
+            return {"error": "Node is not in router mode."}
+        target = body.get("target", "").strip()
+        if not target or not any(w["id"] == target for w in data["wf_nodes"]):
+            return {"error": f"Target node '{target}' does not exist."}
+        route = {"target": target}
+        when = body.get("when")
+        if when and isinstance(when, dict):
+            route["when"] = when
+        fn["router"].append(route)
+        return render_node(data, workflow_id)
+
+    # Router: remove route
+    if action == "remove_route":
+        focused = data.get("focused_node")
+        if focused is None or focused >= len(data["wf_nodes"]):
+            return {"error": "No node is focused."}
+        fn = data["wf_nodes"][focused]
+        routes = fn.get("router", [])
+        ri = body.get("route_index")
+        if not isinstance(ri, int) or ri < 0 or ri >= len(routes):
+            return {"error": "Invalid route index."}
+        routes.pop(ri)
+        return render_node(data, workflow_id)
+
+    # Fork: set merge target
+    if action == "set_fork_merge":
+        focused = data.get("focused_node")
+        if focused is None or focused >= len(data["wf_nodes"]):
+            return {"error": "No node is focused."}
+        fn = data["wf_nodes"][focused]
+        fork = fn.get("fork")
+        if not fork:
+            return {"error": "Node is not in fork mode."}
+        merge = body.get("merge", "").strip()
+        if not merge or not any(w["id"] == merge for w in data["wf_nodes"]):
+            return {"error": f"Merge target '{merge}' does not exist."}
+        fork["merge"] = merge
+        return render_node(data, workflow_id)
+
+    # Fork: set label
+    if action == "set_fork_label":
+        focused = data.get("focused_node")
+        if focused is None or focused >= len(data["wf_nodes"]):
+            return {"error": "No node is focused."}
+        fn = data["wf_nodes"][focused]
+        fork = fn.get("fork")
+        if not fork:
+            return {"error": "Node is not in fork mode."}
+        fork["label"] = body.get("label", "Continue").strip()
+        return render_node(data, workflow_id)
+
+    # Fork: add branch
+    if action == "add_branch":
+        focused = data.get("focused_node")
+        if focused is None or focused >= len(data["wf_nodes"]):
+            return {"error": "No node is focused."}
+        fn = data["wf_nodes"][focused]
+        fork = fn.get("fork")
+        if not fork:
+            return {"error": "Node is not in fork mode."}
+        bid = body.get("branch_id", "").strip()
+        label = body.get("label", "").strip()
+        nodes_list = body.get("nodes", [])
+        if not bid or not re.match(r"^[a-z][a-z0-9_]*$", bid):
+            return {"error": "Branch ID must be lowercase with underscores."}
+        if not label:
+            return {"error": "Branch label is required."}
+        if bid in fork.get("branches", {}):
+            return {"error": f"Branch '{bid}' already exists."}
+        # Validate node references
+        node_ids = {w["id"] for w in data["wf_nodes"]}
+        for nid in nodes_list:
+            if nid not in node_ids:
+                return {"error": f"Branch node '{nid}' does not exist."}
+        fork.setdefault("branches", {})[bid] = {"label": label, "nodes": nodes_list}
+        return render_node(data, workflow_id)
+
+    # Fork: remove branch
+    if action == "remove_branch":
+        focused = data.get("focused_node")
+        if focused is None or focused >= len(data["wf_nodes"]):
+            return {"error": "No node is focused."}
+        fn = data["wf_nodes"][focused]
+        fork = fn.get("fork")
+        if not fork:
+            return {"error": "Node is not in fork mode."}
+        bid = body.get("branch_id", "").strip()
+        branches = fork.get("branches", {})
+        if bid not in branches:
+            return {"error": f"Branch '{bid}' does not exist."}
+        del branches[bid]
+        return render_node(data, workflow_id)
+
+    # Fork: set gate
+    if action == "set_fork_gate":
+        focused = data.get("focused_node")
+        if focused is None or focused >= len(data["wf_nodes"]):
+            return {"error": "No node is focused."}
+        fn = data["wf_nodes"][focused]
+        fork = fn.get("fork")
+        if not fork:
+            return {"error": "Node is not in fork mode."}
+        requires = body.get("requires")
+        if not isinstance(requires, list):
+            return {"error": "requires must be an array of field keys."}
+        fork["gate"] = {
+            "op": "AND",
+            "conditions": [{"type": "field_truthy", "key": k} for k in requires],
+        }
+        return render_node(data, workflow_id)
+
     # Navigation
     if action == "proceed":
         idx = _NODES.index(node)
@@ -623,6 +850,19 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
 # Resource routing
 # ---------------------------------------------------------------------------
 
+def _fcCondLabelPy(when):
+    """Build a short label for a router condition."""
+    if not when:
+        return "default"
+    if when.get("type") == "field_equals":
+        return f"{when.get('key')} = {when.get('value')}"
+    if when.get("type") == "field_truthy":
+        return when.get("key", "?")
+    if when.get("op"):
+        return f"{when['op']}(...)"
+    return "?"
+
+
 _SIMPLE = {"proceed", "go_back", "restart", "publish"}
 _BODY = {
     "set_workflow_id", "set_workflow_title", "set_workflow_description",
@@ -630,6 +870,9 @@ _BODY = {
     "add_field", "edit_field", "remove_field",
     "set_proceed", "add_navigation", "remove_navigation",
     "add_action", "remove_action", "set_show_all_fields",
+    "set_node_mode",
+    "add_route", "remove_route",
+    "set_fork_merge", "set_fork_label", "add_branch", "remove_branch", "set_fork_gate",
 }
 VALID_RESOURCES = _SIMPLE | _BODY
 

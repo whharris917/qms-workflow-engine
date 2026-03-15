@@ -110,7 +110,7 @@ class WorkflowRuntime:
 
         self.VALID_RESOURCES = (
             self.defn.all_field_keys
-            | {"proceed", "go_back", "go_to", "submit", "restart"}
+            | {"proceed", "go_back", "go_to", "submit", "restart", "switch_branch"}
             | _TABLE_RESOURCES
             | _LIST_RESOURCES
         )
@@ -141,6 +141,9 @@ class WorkflowRuntime:
 
         if resource in ("proceed", "go_back", "submit", "restart", "complete"):
             return {"action": resource}, None
+
+        if resource == "switch_branch":
+            return {"action": "switch_branch", "branch": body.get("branch")}, None
 
         if resource == "go_to":
             return {"action": "go_to", "node": body.get("node")}, None
