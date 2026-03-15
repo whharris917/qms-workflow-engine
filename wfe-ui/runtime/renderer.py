@@ -23,6 +23,78 @@ from engine import PlanEngine
 from engine.types import ColumnDef, PlanDefinition, ExecutionState, is_choice_list
 
 
+def _build_lifecycle(defn: WorkflowDef) -> list:
+    """Build a topology-aware lifecycle structure for the banner.
+
+    Returns a list of items, each either:
+      {"type": "node", "id": "...", "title": "..."}
+      {"type": "router", "id": "...", "title": "...", "targets": [{"label": "...", "id": "..."}]}
+      {"type": "fork", "id": "...", "title": "...",
+       "branches": [{"label": "...", "nodes": [{"id": "...", "title": "..."}...]}...],
+       "merge": {"id": "...", "title": "..."}}
+    """
+    # Identify nodes claimed by forks
+    claimed = set()
+    merge_of = {}  # merge_id -> fork_id
+    for nid, nd in defn.nodes.items():
+        if nd.fork:
+            for bdef in nd.fork.branches.values():
+                for bnid in bdef.nodes:
+                    claimed.add(bnid)
+            if nd.fork.merge:
+                merge_of[nd.fork.merge] = nid
+
+    items = []
+    for nid, nd in defn.nodes.items():
+        if nid in claimed or nid in merge_of:
+            continue
+
+        if nd.router:
+            targets = []
+            for route in nd.router:
+                tnode = defn.nodes.get(route.target)
+                targets.append({
+                    "label": _cond_label(route.when),
+                    "id": route.target,
+                    "title": tnode.title if tnode else route.target,
+                })
+            items.append({"type": "router", "id": nid, "title": nd.title, "targets": targets})
+
+        elif nd.fork:
+            branches = []
+            for bid, bdef in nd.fork.branches.items():
+                bnodes = []
+                for bnid in bdef.nodes:
+                    bnode = defn.nodes.get(bnid)
+                    bnodes.append({"id": bnid, "title": bnode.title if bnode else bnid})
+                branches.append({"label": bdef.label, "nodes": bnodes})
+            merge_node = defn.nodes.get(nd.fork.merge)
+            items.append({
+                "type": "fork", "id": nid, "title": nd.title,
+                "branches": branches,
+                "merge": {"id": nd.fork.merge, "title": merge_node.title if merge_node else nd.fork.merge},
+            })
+
+        else:
+            items.append({"type": "node", "id": nid, "title": nd.title})
+
+    return items
+
+
+def _cond_label(when: dict | None) -> str:
+    """Short label for a router condition."""
+    if not when:
+        return "default"
+    if when.get("type") == "field_equals":
+        return f"{when.get('key')} = {when.get('value')}"
+    if when.get("type") == "field_truthy":
+        return when.get("key", "?")
+    op = when.get("op")
+    if op:
+        return f"{op}(...)"
+    return "?"
+
+
 def _serialize_definition(defn: WorkflowDef) -> dict:
     """Serialize a WorkflowDef for the observer UI (Exp-D flowchart)."""
     nodes = []
@@ -96,14 +168,10 @@ def render_page(defn: WorkflowDef, data: dict, workflow_id: str) -> dict:
     if not node:
         return {"error": f"Unknown node: {node_id}"}
 
-    # Derive lifecycle banner from node titles (not a separate phase list)
-    lifecycle = [n.title for n in defn.nodes.values()]
-    lifecycle_current = node.title
-    lifecycle_completed = []
-    for cn in data.get("completed_nodes", []):
-        cn_node = defn.nodes.get(cn)
-        if cn_node and cn_node.title not in lifecycle_completed:
-            lifecycle_completed.append(cn_node.title)
+    # Derive lifecycle banner — topology-aware
+    lifecycle = _build_lifecycle(defn)
+    lifecycle_current = node_id
+    lifecycle_completed = data.get("completed_nodes", [])
 
     state = {
         "workflow": defn.workflow_title,

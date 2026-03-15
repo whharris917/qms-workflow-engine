@@ -1,0 +1,595 @@
+name: create-claude-qms-starter-repo-harden-qms-init
+state: committed
+home: define
+nodes:
+  define:
+    id: define
+    label: Change Overview
+    prompt: Fill in all fields describing the change, then advance.
+    fields:
+      title:
+        name: title
+        type: string
+        value: Create claude-qms Starter Repo, Harden qms init
+      change_type:
+        name: change_type
+        type: string
+      initiator:
+        name: initiator
+        type: string
+      purpose:
+        name: purpose
+        type: string
+        value: End users have no canonical way to obtain the QMS framework. qms init
+          currently unpacks seed/ into whatever directory it is run from with no guard
+          beyond collision checks and no confirmation. This CR creates claude-qms
+          as the canonical distribution repo and hardens qms init with marker-based
+          targeting and a confirmation prompt.
+      scope:
+        name: scope
+        type: string
+        value: 'qms-cli: redesign qms init (marker detection, confirmation prompt,
+          --yes flag, --root marker placement, no-context error). New repo: whharris917/claude-qms
+          with .claude-qms marker, qms-cli submodule, README.md. SDLC-QMS-RS/RTM update.
+          SDLC-CQ namespace registration.'
+      current_state:
+        name: current_state
+        type: string
+      proposed_state:
+        name: proposed_state
+        type: string
+      risk_assessment:
+        name: risk_assessment
+        type: string
+    edges:
+    - target: ei-1
+  ei-1:
+    id: ei-1
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: Pre-execution baseline commit
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: false
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: ei-2
+      condition: outcome==Pass
+    - target: '{var}'
+      condition: outcome==Fail
+      spawns_workflow: var
+  ei-2:
+    id: ei-2
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: Set up development environment for qms-cli
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: false
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: ei-3
+      condition: outcome==Pass
+    - target: '{var}'
+      condition: outcome==Fail
+      spawns_workflow: var
+  ei-3:
+    id: ei-3
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: Check out and update the Requirements Specification (RS) for qms-cli
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: false
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: ei-4
+      condition: outcome==Pass
+    - target: '{var}'
+      condition: outcome==Fail
+      spawns_workflow: var
+  ei-4:
+    id: ei-4
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: Implement the change on the development branch
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: true
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: ei-5
+      condition: outcome==Pass
+    - target: '{var}'
+      condition: outcome==Fail
+      spawns_workflow: var
+    - target: '{vr}'
+      condition: vr_required==True
+      spawns_workflow: vr
+  ei-5:
+    id: ei-5
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: Qualify the implementation (all tests pass, CI green on branch)
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: false
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: ei-6
+      condition: outcome==Pass
+    - target: '{var}'
+      condition: outcome==Fail
+      spawns_workflow: var
+  ei-6:
+    id: ei-6
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: Verify integration in test environment
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: false
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: ei-7
+      condition: outcome==Pass
+    - target: '{var}'
+      condition: outcome==Fail
+      spawns_workflow: var
+  ei-7:
+    id: ei-7
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: "Update the Requirements Traceability Matrix (RTM) \u2014 reference\
+          \ execution branch commit hash"
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: false
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: ei-8
+      condition: outcome==Pass
+    - target: '{var}'
+      condition: outcome==Fail
+      spawns_workflow: var
+  ei-8:
+    id: ei-8
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: Open PR against qms-cli main branch and merge (no-ff, squash prohibited)
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: false
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: ei-9
+      condition: outcome==Pass
+    - target: '{var}'
+      condition: outcome==Fail
+      spawns_workflow: var
+  ei-9:
+    id: ei-9
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: Update qms-cli submodule pointer in pipe-dream
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: false
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: ei-10
+      condition: outcome==Pass
+    - target: '{var}'
+      condition: outcome==Fail
+      spawns_workflow: var
+  ei-10:
+    id: ei-10
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: Post-execution baseline commit
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: false
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: ei-11
+      condition: outcome==Pass
+    - target: '{var}'
+      condition: outcome==Fail
+      spawns_workflow: var
+  ei-11:
+    id: ei-11
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: 'Create whharris917/claude-qms on GitHub: .claude-qms marker, qms-cli
+          submodule, README.md, .gitignore; push'
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: false
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: ei-12
+      condition: outcome==Pass
+    - target: '{var}'
+      condition: outcome==Fail
+      spawns_workflow: var
+  ei-12:
+    id: ei-12
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: Register SDLC namespace CQ; create initial SDLC-CQ-RS and SDLC-CQ-RTM;
+          route for review and approval
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: false
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: ei-13
+      condition: outcome==Pass
+    - target: '{var}'
+      condition: outcome==Fail
+      spawns_workflow: var
+  ei-13:
+    id: ei-13
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: Update qms-cli submodule pointer in claude-qms after merge; push
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: false
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: ei-14
+      condition: outcome==Pass
+    - target: '{var}'
+      condition: outcome==Fail
+      spawns_workflow: var
+  ei-14:
+    id: ei-14
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: Update sandbox/launch.sh to clone claude-qms and run qms init --yes
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: false
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: ei-15
+      condition: outcome==Pass
+    - target: '{var}'
+      condition: outcome==Fail
+      spawns_workflow: var
+  ei-15:
+    id: ei-15
+    template_id: ei
+    label: Execution Items
+    prompt: Execute this item. Fill all fields, then advance.
+    fields:
+      task_description:
+        name: task_description
+        type: string
+        value: 'Verify sandbox end-to-end: clone claude-qms, run qms init, run qms
+          commands, confirm all artifacts created'
+        writable: false
+        parameter: true
+      vr_required:
+        name: vr_required
+        type: bool
+        value: false
+        writable: false
+        parameter: true
+      execution_summary:
+        name: execution_summary
+        type: string
+      outcome:
+        name: outcome
+        type: string
+      performed_by:
+        name: performed_by
+        type: string
+      date:
+        name: date
+        type: string
+    edges:
+    - target: done
+      condition: outcome==Pass
+    - target: '{var}'
+      condition: outcome==Fail
+      spawns_workflow: var
+  done:
+    id: done
+    label: Done

@@ -113,6 +113,9 @@ nodes:
         label: Technical Recommendation
         type: text
         key: tech_recommendation
+    navigation:
+      - action: go_back
+        label: Back to Analysis
     proceed:
       label: Complete Technical Track
       gate: {type: field_truthy, key: tech_recommendation}
@@ -137,6 +140,9 @@ nodes:
         label: Compliance Recommendation
         type: text
         key: compliance_recommendation
+    navigation:
+      - action: go_back
+        label: Back to Review
     proceed:
       label: Complete Compliance Track
       gate: {type: field_truthy, key: compliance_recommendation}

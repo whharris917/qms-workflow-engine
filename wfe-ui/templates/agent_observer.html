@@ -670,15 +670,23 @@ function wfRenderStateProps(state) {
 
 function wfRenderBanner(state) {
     var s = state.state || {};
-    var lifecycle = s.lifecycle || [];
+    var defn = s.definition;
     var current = s.lifecycle_current || '';
     var completed = s.lifecycle_completed || [];
-    if (!lifecycle.length) return '';
 
-    var currentIdx = lifecycle.indexOf(current);
+    /* If we have a topology-aware definition, render mini flowchart */
+    if (defn && defn.nodes && defn.nodes.length) {
+        return _wfMiniFlowchart(defn, current, completed);
+    }
+
+    /* Legacy flat banner */
+    var lifecycle = s.lifecycle || [];
+    if (!lifecycle.length) return '';
+    var labels = (typeof lifecycle[0] === 'string') ? lifecycle : lifecycle.map(function(x) { return x.title || ''; });
+    var currentIdx = labels.indexOf(current);
     var html = '<div class="wf-banner">';
-    for (var i = 0; i < lifecycle.length; i++) {
-        var label = lifecycle[i];
+    for (var i = 0; i < labels.length; i++) {
+        var label = labels[i];
         var isCurrent = label === current;
         var isDone = completed.indexOf(label) !== -1;
         var isPast = i < currentIdx;
@@ -689,6 +697,216 @@ function wfRenderBanner(state) {
         html += '</div>';
     }
     return html + '</div>';
+}
+
+/* ── Mini flowchart banner — pure SVG, horizontal layout ── */
+var _MB = {
+    h: 24, minW: 60, charW: 5, px: 10, r: 4,   /* node: height, min-width, char-width, padding, corner-radius */
+    colGap: 32, rowGap: 10,                       /* gaps between nodes */
+    marginT: 24, marginB: 24, marginL: 10, marginR: 10, /* edge channel zones */
+    fontSize: 9
+};
+
+function _wfMiniFlowchart(defn, current, completed) {
+    var nodes = defn.nodes;
+    var items = _fcBuildLayout(nodes);
+    var edges = _fcEdges(nodes, items);
+
+    /* Compute horizontal slots */
+    var slots = new Array(nodes.length);
+    var contentH = _MB.h;
+    for (var ii = 0; ii < items.length; ii++) {
+        var ih = _mbH(items[ii], nodes);
+        if (ih > contentH) contentH = ih;
+    }
+    var totalH = _MB.marginT + contentH + _MB.marginB;
+    var midY = _MB.marginT + contentH / 2;
+    var cx = _MB.marginL;
+    for (var ii = 0; ii < items.length; ii++) {
+        if (ii > 0) cx += _MB.colGap;
+        cx = _mbPlace(nodes, items[ii], slots, cx, midY, contentH);
+    }
+    var totalW = cx + _MB.marginR;
+
+    /* Render everything as one SVG */
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" class="mb-svg" width="' + totalW + '" height="' + totalH + '" viewBox="0 0 ' + totalW + ' ' + totalH + '">';
+    svg += '<defs>';
+    svg += '<marker id="mb-a" markerWidth="5" markerHeight="4" refX="4" refY="2" orient="auto"><polygon points="0 0,5 2,0 4" fill="#4caf50"/></marker>';
+    svg += '<marker id="mb-ak" markerWidth="5" markerHeight="4" refX="4" refY="2" orient="auto"><polygon points="0 0,5 2,0 4" fill="#4caf50"/></marker>';
+    svg += '<marker id="mb-ar" markerWidth="5" markerHeight="4" refX="4" refY="2" orient="auto"><polygon points="0 0,5 2,0 4" fill="#e65100"/></marker>';
+    svg += '<marker id="mb-ag" markerWidth="5" markerHeight="4" refX="4" refY="2" orient="auto"><polygon points="0 0,5 2,0 4" fill="#7b1fa2"/></marker>';
+    svg += '<marker id="mb-ab" markerWidth="5" markerHeight="4" refX="4" refY="2" orient="auto"><polygon points="0 0,5 2,0 4" fill="#2a6bcf"/></marker>';
+    svg += '</defs>';
+
+    /* Draw edges first (behind nodes) */
+    svg += _mbDrawEdges(slots, edges, totalW, totalH);
+
+    /* Draw nodes */
+    for (var i = 0; i < nodes.length; i++) {
+        var sl = slots[i];
+        if (!sl) continue;
+        var nd = nodes[i];
+        var isCur = nd.id === current;
+        var isDone = completed.indexOf(nd.id) !== -1;
+        var isRtr = nd.router && nd.router.length > 0;
+        var isFrk = nd.fork && nd.fork.branches;
+
+        var fill = isDone ? '#e8f5e9' : isCur ? '#e3f2fd' : '#fff';
+        var stroke = isDone ? '#4caf50' : isCur ? '#2a6bcf' : isRtr ? '#e65100' : isFrk ? '#2e7d32' : '#ccc';
+        var sw = (isCur || isDone) ? 2 : 1;
+        var textFill = isDone ? '#2e7d32' : isCur ? '#1a1a2e' : '#555';
+        var fw = (isCur || isDone) ? 'bold' : 'normal';
+
+        svg += '<rect x="' + sl.x + '" y="' + sl.y + '" width="' + sl.w + '" height="' + sl.h
+            + '" rx="' + _MB.r + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + sw + '"/>';
+        svg += '<text x="' + (sl.x + sl.w / 2) + '" y="' + (sl.y + sl.h / 2)
+            + '" text-anchor="middle" dominant-baseline="central" font-size="' + _MB.fontSize
+            + '" font-family="-apple-system,sans-serif" fill="' + textFill + '" font-weight="' + fw + '">'
+            + wfEsc(nd.title) + '</text>';
+    }
+
+    svg += '</svg>';
+    return '<div class="wf-banner wf-banner-flow">' + svg + '</div>';
+}
+
+function _mbW(title) { return Math.max(_MB.minW, title.length * _MB.charW + _MB.px * 2); }
+function _mbH(item, nodes) {
+    if (item.type === 'fork_group') return item.branches.length * _MB.h + (item.branches.length - 1) * _MB.rowGap;
+    return _MB.h;
+}
+
+function _mbPlace(nodes, item, slots, cx, midY, contentH) {
+    if (item.type === 'node' || item.type === 'router') {
+        var w = _mbW(nodes[item.idx].title);
+        slots[item.idx] = { x: cx, y: midY - _MB.h / 2, w: w, h: _MB.h, cy: midY };
+        return cx + w;
+    }
+    if (item.type === 'fork_group') return _mbPlaceFork(nodes, item, slots, cx, midY, contentH);
+    return cx;
+}
+
+function _mbPlaceFork(nodes, item, slots, cx, midY, contentH) {
+    var nBr = item.branches.length;
+    /* Fork card */
+    var fw = _mbW(nodes[item.fork_idx].title);
+    slots[item.fork_idx] = { x: cx, y: midY - _MB.h / 2, w: fw, h: _MB.h, cy: midY };
+    cx += fw + _MB.colGap;
+
+    /* Column-aligned branches */
+    var blockH = nBr * _MB.h + (nBr - 1) * _MB.rowGap;
+    var topY = midY - blockH / 2;
+    var maxCols = 0;
+    for (var bi = 0; bi < nBr; bi++) {
+        if (item.branches[bi].node_indices.length > maxCols)
+            maxCols = item.branches[bi].node_indices.length;
+    }
+    /* Compute uniform column widths */
+    var colWs = [];
+    for (var ci = 0; ci < maxCols; ci++) {
+        var mw = _MB.minW;
+        for (var bi = 0; bi < nBr; bi++) {
+            var br = item.branches[bi];
+            if (ci < br.node_indices.length) {
+                var w = _mbW(nodes[br.node_indices[ci]].title);
+                if (w > mw) mw = w;
+            }
+        }
+        colWs.push(mw);
+    }
+    /* Place in grid */
+    var colX = cx;
+    for (var ci = 0; ci < maxCols; ci++) {
+        for (var bi = 0; bi < nBr; bi++) {
+            var br = item.branches[bi];
+            if (ci < br.node_indices.length) {
+                var idx = br.node_indices[ci];
+                var w = _mbW(nodes[idx].title);
+                var bx = colX + (colWs[ci] - w) / 2;
+                var by = topY + bi * (_MB.h + _MB.rowGap);
+                slots[idx] = { x: bx, y: by, w: w, h: _MB.h, cy: by + _MB.h / 2 };
+            }
+        }
+        colX += colWs[ci];
+        if (ci < maxCols - 1) colX += _MB.colGap;
+    }
+    cx = colX + _MB.colGap;
+
+    /* Merge card */
+    var mw = _mbW(nodes[item.merge_idx].title);
+    slots[item.merge_idx] = { x: cx, y: midY - _MB.h / 2, w: mw, h: _MB.h, cy: midY };
+    return cx + mw;
+}
+
+function _mbDrawEdges(slots, edges, totalW, totalH) {
+    var svg = '';
+    /* Separate fork/merge from others */
+    var forkG = {}, mergeG = {}, rest = [];
+    for (var i = 0; i < edges.length; i++) {
+        var e = edges[i];
+        if (e.type === 'fork') (forkG[e.from] = forkG[e.from] || []).push(e);
+        else if (e.type === 'merge') (mergeG[e.to] = mergeG[e.to] || []).push(e);
+        else rest.push(e);
+    }
+
+    /* Fork bus bars */
+    for (var fk in forkG) {
+        var grp = forkG[fk], fs = slots[fk]; if (!fs) continue;
+        var busX = fs.x + fs.w + _MB.colGap * 0.4;
+        var cys = [];
+        for (var g = 0; g < grp.length; g++) { var ts = slots[grp[g].to]; if (ts) cys.push(ts.cy); }
+        if (!cys.length) continue;
+        svg += '<path d="M' + (fs.x + fs.w) + ' ' + fs.cy + ' H' + busX + '" stroke="#4caf50" fill="none" stroke-width="1.5"/>';
+        svg += '<path d="M' + busX + ' ' + Math.min.apply(null, cys) + ' V' + Math.max.apply(null, cys) + '" stroke="#4caf50" fill="none" stroke-width="1.5"/>';
+        for (var g = 0; g < grp.length; g++) {
+            var ts = slots[grp[g].to]; if (!ts) continue;
+            svg += '<path d="M' + busX + ' ' + ts.cy + ' H' + ts.x + '" stroke="#4caf50" fill="none" stroke-width="1.5" marker-end="url(#mb-ak)"/>';
+        }
+    }
+
+    /* Merge bus bars */
+    for (var mk in mergeG) {
+        var grp = mergeG[mk], ts = slots[mk]; if (!ts) continue;
+        var busX = ts.x - _MB.colGap * 0.4;
+        var cys = [];
+        for (var g = 0; g < grp.length; g++) { var fs2 = slots[grp[g].from]; if (fs2) cys.push(fs2.cy); }
+        if (!cys.length) continue;
+        for (var g = 0; g < grp.length; g++) {
+            var fs2 = slots[grp[g].from]; if (!fs2) continue;
+            svg += '<path d="M' + (fs2.x + fs2.w) + ' ' + fs2.cy + ' H' + busX + '" stroke="#4caf50" fill="none" stroke-width="1.5"/>';
+        }
+        svg += '<path d="M' + busX + ' ' + Math.min.apply(null, cys) + ' V' + Math.max.apply(null, cys) + '" stroke="#4caf50" fill="none" stroke-width="1.5"/>';
+        svg += '<path d="M' + busX + ' ' + ts.cy + ' H' + ts.x + '" stroke="#4caf50" fill="none" stroke-width="1.5" marker-end="url(#mb-ak)"/>';
+    }
+
+    /* Other edges */
+    var botCh = 0, topCh = 0;
+    for (var i = 0; i < rest.length; i++) {
+        var e = rest[i], fs = slots[e.from], ts = slots[e.to];
+        if (!fs || !ts) continue;
+        if (e.type === 'forward') {
+            if (Math.abs(fs.cy - ts.cy) < 2) {
+                svg += '<path d="M' + (fs.x + fs.w) + ' ' + fs.cy + ' H' + ts.x + '" stroke="#4caf50" fill="none" stroke-width="1.5" marker-end="url(#mb-a)"/>';
+            } else {
+                var mx = (fs.x + fs.w + ts.x) / 2;
+                svg += '<path d="M' + (fs.x + fs.w) + ' ' + fs.cy + ' H' + mx + ' V' + ts.cy + ' H' + ts.x + '" stroke="#4caf50" fill="none" stroke-width="1.5" marker-end="url(#mb-a)"/>';
+            }
+        } else if (e.type === 'router' || e.type === 'goto') {
+            var chY = totalH - _MB.marginB + 6 + botCh * 12;
+            botCh++;
+            var col = e.type === 'router' ? '#e65100' : '#7b1fa2';
+            var mk = e.type === 'router' ? 'url(#mb-ar)' : 'url(#mb-ag)';
+            var da = e.type === 'router' ? ' stroke-dasharray="5 3"' : ' stroke-dasharray="3 3"';
+            svg += '<path d="M' + (fs.x + fs.w / 2) + ' ' + (fs.y + fs.h) + ' V' + chY + ' H' + (ts.x + ts.w / 2) + ' V' + (ts.y + ts.h) + '" stroke="' + col + '" fill="none" stroke-width="1"' + da + ' marker-end="' + mk + '"/>';
+            if (e.label) {
+                svg += '<text x="' + ((fs.x + fs.w / 2 + ts.x + ts.w / 2) / 2) + '" y="' + (chY - 2) + '" text-anchor="middle" dominant-baseline="auto" font-size="7" font-family="-apple-system,sans-serif" fill="' + col + '">' + wfEsc(e.label) + '</text>';
+            }
+        } else if (e.type === 'back') {
+            var chY = _MB.marginT - 6 - topCh * 12;
+            topCh++;
+            svg += '<path d="M' + (fs.x + fs.w / 2) + ' ' + fs.y + ' V' + chY + ' H' + (ts.x + ts.w / 2) + ' V' + ts.y + '" stroke="#2a6bcf" fill="none" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#mb-ab)"/>';
+        }
+    }
+    return svg;
 }
 
 function wfRenderTable(table) {
@@ -1053,6 +1271,15 @@ var WF_STRUCTURAL_CSS = ''
     + '.wf-dot { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; font-size:0.7rem; font-weight:600; }'
     + '.wf-step-label { font-size:0.68rem; font-weight:500; text-align:center; white-space:nowrap; }'
     + '.wf-conn { flex:1; height:2px; margin:0 0.25rem; min-width:12px; align-self:center; margin-bottom:1rem; }'
+    + '.wf-parallel { display:flex; flex-direction:column; gap:0.2rem; align-self:center; padding:0.3rem 0.5rem; border:1px dashed; border-radius:6px; }'
+    + '.wf-branch { display:flex; align-items:center; gap:0.25rem; font-size:0.6rem; }'
+    + '.wf-branch-label { font-weight:700; font-size:0.58rem; min-width:4em; }'
+    + '.wf-branch-node { font-size:0.58rem; padding:0.1rem 0.3rem; border-radius:3px; border:1px solid; white-space:nowrap; }'
+    + '.wf-branch-sep { font-size:0.5rem; opacity:0.5; }'
+    + '.wf-step-targets { display:flex; flex-direction:column; gap:0.1rem; margin-top:0.15rem; }'
+    + '.wf-target { font-size:0.55rem; padding:0.05rem 0.25rem; border-radius:2px; border:1px dashed; text-align:center; }'
+    + '.wf-banner-flow { overflow-x:auto !important; padding:0.25rem !important; display:block !important; }'
+    + '.mb-svg { display:block; }'
     + '.wf-section { padding:0.5rem 1.5rem 0; }'
     + '.wf-section-head { font-size:1.1rem; font-weight:600; }'
     + '.wf-desc { padding:0.25rem 1.5rem 0.75rem; font-size:0.9rem; line-height:1.5; white-space:pre-line; }'
@@ -2592,12 +2819,26 @@ function _fcEdges(nodes, items) {
                         label: branch.label, type: 'fork'});
                 }
             }
-            /* Branch internal forward edges */
+            /* Branch internal forward edges + navigation edges */
             for (var bi = 0; bi < item.branches.length; bi++) {
                 var branch = item.branches[bi];
                 for (var ni = 0; ni < branch.node_indices.length - 1; ni++) {
                     edges.push({from: branch.node_indices[ni],
                         to: branch.node_indices[ni + 1], label: '', type: 'forward'});
+                }
+                /* Navigation edges within branch nodes */
+                for (var ni = 0; ni < branch.node_indices.length; ni++) {
+                    var bnd = nodes[branch.node_indices[ni]];
+                    var bnavs = bnd.navigation || [];
+                    for (var nvi = 0; nvi < bnavs.length; nvi++) {
+                        var nav = bnavs[nvi];
+                        if (nav.action === 'go_back') {
+                            var t = nav.node ? nodeIdMap[nav.node] : (ni > 0 ? branch.node_indices[ni - 1] : item.fork_idx);
+                            if (t !== undefined) edges.push({from: branch.node_indices[ni], to: t, label: nav.label, type: 'back'});
+                        } else if (nav.action === 'go_to' && nav.node && nodeIdMap[nav.node] !== undefined) {
+                            edges.push({from: branch.node_indices[ni], to: nodeIdMap[nav.node], label: nav.label, type: 'goto'});
+                        }
+                    }
                 }
                 /* Last branch node → merge */
                 if (branch.node_indices.length > 0) {
@@ -2854,7 +3095,16 @@ function _fcBuildEdgeSvg(slots, edges, totalW, totalH) {
         }
     }
 
-    /* Render plain edges (forward, back) */
+    /* Render plain edges (forward, back) — stagger left-side Y per node */
+    var backChannel = 0;
+    var nodeLeftCount = {};
+    var nodeLeftNext = {};
+    for (var i = 0; i < plainEdges.length; i++) {
+        if (plainEdges[i].type === 'back') {
+            nodeLeftCount[plainEdges[i].from] = (nodeLeftCount[plainEdges[i].from] || 0) + 1;
+            nodeLeftCount[plainEdges[i].to] = (nodeLeftCount[plainEdges[i].to] || 0) + 1;
+        }
+    }
     for (var i = 0; i < plainEdges.length; i++) {
         var e = plainEdges[i], fs = slots[e.from], ts = slots[e.to];
         if (!fs || !ts) continue;
@@ -2869,9 +3119,12 @@ function _fcBuildEdgeSvg(slots, edges, totalW, totalH) {
                 svg += '<path d="M' + x1 + ' ' + y1 + ' V' + midY + ' H' + x2 + ' V' + y2 + '" class="fc-ef" marker-end="url(#fc-af)"/>';
             }
         } else if (e.type === 'back') {
-            var channelX = 20;
-            var x1 = fs.x, y1 = fs.y + fs.h * 0.5;
-            var x2 = ts.x, y2 = ts.y + ts.h * 0.5;
+            var channelX = 20 + backChannel * 16;
+            /* Stagger Y by global back-edge index to avoid overlap across row-aligned nodes */
+            var yOffset = backChannel * 30;
+            backChannel++;
+            var x1 = fs.x, y1 = fs.y + fs.h * 0.5 + yOffset;
+            var x2 = ts.x, y2 = ts.y + ts.h * 0.5 + yOffset;
             svg += '<path d="M' + x1 + ' ' + y1 + ' H' + channelX + ' V' + y2 + ' H' + x2 + '" class="fc-eb" marker-end="url(#fc-ab)"/>';
             if (e.label) {
                 svg += '<text x="' + (x2 + 6) + '" y="' + (y2 - 14) + '" class="fc-el fc-el-b" text-anchor="start" dominant-baseline="auto">' + wfEsc(e.label) + '</text>';
@@ -2913,7 +3166,8 @@ function _fcBuildEdgeSvg(slots, edges, totalW, totalH) {
         var marker = e.type === 'router' ? 'url(#fc-ar)' : 'url(#fc-ag)';
         svg += '<path d="M' + x1 + ' ' + y1 + ' H' + channelX + ' V' + y2 + ' H' + x2 + '" class="' + cls + '" marker-end="' + marker + '"/>';
         if (e.label) {
-            svg += '<text x="' + (x2 + 6) + '" y="' + (y2 - 14) + '" class="fc-el fc-el-rt" text-anchor="start" dominant-baseline="auto">' + wfEsc(e.label) + '</text>';
+            var labelCls = e.type === 'router' ? 'fc-el-rt' : 'fc-el-g';
+            svg += '<text x="' + (x2 + 6) + '" y="' + (y2 - 14) + '" class="fc-el ' + labelCls + '" text-anchor="start" dominant-baseline="auto">' + wfEsc(e.label) + '</text>';
         }
     }
     svg += '</svg>';
@@ -3269,12 +3523,12 @@ var EXP_D_FC_CSS = ''
     + '.fc-fork-branches { display:flex; gap:0.4rem; margin-top:0.2rem; flex-wrap:wrap; }'
     + '.fc-fork-branch { font-size:0.65rem; padding:0.1rem 0.4rem; border-radius:3px; border:1px solid; }'
     /* Edge SVG */
-    + '.fc-ef { fill:none; stroke-width:2; }'
-    + '.fc-eb { fill:none; stroke-width:1.5; stroke-dasharray:6 3; }'
-    + '.fc-eg { fill:none; stroke-width:1.5; stroke-dasharray:8 3; }'
-    + '.fc-efk { fill:none; stroke-width:2; }'       /* fork edge */
-    + '.fc-emg { fill:none; stroke-width:2; }'       /* merge edge */
-    + '.fc-ert { fill:none; stroke-width:1.5; stroke-dasharray:4 4; }' /* router edge */
+    + '.fc-ef { fill:none; stroke-width:2; }'                             /* forward: solid */
+    + '.fc-eb { fill:none; stroke-width:1.5; stroke-dasharray:3 3; }'   /* back: dotted */
+    + '.fc-eg { fill:none; stroke-width:1.5; stroke-dasharray:3 3; }'   /* goto: dotted */
+    + '.fc-efk { fill:none; stroke-width:2; }'                           /* fork: solid */
+    + '.fc-emg { fill:none; stroke-width:2; }'                           /* merge: solid */
+    + '.fc-ert { fill:none; stroke-width:1.5; stroke-dasharray:6 4; }'  /* router: dashed */
     + '.fc-el { font-size:11px; font-family:-apple-system,sans-serif; }'
     ;
 
@@ -3308,11 +3562,11 @@ var EXP_D_FC_LIGHT = ''
     + '.fc-ef { stroke:#4caf50; } .fc-mf { fill:#4caf50; }'
     + '.fc-eb { stroke:#2a6bcf; } .fc-mb { fill:#2a6bcf; }'
     + '.fc-eg { stroke:#7b1fa2; } .fc-mg { fill:#7b1fa2; }'
-    + '.fc-efk { stroke:#2e7d32; } .fc-mk { fill:#2e7d32; }'
-    + '.fc-emg { stroke:#2e7d32; }'
+    + '.fc-efk { stroke:#4caf50; } .fc-mk { fill:#4caf50; }'
+    + '.fc-emg { stroke:#4caf50; }'
     + '.fc-ert { stroke:#e65100; } .fc-mr { fill:#e65100; }'
     + '.fc-el-b { fill:#2a6bcf; } .fc-el-g { fill:#7b1fa2; }'
-    + '.fc-el-fk { fill:#2e7d32; } .fc-el-rt { fill:#e65100; }'
+    + '.fc-el-fk { fill:#4caf50; } .fc-el-rt { fill:#e65100; }'
     ;
 
 /* ── Dark tokens ── */
@@ -3345,11 +3599,11 @@ var EXP_D_FC_DARK = ''
     + '.fc-ef { stroke:#4caf50; } .fc-mf { fill:#4caf50; }'
     + '.fc-eb { stroke:#4a9eff; } .fc-mb { fill:#4a9eff; }'
     + '.fc-eg { stroke:#ce93d8; } .fc-mg { fill:#ce93d8; }'
-    + '.fc-efk { stroke:#66bb6a; } .fc-mk { fill:#66bb6a; }'
-    + '.fc-emg { stroke:#66bb6a; }'
+    + '.fc-efk { stroke:#4caf50; } .fc-mk { fill:#4caf50; }'
+    + '.fc-emg { stroke:#4caf50; }'
     + '.fc-ert { stroke:#ffb74d; } .fc-mr { fill:#ffb74d; }'
     + '.fc-el-b { fill:#4a9eff; } .fc-el-g { fill:#ce93d8; }'
-    + '.fc-el-fk { fill:#66bb6a; } .fc-el-rt { fill:#ffb74d; }'
+    + '.fc-el-fk { fill:#4caf50; } .fc-el-rt { fill:#ffb74d; }'
     ;
 
 function _scopeFC(sel, css) { return css.replace(/\.fc-/g, sel + ' .fc-'); }
@@ -3366,7 +3620,7 @@ function _scopeFC(sel, css) { return css.replace(/\.fc-/g, sel + ' .fc-'); }
             style.textContent = WF_STRUCTURAL_CSS + EXP_D_FC_CSS
                 + _scopeFC('#rc-exp-d', EXP_D_FC_LIGHT)
                 + '#rc-exp-d { background:#f5f5f5; color:#333; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
-                + '#rc-exp-d .wf-title { color:#1a1a2e; } #rc-exp-d .wf-banner { background:#f8f9fb; border-color:#e8e8e8; } #rc-exp-d .wf-dot { background:#dde1e6; color:#888; } #rc-exp-d .wf-step-label { color:#888; } #rc-exp-d .wf-step-active .wf-dot { background:#2a6bcf; color:#fff; } #rc-exp-d .wf-step-active .wf-step-label { color:#1a1a2e; font-weight:600; } #rc-exp-d .wf-step-done .wf-dot { background:#4caf50; color:#fff; } #rc-exp-d .wf-step-done .wf-step-label { color:#555; } #rc-exp-d .wf-conn { background:#dde1e6; } #rc-exp-d .wf-conn-active { background:#4caf50; } #rc-exp-d .wf-section-head { color:#1a1a2e; } #rc-exp-d .wf-desc { color:#666; } #rc-exp-d .wf-card { background:#fff; border-color:#e8e8e8; } #rc-exp-d .wf-card-head { color:#7f8fa6; } #rc-exp-d .wf-tbl td { border-bottom:1px solid #f0f0f0; } #rc-exp-d .wf-key { color:#7f8fa6; } #rc-exp-d .wf-val { color:#333; } #rc-exp-d .wf-null, #rc-exp-d .wf-empty-arr, #rc-exp-d .wf-empty-obj { color:#bbb; } #rc-exp-d .wf-bool, #rc-exp-d .wf-num { color:#2a6bcf; } #rc-exp-d .wf-str { color:#333; } #rc-exp-d .wf-arr-item { border-left-color:#e8e8e8; } #rc-exp-d .wf-field { border-bottom:1px solid #f0f0f0; } #rc-exp-d .wf-field-label { color:#555; } #rc-exp-d .wf-field-instruction { color:#999; } #rc-exp-d .wf-field-value { color:#333; } #rc-exp-d .wf-field-empty { color:#bbb; } #rc-exp-d .wf-field-options { color:#7f8fa6; } #rc-exp-d .wf-aff { background:#f8f9fb; border-color:#e8e8e8; } #rc-exp-d .wf-aff-id { background:#dde1e6; color:#555; } #rc-exp-d .wf-aff-label { color:#333; } #rc-exp-d .wf-aff-method { color:#7f8fa6; background:#eef1f5; } #rc-exp-d .wf-aff-detail { color:#999; } #rc-exp-d .wf-aff-options { color:#7f8fa6; } #rc-exp-d .wf-aff-primary { border-color:#2a6bcf; background:#f0f5ff; } #rc-exp-d .wf-aff-primary .wf-aff-label { color:#2a6bcf; font-weight:600; } #rc-exp-d .wf-aff-primary .wf-aff-id { background:#2a6bcf; color:#fff; } #rc-exp-d .wf-aff-nav { border-color:#dde1e6; background:#fafafa; } #rc-exp-d .wf-aff-nav .wf-aff-label { color:#888; } #rc-exp-d .wf-aff-selected { border-color:#4caf50; background:#f0fff0; } #rc-exp-d .wf-aff-selected .wf-aff-label { color:#2e7d32; } #rc-exp-d .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; } #rc-exp-d .wf-fb-outcome { border-left:3px solid #2a6bcf; background:#f0f5ff; } #rc-exp-d .wf-fb-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-exp-d .wf-fb-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-exp-d .wf-aff-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-exp-d .wf-aff-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-exp-d .wf-tag-outcome { color:#2a6bcf; } #rc-exp-d .wf-tag-new { color:#4caf50; } #rc-exp-d .wf-tag-modified { color:#e6a817; } #rc-exp-d .wf-table th { background:#f4f6f9; border-color:#e8e8e8; } #rc-exp-d .wf-table td { border-color:#e8e8e8; } #rc-exp-d .wf-table-rownum { color:#aaa; background:#fafbfc; } #rc-exp-d .wf-table-coltype { color:#7f8fa6; } #rc-exp-d .wf-table-empty { color:#bbb; } #rc-exp-d .wf-table-summary { color:#7f8fa6; } #rc-exp-d .wf-table-prop { color:#7f8fa6; } #rc-exp-d .wf-exec-pass { color:#2e7d32; } #rc-exp-d .wf-exec-pending { color:#b0b0b0; } #rc-exp-d [data-completed="true"] { background:#e8f5e9; } #rc-exp-d .wf-exec-reason { color:#999; }'
+                + '#rc-exp-d .wf-title { color:#1a1a2e; } #rc-exp-d .wf-banner { background:#f8f9fb; border-color:#e8e8e8; } #rc-exp-d .wf-dot { background:#dde1e6; color:#888; } #rc-exp-d .wf-step-label { color:#888; } #rc-exp-d .wf-step-active .wf-dot { background:#2a6bcf; color:#fff; } #rc-exp-d .wf-step-active .wf-step-label { color:#1a1a2e; font-weight:600; } #rc-exp-d .wf-step-done .wf-dot { background:#4caf50; color:#fff; } #rc-exp-d .wf-step-done .wf-step-label { color:#555; } #rc-exp-d .wf-conn { background:#dde1e6; } #rc-exp-d .wf-conn-active { background:#4caf50; } #rc-exp-d .wf-section-head { color:#1a1a2e; } #rc-exp-d .wf-desc { color:#666; } #rc-exp-d .wf-card { background:#fff; border-color:#e8e8e8; } #rc-exp-d .wf-card-head { color:#7f8fa6; } #rc-exp-d .wf-tbl td { border-bottom:1px solid #f0f0f0; } #rc-exp-d .wf-key { color:#7f8fa6; } #rc-exp-d .wf-val { color:#333; } #rc-exp-d .wf-null, #rc-exp-d .wf-empty-arr, #rc-exp-d .wf-empty-obj { color:#bbb; } #rc-exp-d .wf-bool, #rc-exp-d .wf-num { color:#2a6bcf; } #rc-exp-d .wf-str { color:#333; } #rc-exp-d .wf-arr-item { border-left-color:#e8e8e8; } #rc-exp-d .wf-field { border-bottom:1px solid #f0f0f0; } #rc-exp-d .wf-field-label { color:#555; } #rc-exp-d .wf-field-instruction { color:#999; } #rc-exp-d .wf-field-value { color:#333; } #rc-exp-d .wf-field-empty { color:#bbb; } #rc-exp-d .wf-field-options { color:#7f8fa6; } #rc-exp-d .wf-aff { background:#f8f9fb; border-color:#e8e8e8; } #rc-exp-d .wf-aff-id { background:#dde1e6; color:#555; } #rc-exp-d .wf-aff-label { color:#333; } #rc-exp-d .wf-aff-method { color:#7f8fa6; background:#eef1f5; } #rc-exp-d .wf-aff-detail { color:#999; } #rc-exp-d .wf-aff-options { color:#7f8fa6; } #rc-exp-d .wf-aff-primary { border-color:#2a6bcf; background:#f0f5ff; } #rc-exp-d .wf-aff-primary .wf-aff-label { color:#2a6bcf; font-weight:600; } #rc-exp-d .wf-aff-primary .wf-aff-id { background:#2a6bcf; color:#fff; } #rc-exp-d .wf-aff-nav { border-color:#dde1e6; background:#fafafa; } #rc-exp-d .wf-aff-nav .wf-aff-label { color:#888; } #rc-exp-d .wf-aff-selected { border-color:#4caf50; background:#f0fff0; } #rc-exp-d .wf-aff-selected .wf-aff-label { color:#2e7d32; } #rc-exp-d .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; } #rc-exp-d .wf-fb-outcome { border-left:3px solid #2a6bcf; background:#f0f5ff; } #rc-exp-d .wf-fb-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-exp-d .wf-fb-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-exp-d .wf-aff-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-exp-d .wf-aff-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-exp-d .wf-tag-outcome { color:#2a6bcf; } #rc-exp-d .wf-tag-new { color:#4caf50; } #rc-exp-d .wf-tag-modified { color:#e6a817; } #rc-exp-d .wf-table th { background:#f4f6f9; border-color:#e8e8e8; } #rc-exp-d .wf-table td { border-color:#e8e8e8; } #rc-exp-d .wf-table-rownum { color:#aaa; background:#fafbfc; } #rc-exp-d .wf-table-coltype { color:#7f8fa6; } #rc-exp-d .wf-table-empty { color:#bbb; } #rc-exp-d .wf-table-summary { color:#7f8fa6; } #rc-exp-d .wf-table-prop { color:#7f8fa6; } #rc-exp-d .wf-exec-pass { color:#2e7d32; } #rc-exp-d .wf-exec-pending { color:#b0b0b0; } #rc-exp-d [data-completed="true"] { background:#e8f5e9; } #rc-exp-d .wf-exec-reason { color:#999; } #rc-exp-d .wf-parallel { border-color:#c8e6c9; background:#f8fdf8; } #rc-exp-d .wf-branch-label { color:#2e7d32; } #rc-exp-d .wf-branch-node { background:#fff; border-color:#dde1e6; color:#555; } #rc-exp-d .wf-branch-done { background:#e8f5e9; border-color:#4caf50; color:#2e7d32; } #rc-exp-d .wf-branch-active { background:#e3f2fd; border-color:#2a6bcf; color:#1a1a2e; font-weight:600; } #rc-exp-d .wf-dot-router { background:#e65100; } #rc-exp-d .wf-dot-fork { background:#2e7d32; } #rc-exp-d .wf-target { border-color:#e65100; color:#795548; } #rc-exp-d .wf-target-done { background:#fff3e0; color:#e65100; } #rc-exp-d .wf-target-active { background:#fff3e0; border-color:#e65100; color:#e65100; font-weight:600; } #rc-exp-d .mb-node { background:#fff; border-color:#dde1e6; color:#555; } #rc-exp-d .mb-current { background:#e3f2fd; border-color:#2a6bcf; color:#1a1a2e; font-weight:700; } #rc-exp-d .mb-done { background:#e8f5e9; border-color:#4caf50; color:#2e7d32; } #rc-exp-d .mb-router { border-color:#e65100; } #rc-exp-d .mb-router.mb-done { border-color:#4caf50; } #rc-exp-d .mb-fork { border-color:#2e7d32; } #rc-exp-d .mb-fork.mb-done { border-color:#4caf50; }'
                 ; document.head.appendChild(style); container = c;
         },
         update: function(state, msg, feedback) { _expDPage(container, state, msg, feedback, false); },
