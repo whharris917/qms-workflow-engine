@@ -26,13 +26,8 @@ with open(_YAML_PATH) as _f:
     _DEF = yaml.safe_load(_f)
 
 _NODES = list(_DEF["nodes"].keys())
-_LIFECYCLE = _DEF["lifecycle_banner"]
 _NODE_INFO = {
     nid: {"title": n["title"], "instruction": n["instruction"]}
-    for nid, n in _DEF["nodes"].items()
-}
-_NODE_TO_LIFECYCLE = {
-    nid: n["lifecycle_label"]
     for nid, n in _DEF["nodes"].items()
 }
 
@@ -55,7 +50,6 @@ def default_data() -> dict:
         "workflow_id": None,
         "workflow_title": None,
         "workflow_description": None,
-        "phases": [],
         "wf_nodes": [],
         "focused_node": None,
     }
@@ -65,7 +59,6 @@ def _ensure(data: dict) -> dict:
     if "node" not in data:
         return default_data()
     data.setdefault("completed_nodes", [])
-    data.setdefault("phases", [])
     data.setdefault("wf_nodes", [])
     data.setdefault("focused_node", None)
     return data
@@ -78,7 +71,6 @@ def _ensure(data: dict) -> dict:
 
 def _validate(data: dict) -> list[str]:
     errors = []
-    phases = set(data.get("phases", []))
     wf_nodes = data.get("wf_nodes", [])
     node_ids = {n["id"] for n in wf_nodes}
 
@@ -90,10 +82,6 @@ def _validate(data: dict) -> list[str]:
     has_proceed_or_action = False
 
     for wn in wf_nodes:
-        nid = wn["id"]
-        if wn.get("lifecycle_label") and wn["lifecycle_label"] not in phases:
-            errors.append(f"Node '{nid}': lifecycle label '{wn['lifecycle_label']}' not in banner.")
-
         for fld in wn.get("fields", []):
             all_keys.append(fld["key"])
 
@@ -143,14 +131,12 @@ def _publish(data: dict) -> str | None:
     defn = {
         "workflow_title": data["workflow_title"],
         "workflow_description": data["workflow_description"] or "",
-        "lifecycle_banner": list(data["phases"]),
         "nodes": {},
     }
 
     for wn in data["wf_nodes"]:
         nd = {
             "title": wn["title"],
-            "lifecycle_label": wn["lifecycle_label"],
             "instruction": wn["instruction"],
         }
         if wn.get("show_all_fields"):
@@ -192,11 +178,9 @@ def _summary(data: dict) -> dict:
         "workflow_id": data.get("workflow_id"),
         "workflow_title": data.get("workflow_title"),
         "workflow_description": data.get("workflow_description"),
-        "lifecycle_banner": data.get("phases", []),
         "nodes": [
             {
                 "id": wn["id"], "title": wn["title"],
-                "lifecycle_label": wn.get("lifecycle_label", ""),
                 "instruction": wn.get("instruction", ""),
                 "show_all_fields": wn.get("show_all_fields", False),
                 "fields": wn.get("fields", []),
@@ -214,12 +198,14 @@ def render_node(data: dict, workflow_id: str) -> dict:
     node = data["node"]
     info = _NODE_INFO[node]
 
-    lifecycle_current = _NODE_TO_LIFECYCLE.get(node, _LIFECYCLE[0])
+    # Derive lifecycle from builder's own node titles
+    lifecycle = [_NODE_INFO[nid]["title"] for nid in _NODES]
+    lifecycle_current = info["title"]
     lifecycle_completed = []
     for cn in data["completed_nodes"]:
-        lbl = _NODE_TO_LIFECYCLE.get(cn)
-        if lbl and lbl not in lifecycle_completed:
-            lifecycle_completed.append(lbl)
+        cn_info = _NODE_INFO.get(cn)
+        if cn_info and cn_info["title"] not in lifecycle_completed:
+            lifecycle_completed.append(cn_info["title"])
 
     affordances = _build_affordances(data, workflow_id)
 
@@ -227,7 +213,7 @@ def render_node(data: dict, workflow_id: str) -> dict:
         "workflow": WORKFLOW_TITLE,
         "node": node,
         "node_title": info["title"],
-        "lifecycle": _LIFECYCLE,
+        "lifecycle": lifecycle,
         "lifecycle_current": lifecycle_current,
         "lifecycle_completed": lifecycle_completed,
         "completed_nodes": data["completed_nodes"],
@@ -267,30 +253,13 @@ def _build_affordances(data: dict, workflow_id: str) -> list[dict]:
             affs.append({"id": n, "label": "Proceed to Lifecycle", "method": "POST", "url": f"{api}/proceed", "body": {}})
             n += 1
 
-    elif node == "lifecycle":
-        phases = data.get("phases", [])
-        affs.append({"id": n, "label": f"Add phase (current: {json.dumps(phases)})", "method": "POST", "url": f"{api}/add_phase", "body": {"label": "<label>"}, "parameters": {"label": {}}})
-        n += 1
-        if phases:
-            affs.append({"id": n, "label": "Remove phase", "method": "POST", "url": f"{api}/remove_phase", "body": {"index": "<index>"}, "parameters": {"index": {"options": list(range(len(phases))), "labels": phases}}})
-            n += 1
-            if len(phases) > 1:
-                affs.append({"id": n, "label": "Move phase up", "method": "POST", "url": f"{api}/reorder_phase", "body": {"index": "<index>", "direction": "up"}, "parameters": {"index": {"options": list(range(len(phases))), "labels": phases}}})
-                n += 1
-        affs.append({"id": n, "label": "Go back to Metadata", "method": "POST", "url": f"{api}/go_back", "body": {}})
-        n += 1
-        if phases:
-            affs.append({"id": n, "label": "Proceed to Node Builder", "method": "POST", "url": f"{api}/proceed", "body": {}})
-            n += 1
-
     elif node == "node_builder":
         wf_nodes = data.get("wf_nodes", [])
-        phases = data.get("phases", [])
         focused = data.get("focused_node")
 
         affs.append({"id": n, "label": "Add node", "method": "POST", "url": f"{api}/add_node",
-                      "body": {"id": "<id>", "title": "<title>", "instruction": "<instruction>", "lifecycle_label": "<lifecycle_label>"},
-                      "parameters": {"id": {"description": "Lowercase, underscores"}, "title": {}, "instruction": {}, "lifecycle_label": {"options": phases}}})
+                      "body": {"id": "<id>", "title": "<title>", "instruction": "<instruction>"},
+                      "parameters": {"id": {"description": "Lowercase, underscores"}, "title": {}, "instruction": {}}})
         n += 1
 
         if wf_nodes:
@@ -300,7 +269,7 @@ def _build_affordances(data: dict, workflow_id: str) -> list[dict]:
                           "method": "POST", "url": f"{api}/select_node", "body": {"index": "<index>"}, "parameters": {"index": {"options": ni, "labels": nl}}})
             n += 1
             affs.append({"id": n, "label": "Edit node", "method": "POST", "url": f"{api}/edit_node",
-                          "body": {"index": "<index>"}, "parameters": {"index": {"options": ni, "labels": nl}, "title": {}, "instruction": {}, "lifecycle_label": {"options": phases}}})
+                          "body": {"index": "<index>"}, "parameters": {"index": {"options": ni, "labels": nl}, "title": {}, "instruction": {}}})
             n += 1
             affs.append({"id": n, "label": "Remove node", "method": "POST", "url": f"{api}/remove_node", "body": {"index": "<index>"}, "parameters": {"index": {"options": ni, "labels": nl}}})
             n += 1
@@ -423,48 +392,18 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         data["workflow_description"] = body.get("value", "").strip() or None
         return render_node(data, workflow_id)
 
-    # Lifecycle
-    if action == "add_phase":
-        label = body.get("label", "").strip()
-        if not label:
-            return {"error": "Phase label is required."}
-        if label in data["phases"]:
-            return {"error": f"Phase '{label}' already exists."}
-        data["phases"].append(label)
-        return render_node(data, workflow_id)
-
-    if action == "remove_phase":
-        idx = body.get("index")
-        if not isinstance(idx, int) or idx < 0 or idx >= len(data["phases"]):
-            return {"error": "Invalid phase index."}
-        data["phases"].pop(idx)
-        return render_node(data, workflow_id)
-
-    if action == "reorder_phase":
-        idx = body.get("index")
-        direction = body.get("direction", "up")
-        phases = data["phases"]
-        if not isinstance(idx, int) or idx < 0 or idx >= len(phases):
-            return {"error": "Invalid phase index."}
-        if direction == "up" and idx > 0:
-            phases[idx], phases[idx-1] = phases[idx-1], phases[idx]
-        elif direction == "down" and idx < len(phases) - 1:
-            phases[idx], phases[idx+1] = phases[idx+1], phases[idx]
-        return render_node(data, workflow_id)
-
     # Node builder
     if action == "add_node":
         nid = body.get("id", "").strip()
         title = body.get("title", "").strip()
         instruction = body.get("instruction", "").strip()
-        ll = body.get("lifecycle_label", "").strip()
         if not nid or not re.match(r"^[a-z][a-z0-9_]*$", nid):
             return {"error": "Node ID must be lowercase with underscores."}
         if any(w["id"] == nid for w in data["wf_nodes"]):
             return {"error": f"Node '{nid}' already exists."}
         if not title:
             return {"error": "Node title is required."}
-        data["wf_nodes"].append({"id": nid, "title": title, "instruction": instruction, "lifecycle_label": ll, "show_all_fields": False, "fields": [], "navigation": [], "proceed": None, "actions": []})
+        data["wf_nodes"].append({"id": nid, "title": title, "instruction": instruction, "show_all_fields": False, "fields": [], "navigation": [], "proceed": None, "actions": []})
         data["focused_node"] = len(data["wf_nodes"]) - 1
         return render_node(data, workflow_id)
 
@@ -484,8 +423,6 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
             wn["title"] = body["title"].strip()
         if body.get("instruction"):
             wn["instruction"] = body["instruction"].strip()
-        if body.get("lifecycle_label"):
-            wn["lifecycle_label"] = body["lifecycle_label"].strip()
         return render_node(data, workflow_id)
 
     if action == "remove_node":
@@ -689,7 +626,6 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
 _SIMPLE = {"proceed", "go_back", "restart", "publish"}
 _BODY = {
     "set_workflow_id", "set_workflow_title", "set_workflow_description",
-    "add_phase", "remove_phase", "reorder_phase",
     "add_node", "select_node", "edit_node", "remove_node", "reorder_node",
     "add_field", "edit_field", "remove_field",
     "set_proceed", "add_navigation", "remove_navigation",

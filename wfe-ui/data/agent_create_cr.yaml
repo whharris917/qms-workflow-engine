@@ -32,7 +32,7 @@ sdlc_governed:
 nodes:
   initiation:
     title: Initiation
-    lifecycle_label: Initiation
+    #Initiation
     instruction: >-
       Provide the document title, classify code impact, and state the purpose of this change.
     proceed:
@@ -98,7 +98,7 @@ nodes:
 
   definition:
     title: Change Definition
-    lifecycle_label: Change Definition
+    #Change Definition
     instruction: >-
       Define the scope, describe the change in detail, assess impact, and outline how
       the implementation will be verified.
@@ -196,7 +196,7 @@ nodes:
 
   preflight:
     title: Pre-Submission Review
-    lifecycle_label: Pre-Review
+    #Pre-Review
     show_all_fields: true
     instruction: >-
       Review all fields before submission. You may go back to correct any field.
@@ -213,7 +213,7 @@ nodes:
 
   submitted:
     title: Submitted for Review
-    lifecycle_label: Pre-Review
+    #Pre-Review
     show_all_fields: true
     instruction: >-
       This Change Record has been submitted for review.
@@ -221,12 +221,3 @@ nodes:
       - action: restart
         label: Start a new Change Record
 
-lifecycle_banner:
-  - Initiation
-  - Change Definition
-  - Pre-Review
-  - Pre-Approval
-  - Execution
-  - Post-Review
-  - Post-Approval
-  - Closure

@@ -30,20 +30,20 @@ def render_page(defn: WorkflowDef, data: dict, workflow_id: str) -> dict:
     if not node:
         return {"error": f"Unknown node: {node_id}"}
 
-    lifecycle_current = node.lifecycle_label
+    # Derive lifecycle banner from node titles (not a separate phase list)
+    lifecycle = [n.title for n in defn.nodes.values()]
+    lifecycle_current = node.title
     lifecycle_completed = []
     for cn in data.get("completed_nodes", []):
         cn_node = defn.nodes.get(cn)
-        if cn_node:
-            lbl = cn_node.lifecycle_label
-            if lbl and lbl not in lifecycle_completed:
-                lifecycle_completed.append(lbl)
+        if cn_node and cn_node.title not in lifecycle_completed:
+            lifecycle_completed.append(cn_node.title)
 
     state = {
         "workflow": defn.workflow_title,
         "node": node_id,
         "node_title": node.title,
-        "lifecycle": defn.lifecycle_banner,
+        "lifecycle": lifecycle,
         "lifecycle_current": lifecycle_current,
         "lifecycle_completed": lifecycle_completed,
         "completed_nodes": data.get("completed_nodes", []),

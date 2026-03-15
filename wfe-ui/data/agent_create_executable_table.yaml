@@ -2,8 +2,8 @@
 ##
 ## Defines the executable table authoring workflow. The table structure
 ## (columns, rows, cells, properties) is managed by the runtime's table
-## component. This YAML declares nodes, lifecycle, table operations,
-## and the column type catalog.
+## component. This YAML declares nodes, table operations, and the
+## column type catalog.
 
 workflow_title: Create Executable Table
 workflow_description: Build a structured table with typed columns, acceptance criteria, and integrated execution.
@@ -11,7 +11,6 @@ workflow_description: Build a structured table with typed columns, acceptance cr
 nodes:
   construction:
     title: Table Construction
-    lifecycle_label: Construction
     instruction: |
       Build an executable table. Add columns to define the structure, then add rows and fill in cell values.
 
@@ -45,7 +44,6 @@ nodes:
 
   review:
     title: Review
-    lifecycle_label: Review
     instruction: |
       Review the complete table. Go back to make changes, or proceed to execution.
     navigation:
@@ -57,7 +55,6 @@ nodes:
 
   executing:
     title: Execution
-    lifecycle_label: Execution
     execution: true
     instruction: |
       Execute the table by filling cells, signing, and recording evidence.
@@ -69,7 +66,6 @@ nodes:
 
   done:
     title: Complete
-    lifecycle_label: Done
     instruction: |
       All rows have passed acceptance criteria. You may go back to make corrections or start a new table.
     navigation:
@@ -78,12 +74,6 @@ nodes:
     actions:
       - action: restart
         label: Start a new Executable Table
-
-lifecycle_banner:
-  - Construction
-  - Review
-  - Execution
-  - Done
 
 column_types:
   ne-free-text:
