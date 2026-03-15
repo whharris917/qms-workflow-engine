@@ -585,8 +585,18 @@ def _build_execution_affordances(data, api, affordances, n):
             else:
                 params["value"] = {}
             label = f"Fill {col_name} for {row_id}"
+        elif action == "amend":
+            cell_body["value"] = "<value>"
+            col_def = engine.plan.columns[col]
+            if is_choice_list(col_def.type) and col_def.choices:
+                params["value"] = {"options": col_def.choices}
+            else:
+                params["value"] = {}
+            label = f"Amend {col_name} for {row_id}"
         elif action == "sign":
             label = f"Sign {col_name} for {row_id}"
+        elif action == "re-sign":
+            label = f"Re-sign {col_name} for {row_id}"
         elif action == "mark_na":
             label = f"Mark {col_name} as N/A for {row_id}"
         elif action == "initiate_issue":

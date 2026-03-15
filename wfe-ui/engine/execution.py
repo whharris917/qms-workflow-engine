@@ -106,9 +106,14 @@ class PlanEngine:
             self.state.started_at = _now()
         return self.get_plan_state()
 
-    def fill_cell(self, row: int, col: int, value: str, actor: str) -> FillResult:
-        """Fill an executable cell (free-text, choice-list)."""
-        error = self._validate_cell_action(row, col, "fill")
+    def fill_cell(self, row: int, col: int, value: str, actor: str,
+                  is_amend: bool = False) -> FillResult:
+        """Fill an executable cell (free-text, choice-list).
+
+        If is_amend=True, this is a correction to a previously filled cell.
+        """
+        expected_action = "amend" if is_amend else "fill"
+        error = self._validate_cell_action(row, col, expected_action)
         if error:
             return FillResult(ok=False, error=error)
 
@@ -135,9 +140,14 @@ class PlanEngine:
             snapshot=snapshot,
         )
 
-    def sign_cell(self, row: int, col: int, actor: str) -> FillResult:
-        """Sign a signature cell."""
-        error = self._validate_cell_action(row, col, "sign")
+    def sign_cell(self, row: int, col: int, actor: str,
+                  is_resign: bool = False) -> FillResult:
+        """Sign a signature cell.
+
+        If is_resign=True, this is a re-signature of a previously signed cell.
+        """
+        expected_action = "re-sign" if is_resign else "sign"
+        error = self._validate_cell_action(row, col, expected_action)
         if error:
             return FillResult(ok=False, error=error)
 
@@ -155,9 +165,11 @@ class PlanEngine:
             snapshot=snapshot,
         )
 
-    def mark_na(self, row: int, col: int, actor: str) -> FillResult:
+    def mark_na(self, row: int, col: int, actor: str,
+                is_amend: bool = False) -> FillResult:
         """Mark a cross-reference cell as N/A."""
-        error = self._validate_cell_action(row, col, "mark_na")
+        expected_action = "amend" if is_amend else "mark_na"
+        error = self._validate_cell_action(row, col, expected_action)
         if error:
             return FillResult(ok=False, error=error)
 
@@ -175,15 +187,17 @@ class PlanEngine:
         )
 
     def initiate_issue(
-        self, row: int, col: int, actor: str, issue_type: str = "ER"
+        self, row: int, col: int, actor: str, issue_type: str = "ER",
+        is_amend: bool = False,
     ) -> FillResult:
         """Create a child issue reference in a cross-reference cell."""
-        error = self._validate_cell_action(row, col, "initiate_issue")
+        expected_action = "amend" if is_amend else "initiate_issue"
+        error = self._validate_cell_action(row, col, expected_action)
         if error:
             return FillResult(ok=False, error=error)
 
-        # Generate issue ID from the CR and row
-        issue_id = f"{self.plan.cr_id}-{issue_type}-{row + 1}"
+        # Generate sequential issue ID per type
+        issue_id = self.state.next_issue_id(issue_type)
         ref_value = json.dumps({
             "id": issue_id,
             "status": "draft",
@@ -230,15 +244,26 @@ class PlanEngine:
             blocking_name = self.plan.columns[blocking_col].name
             return f"Column {col} ({col_def.name}) is sequentially locked: complete {blocking_name} (col {blocking_col}) first"
 
+        # Cell lifecycle: check fill vs amend
+        current_value = self.state.get_cell(row, col)
+        has_value = current_value != ""
+
+        if action == "amend" or action == "re-sign":
+            if not has_value:
+                return f"Cannot {action}: cell [{row}, {col}] has not been filled yet"
+        elif action in ("fill", "sign", "mark_na", "initiate_issue"):
+            if has_value:
+                return f"Cell [{row}, {col}] already has a value. Use amend to change it."
+
         # Action-specific validation
         if action in ("mark_na", "initiate_issue") and not is_cross_ref(col_def.type):
             return f"{action} is only valid for cross-reference columns"
 
-        if action == "sign" and not is_signature(col_def.type):
-            return f"sign is only valid for signature columns"
+        if action in ("sign", "re-sign") and not is_signature(col_def.type):
+            return f"{action} is only valid for signature columns"
 
         if action == "fill" and is_signature(col_def.type):
-            return "Use sign_cell() for signature columns"
+            return "Use sign for signature columns"
 
         return None
 
@@ -289,9 +314,10 @@ class PlanEngine:
     def _cascade_revert(
         self, row: int, col: int, timestamp: str, actor: str
     ) -> list[dict]:
-        """If sequential execution is enabled, clear all executable cells
+        """If sequential execution is enabled, clear eligible executable cells
         to the right of the changed cell in this row.
 
+        Columns with cascade_revert=False (e.g., cross-references) are exempt.
         Returns list of reverted cell descriptors.
         """
         if not self.plan.sequential_execution:
@@ -303,13 +329,16 @@ class PlanEngine:
         reverted = []
         for i in range(pos + 1, len(order)):
             ci = order[i]
+            col_def = self.plan.columns[ci]
+            if not col_def.should_cascade_revert:
+                continue
             old_val = self.state.get_cell(row, ci)
             if old_val:
                 self.state.clear_cell(row, ci)
                 reverted.append({
                     "row": row,
                     "col": ci,
-                    "column_name": self.plan.columns[ci].name,
+                    "column_name": col_def.name,
                     "old_value": old_val,
                 })
         return reverted
@@ -359,20 +388,22 @@ class PlanEngine:
                     break
         elif value == "":
             status = "empty"
-            actions = _available_actions(col_def)
+            actions = _available_actions(col_def, has_value=False)
         elif value == "N/A":
             status = "na"
             display_value = "N/A"
+            actions = _available_actions(col_def, has_value=True)
         else:
             status = "filled"
             # Format display value for special types
             if is_cross_ref(col_def.type):
+                status = "issued"
                 display_value = _format_cross_ref(value)
             elif is_signature(col_def.type):
                 status = "signed"
 
-            # Allow re-fill for editable types
-            actions = _available_actions(col_def)
+            # Cell has a value: only amend/re-sign available
+            actions = _available_actions(col_def, has_value=True)
 
         return CellState(
             row=row,
@@ -441,8 +472,19 @@ def _format_cross_ref(val: str) -> str:
         return val
 
 
-def _available_actions(col_def: ColumnDef) -> list[str]:
-    """Determine what actions can be performed on a cell based on its type."""
+def _available_actions(col_def: ColumnDef, has_value: bool = False) -> list[str]:
+    """Determine what actions can be performed on a cell based on its type and state.
+
+    First-time actions (fill, sign, mark_na, initiate_issue) are available when
+    has_value=False. Once filled, only amend (or re-sign for signatures) is available.
+    """
+    if has_value:
+        # Cell already has a value — only corrections available
+        if is_signature(col_def.type):
+            return ["re-sign"]
+        return ["amend"]
+
+    # Empty cell — type-specific first-time actions
     if is_signature(col_def.type):
         return ["sign"]
     if is_cross_ref(col_def.type):
@@ -459,5 +501,7 @@ def _action_description(action: str, row_id: str, col_name: str) -> str:
         "sign": f"Sign {col_name} for {row_id}",
         "mark_na": f"Mark {col_name} as N/A for {row_id}",
         "initiate_issue": f"Initiate issue for {col_name} in {row_id}",
+        "amend": f"Amend {col_name} for {row_id}",
+        "re-sign": f"Re-sign {col_name} for {row_id}",
     }
     return descriptions.get(action, f"{action} on {col_name} for {row_id}")

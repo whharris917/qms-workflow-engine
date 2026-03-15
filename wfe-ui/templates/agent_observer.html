@@ -96,6 +96,15 @@ var viewMode = 'full';        // 'full' or 'feedback'
 /* Renderer availability is declared by the workflow, not guessed from data shape. */
 var allowedRenderers = {{ renderers|safe }};
 
+/* Hierarchical renderer metadata:
+   Each renderer can declare: format, verbosity, style.
+   The top-level format defines what dimensions it exposes.
+   Selector UI auto-adapts: only shows sub-selectors if the format has multiple options. */
+var formatIndex = {};  // format -> [{id, verbosity, style, verbosity_label, style_label}]
+var activeFormat = null;
+var activeVerbosity = null;
+var activeStyle = null;
+
 function registerRenderer(r) {
     renderers[r.id] = r;
     /* Create container div */
@@ -105,14 +114,144 @@ function registerRenderer(r) {
     document.getElementById('view-frame').appendChild(container);
     r._container = container;
     r.init(container);
-    /* Create mode button — only visible if this workflow declares it */
-    var btn = document.createElement('button');
-    btn.className = 'mode-btn';
-    btn.id = 'btn-' + r.id;
-    btn.textContent = r.label;
-    btn.onclick = function() { setMode(r.id); };
-    btn.style.display = allowedRenderers.indexOf(r.id) >= 0 ? '' : 'none';
-    document.getElementById('mode-toggle').appendChild(btn);
+
+    /* Index by format for hierarchical selection */
+    var fmt = r.format || r.id;
+    if (!formatIndex[fmt]) formatIndex[fmt] = [];
+    formatIndex[fmt].push({
+        id: r.id,
+        verbosity: r.verbosity || 'default',
+        style: r.style || 'default',
+        verbosity_label: r.verbosity_label || r.verbosity || 'Default',
+        style_label: r.style_label || r.style || 'Default',
+    });
+}
+
+function buildModeToggle() {
+    /* Build the hierarchical selector UI after all renderers are registered. */
+    var toggle = document.getElementById('mode-toggle');
+    toggle.innerHTML = '';
+
+    /* Format buttons — one per format that has at least one allowed renderer */
+    var formats = Object.keys(formatIndex);
+    for (var i = 0; i < formats.length; i++) {
+        var fmt = formats[i];
+        var entries = formatIndex[fmt];
+        var hasAllowed = entries.some(function(e) { return allowedRenderers.indexOf(e.id) >= 0; });
+        if (!hasAllowed) continue;
+        var btn = document.createElement('button');
+        btn.className = 'mode-btn';
+        btn.id = 'btn-fmt-' + fmt;
+        btn.textContent = entries[0].id === fmt ? (renderers[fmt] || {}).label || fmt : fmt;
+        /* Use the format label from the first renderer's label if format === id (single-option) */
+        if (entries.length === 1 && renderers[entries[0].id]) {
+            btn.textContent = renderers[entries[0].id].label || fmt;
+        } else {
+            /* Multi-option format: use format name capitalized */
+            btn.textContent = fmt.charAt(0).toUpperCase() + fmt.slice(1);
+        }
+        btn.setAttribute('data-format', fmt);
+        btn.onclick = (function(f) { return function() { selectFormat(f); }; })(fmt);
+        toggle.appendChild(btn);
+    }
+
+    /* Sub-selector containers */
+    var subBar = document.getElementById('sub-toggle');
+    if (!subBar) {
+        subBar = document.createElement('div');
+        subBar.id = 'sub-toggle';
+        subBar.className = 'mode-toggle';
+        subBar.style.marginLeft = '0';
+        toggle.parentNode.insertBefore(subBar, toggle.nextSibling);
+    }
+}
+
+function selectFormat(fmt) {
+    activeFormat = fmt;
+    var entries = formatIndex[fmt] || [];
+
+    /* Determine available verbosities and styles */
+    var verbosities = [], styles = [];
+    var vSet = {}, sSet = {};
+    for (var i = 0; i < entries.length; i++) {
+        if (!vSet[entries[i].verbosity]) { verbosities.push(entries[i]); vSet[entries[i].verbosity] = true; }
+        if (!sSet[entries[i].style]) { styles.push(entries[i]); sSet[entries[i].style] = true; }
+    }
+
+    /* Build sub-selectors if format has multiple options */
+    var subBar = document.getElementById('sub-toggle');
+    subBar.innerHTML = '';
+
+    var hasMultipleVerbosities = Object.keys(vSet).length > 1;
+    var hasMultipleStyles = Object.keys(sSet).length > 1;
+
+    if (hasMultipleVerbosities) {
+        var sep = document.createElement('span');
+        sep.style.cssText = 'color:#333;margin:0 0.3rem;';
+        sep.textContent = '|';
+        subBar.appendChild(sep);
+        for (var vi = 0; vi < verbosities.length; vi++) {
+            var vb = document.createElement('button');
+            vb.className = 'mode-btn';
+            vb.id = 'btn-verb-' + verbosities[vi].verbosity;
+            vb.textContent = verbosities[vi].verbosity_label;
+            vb.setAttribute('data-verbosity', verbosities[vi].verbosity);
+            vb.onclick = (function(v) { return function() { selectVerbosity(v); }; })(verbosities[vi].verbosity);
+            subBar.appendChild(vb);
+        }
+    }
+
+    if (hasMultipleStyles) {
+        var sep2 = document.createElement('span');
+        sep2.style.cssText = 'color:#333;margin:0 0.3rem;';
+        sep2.textContent = '|';
+        subBar.appendChild(sep2);
+        for (var si = 0; si < styles.length; si++) {
+            var sb = document.createElement('button');
+            sb.className = 'mode-btn';
+            sb.id = 'btn-style-' + styles[si].style;
+            sb.textContent = styles[si].style_label;
+            sb.setAttribute('data-style', styles[si].style);
+            sb.onclick = (function(s) { return function() { selectStyle(s); }; })(styles[si].style);
+            subBar.appendChild(sb);
+        }
+    }
+
+    /* Pick defaults */
+    activeVerbosity = hasMultipleVerbosities ? (activeVerbosity && vSet[activeVerbosity] ? activeVerbosity : verbosities[0].verbosity) : entries[0].verbosity;
+    activeStyle = hasMultipleStyles ? (activeStyle && sSet[activeStyle] ? activeStyle : styles[0].style) : entries[0].style;
+
+    _activateRendererFromSelection();
+}
+
+function selectVerbosity(v) {
+    activeVerbosity = v;
+    _activateRendererFromSelection();
+}
+
+function selectStyle(s) {
+    activeStyle = s;
+    _activateRendererFromSelection();
+}
+
+function _activateRendererFromSelection() {
+    /* Find the renderer matching current format + verbosity + style */
+    var entries = formatIndex[activeFormat] || [];
+    var match = null;
+    for (var i = 0; i < entries.length; i++) {
+        if (entries[i].verbosity === activeVerbosity && entries[i].style === activeStyle) {
+            match = entries[i].id;
+            break;
+        }
+    }
+    /* Fallback: match format + verbosity, or just format */
+    if (!match) {
+        for (var i = 0; i < entries.length; i++) {
+            if (entries[i].verbosity === activeVerbosity) { match = entries[i].id; break; }
+        }
+    }
+    if (!match && entries.length) match = entries[0].id;
+    if (match) setMode(match);
 }
 
 function setMode(id) {
@@ -127,15 +266,31 @@ function setMode(id) {
     if (activeRenderer && renderers[activeRenderer]) {
         renderers[activeRenderer]._container.classList.remove('active');
         renderers[activeRenderer].deactivate();
-        document.getElementById('btn-' + activeRenderer).classList.remove('active');
     }
     /* Activate new */
     activeRenderer = id;
     var r = renderers[id];
     r._container.classList.add('active');
-    document.getElementById('btn-' + id).classList.add('active');
     r.activate();
+    /* Update button highlights */
+    _updateToggleHighlights();
     if (agentState) dispatchRender();
+}
+
+function _updateToggleHighlights() {
+    /* Highlight active format button */
+    var fmtBtns = document.querySelectorAll('#mode-toggle .mode-btn');
+    for (var i = 0; i < fmtBtns.length; i++) {
+        fmtBtns[i].classList.toggle('active', fmtBtns[i].getAttribute('data-format') === activeFormat);
+    }
+    /* Highlight active verbosity/style buttons */
+    var subBtns = document.querySelectorAll('#sub-toggle .mode-btn');
+    for (var i = 0; i < subBtns.length; i++) {
+        var isVerb = subBtns[i].getAttribute('data-verbosity');
+        var isStyle = subBtns[i].getAttribute('data-style');
+        if (isVerb) subBtns[i].classList.toggle('active', isVerb === activeVerbosity);
+        if (isStyle) subBtns[i].classList.toggle('active', isStyle === activeStyle);
+    }
 }
 
 function setViewMode(mode) {
@@ -191,6 +346,7 @@ function extractState(raw, feedback) {
 registerRenderer({
     id: 'raw',
     label: 'Raw',
+    format: 'raw',
     _pre: null,
     init: function(c) {
         c.style.overflowY = 'auto';
@@ -486,8 +642,14 @@ function wfRenderExecTable(et) {
         var cells = r.cells || [];
         for (var ci = 0; ci < cells.length; ci++) {
             var cell = cells[ci];
-            var cls = 'wf-exec-cell wf-exec-' + (cell.status || 'empty');
-            html += '<td class="' + cls + '">';
+            var cellStatus = cell.status || 'empty';
+            var isCompleted = (cell.display_value && cell.available_actions.indexOf('fill') === -1
+                && cell.available_actions.indexOf('sign') === -1
+                && cell.available_actions.indexOf('mark_na') === -1
+                && cell.available_actions.indexOf('initiate_issue') === -1
+                && cellStatus !== 'empty' && cellStatus !== 'locked' && cellStatus !== 'gated' && cellStatus !== 'pending');
+            var cls = 'wf-exec-cell wf-exec-' + cellStatus;
+            html += '<td class="' + cls + '"' + (isCompleted ? ' data-completed="true"' : '') + '>';
             /* display_value */
             html += '<div>' + (cell.display_value ? wfEsc(cell.display_value) : '<span class="wf-table-empty">&mdash;</span>') + '</div>';
             /* status */
@@ -503,6 +665,64 @@ function wfRenderExecTable(et) {
             /* locked_reason */
             if (cell.locked_reason) {
                 html += '<div class="wf-exec-reason">locked_reason: ' + wfEsc(cell.locked_reason) + '</div>';
+            }
+            html += '</td>';
+        }
+        html += '</tr>';
+    }
+
+    html += '</tbody></table></div></div>';
+    return html;
+}
+
+/* Default-verbosity exec table: display_value only, status via CSS, no metadata text */
+function wfRenderExecTableDefault(et) {
+    if (!et) return '';
+    var cols = et.columns || [];
+    var rows = et.rows || [];
+
+    var html = '<div class="wf-card">';
+    html += '<div class="wf-card-head">Execution Table</div>';
+
+    if (!cols.length) {
+        html += '<div class="wf-table-empty">(no columns)</div></div>';
+        return html;
+    }
+
+    html += '<div class="wf-table-wrap"><table class="wf-table"><thead><tr>';
+    html += '<th class="wf-table-rownum">Row</th>';
+    for (var ci = 0; ci < cols.length; ci++) {
+        var c = cols[ci];
+        html += '<th><div class="wf-table-colname">' + wfEsc(c.name) + '</div>';
+        html += '<div class="wf-table-coltype">' + wfEsc(c.type) + '</div>';
+        if (c.rule) html += '<div class="wf-table-colmeta">rule: ' + wfEsc(wfRuleToExpr(c.rule, cols)) + '</div>';
+        html += '</th>';
+    }
+    html += '</tr></thead><tbody>';
+
+    for (var ri = 0; ri < rows.length; ri++) {
+        var r = rows[ri];
+        var rowCls = r.gated ? ' class="wf-row-gated"' : '';
+        html += '<tr' + rowCls + '>';
+        html += '<td class="wf-table-rownum">' + wfEsc(r.row_id || String(r.row)) + '</td>';
+
+        var cells = r.cells || [];
+        for (var ci = 0; ci < cells.length; ci++) {
+            var cell = cells[ci];
+            var cellStatus = cell.status || 'empty';
+            var isCompleted = (cell.display_value && cell.available_actions.indexOf('fill') === -1
+                && cell.available_actions.indexOf('sign') === -1
+                && cell.available_actions.indexOf('mark_na') === -1
+                && cell.available_actions.indexOf('initiate_issue') === -1
+                && cellStatus !== 'empty' && cellStatus !== 'locked' && cellStatus !== 'gated' && cellStatus !== 'pending');
+            var cls = 'wf-exec-cell wf-exec-' + cellStatus;
+            html += '<td class="' + cls + '"' + (isCompleted ? ' data-completed="true"' : '') + '>';
+            if (cellStatus === 'gated') {
+                html += '<span class="wf-table-empty">[BLOCKED]</span>';
+            } else if (cellStatus === 'locked') {
+                html += '<span class="wf-table-empty">[LOCKED]</span>';
+            } else {
+                html += (cell.display_value ? wfEsc(cell.display_value) : '<span class="wf-table-empty">&mdash;</span>');
             }
             html += '</td>';
         }
@@ -590,6 +810,83 @@ function wfRenderPage(container, state, msg, feedback) {
     container.innerHTML = html;
 }
 
+/* Default-verbosity page renderer: uses clean exec table, no state.* card headers */
+function wfRenderPageDefault(container, state, msg, feedback) {
+    if (!container || !state) return;
+
+    var fieldCategory = {};
+    var affCategory = {};
+    if (feedback) {
+        var out = feedback.outcome || {};
+        var eff = feedback.effects || {};
+        for (var k in out) fieldCategory[k] = 'outcome';
+        for (var k in (eff.new_fields || {})) fieldCategory[k] = 'new';
+        for (var k in (eff.modified_fields || {})) fieldCategory[k] = 'modified';
+        (eff.new_affordances || []).forEach(function(a){ affCategory[a.label] = 'new'; });
+        (eff.modified_affordances || []).forEach(function(a){ affCategory[a.label] = 'modified'; });
+    }
+
+    var html = '';
+    var s = state.state || {};
+
+    html += '<div class="wf-header">';
+    html += '<h1 class="wf-title">' + wfEsc(s.workflow || 'Workflow') + '</h1>';
+    html += '</div>';
+
+    html += wfRenderBanner(state);
+
+    html += '<div class="wf-section">';
+    html += '<div class="wf-section-head">' + wfEsc(s.node_title || s.node) + '</div>';
+    html += '</div>';
+
+    if (state.instructions) {
+        html += '<div class="wf-desc">' + wfEsc(state.instructions) + '</div>';
+    }
+
+    if (s.fields) {
+        html += '<div class="wf-card">';
+        html += '<div class="wf-card-head">Fields</div>';
+        html += wfRenderFields(s.fields, fieldCategory);
+        html += '</div>';
+    }
+
+    if (s.execution_table) {
+        html += wfRenderExecTableDefault(s.execution_table);
+    } else if (s.table) {
+        html += wfRenderTable(s.table);
+    }
+
+    if (state.affordances && state.affordances.length) {
+        html += '<div class="wf-card">';
+        html += '<div class="wf-card-head">Affordances</div>';
+        for (var i = 0; i < state.affordances.length; i++) {
+            var a = state.affordances[i];
+            var cls = 'wf-aff';
+            if (/Proceed|Submit|Complete/.test(a.label)) cls += ' wf-aff-primary';
+            else if (/Go back/.test(a.label)) cls += ' wf-aff-nav';
+            else if (/\[Selected\]/.test(a.label)) cls += ' wf-aff-selected';
+            if (affCategory[a.label]) cls += ' wf-aff-' + affCategory[a.label];
+            html += '<div class="' + cls + '">';
+            html += '<div class="wf-aff-top">';
+            html += '<span class="wf-aff-id">' + a.id + '</span>';
+            var ac = affCategory[a.label];
+            var affTag = ac === 'new' ? '<span class="wf-tag-new">NEW</span>' : ac === 'modified' ? '<span class="wf-tag-modified">CHANGED</span>' : '';
+            html += '<span class="wf-aff-label">' + wfEsc(a.label) + affTag + '</span>';
+            html += '<span class="wf-aff-method">' + wfEsc(a.method) + '</span>';
+            html += '</div>';
+            html += '<div class="wf-aff-detail">' + wfEsc(a.url) + ' &nbsp; ' + wfEsc(JSON.stringify(a.body)) + '</div>';
+            var pStr = wfRenderParams(a);
+            if (pStr) {
+                html += '<div class="wf-aff-options">' + wfEsc(pStr) + '</div>';
+            }
+            html += '</div>';
+        }
+        html += '</div>';
+    }
+
+    container.innerHTML = html;
+}
+
 /* Shared structural CSS (layout, sizing, typography — no colors) */
 var WF_STRUCTURAL_CSS = ''
     + '.wf-header { display:flex; align-items:baseline; justify-content:space-between; padding:1.25rem 1.5rem 0.25rem; }'
@@ -652,13 +949,18 @@ var WF_STRUCTURAL_CSS = ''
     ;
 
 /* ======================================================================
-   RENDERER: LIGHT MODE — Simple
+   RENDERER: SIMPLE — Default / Light
    ====================================================================== */
 (function() {
     var container;
     registerRenderer({
         id: 'light',
-        label: 'Light Mode - Simple',
+        label: 'Simple',
+        format: 'simple',
+        verbosity: 'default',
+        verbosity_label: 'Default',
+        style: 'light',
+        style_label: 'Light',
         init: function(c) {
             c.style.cssText = 'overflow-y:auto;padding:0;';
             var style = document.createElement('style');
@@ -723,9 +1025,101 @@ var WF_STRUCTURAL_CSS = ''
                 + '#rc-light .wf-table-prop { color:#7f8fa6; }'
                 + '#rc-light .wf-exec-pass { color:#2e7d32; }'
                 + '#rc-light .wf-exec-pending { color:#b0b0b0; }'
-                + '#rc-light .wf-exec-filled { background:#e8f5e9; }'
-                + '#rc-light .wf-exec-signed { background:#e8f5e9; }'
+                + '#rc-light [data-completed="true"] { background:#e8f5e9; }'
                 + '#rc-light .wf-exec-reason { color:#999; }'
+                ;
+            document.head.appendChild(style);
+            container = c;
+        },
+        update: function(state, msg, feedback) { wfRenderPageDefault(container, state, msg, feedback); },
+        activate: function() {},
+        deactivate: function() {}
+    });
+})();
+
+/* ======================================================================
+   RENDERER: SIMPLE — Verbose / Light
+   ====================================================================== */
+(function() {
+    var container;
+    registerRenderer({
+        id: 'light-verbose',
+        label: 'Simple',
+        format: 'simple',
+        verbosity: 'verbose',
+        verbosity_label: 'Verbose',
+        style: 'light',
+        style_label: 'Light',
+        init: function(c) {
+            c.style.cssText = 'overflow-y:auto;padding:0;';
+            /* Reuse same light CSS — scoped to #rc-light-verbose */
+            var style = document.createElement('style');
+            var css = WF_STRUCTURAL_CSS;
+            /* Copy all #rc-light rules but target #rc-light-verbose */
+            var lightRules = document.querySelectorAll('style');
+            /* Use same color tokens via shared class */
+            style.textContent = css
+                + '#rc-light-verbose { background:#f5f5f5; color:#333; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
+                + '#rc-light-verbose .wf-title { color:#1a1a2e; }'
+                + '#rc-light-verbose .wf-banner { background:#f8f9fb; border-color:#e8e8e8; }'
+                + '#rc-light-verbose .wf-dot { background:#dde1e6; color:#888; }'
+                + '#rc-light-verbose .wf-step-label { color:#888; }'
+                + '#rc-light-verbose .wf-step-active .wf-dot { background:#2a6bcf; color:#fff; }'
+                + '#rc-light-verbose .wf-step-active .wf-step-label { color:#1a1a2e; font-weight:600; }'
+                + '#rc-light-verbose .wf-step-done .wf-dot { background:#4caf50; color:#fff; }'
+                + '#rc-light-verbose .wf-step-done .wf-step-label { color:#555; }'
+                + '#rc-light-verbose .wf-conn { background:#dde1e6; }'
+                + '#rc-light-verbose .wf-conn-active { background:#4caf50; }'
+                + '#rc-light-verbose .wf-section-head { color:#1a1a2e; }'
+                + '#rc-light-verbose .wf-desc { color:#666; }'
+                + '#rc-light-verbose .wf-card { background:#fff; border-color:#e8e8e8; }'
+                + '#rc-light-verbose .wf-card-head { color:#7f8fa6; }'
+                + '#rc-light-verbose .wf-tbl td { border-bottom:1px solid #f0f0f0; }'
+                + '#rc-light-verbose .wf-key { color:#7f8fa6; }'
+                + '#rc-light-verbose .wf-val { color:#333; }'
+                + '#rc-light-verbose .wf-null, #rc-light-verbose .wf-empty-arr, #rc-light-verbose .wf-empty-obj { color:#bbb; }'
+                + '#rc-light-verbose .wf-bool, #rc-light-verbose .wf-num { color:#2a6bcf; }'
+                + '#rc-light-verbose .wf-str { color:#333; }'
+                + '#rc-light-verbose .wf-arr-item { border-left-color:#e8e8e8; }'
+                + '#rc-light-verbose .wf-field { border-bottom:1px solid #f0f0f0; }'
+                + '#rc-light-verbose .wf-field-label { color:#555; }'
+                + '#rc-light-verbose .wf-field-instruction { color:#999; }'
+                + '#rc-light-verbose .wf-field-value { color:#333; }'
+                + '#rc-light-verbose .wf-field-empty { color:#bbb; }'
+                + '#rc-light-verbose .wf-field-options { color:#7f8fa6; }'
+                + '#rc-light-verbose .wf-aff { background:#f8f9fb; border-color:#e8e8e8; }'
+                + '#rc-light-verbose .wf-aff-id { background:#dde1e6; color:#555; }'
+                + '#rc-light-verbose .wf-aff-label { color:#333; }'
+                + '#rc-light-verbose .wf-aff-method { color:#7f8fa6; background:#eef1f5; }'
+                + '#rc-light-verbose .wf-aff-detail { color:#999; }'
+                + '#rc-light-verbose .wf-aff-options { color:#7f8fa6; }'
+                + '#rc-light-verbose .wf-aff-primary { border-color:#2a6bcf; background:#f0f5ff; }'
+                + '#rc-light-verbose .wf-aff-primary .wf-aff-label { color:#2a6bcf; font-weight:600; }'
+                + '#rc-light-verbose .wf-aff-primary .wf-aff-id { background:#2a6bcf; color:#fff; }'
+                + '#rc-light-verbose .wf-aff-nav { border-color:#dde1e6; background:#fafafa; }'
+                + '#rc-light-verbose .wf-aff-nav .wf-aff-label { color:#888; }'
+                + '#rc-light-verbose .wf-aff-selected { border-color:#4caf50; background:#f0fff0; }'
+                + '#rc-light-verbose .wf-aff-selected .wf-aff-label { color:#2e7d32; }'
+                + '#rc-light-verbose .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; }'
+                + '#rc-light-verbose .wf-fb-outcome { border-left:3px solid #2a6bcf; background:#f0f5ff; }'
+                + '#rc-light-verbose .wf-fb-new { border-left:3px solid #4caf50; background:#f0faf0; }'
+                + '#rc-light-verbose .wf-fb-modified { border-left:3px solid #e6a817; background:#fdf8ed; }'
+                + '#rc-light-verbose .wf-aff-new { border-left:3px solid #4caf50; background:#f0faf0; }'
+                + '#rc-light-verbose .wf-aff-modified { border-left:3px solid #e6a817; background:#fdf8ed; }'
+                + '#rc-light-verbose .wf-tag-outcome { color:#2a6bcf; }'
+                + '#rc-light-verbose .wf-tag-new { color:#4caf50; }'
+                + '#rc-light-verbose .wf-tag-modified { color:#e6a817; }'
+                + '#rc-light-verbose .wf-table th { background:#f4f6f9; border-color:#e8e8e8; }'
+                + '#rc-light-verbose .wf-table td { border-color:#e8e8e8; }'
+                + '#rc-light-verbose .wf-table-rownum { color:#aaa; background:#fafbfc; }'
+                + '#rc-light-verbose .wf-table-coltype { color:#7f8fa6; }'
+                + '#rc-light-verbose .wf-table-empty { color:#bbb; }'
+                + '#rc-light-verbose .wf-table-summary { color:#7f8fa6; }'
+                + '#rc-light-verbose .wf-table-prop { color:#7f8fa6; }'
+                + '#rc-light-verbose .wf-exec-pass { color:#2e7d32; }'
+                + '#rc-light-verbose .wf-exec-pending { color:#b0b0b0; }'
+                + '#rc-light-verbose [data-completed="true"] { background:#e8f5e9; }'
+                + '#rc-light-verbose .wf-exec-reason { color:#999; }'
                 ;
             document.head.appendChild(style);
             container = c;
@@ -737,13 +1131,18 @@ var WF_STRUCTURAL_CSS = ''
 })();
 
 /* ======================================================================
-   RENDERER: DARK MODE — Simple
+   RENDERER: SIMPLE — Default / Dark
    ====================================================================== */
 (function() {
     var container;
     registerRenderer({
         id: 'dark',
-        label: 'Dark Mode - Simple',
+        label: 'Simple',
+        format: 'simple',
+        verbosity: 'default',
+        verbosity_label: 'Default',
+        style: 'dark',
+        style_label: 'Dark',
         init: function(c) {
             c.style.cssText = 'overflow-y:auto;padding:0;';
             var style = document.createElement('style');
@@ -808,9 +1207,96 @@ var WF_STRUCTURAL_CSS = ''
                 + '#rc-dark .wf-table-prop { color:#666; }'
                 + '#rc-dark .wf-exec-pass { color:#66bb6a; }'
                 + '#rc-dark .wf-exec-pending { color:#666; }'
-                + '#rc-dark .wf-exec-filled { background:#1b3a1b; }'
-                + '#rc-dark .wf-exec-signed { background:#1b3a1b; }'
+                + '#rc-dark [data-completed="true"] { background:#1b3a1b; }'
                 + '#rc-dark .wf-exec-reason { color:#666; }'
+                ;
+            document.head.appendChild(style);
+            container = c;
+        },
+        update: function(state, msg, feedback) { wfRenderPageDefault(container, state, msg, feedback); },
+        activate: function() {},
+        deactivate: function() {}
+    });
+})();
+
+/* ======================================================================
+   RENDERER: SIMPLE — Verbose / Dark
+   ====================================================================== */
+(function() {
+    var container;
+    registerRenderer({
+        id: 'dark-verbose',
+        label: 'Simple',
+        format: 'simple',
+        verbosity: 'verbose',
+        verbosity_label: 'Verbose',
+        style: 'dark',
+        style_label: 'Dark',
+        init: function(c) {
+            c.style.cssText = 'overflow-y:auto;padding:0;';
+            var style = document.createElement('style');
+            style.textContent = WF_STRUCTURAL_CSS
+                + '#rc-dark-verbose { background:#0e0e0e; color:#c8c8c8; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
+                + '#rc-dark-verbose .wf-title { color:#e0e0e0; }'
+                + '#rc-dark-verbose .wf-banner { background:#1a1a1a; border-color:#2a2a2a; }'
+                + '#rc-dark-verbose .wf-dot { background:#333; color:#888; }'
+                + '#rc-dark-verbose .wf-step-label { color:#777; }'
+                + '#rc-dark-verbose .wf-step-active .wf-dot { background:#4a9eff; color:#fff; }'
+                + '#rc-dark-verbose .wf-step-active .wf-step-label { color:#e0e0e0; font-weight:600; }'
+                + '#rc-dark-verbose .wf-step-done .wf-dot { background:#4caf50; color:#fff; }'
+                + '#rc-dark-verbose .wf-step-done .wf-step-label { color:#888; }'
+                + '#rc-dark-verbose .wf-conn { background:#333; }'
+                + '#rc-dark-verbose .wf-conn-active { background:#4caf50; }'
+                + '#rc-dark-verbose .wf-section-head { color:#e0e0e0; }'
+                + '#rc-dark-verbose .wf-desc { color:#999; }'
+                + '#rc-dark-verbose .wf-card { background:#141414; border-color:#2a2a2a; }'
+                + '#rc-dark-verbose .wf-card-head { color:#666; }'
+                + '#rc-dark-verbose .wf-tbl td { border-bottom:1px solid #1e1e1e; }'
+                + '#rc-dark-verbose .wf-key { color:#666; }'
+                + '#rc-dark-verbose .wf-val { color:#c8c8c8; }'
+                + '#rc-dark-verbose .wf-null, #rc-dark-verbose .wf-empty-arr, #rc-dark-verbose .wf-empty-obj { color:#555; }'
+                + '#rc-dark-verbose .wf-bool, #rc-dark-verbose .wf-num { color:#4a9eff; }'
+                + '#rc-dark-verbose .wf-str { color:#c8c8c8; }'
+                + '#rc-dark-verbose .wf-arr-item { border-left-color:#2a2a2a; }'
+                + '#rc-dark-verbose .wf-field { border-bottom:1px solid #1e1e1e; }'
+                + '#rc-dark-verbose .wf-field-label { color:#999; }'
+                + '#rc-dark-verbose .wf-field-instruction { color:#666; }'
+                + '#rc-dark-verbose .wf-field-value { color:#c8c8c8; }'
+                + '#rc-dark-verbose .wf-field-empty { color:#555; }'
+                + '#rc-dark-verbose .wf-field-options { color:#666; }'
+                + '#rc-dark-verbose .wf-aff { background:#1a1a1a; border-color:#2a2a2a; }'
+                + '#rc-dark-verbose .wf-aff-id { background:#333; color:#aaa; }'
+                + '#rc-dark-verbose .wf-aff-label { color:#c8c8c8; }'
+                + '#rc-dark-verbose .wf-aff-method { color:#666; background:#1e1e1e; }'
+                + '#rc-dark-verbose .wf-aff-detail { color:#555; }'
+                + '#rc-dark-verbose .wf-aff-options { color:#666; }'
+                + '#rc-dark-verbose .wf-aff-primary { border-color:#4a9eff; background:#0d1a2e; }'
+                + '#rc-dark-verbose .wf-aff-primary .wf-aff-label { color:#4a9eff; font-weight:600; }'
+                + '#rc-dark-verbose .wf-aff-primary .wf-aff-id { background:#4a9eff; color:#fff; }'
+                + '#rc-dark-verbose .wf-aff-nav { border-color:#2a2a2a; background:#111; }'
+                + '#rc-dark-verbose .wf-aff-nav .wf-aff-label { color:#666; }'
+                + '#rc-dark-verbose .wf-aff-selected { border-color:#4caf50; background:#0d1a0d; }'
+                + '#rc-dark-verbose .wf-aff-selected .wf-aff-label { color:#4caf50; }'
+                + '#rc-dark-verbose .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; }'
+                + '#rc-dark-verbose .wf-fb-outcome { border-left:3px solid #4a9eff; background:#0d1a2e; }'
+                + '#rc-dark-verbose .wf-fb-new { border-left:3px solid #4caf50; background:#0d1a0d; }'
+                + '#rc-dark-verbose .wf-fb-modified { border-left:3px solid #e6a817; background:#1a1500; }'
+                + '#rc-dark-verbose .wf-aff-new { border-left:3px solid #4caf50; background:#0d1a0d; }'
+                + '#rc-dark-verbose .wf-aff-modified { border-left:3px solid #e6a817; background:#1a1500; }'
+                + '#rc-dark-verbose .wf-tag-outcome { color:#4a9eff; }'
+                + '#rc-dark-verbose .wf-tag-new { color:#4caf50; }'
+                + '#rc-dark-verbose .wf-tag-modified { color:#e6a817; }'
+                + '#rc-dark-verbose .wf-table th { background:#1a1a1a; border-color:#2a2a2a; }'
+                + '#rc-dark-verbose .wf-table td { border-color:#2a2a2a; }'
+                + '#rc-dark-verbose .wf-table-rownum { color:#555; background:#141414; }'
+                + '#rc-dark-verbose .wf-table-coltype { color:#666; }'
+                + '#rc-dark-verbose .wf-table-empty { color:#555; }'
+                + '#rc-dark-verbose .wf-table-summary { color:#666; }'
+                + '#rc-dark-verbose .wf-table-prop { color:#666; }'
+                + '#rc-dark-verbose .wf-exec-pass { color:#66bb6a; }'
+                + '#rc-dark-verbose .wf-exec-pending { color:#666; }'
+                + '#rc-dark-verbose [data-completed="true"] { background:#1b3a1b; }'
+                + '#rc-dark-verbose .wf-exec-reason { color:#666; }'
                 ;
             document.head.appendChild(style);
             container = c;
@@ -1070,6 +1556,7 @@ var WF_STRUCTURAL_CSS = ''
     registerRenderer({
         id: 'exp-a',
         label: 'Experimental - A',
+        format: 'exp-a',
         init: function(c) {
             c.style.cssText = 'overflow-y:auto;padding:0;';
             var style = document.createElement('style');
@@ -1291,6 +1778,7 @@ var WF_STRUCTURAL_CSS = ''
     registerRenderer({
         id: 'exp-b',
         label: 'Experimental - B',
+        format: 'exp-b',
         init: function(c) {
             c.style.cssText = 'overflow-y:auto;padding:0;';
             var style = document.createElement('style');
@@ -1613,6 +2101,7 @@ var WF_STRUCTURAL_CSS = ''
     registerRenderer({
         id: 'exp-c',
         label: 'Experimental - C',
+        format: 'exp-c',
         init: function(c) {
             c.style.cssText = 'overflow-y:auto;padding:0;';
             var style = document.createElement('style');
@@ -1849,6 +2338,7 @@ var WF_STRUCTURAL_CSS = ''
     registerRenderer({
         id: 'exp-d',
         label: 'Experimental - D',
+        format: 'exp-d',
         init: function(c) {
             c.style.cssText = 'overflow-y:auto;padding:0;';
             var style = document.createElement('style');
@@ -1893,8 +2383,16 @@ function connect() {
 }
 
 /* ── Boot ── */
-/* Default to the last (most specific) declared renderer */
-setMode(allowedRenderers[allowedRenderers.length - 1] || 'raw');
+/* Build hierarchical mode toggle from registered renderers */
+buildModeToggle();
+/* Default to the format of the last declared renderer */
+var bootId = allowedRenderers[allowedRenderers.length - 1] || 'raw';
+var bootRenderer = renderers[bootId];
+if (bootRenderer && bootRenderer.format) {
+    selectFormat(bootRenderer.format);
+} else {
+    selectFormat('raw');
+}
 connect();
 </script>
 </body>

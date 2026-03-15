@@ -146,6 +146,20 @@ def _proceed(defn: WorkflowDef, data: dict, workflow_id: str, body: dict = None)
             return {"error": "Already at the final node."}
         data["node"] = node_ids[idx + 1]
 
+    # Check if destination node allows auto-advance (pause=False)
+    dest_node = defn.nodes.get(data["node"])
+    if dest_node and not dest_node.pause:
+        # Auto-advance if gate passes (or no gate)
+        if dest_node.proceed:
+            gate = dest_node.proceed.gate
+            if gate:
+                from .evaluator import evaluate
+                passed, _ = evaluate(gate, data)
+            else:
+                passed = True
+            if passed:
+                return _proceed(defn, data, workflow_id)
+
     return render_page(defn, data, workflow_id)
 
 
@@ -471,6 +485,24 @@ def _cell_action(defn, data, workflow_id, body):
 
     if cell_action == "fill":
         result = engine.fill_cell(row, col, body.get("value", ""), "claude")
+    elif cell_action == "amend":
+        # Amend dispatches to the appropriate engine method based on column type
+        from engine.types import is_signature, is_cross_ref
+        col_def = engine.plan.columns[col]
+        if is_signature(col_def.type):
+            result = engine.sign_cell(row, col, "claude", is_resign=True)
+        elif is_cross_ref(col_def.type):
+            # For cross-refs, amend can be mark_na or initiate_issue
+            sub_action = body.get("sub_action", "mark_na")
+            if sub_action == "initiate_issue":
+                result = engine.initiate_issue(
+                    row, col, "claude", body.get("issue_type", "ER"), is_amend=True)
+            else:
+                result = engine.mark_na(row, col, "claude", is_amend=True)
+        else:
+            result = engine.fill_cell(row, col, body.get("value", ""), "claude", is_amend=True)
+    elif cell_action == "re-sign":
+        result = engine.sign_cell(row, col, "claude", is_resign=True)
     elif cell_action == "sign":
         result = engine.sign_cell(row, col, "claude")
     elif cell_action == "mark_na":
@@ -485,16 +517,17 @@ def _cell_action(defn, data, workflow_id, body):
 
     data["execution"] = engine.state.to_dict()
 
-    # Auto-advance to done if all acceptance criteria pass
+    # Auto-advance to done only if the destination node allows it (pause=False)
     if engine.state.status == "completed":
         node_id = data["node"]
-        if node_id not in data["completed_nodes"]:
-            data["completed_nodes"].append(node_id)
-        # Find next node
         node_ids = defn.node_ids
         idx = node_ids.index(node_id)
         if idx < len(node_ids) - 1:
-            data["node"] = node_ids[idx + 1]
+            next_node = defn.nodes.get(node_ids[idx + 1])
+            if next_node and not next_node.pause:
+                if node_id not in data["completed_nodes"]:
+                    data["completed_nodes"].append(node_id)
+                data["node"] = node_ids[idx + 1]
 
     return render_page(defn, data, workflow_id)
 

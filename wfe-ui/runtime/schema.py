@@ -160,6 +160,7 @@ class NodeDef:
     instruction: str = ""
     lifecycle_label: str = ""
     show_all_fields: bool = False
+    pause: bool = True  # True = always stop here; False = may auto-advance
     fields: dict[str, FieldDef] = field(default_factory=dict)
     lists: dict[str, ListDef] = field(default_factory=dict)
     table: TableDef | None = None
@@ -195,6 +196,7 @@ class NodeDef:
             instruction=d.get("instruction", ""),
             lifecycle_label=d.get("lifecycle_label", ""),
             show_all_fields=d.get("show_all_fields", False),
+            pause=d.get("pause", True),
             fields=fields,
             lists=lists,
             table=table,

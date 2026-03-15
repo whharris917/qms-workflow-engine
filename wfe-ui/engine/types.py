@@ -53,6 +53,21 @@ class ColumnDef:
     type: str
     choices: list[str] | None = None
     rule: dict | None = None
+    cascade_revert: bool | None = None  # None = use type default
+
+    @property
+    def should_cascade_revert(self) -> bool:
+        """Whether this column should be reverted during cascade.
+
+        Explicit per-column setting wins; otherwise use type default.
+        Cross-reference columns default to exempt (False).
+        """
+        if self.cascade_revert is not None:
+            return self.cascade_revert
+        # Type defaults: cross-references are exempt
+        if is_cross_ref(self.type):
+            return False
+        return True
 
     @classmethod
     def from_dict(cls, d: dict) -> ColumnDef:
@@ -61,6 +76,7 @@ class ColumnDef:
             type=d.get("type", ""),
             choices=d.get("choices"),
             rule=d.get("rule"),
+            cascade_revert=d.get("cascade_revert"),
         )
 
     def to_dict(self) -> dict:
@@ -69,6 +85,8 @@ class ColumnDef:
             d["choices"] = self.choices
         if self.rule is not None:
             d["rule"] = self.rule
+        if self.cascade_revert is not None:
+            d["cascade_revert"] = self.cascade_revert
         return d
 
 
@@ -133,6 +151,7 @@ class ExecutionState:
     started_at: str | None = None
     cells: dict[str, CellValue] = field(default_factory=dict)  # "row:col" -> CellValue
     history: dict[str, list[Snapshot]] = field(default_factory=dict)  # "row" -> [snapshots]
+    issue_counters: dict[str, int] = field(default_factory=dict)  # "VAR" -> 1, "ER" -> 0
 
     def get_cell(self, row: int, col: int) -> str:
         """Get the current value of a cell, or empty string if not set."""
@@ -148,14 +167,23 @@ class ExecutionState:
         key = f"{row}:{col}"
         self.cells.pop(key, None)
 
+    def next_issue_id(self, issue_type: str) -> str:
+        """Get the next sequential issue ID for a given type."""
+        count = self.issue_counters.get(issue_type, 0) + 1
+        self.issue_counters[issue_type] = count
+        return f"{self.cr_id}-{issue_type}-{count:03d}"
+
     def to_dict(self) -> dict:
-        return {
+        d = {
             "cr_id": self.cr_id,
             "status": self.status,
             "started_at": self.started_at,
             "cells": {k: v.to_dict() for k, v in self.cells.items()},
             "history": {k: [s.to_dict() for s in v] for k, v in self.history.items()},
         }
+        if self.issue_counters:
+            d["issue_counters"] = self.issue_counters
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> ExecutionState:
@@ -165,6 +193,7 @@ class ExecutionState:
             started_at=d.get("started_at"),
             cells={k: CellValue.from_dict(v) for k, v in d.get("cells", {}).items()},
             history={k: [Snapshot.from_dict(s) for s in v] for k, v in d.get("history", {}).items()},
+            issue_counters=d.get("issue_counters", {}),
         )
 
 
@@ -178,7 +207,7 @@ class CellState:
     column_type: str
     value: str
     display_value: str
-    status: str  # empty | filled | signed | na | locked | gated
+    status: str  # empty | filled | signed | na | issued | locked | gated | pass | pending | static
     locked_reason: str | None = None
     available_actions: list[str] = field(default_factory=list)
 
