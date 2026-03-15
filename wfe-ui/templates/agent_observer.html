@@ -2455,6 +2455,495 @@ var WF_STRUCTURAL_CSS = ''
 })();
 
 /* ======================================================================
+   RENDERER: EXPERIMENTAL D — Visual workflow renderer
+   Shared rendering functions + CSS, then 4 variant registrations
+   ====================================================================== */
+
+/* ── Exp-D: Flowchart renderer (Path B) ──
+   HTML cards with absolute positioning + SVG edge layer behind.
+   Layout computed from data → positions assigned, not measured.
+*/
+
+/* ── Layout config ── */
+var _FC = {
+    nodeW: 630,        /* card width */
+    rowGap: 70,        /* vertical gap between cards */
+    marginTop: 40,     /* top padding in graph */
+    marginBot: 40,
+    marginLeft: 140,   /* space for back-edge arcs + labels on the left */
+    marginRight: 140
+};
+
+/* ── Collect edges from node data ── */
+function _fcEdges(nodes) {
+    var nodeIdMap = {};
+    for (var i = 0; i < nodes.length; i++) nodeIdMap[nodes[i].id] = i;
+    var edges = [];
+    for (var i = 0; i < nodes.length; i++) {
+        if (i < nodes.length - 1) {
+            var lbl = (nodes[i].proceed && nodes[i].proceed.label) || '';
+            edges.push({from: i, to: i + 1, label: lbl, type: 'forward'});
+        }
+        var navs = nodes[i].navigation || [];
+        for (var ni = 0; ni < navs.length; ni++) {
+            var nav = navs[ni];
+            if (nav.action === 'go_back') {
+                var t = nav.node ? nodeIdMap[nav.node] : (i > 0 ? i - 1 : 0);
+                if (t !== undefined) edges.push({from: i, to: t, label: nav.label, type: 'back'});
+            } else if (nav.action === 'go_to' && nav.node && nodeIdMap[nav.node] !== undefined) {
+                edges.push({from: i, to: nodeIdMap[nav.node], label: nav.label, type: 'goto'});
+            }
+        }
+    }
+    return edges;
+}
+
+/* ── Render a single node card as an HTML string ── */
+function _fcNodeCard(nd, idx) {
+    var h = '<div class="fc-card">';
+
+    /* Header */
+    h += '<div class="fc-card-head">';
+    h += '<span class="fc-num">' + (idx + 1) + '</span>';
+    h += '<span class="fc-card-title">' + wfEsc(nd.title || nd.id) + '</span>';
+    h += '<code class="fc-card-id">' + wfEsc(nd.id) + '</code>';
+    if (nd.show_all_fields) {
+        h += '<span class="fc-eye" title="show_all_fields">&#128065;</span>';
+    }
+    h += '</div>';
+
+    /* Instruction */
+    if (nd.instruction) {
+        h += '<div class="fc-instr">' + wfEsc(nd.instruction) + '</div>';
+    }
+
+    /* Fields */
+    var fields = nd.fields || [];
+    if (fields.length) {
+        h += '<div class="fc-fields">';
+        for (var fi = 0; fi < fields.length; fi++) {
+            var fld = fields[fi];
+            var typeCls = 'fc-ft-text';
+            var typeLabel = 'T';
+            if (fld.type === 'boolean') { typeCls = 'fc-ft-bool'; typeLabel = '?'; }
+            else if (fld.type === 'select') { typeCls = 'fc-ft-sel'; typeLabel = '\u25BE'; }
+            h += '<div class="fc-field">';
+            h += '<span class="fc-field-dot ' + typeCls + '">' + typeLabel + '</span>';
+            h += '<span class="fc-field-name">' + wfEsc(fld.label || fld.key) + '</span>';
+            h += '<code class="fc-field-key">' + wfEsc(fld.key) + '</code>';
+            if (fld.type === 'select' && fld.options && fld.options.length) {
+                h += '<span class="fc-field-opts">' + wfEsc(fld.options.join(' | ')) + '</span>';
+            }
+            h += '</div>';
+        }
+        h += '</div>';
+    }
+
+    /* Proceed gate */
+    if (nd.proceed) {
+        var reqs = nd.proceed.requires || [];
+        h += '<div class="fc-gate">';
+        h += '<span class="fc-gate-lock">&#128274;</span>';
+        h += '<span class="fc-gate-lbl">' + wfEsc(nd.proceed.label || 'Proceed') + '</span>';
+        if (reqs.length) {
+            h += '<span class="fc-gate-reqs">&#128273; ' + wfEsc(reqs.join(', ')) + '</span>';
+        }
+        h += '</div>';
+    }
+
+    /* Actions */
+    var acts = nd.actions || [];
+    if (acts.length) {
+        h += '<div class="fc-acts">';
+        for (var ai = 0; ai < acts.length; ai++) {
+            var act = acts[ai];
+            var cls = act.action === 'submit' ? 'fc-act-submit' : 'fc-act-restart';
+            var icon = act.action === 'submit' ? '\u2714 ' : '\u21BB ';
+            h += '<span class="fc-act ' + cls + '">' + icon + wfEsc(act.label) + '</span>';
+        }
+        h += '</div>';
+    }
+
+    h += '</div>';
+    return h;
+}
+
+/* ── Build SVG edges ── */
+function _fcBuildEdgeSvg(slots, edges, totalW, totalH) {
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" class="fc-edge-svg" width="' + totalW + '" height="' + totalH + '" viewBox="0 0 ' + totalW + ' ' + totalH + '">';
+    svg += '<defs>';
+    svg += '<marker id="fc-af" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" class="fc-mf"/></marker>';
+    svg += '<marker id="fc-ab" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" class="fc-mb"/></marker>';
+    svg += '<marker id="fc-ag" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" class="fc-mg"/></marker>';
+    svg += '</defs>';
+
+    for (var i = 0; i < edges.length; i++) {
+        var e = edges[i], fs = slots[e.from], ts = slots[e.to];
+        if (!fs || !ts) continue;
+
+        if (e.type === 'forward') {
+            var x1 = fs.cx, y1 = fs.y + fs.h;
+            var x2 = ts.cx, y2 = ts.y;
+            var my = (y1 + y2) / 2;
+            svg += '<path d="M' + x1 + ' ' + y1 + ' C' + x1 + ' ' + my + ' ' + x2 + ' ' + my + ' ' + x2 + ' ' + y2 + '" class="fc-ef" marker-end="url(#fc-af)"/>';
+        } else if (e.type === 'back') {
+            var x1 = fs.x - 6, y1 = fs.y;
+            var x2 = ts.x - 6, y2 = ts.y + ts.h;
+            var bulge = Math.max(35, Math.abs(y1 - y2) * 0.12 + 25);
+            var cx = Math.min(x1, x2) - bulge;
+            svg += '<path d="M' + x1 + ' ' + y1 + ' C' + cx + ' ' + y1 + ' ' + cx + ' ' + y2 + ' ' + x2 + ' ' + y2 + '" class="fc-eb" marker-end="url(#fc-ab)"/>';
+            svg += '<text x="' + (cx + 24) + '" y="' + ((y1 + y2) / 2) + '" class="fc-el fc-el-b" text-anchor="start" dominant-baseline="middle">' + wfEsc(e.label) + '</text>';
+        } else if (e.type === 'goto') {
+            var x1 = fs.x + fs.w + 6, y1 = fs.y + fs.h * 0.5;
+            var x2 = ts.x + ts.w + 6, y2 = ts.y + ts.h * 0.5;
+            var bulge = Math.max(35, Math.abs(y1 - y2) * 0.12 + 25);
+            var cx = Math.max(x1, x2) + bulge;
+            svg += '<path d="M' + x1 + ' ' + y1 + ' C' + cx + ' ' + y1 + ' ' + cx + ' ' + y2 + ' ' + x2 + ' ' + y2 + '" class="fc-eg" marker-end="url(#fc-ag)"/>';
+            svg += '<text x="' + (cx + 4) + '" y="' + ((y1 + y2) / 2) + '" class="fc-el fc-el-g" text-anchor="start" dominant-baseline="middle">' + wfEsc(e.label) + '</text>';
+        }
+    }
+    svg += '</svg>';
+    return svg;
+}
+
+/* ── Main definition renderer ── */
+function expDRenderDefinition(defn) {
+    if (!defn) return '';
+    var nodes = defn.nodes || [];
+
+    /* HTML header */
+    var h = '<div class="fc-hdr">';
+    h += '<span class="fc-hdr-title">' + wfEsc(defn.workflow_title || '(untitled)') + '</span>';
+    if (defn.workflow_id) h += ' <code class="fc-hdr-id">' + wfEsc(defn.workflow_id) + '</code>';
+    if (defn.workflow_description) h += '<div class="fc-hdr-desc">' + wfEsc(defn.workflow_description) + '</div>';
+    h += '</div>';
+
+    if (!nodes.length) return '<div class="fc-wrap">' + h + '<div class="fc-empty">No nodes defined</div></div>';
+
+    var edges = _fcEdges(nodes);
+
+    /* ── First pass: render cards to hidden container to measure heights ── */
+    /* We can't know card heights until the browser renders them, so we use
+       a two-phase approach: render cards, measure via a temp container,
+       compute layout, then render final output with absolute positions.
+       To avoid the async rAF dance, we estimate heights instead.
+       Each card's height is roughly: header(36) + instr(~40 if present) +
+       fields(28 each) + gate(28) + actions(28) + padding(16). */
+    var slots = [];
+    var cy = _FC.marginTop;
+    for (var i = 0; i < nodes.length; i++) {
+        var nd = nodes[i];
+        var eh = 36 + 16; /* header + padding */
+        if (nd.instruction) eh += Math.min(80, 20 + nd.instruction.length * 0.3);
+        var fields = nd.fields || [];
+        if (fields.length) eh += fields.length * 26 + 8;
+        if (nd.proceed) eh += 28;
+        if (nd.actions && nd.actions.length) eh += 28;
+        eh = Math.max(60, eh);
+
+        slots.push({
+            x: _FC.marginLeft,
+            y: cy,
+            w: _FC.nodeW,
+            h: eh,
+            cx: _FC.marginLeft + _FC.nodeW / 2
+        });
+        cy += eh + _FC.rowGap;
+    }
+    var totalW = _FC.marginLeft + _FC.nodeW + _FC.marginRight;
+    var totalH = cy - _FC.rowGap + _FC.marginBot;
+
+    /* ── Build edge SVG ── */
+    var edgeSvg = _fcBuildEdgeSvg(slots, edges, totalW, totalH);
+
+    /* ── Build graph container with absolutely-positioned cards ── */
+    var edgesB64 = btoa(JSON.stringify(edges));
+    h += '<div class="fc-graph" data-edges="' + edgesB64 + '" style="position:relative;width:' + totalW + 'px;min-height:' + totalH + 'px;">';
+    /* Edge SVG behind cards */
+    h += '<div class="fc-edge-layer">' + edgeSvg + '</div>';
+
+    for (var i = 0; i < nodes.length; i++) {
+        var s = slots[i];
+        h += '<div class="fc-card-wrap" style="position:absolute;left:' + s.x + 'px;top:' + s.y + 'px;width:' + s.w + 'px;">';
+        h += _fcNodeCard(nodes[i], i);
+        h += '</div>';
+    }
+    h += '</div>';
+
+    return '<div class="fc-wrap">' + h + '</div>';
+}
+
+/* ── State props (definition-aware) ── */
+function expDRenderStateProps(state) {
+    var s = state.state || {};
+    var known = ['workflow','node','node_title','completed_nodes','lifecycle','lifecycle_current','lifecycle_completed','fields','table','execution_table'];
+    var extra = Object.keys(s).filter(function(k) { return known.indexOf(k) === -1; });
+    if (!extra.length) return '';
+    var html = '';
+    for (var i = 0; i < extra.length; i++) {
+        var k = extra[i], v = s[k];
+        if (k === 'definition' && _isDefinition(v)) { html += expDRenderDefinition(v); continue; }
+        html += '<div class="wf-card"><div class="wf-card-head">state.' + wfEsc(k) + '</div>';
+        if (Array.isArray(v) && v.length && typeof v[0] === 'string') {
+            html += '<ul class="wf-extra-list">'; for (var j = 0; j < v.length; j++) html += '<li>' + wfEsc(v[j]) + '</li>'; html += '</ul>';
+        } else if (v && typeof v === 'object') { html += wfRenderValue(v); }
+        else { html += '<div class="wf-field-value">' + wfRenderValue(v) + '</div>'; }
+        html += '</div>';
+    }
+    return html;
+}
+
+/* ── Page renderer (shared default + verbose) ── */
+function _expDPage(container, state, msg, feedback, verbose) {
+    if (!container || !state) return;
+    var fieldCategory = {}, affCategory = {};
+    if (feedback) {
+        var out = feedback.outcome || {}, eff = feedback.effects || {};
+        for (var k in out) fieldCategory[k] = 'outcome';
+        for (var k in (eff.new_fields || {})) fieldCategory[k] = 'new';
+        for (var k in (eff.modified_fields || {})) fieldCategory[k] = 'modified';
+        (eff.new_affordances || []).forEach(function(a){ affCategory[a.label] = 'new'; });
+        (eff.modified_affordances || []).forEach(function(a){ affCategory[a.label] = 'modified'; });
+    }
+    var html = '', s = state.state || {};
+    html += '<div class="wf-header"><h1 class="wf-title">' + wfEsc(s.workflow || 'Workflow') + '</h1></div>';
+    html += wfRenderBanner(state);
+    html += '<div class="wf-section"><div class="wf-section-head">' + wfEsc(s.node_title || s.node) + '</div></div>';
+    if (state.instructions) html += '<div class="wf-desc">' + wfEsc(state.instructions) + '</div>';
+    html += expDRenderStateProps(state);
+    if (s.fields) { html += '<div class="wf-card"><div class="wf-card-head">Fields</div>' + wfRenderFields(s.fields, fieldCategory) + '</div>'; }
+    if (s.execution_table) { html += verbose ? wfRenderExecTable(s.execution_table) : wfRenderExecTableDefault(s.execution_table); }
+    else if (s.table) { html += wfRenderTable(s.table); }
+    if (state.affordances && state.affordances.length) {
+        html += '<div class="wf-card"><div class="wf-card-head">Affordances</div>';
+        for (var i = 0; i < state.affordances.length; i++) {
+            var a = state.affordances[i], cls = 'wf-aff';
+            if (/Proceed|Submit|Complete/.test(a.label)) cls += ' wf-aff-primary';
+            else if (/Go back/.test(a.label)) cls += ' wf-aff-nav';
+            else if (/\[Selected\]/.test(a.label)) cls += ' wf-aff-selected';
+            if (affCategory[a.label]) cls += ' wf-aff-' + affCategory[a.label];
+            html += '<div class="' + cls + '"><div class="wf-aff-top">';
+            html += '<span class="wf-aff-id">' + a.id + '</span>';
+            var ac = affCategory[a.label];
+            var tag = ac === 'new' ? '<span class="wf-tag-new">NEW</span>' : ac === 'modified' ? '<span class="wf-tag-modified">CHANGED</span>' : '';
+            html += '<span class="wf-aff-label">' + wfEsc(a.label) + tag + '</span>';
+            html += '<span class="wf-aff-method">' + wfEsc(a.method) + '</span></div>';
+            html += '<div class="wf-aff-detail">' + wfEsc(a.url) + ' &nbsp; ' + wfEsc(JSON.stringify(a.body)) + '</div>';
+            var pStr = wfRenderParams(a); if (pStr) html += '<div class="wf-aff-options">' + wfEsc(pStr) + '</div>';
+            html += '</div>';
+        }
+        html += '</div>';
+    }
+    container.innerHTML = html;
+
+    /* Post-render: measure actual card heights and fix layout if estimates were off */
+    requestAnimationFrame(function() { _fcFixLayout(container); });
+}
+
+/* ── Post-render layout correction ── */
+function _fcFixLayout(container) {
+    var graph = container.querySelector('.fc-graph');
+    if (!graph) return;
+    var wraps = graph.querySelectorAll('.fc-card-wrap');
+    if (!wraps.length) return;
+
+    /* Measure actual card heights and reflow positions */
+    var cy = _FC.marginTop;
+    var slots = [];
+    for (var i = 0; i < wraps.length; i++) {
+        var wrap = wraps[i];
+        var card = wrap.querySelector('.fc-card');
+        var actualH = card ? card.offsetHeight : 60;
+        var x = parseFloat(wrap.style.left);
+        var nw = parseFloat(wrap.style.width);
+        wrap.style.top = cy + 'px';
+        slots.push({x: x, y: cy, w: nw, h: actualH, cx: x + nw / 2});
+        cy += actualH + _FC.rowGap;
+    }
+
+    var totalW = _FC.marginLeft + _FC.nodeW + _FC.marginRight;
+    var totalH = cy - _FC.rowGap + _FC.marginBot;
+    graph.style.minHeight = totalH + 'px';
+    graph.style.width = totalW + 'px';
+
+    /* Decode edges and rebuild SVG */
+    var edgesB64 = graph.getAttribute('data-edges');
+    if (!edgesB64) return;
+    var edges;
+    try { edges = JSON.parse(atob(edgesB64)); } catch(e) { return; }
+
+    var edgeLayer = graph.querySelector('.fc-edge-layer');
+    if (!edgeLayer) return;
+    edgeLayer.innerHTML = _fcBuildEdgeSvg(slots, edges, totalW, totalH);
+}
+
+/* ── CSS ── */
+var EXP_D_FC_CSS = ''
+    /* Wrapper */
+    + '.fc-wrap { margin:0.5rem 1rem; }'
+    + '.fc-hdr { padding:0.4rem 0; border-bottom:2px solid; margin-bottom:0.5rem; }'
+    + '.fc-hdr-title { font-size:1.05rem; font-weight:700; }'
+    + '.fc-hdr-id { font-size:0.7rem; opacity:0.6; vertical-align:middle; }'
+    + '.fc-hdr-desc { font-size:0.78rem; margin-top:0.15rem; opacity:0.6; }'
+    + '.fc-empty { text-align:center; padding:2rem; opacity:0.6; font-style:italic; }'
+    /* Graph container */
+    + '.fc-graph { overflow:visible; }'
+    + '.fc-edge-layer { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:0; }'
+    + '.fc-edge-svg { display:block; }'
+    + '.fc-card-wrap { z-index:1; }'
+    /* Card */
+    + '.fc-card { border:1px solid; border-radius:8px; overflow:hidden; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
+    + '.fc-card-head { display:flex; align-items:center; gap:0.4rem; padding:0.45rem 0.65rem; flex-wrap:wrap; }'
+    + '.fc-num { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; font-size:0.7rem; font-weight:700; flex-shrink:0; }'
+    + '.fc-card-title { font-size:0.88rem; font-weight:700; }'
+    + '.fc-card-id { font-size:0.62rem; opacity:0.6; font-family:Consolas,Monaco,monospace; }'
+    + '.fc-eye { font-size:0.75rem; opacity:0.6; }'
+    /* Instruction */
+    + '.fc-instr { padding:0.2rem 0.65rem 0.35rem; font-size:0.72rem; line-height:1.35; opacity:0.6; white-space:pre-line; }'
+    /* Fields */
+    + '.fc-fields { padding:0.25rem 0.65rem; }'
+    + '.fc-field { display:flex; align-items:center; gap:0.35rem; padding:0.2rem 0; font-size:0.78rem; }'
+    + '.fc-field-dot { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; font-size:0.6rem; font-weight:700; flex-shrink:0; border:1.5px solid; }'
+    + '.fc-field-name { font-weight:600; }'
+    + '.fc-field-key { font-size:0.62rem; margin-left:auto; }'
+    + '.fc-field-opts { font-size:0.62rem; font-family:Consolas,Monaco,monospace; }'
+    /* Gate */
+    + '.fc-gate { display:flex; align-items:center; gap:0.3rem; padding:0.3rem 0.65rem; border-top:1px dashed; flex-wrap:wrap; font-size:0.78rem; }'
+    + '.fc-gate-lock { font-size:0.8rem; }'
+    + '.fc-gate-lbl { font-weight:600; }'
+    + '.fc-gate-reqs { font-size:0.68rem; font-family:Consolas,monospace; margin-left:auto; }'
+    /* Actions */
+    + '.fc-acts { display:flex; gap:0.3rem; padding:0.3rem 0.65rem; border-top:1px solid; flex-wrap:wrap; }'
+    + '.fc-act { font-size:0.72rem; font-weight:600; padding:0.15rem 0.5rem; border-radius:4px; }'
+    /* Edge SVG */
+    + '.fc-ef { fill:none; stroke-width:2; }'
+    + '.fc-eb { fill:none; stroke-width:1.5; stroke-dasharray:6 3; }'
+    + '.fc-eg { fill:none; stroke-width:1.5; stroke-dasharray:8 3; }'
+    + '.fc-el { font-size:11px; font-family:-apple-system,sans-serif; }'
+    ;
+
+/* ── Light tokens ── */
+var EXP_D_FC_LIGHT = ''
+    + '.fc-hdr { border-bottom-color:#2a6bcf; } .fc-hdr-title { color:#1a1a2e; }'
+    + '.fc-card { background:#fff; border-color:#dde1e6; box-shadow:0 1px 4px rgba(0,0,0,0.06); }'
+    + '.fc-card-head { background:linear-gradient(135deg,#e8ecf1,#dde2e8); }'
+    + '.fc-num { background:#2a6bcf; color:#fff; }'
+    + '.fc-card-title { color:#1a1a2e; }'
+    + '.fc-ft-text { background:#e3f2fd; border-color:#1565c0; color:#1565c0; }'
+    + '.fc-ft-bool { background:#fff3e0; border-color:#e65100; color:#e65100; }'
+    + '.fc-ft-sel { background:#f3e5f5; border-color:#7b1fa2; color:#7b1fa2; }'
+    + '.fc-gate { border-top-color:#c8e6c9; }'
+    + '.fc-gate-lbl { color:#2e7d32; }'
+    + '.fc-gate-reqs { color:#1565c0; }'
+    + '.fc-acts { border-top-color:#f0f0f0; }'
+    + '.fc-act-submit { background:#e8f5e9; color:#2e7d32; }'
+    + '.fc-act-restart { background:#fff3e0; color:#e65100; }'
+    + '.fc-ef { stroke:#4caf50; } .fc-mf { fill:#4caf50; }'
+    + '.fc-eb { stroke:#2a6bcf; } .fc-mb { fill:#2a6bcf; }'
+    + '.fc-eg { stroke:#7b1fa2; } .fc-mg { fill:#7b1fa2; }'
+    + '.fc-el-b { fill:#2a6bcf; } .fc-el-g { fill:#7b1fa2; }'
+    ;
+
+/* ── Dark tokens ── */
+var EXP_D_FC_DARK = ''
+    + '.fc-hdr { border-bottom-color:#4a9eff; } .fc-hdr-title { color:#e0e0e0; }'
+    + '.fc-card { background:#141414; border-color:#2a2a2a; box-shadow:0 1px 4px rgba(0,0,0,0.3); }'
+    + '.fc-card-head { background:linear-gradient(135deg,#252525,#2a2a2a); }'
+    + '.fc-num { background:#4a9eff; color:#fff; }'
+    + '.fc-card-title { color:#e0e0e0; }'
+    + '.fc-ft-text { background:#0d2a40; border-color:#64b5f6; color:#64b5f6; }'
+    + '.fc-ft-bool { background:#2a1a00; border-color:#ffb74d; color:#ffb74d; }'
+    + '.fc-ft-sel { background:#2a1a30; border-color:#ce93d8; color:#ce93d8; }'
+    + '.fc-gate { border-top-color:#1b3a1b; }'
+    + '.fc-gate-lbl { color:#66bb6a; }'
+    + '.fc-gate-reqs { color:#64b5f6; }'
+    + '.fc-acts { border-top-color:#1e1e1e; }'
+    + '.fc-act-submit { background:#1b3a1b; color:#66bb6a; }'
+    + '.fc-act-restart { background:#2a1a00; color:#ffb74d; }'
+    + '.fc-ef { stroke:#4caf50; } .fc-mf { fill:#4caf50; }'
+    + '.fc-eb { stroke:#4a9eff; } .fc-mb { fill:#4a9eff; }'
+    + '.fc-eg { stroke:#ce93d8; } .fc-mg { fill:#ce93d8; }'
+    + '.fc-el-b { fill:#4a9eff; } .fc-el-g { fill:#ce93d8; }'
+    ;
+
+function _scopeFC(sel, css) { return css.replace(/\.fc-/g, sel + ' .fc-'); }
+
+/* ── Register 4 variants ── */
+(function() {
+    var container;
+    registerRenderer({
+        id: 'exp-d', label: 'Experimental - D', format: 'exp-d',
+        verbosity: 'default', verbosity_label: 'Default', style: 'light', style_label: 'Light',
+        init: function(c) {
+            c.style.cssText = 'overflow-y:auto;padding:0;';
+            var style = document.createElement('style');
+            style.textContent = WF_STRUCTURAL_CSS + EXP_D_FC_CSS
+                + _scopeFC('#rc-exp-d', EXP_D_FC_LIGHT)
+                + '#rc-exp-d { background:#f5f5f5; color:#333; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
+                + '#rc-exp-d .wf-title { color:#1a1a2e; } #rc-exp-d .wf-banner { background:#f8f9fb; border-color:#e8e8e8; } #rc-exp-d .wf-dot { background:#dde1e6; color:#888; } #rc-exp-d .wf-step-label { color:#888; } #rc-exp-d .wf-step-active .wf-dot { background:#2a6bcf; color:#fff; } #rc-exp-d .wf-step-active .wf-step-label { color:#1a1a2e; font-weight:600; } #rc-exp-d .wf-step-done .wf-dot { background:#4caf50; color:#fff; } #rc-exp-d .wf-step-done .wf-step-label { color:#555; } #rc-exp-d .wf-conn { background:#dde1e6; } #rc-exp-d .wf-conn-active { background:#4caf50; } #rc-exp-d .wf-section-head { color:#1a1a2e; } #rc-exp-d .wf-desc { color:#666; } #rc-exp-d .wf-card { background:#fff; border-color:#e8e8e8; } #rc-exp-d .wf-card-head { color:#7f8fa6; } #rc-exp-d .wf-tbl td { border-bottom:1px solid #f0f0f0; } #rc-exp-d .wf-key { color:#7f8fa6; } #rc-exp-d .wf-val { color:#333; } #rc-exp-d .wf-null, #rc-exp-d .wf-empty-arr, #rc-exp-d .wf-empty-obj { color:#bbb; } #rc-exp-d .wf-bool, #rc-exp-d .wf-num { color:#2a6bcf; } #rc-exp-d .wf-str { color:#333; } #rc-exp-d .wf-arr-item { border-left-color:#e8e8e8; } #rc-exp-d .wf-field { border-bottom:1px solid #f0f0f0; } #rc-exp-d .wf-field-label { color:#555; } #rc-exp-d .wf-field-instruction { color:#999; } #rc-exp-d .wf-field-value { color:#333; } #rc-exp-d .wf-field-empty { color:#bbb; } #rc-exp-d .wf-field-options { color:#7f8fa6; } #rc-exp-d .wf-aff { background:#f8f9fb; border-color:#e8e8e8; } #rc-exp-d .wf-aff-id { background:#dde1e6; color:#555; } #rc-exp-d .wf-aff-label { color:#333; } #rc-exp-d .wf-aff-method { color:#7f8fa6; background:#eef1f5; } #rc-exp-d .wf-aff-detail { color:#999; } #rc-exp-d .wf-aff-options { color:#7f8fa6; } #rc-exp-d .wf-aff-primary { border-color:#2a6bcf; background:#f0f5ff; } #rc-exp-d .wf-aff-primary .wf-aff-label { color:#2a6bcf; font-weight:600; } #rc-exp-d .wf-aff-primary .wf-aff-id { background:#2a6bcf; color:#fff; } #rc-exp-d .wf-aff-nav { border-color:#dde1e6; background:#fafafa; } #rc-exp-d .wf-aff-nav .wf-aff-label { color:#888; } #rc-exp-d .wf-aff-selected { border-color:#4caf50; background:#f0fff0; } #rc-exp-d .wf-aff-selected .wf-aff-label { color:#2e7d32; } #rc-exp-d .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; } #rc-exp-d .wf-fb-outcome { border-left:3px solid #2a6bcf; background:#f0f5ff; } #rc-exp-d .wf-fb-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-exp-d .wf-fb-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-exp-d .wf-aff-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-exp-d .wf-aff-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-exp-d .wf-tag-outcome { color:#2a6bcf; } #rc-exp-d .wf-tag-new { color:#4caf50; } #rc-exp-d .wf-tag-modified { color:#e6a817; } #rc-exp-d .wf-table th { background:#f4f6f9; border-color:#e8e8e8; } #rc-exp-d .wf-table td { border-color:#e8e8e8; } #rc-exp-d .wf-table-rownum { color:#aaa; background:#fafbfc; } #rc-exp-d .wf-table-coltype { color:#7f8fa6; } #rc-exp-d .wf-table-empty { color:#bbb; } #rc-exp-d .wf-table-summary { color:#7f8fa6; } #rc-exp-d .wf-table-prop { color:#7f8fa6; } #rc-exp-d .wf-exec-pass { color:#2e7d32; } #rc-exp-d .wf-exec-pending { color:#b0b0b0; } #rc-exp-d [data-completed="true"] { background:#e8f5e9; } #rc-exp-d .wf-exec-reason { color:#999; }'
+                ; document.head.appendChild(style); container = c;
+        },
+        update: function(state, msg, feedback) { _expDPage(container, state, msg, feedback, false); },
+        activate: function() {}, deactivate: function() {}
+    });
+})();
+(function() {
+    var container;
+    registerRenderer({
+        id: 'exp-d-verbose', label: 'Experimental - D', format: 'exp-d',
+        verbosity: 'verbose', verbosity_label: 'Verbose', style: 'light', style_label: 'Light',
+        init: function(c) {
+            c.style.cssText = 'overflow-y:auto;padding:0;';
+            var style = document.createElement('style');
+            style.textContent = WF_STRUCTURAL_CSS + EXP_D_FC_CSS
+                + _scopeFC('#rc-exp-d-verbose', EXP_D_FC_LIGHT)
+                + '#rc-exp-d-verbose { background:#f5f5f5; color:#333; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
+                + '#rc-exp-d-verbose .wf-title { color:#1a1a2e; } #rc-exp-d-verbose .wf-banner { background:#f8f9fb; border-color:#e8e8e8; } #rc-exp-d-verbose .wf-dot { background:#dde1e6; color:#888; } #rc-exp-d-verbose .wf-step-label { color:#888; } #rc-exp-d-verbose .wf-step-active .wf-dot { background:#2a6bcf; color:#fff; } #rc-exp-d-verbose .wf-step-active .wf-step-label { color:#1a1a2e; font-weight:600; } #rc-exp-d-verbose .wf-step-done .wf-dot { background:#4caf50; color:#fff; } #rc-exp-d-verbose .wf-step-done .wf-step-label { color:#555; } #rc-exp-d-verbose .wf-conn { background:#dde1e6; } #rc-exp-d-verbose .wf-conn-active { background:#4caf50; } #rc-exp-d-verbose .wf-section-head { color:#1a1a2e; } #rc-exp-d-verbose .wf-desc { color:#666; } #rc-exp-d-verbose .wf-card { background:#fff; border-color:#e8e8e8; } #rc-exp-d-verbose .wf-card-head { color:#7f8fa6; } #rc-exp-d-verbose .wf-tbl td { border-bottom:1px solid #f0f0f0; } #rc-exp-d-verbose .wf-key { color:#7f8fa6; } #rc-exp-d-verbose .wf-val { color:#333; } #rc-exp-d-verbose .wf-null, #rc-exp-d-verbose .wf-empty-arr, #rc-exp-d-verbose .wf-empty-obj { color:#bbb; } #rc-exp-d-verbose .wf-bool, #rc-exp-d-verbose .wf-num { color:#2a6bcf; } #rc-exp-d-verbose .wf-str { color:#333; } #rc-exp-d-verbose .wf-arr-item { border-left-color:#e8e8e8; } #rc-exp-d-verbose .wf-field { border-bottom:1px solid #f0f0f0; } #rc-exp-d-verbose .wf-field-label { color:#555; } #rc-exp-d-verbose .wf-field-instruction { color:#999; } #rc-exp-d-verbose .wf-field-value { color:#333; } #rc-exp-d-verbose .wf-field-empty { color:#bbb; } #rc-exp-d-verbose .wf-field-options { color:#7f8fa6; } #rc-exp-d-verbose .wf-aff { background:#f8f9fb; border-color:#e8e8e8; } #rc-exp-d-verbose .wf-aff-id { background:#dde1e6; color:#555; } #rc-exp-d-verbose .wf-aff-label { color:#333; } #rc-exp-d-verbose .wf-aff-method { color:#7f8fa6; background:#eef1f5; } #rc-exp-d-verbose .wf-aff-detail { color:#999; } #rc-exp-d-verbose .wf-aff-options { color:#7f8fa6; } #rc-exp-d-verbose .wf-aff-primary { border-color:#2a6bcf; background:#f0f5ff; } #rc-exp-d-verbose .wf-aff-primary .wf-aff-label { color:#2a6bcf; font-weight:600; } #rc-exp-d-verbose .wf-aff-primary .wf-aff-id { background:#2a6bcf; color:#fff; } #rc-exp-d-verbose .wf-aff-nav { border-color:#dde1e6; background:#fafafa; } #rc-exp-d-verbose .wf-aff-nav .wf-aff-label { color:#888; } #rc-exp-d-verbose .wf-aff-selected { border-color:#4caf50; background:#f0fff0; } #rc-exp-d-verbose .wf-aff-selected .wf-aff-label { color:#2e7d32; } #rc-exp-d-verbose .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; } #rc-exp-d-verbose .wf-fb-outcome { border-left:3px solid #2a6bcf; background:#f0f5ff; } #rc-exp-d-verbose .wf-fb-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-exp-d-verbose .wf-fb-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-exp-d-verbose .wf-aff-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-exp-d-verbose .wf-aff-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-exp-d-verbose .wf-tag-outcome { color:#2a6bcf; } #rc-exp-d-verbose .wf-tag-new { color:#4caf50; } #rc-exp-d-verbose .wf-tag-modified { color:#e6a817; } #rc-exp-d-verbose .wf-table th { background:#f4f6f9; border-color:#e8e8e8; } #rc-exp-d-verbose .wf-table td { border-color:#e8e8e8; } #rc-exp-d-verbose .wf-table-rownum { color:#aaa; background:#fafbfc; } #rc-exp-d-verbose .wf-table-coltype { color:#7f8fa6; } #rc-exp-d-verbose .wf-table-empty { color:#bbb; } #rc-exp-d-verbose .wf-table-summary { color:#7f8fa6; } #rc-exp-d-verbose .wf-table-prop { color:#7f8fa6; } #rc-exp-d-verbose .wf-exec-pass { color:#2e7d32; } #rc-exp-d-verbose .wf-exec-pending { color:#b0b0b0; } #rc-exp-d-verbose [data-completed="true"] { background:#e8f5e9; } #rc-exp-d-verbose .wf-exec-reason { color:#999; }'
+                ; document.head.appendChild(style); container = c;
+        },
+        update: function(state, msg, feedback) { _expDPage(container, state, msg, feedback, true); },
+        activate: function() {}, deactivate: function() {}
+    });
+})();
+(function() {
+    var container;
+    registerRenderer({
+        id: 'exp-d-dark', label: 'Experimental - D', format: 'exp-d',
+        verbosity: 'default', verbosity_label: 'Default', style: 'dark', style_label: 'Dark',
+        init: function(c) {
+            c.style.cssText = 'overflow-y:auto;padding:0;';
+            var style = document.createElement('style');
+            style.textContent = WF_STRUCTURAL_CSS + EXP_D_FC_CSS
+                + _scopeFC('#rc-exp-d-dark', EXP_D_FC_DARK)
+                + '#rc-exp-d-dark { background:#0e0e0e; color:#c8c8c8; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
+                + '#rc-exp-d-dark .wf-title { color:#e0e0e0; } #rc-exp-d-dark .wf-banner { background:#1a1a1a; border-color:#2a2a2a; } #rc-exp-d-dark .wf-dot { background:#333; color:#888; } #rc-exp-d-dark .wf-step-label { color:#777; } #rc-exp-d-dark .wf-step-active .wf-dot { background:#4a9eff; color:#fff; } #rc-exp-d-dark .wf-step-active .wf-step-label { color:#e0e0e0; font-weight:600; } #rc-exp-d-dark .wf-step-done .wf-dot { background:#4caf50; color:#fff; } #rc-exp-d-dark .wf-step-done .wf-step-label { color:#888; } #rc-exp-d-dark .wf-conn { background:#333; } #rc-exp-d-dark .wf-conn-active { background:#4caf50; } #rc-exp-d-dark .wf-section-head { color:#e0e0e0; } #rc-exp-d-dark .wf-desc { color:#999; } #rc-exp-d-dark .wf-card { background:#141414; border-color:#2a2a2a; } #rc-exp-d-dark .wf-card-head { color:#666; } #rc-exp-d-dark .wf-tbl td { border-bottom:1px solid #1e1e1e; } #rc-exp-d-dark .wf-key { color:#666; } #rc-exp-d-dark .wf-val { color:#c8c8c8; } #rc-exp-d-dark .wf-null, #rc-exp-d-dark .wf-empty-arr, #rc-exp-d-dark .wf-empty-obj { color:#555; } #rc-exp-d-dark .wf-bool, #rc-exp-d-dark .wf-num { color:#4a9eff; } #rc-exp-d-dark .wf-str { color:#c8c8c8; } #rc-exp-d-dark .wf-arr-item { border-left-color:#2a2a2a; } #rc-exp-d-dark .wf-field { border-bottom:1px solid #1e1e1e; } #rc-exp-d-dark .wf-field-label { color:#999; } #rc-exp-d-dark .wf-field-instruction { color:#666; } #rc-exp-d-dark .wf-field-value { color:#c8c8c8; } #rc-exp-d-dark .wf-field-empty { color:#555; } #rc-exp-d-dark .wf-field-options { color:#666; } #rc-exp-d-dark .wf-aff { background:#1a1a1a; border-color:#2a2a2a; } #rc-exp-d-dark .wf-aff-id { background:#333; color:#aaa; } #rc-exp-d-dark .wf-aff-label { color:#c8c8c8; } #rc-exp-d-dark .wf-aff-method { color:#666; background:#1e1e1e; } #rc-exp-d-dark .wf-aff-detail { color:#555; } #rc-exp-d-dark .wf-aff-options { color:#666; } #rc-exp-d-dark .wf-aff-primary { border-color:#4a9eff; background:#0d1a2e; } #rc-exp-d-dark .wf-aff-primary .wf-aff-label { color:#4a9eff; font-weight:600; } #rc-exp-d-dark .wf-aff-primary .wf-aff-id { background:#4a9eff; color:#fff; } #rc-exp-d-dark .wf-aff-nav { border-color:#2a2a2a; background:#111; } #rc-exp-d-dark .wf-aff-nav .wf-aff-label { color:#666; } #rc-exp-d-dark .wf-aff-selected { border-color:#4caf50; background:#0d1a0d; } #rc-exp-d-dark .wf-aff-selected .wf-aff-label { color:#4caf50; } #rc-exp-d-dark .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; } #rc-exp-d-dark .wf-fb-outcome { border-left:3px solid #4a9eff; background:#0d1a2e; } #rc-exp-d-dark .wf-fb-new { border-left:3px solid #4caf50; background:#0d1a0d; } #rc-exp-d-dark .wf-fb-modified { border-left:3px solid #e6a817; background:#1a1500; } #rc-exp-d-dark .wf-aff-new { border-left:3px solid #4caf50; background:#0d1a0d; } #rc-exp-d-dark .wf-aff-modified { border-left:3px solid #e6a817; background:#1a1500; } #rc-exp-d-dark .wf-tag-outcome { color:#4a9eff; } #rc-exp-d-dark .wf-tag-new { color:#4caf50; } #rc-exp-d-dark .wf-tag-modified { color:#e6a817; } #rc-exp-d-dark .wf-table th { background:#1a1a1a; border-color:#2a2a2a; } #rc-exp-d-dark .wf-table td { border-color:#2a2a2a; } #rc-exp-d-dark .wf-table-rownum { color:#555; background:#141414; } #rc-exp-d-dark .wf-table-coltype { color:#666; } #rc-exp-d-dark .wf-table-empty { color:#555; } #rc-exp-d-dark .wf-table-summary { color:#666; } #rc-exp-d-dark .wf-table-prop { color:#666; } #rc-exp-d-dark .wf-exec-pass { color:#66bb6a; } #rc-exp-d-dark .wf-exec-pending { color:#666; } #rc-exp-d-dark [data-completed="true"] { background:#1b3a1b; } #rc-exp-d-dark .wf-exec-reason { color:#666; }'
+                ; document.head.appendChild(style); container = c;
+        },
+        update: function(state, msg, feedback) { _expDPage(container, state, msg, feedback, false); },
+        activate: function() {}, deactivate: function() {}
+    });
+})();
+(function() {
+    var container;
+    registerRenderer({
+        id: 'exp-d-dark-verbose', label: 'Experimental - D', format: 'exp-d',
+        verbosity: 'verbose', verbosity_label: 'Verbose', style: 'dark', style_label: 'Dark',
+        init: function(c) {
+            c.style.cssText = 'overflow-y:auto;padding:0;';
+            var style = document.createElement('style');
+            style.textContent = WF_STRUCTURAL_CSS + EXP_D_FC_CSS
+                + _scopeFC('#rc-exp-d-dark-verbose', EXP_D_FC_DARK)
+                + '#rc-exp-d-dark-verbose { background:#0e0e0e; color:#c8c8c8; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
+                + '#rc-exp-d-dark-verbose .wf-title { color:#e0e0e0; } #rc-exp-d-dark-verbose .wf-banner { background:#1a1a1a; border-color:#2a2a2a; } #rc-exp-d-dark-verbose .wf-dot { background:#333; color:#888; } #rc-exp-d-dark-verbose .wf-step-label { color:#777; } #rc-exp-d-dark-verbose .wf-step-active .wf-dot { background:#4a9eff; color:#fff; } #rc-exp-d-dark-verbose .wf-step-active .wf-step-label { color:#e0e0e0; font-weight:600; } #rc-exp-d-dark-verbose .wf-step-done .wf-dot { background:#4caf50; color:#fff; } #rc-exp-d-dark-verbose .wf-step-done .wf-step-label { color:#888; } #rc-exp-d-dark-verbose .wf-conn { background:#333; } #rc-exp-d-dark-verbose .wf-conn-active { background:#4caf50; } #rc-exp-d-dark-verbose .wf-section-head { color:#e0e0e0; } #rc-exp-d-dark-verbose .wf-desc { color:#999; } #rc-exp-d-dark-verbose .wf-card { background:#141414; border-color:#2a2a2a; } #rc-exp-d-dark-verbose .wf-card-head { color:#666; } #rc-exp-d-dark-verbose .wf-tbl td { border-bottom:1px solid #1e1e1e; } #rc-exp-d-dark-verbose .wf-key { color:#666; } #rc-exp-d-dark-verbose .wf-val { color:#c8c8c8; } #rc-exp-d-dark-verbose .wf-null, #rc-exp-d-dark-verbose .wf-empty-arr, #rc-exp-d-dark-verbose .wf-empty-obj { color:#555; } #rc-exp-d-dark-verbose .wf-bool, #rc-exp-d-dark-verbose .wf-num { color:#4a9eff; } #rc-exp-d-dark-verbose .wf-str { color:#c8c8c8; } #rc-exp-d-dark-verbose .wf-arr-item { border-left-color:#2a2a2a; } #rc-exp-d-dark-verbose .wf-field { border-bottom:1px solid #1e1e1e; } #rc-exp-d-dark-verbose .wf-field-label { color:#999; } #rc-exp-d-dark-verbose .wf-field-instruction { color:#666; } #rc-exp-d-dark-verbose .wf-field-value { color:#c8c8c8; } #rc-exp-d-dark-verbose .wf-field-empty { color:#555; } #rc-exp-d-dark-verbose .wf-field-options { color:#666; } #rc-exp-d-dark-verbose .wf-aff { background:#1a1a1a; border-color:#2a2a2a; } #rc-exp-d-dark-verbose .wf-aff-id { background:#333; color:#aaa; } #rc-exp-d-dark-verbose .wf-aff-label { color:#c8c8c8; } #rc-exp-d-dark-verbose .wf-aff-method { color:#666; background:#1e1e1e; } #rc-exp-d-dark-verbose .wf-aff-detail { color:#555; } #rc-exp-d-dark-verbose .wf-aff-options { color:#666; } #rc-exp-d-dark-verbose .wf-aff-primary { border-color:#4a9eff; background:#0d1a2e; } #rc-exp-d-dark-verbose .wf-aff-primary .wf-aff-label { color:#4a9eff; font-weight:600; } #rc-exp-d-dark-verbose .wf-aff-primary .wf-aff-id { background:#4a9eff; color:#fff; } #rc-exp-d-dark-verbose .wf-aff-nav { border-color:#2a2a2a; background:#111; } #rc-exp-d-dark-verbose .wf-aff-nav .wf-aff-label { color:#666; } #rc-exp-d-dark-verbose .wf-aff-selected { border-color:#4caf50; background:#0d1a0d; } #rc-exp-d-dark-verbose .wf-aff-selected .wf-aff-label { color:#4caf50; } #rc-exp-d-dark-verbose .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; } #rc-exp-d-dark-verbose .wf-fb-outcome { border-left:3px solid #4a9eff; background:#0d1a2e; } #rc-exp-d-dark-verbose .wf-fb-new { border-left:3px solid #4caf50; background:#0d1a0d; } #rc-exp-d-dark-verbose .wf-fb-modified { border-left:3px solid #e6a817; background:#1a1500; } #rc-exp-d-dark-verbose .wf-aff-new { border-left:3px solid #4caf50; background:#0d1a0d; } #rc-exp-d-dark-verbose .wf-aff-modified { border-left:3px solid #e6a817; background:#1a1500; } #rc-exp-d-dark-verbose .wf-tag-outcome { color:#4a9eff; } #rc-exp-d-dark-verbose .wf-tag-new { color:#4caf50; } #rc-exp-d-dark-verbose .wf-tag-modified { color:#e6a817; } #rc-exp-d-dark-verbose .wf-table th { background:#1a1a1a; border-color:#2a2a2a; } #rc-exp-d-dark-verbose .wf-table td { border-color:#2a2a2a; } #rc-exp-d-dark-verbose .wf-table-rownum { color:#555; background:#141414; } #rc-exp-d-dark-verbose .wf-table-coltype { color:#666; } #rc-exp-d-dark-verbose .wf-table-empty { color:#555; } #rc-exp-d-dark-verbose .wf-table-summary { color:#666; } #rc-exp-d-dark-verbose .wf-table-prop { color:#666; } #rc-exp-d-dark-verbose .wf-exec-pass { color:#66bb6a; } #rc-exp-d-dark-verbose .wf-exec-pending { color:#666; } #rc-exp-d-dark-verbose [data-completed="true"] { background:#1b3a1b; } #rc-exp-d-dark-verbose .wf-exec-reason { color:#666; }'
+                ; document.head.appendChild(style); container = c;
+        },
+        update: function(state, msg, feedback) { _expDPage(container, state, msg, feedback, true); },
+        activate: function() {}, deactivate: function() {}
+    });
+})();
+
+
+/* ======================================================================
    SSE CONNECTION
    ====================================================================== */
 var connEl = document.getElementById('conn');
