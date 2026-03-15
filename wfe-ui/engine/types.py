@@ -210,7 +210,7 @@ class AcceptanceResult:
 @dataclass
 class RowState:
     row: int
-    row_id: str  # e.g. "CR-001-EI-1"
+    row_id: str  # e.g. "WF-Row-1"
     gated: bool
     gated_by: list[str]  # row IDs that block this row
     cells: list[CellState] = field(default_factory=list)

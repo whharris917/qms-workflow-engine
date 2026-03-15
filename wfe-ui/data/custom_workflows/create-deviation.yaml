@@ -1,0 +1,132 @@
+workflow_title: Create Deviation
+workflow_description: Author a deviation report documenting a departure from approved
+  procedure or expected product behavior.
+lifecycle_banner:
+- Discovery
+- Analysis
+- Review
+- Closure
+nodes:
+  discovery:
+    title: Discovery
+    lifecycle_label: Discovery
+    instruction: Describe how the deviation was discovered and its immediate context.
+      Provide a title, classify the severity, and identify what was affected.
+    fields:
+      title:
+        label: Deviation Title
+        type: text
+        key: title
+        default: null
+        instruction: A short, descriptive title summarizing the deviation.
+      classification:
+        label: Classification
+        type: select
+        key: classification
+        default: null
+        instruction: 'Minor: no impact on product quality. Major: potential impact,
+          requires corrective action. Critical: immediate risk, requires escalation.'
+        options:
+        - Minor
+        - Major
+        - Critical
+      discovery_context:
+        label: Discovery Context
+        type: text
+        key: discovery_context
+        default: null
+        instruction: How was this deviation discovered? During what activity? By whom?
+      affected_area:
+        label: Affected Area
+        type: select
+        key: affected_area
+        default: null
+        instruction: The primary area affected by this deviation.
+        options:
+        - Code
+        - Process
+        - Document
+        - Infrastructure
+        - Other
+    proceed:
+      label: Proceed to Analysis
+      requires:
+      - title
+      - classification
+      - affected_area
+  analysis:
+    title: Analysis
+    lifecycle_label: Analysis
+    instruction: 'Analyze the deviation: describe what happened, identify the root
+      cause, and propose corrective and preventive actions.'
+    fields:
+      description:
+        label: Description of Deviation
+        type: text
+        key: description
+        default: null
+        instruction: What happened? Describe the deviation in detail, including the
+          expected vs. actual behavior or procedure.
+      root_cause:
+        label: Root Cause
+        type: text
+        key: root_cause
+        default: null
+        instruction: Why did it happen? Identify the fundamental cause, not just the
+          immediate trigger.
+      corrective_action:
+        label: Corrective Action
+        type: text
+        key: corrective_action
+        default: null
+        instruction: What will be done to fix the immediate problem and remediate
+          any consequences?
+      preventive_action:
+        label: Preventive Action
+        type: text
+        key: preventive_action
+        default: null
+        instruction: What will be done to prevent recurrence? Consider process changes,
+          training, or tooling improvements.
+      requires_investigation:
+        label: Requires Investigation
+        type: boolean
+        key: requires_investigation
+        default: null
+        instruction: Does this deviation warrant a formal Investigation (INV)? Set
+          to true if the root cause is systemic or unclear.
+    navigation:
+    - action: go_back
+      label: Go back to Discovery
+    proceed:
+      label: Proceed to Review
+      requires:
+      - description
+      - root_cause
+      - corrective_action
+  review:
+    title: Review
+    lifecycle_label: Review
+    instruction: Review all fields before submission. Verify the classification is
+      appropriate, the root cause analysis is thorough, and the corrective/preventive
+      actions are adequate.
+    show_all_fields: true
+    navigation:
+    - action: go_to
+      label: Go back to Discovery
+      node: discovery
+    - action: go_to
+      label: Go back to Analysis
+      node: analysis
+    actions:
+    - action: submit
+      label: Submit Deviation
+  submitted:
+    title: Submitted
+    lifecycle_label: Closure
+    instruction: This deviation report has been submitted for processing. If an investigation
+      is required, an INV document should be created as a follow-up.
+    show_all_fields: true
+    actions:
+    - action: restart
+      label: Start a new Deviation

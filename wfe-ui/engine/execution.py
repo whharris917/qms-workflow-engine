@@ -69,7 +69,7 @@ class PlanEngine:
 
     def get_row_state(self, row: int) -> RowState:
         """Compute the full state of a single row."""
-        row_id = f"{self.plan.cr_id}-EI-{row + 1}"
+        row_id = f"{self.plan.cr_id}-Row-{row + 1}"
         gated, gated_by = self._check_gating(row)
 
         cells = []
@@ -265,7 +265,7 @@ class PlanEngine:
                     continue
                 result = evaluate_acceptance(self.plan, self.state, dep_ri, ac_col)
                 if not result.passed:
-                    gated_by.append(f"{self.plan.cr_id}-EI-{dep_ri + 1}")
+                    gated_by.append(f"{self.plan.cr_id}-Row-{dep_ri + 1}")
         return bool(gated_by), gated_by
 
     def _is_seq_locked(self, row: int, col: int) -> bool:
@@ -338,7 +338,7 @@ class PlanEngine:
                 deps = _parse_prereqs(self.plan.rows[row][col])
                 if deps:
                     display_value = ", ".join(
-                        f"{self.plan.cr_id}-EI-{d + 1}" for d in deps
+                        f"{self.plan.cr_id}-Row-{d + 1}" for d in deps
                     )
                 else:
                     display_value = "N/A"

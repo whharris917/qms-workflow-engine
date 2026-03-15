@@ -1,0 +1,275 @@
+workflow_title: Incident Response
+workflow_description: Triage, investigate, and resolve production incidents with structured evidence collection.
+
+lifecycle_banner:
+  - Triage
+  - Investigation
+  - Resolution
+  - Verification
+  - Closure
+
+column_types:
+  ne-free-text:
+    label: Free Text
+    category: non-executable
+    description: Static text defined during planning.
+  ne-prerequisite:
+    label: Prerequisite
+    category: non-executable
+    description: Row dependencies.
+  ex-free-text:
+    label: Free Text
+    category: executable
+    description: Free-form evidence recorded during execution.
+  ex-choice-list:
+    label: Choice List
+    category: executable
+    description: Selection from predefined options.
+  ex-signature:
+    label: Signature
+    category: executable
+    description: Electronic signature.
+  ae-acceptance-criteria:
+    label: Acceptance Criteria
+    category: auto-executed
+    description: Evaluated automatically.
+
+nodes:
+  triage:
+    title: Incident Triage
+    lifecycle_label: Triage
+    instruction: |
+      Classify the incident. Severity determines the investigation path:
+      - Critical/High → full investigation with evidence table
+      - Medium → standard investigation
+      - Low → fast-track to resolution
+
+    fields:
+      incident_title:
+        label: Incident Title
+        type: text
+        key: incident_title
+        instruction: A brief description of what happened.
+
+      severity:
+        label: Severity
+        type: select
+        key: severity
+        options: [Critical, High, Medium, Low]
+        instruction: "Critical: data loss or security breach. High: service degradation. Medium: limited impact. Low: cosmetic or minor."
+        side_effects:
+          - when: {type: field_equals, key: severity, value: Low}
+            set: {needs_investigation: false}
+          - when: {type: field_equals, key: severity, value: Medium}
+            set: {needs_investigation: true}
+          - when: {type: field_equals, key: severity, value: High}
+            set: {needs_investigation: true}
+          - when: {type: field_equals, key: severity, value: Critical}
+            set: {needs_investigation: true}
+
+      category:
+        label: Category
+        type: select
+        key: category
+        options: [Infrastructure, Application, Security, Data, Process]
+        instruction: The primary domain of the incident.
+
+      affected_system:
+        label: Affected System
+        type: select
+        key: affected_system
+        dynamic_options:
+          source_key: category
+          mapping:
+            Infrastructure: [Network, DNS, Load Balancer, Database Server, Storage]
+            Application: [API Gateway, Auth Service, Worker Queue, Frontend, Backend]
+            Security: [Firewall, IAM, Certificates, Secrets Manager, WAF]
+            Data: [Primary DB, Replica DB, Cache, Object Storage, Search Index]
+            Process: [CI/CD Pipeline, Deployment, Monitoring, Alerting, Backup]
+          default: []
+
+      needs_investigation:
+        label: Requires Full Investigation
+        type: boolean
+        key: needs_investigation
+        default: true
+        instruction: Auto-set based on severity. Override if needed.
+
+    navigation:
+      # Low severity → skip investigation, go straight to resolution
+      - action: go_to
+        node: resolution
+        label: Fast-track to Resolution (Low severity)
+        when: {type: field_equals, key: severity, value: Low}
+
+    proceed:
+      label: Proceed to Investigation
+      gate:
+        op: AND
+        conditions:
+          - {type: field_truthy, key: incident_title}
+          - {type: field_truthy, key: severity}
+          - {type: field_truthy, key: category}
+          - {type: field_truthy, key: affected_system}
+
+  investigation:
+    title: Investigation
+    lifecycle_label: Investigation
+    instruction: |
+      Document the investigation. Add affected components, then describe timeline, root cause, and impact.
+
+    fields:
+      timeline:
+        label: Timeline
+        type: text
+        key: timeline
+        instruction: "Chronological sequence: when was it detected, when did it start, when was it mitigated?"
+
+      root_cause:
+        label: Root Cause
+        type: text
+        key: root_cause
+        instruction: Why did this happen? Identify the fundamental cause.
+
+      impact_description:
+        label: Impact Description
+        type: text
+        key: impact_description
+        instruction: What was affected? Users, data, services, SLAs?
+
+      blast_radius:
+        label: Blast Radius
+        type: select
+        key: blast_radius
+        options: [Single Component, Single Service, Multiple Services, Platform-wide, External/Customer-facing]
+
+    lists:
+      affected_components:
+        label: Affected Component
+        item_schema:
+          component_name:
+            type: text
+            required: true
+          status:
+            type: select
+            options: [Degraded, Down, Recovered, Unaffected]
+          notes:
+            type: text
+        operations: [add, edit, remove, reorder]
+        focus: true
+
+    navigation:
+      - action: go_back
+        label: Go back to Triage
+
+    proceed:
+      label: Proceed to Resolution
+      gate:
+        op: AND
+        conditions:
+          - {type: field_truthy, key: root_cause}
+          - {type: field_truthy, key: impact_description}
+
+  resolution:
+    title: Resolution Planning
+    lifecycle_label: Resolution
+    instruction: |
+      Define the resolution actions. For Critical/High incidents, build an evidence table.
+      For lower severity, describe the fix and proceed.
+
+    fields:
+      resolution_summary:
+        label: Resolution Summary
+        type: text
+        key: resolution_summary
+        instruction: What was done (or will be done) to resolve the incident?
+
+      preventive_measures:
+        label: Preventive Measures
+        type: text
+        key: preventive_measures
+        instruction: What changes will prevent recurrence?
+
+    # Evidence table for Critical/High incidents
+    table:
+      column_type_catalog: column_types
+      properties:
+        sequential_execution: {type: boolean, default: false}
+      operations:
+        - add_column
+        - remove_column
+        - rename_column
+        - set_column_type
+        - add_row
+        - remove_row
+        - set_cell
+        - set_choices
+        - set_rule
+        - set_prerequisites
+        - set_property
+
+    navigation:
+      - action: go_back
+        label: Go back to Investigation
+        when:
+          op: NOT
+          conditions:
+            - {type: field_equals, key: severity, value: Low}
+      - action: go_back
+        label: Go back to Triage
+        when: {type: field_equals, key: severity, value: Low}
+
+    proceed:
+      label: Proceed to Verification
+      gate:
+        op: AND
+        conditions:
+          - {type: field_truthy, key: resolution_summary}
+
+  verification:
+    title: Verification
+    lifecycle_label: Verification
+    instruction: |
+      Execute the evidence table to verify all resolution actions were completed.
+      Each row requires evidence and sign-off before the incident can be closed.
+
+    execution: true
+
+    navigation:
+      - action: go_back
+        label: Go back to Resolution Planning
+
+  review:
+    title: Incident Review
+    lifecycle_label: Closure
+    show_all_fields: true
+    instruction: |
+      Review all incident data before closing. Verify the root cause, resolution, and preventive measures are adequate.
+
+    navigation:
+      - action: go_to
+        node: triage
+        label: Go back to Triage
+      - action: go_to
+        node: investigation
+        label: Go back to Investigation
+        when:
+          op: NOT
+          conditions:
+            - {type: field_equals, key: severity, value: Low}
+      - action: go_to
+        node: resolution
+        label: Go back to Resolution
+    actions:
+      - action: submit
+        label: Close Incident
+
+  closed:
+    title: Incident Closed
+    lifecycle_label: Closure
+    show_all_fields: true
+    instruction: |
+      This incident has been closed. All evidence is recorded and verified.
+    actions:
+      - action: restart
+        label: Start a new Incident Response

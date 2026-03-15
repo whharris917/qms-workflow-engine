@@ -9,9 +9,9 @@ import yaml
 import markdown
 from flask import Flask, render_template, abort, request, redirect, url_for, jsonify, Response
 
-import table_handler
-import cr_handler
-import execution_handler
+import builder_handler
+from runtime import WorkflowRuntime
+
 
 app = Flask(__name__)
 
@@ -481,26 +481,67 @@ def _compute_feedback(before: dict, after: dict, acted_label: str = None) -> dic
 
 # -- Workflow registry --
 # Each entry maps a workflow_id to its handler module and display metadata.
-_WORKFLOWS = {
-    "create-cr": {
-        "handler": cr_handler,
-        "title": cr_handler.WORKFLOW_TITLE,
-        "description": "Author a Change Record through the full pre-approval lifecycle.",
-        "renderers": ["raw", "light", "dark", "exp-a", "exp-b", "exp-c", "exp-d"],
-    },
-    "create-implementation-plan": {
-        "handler": table_handler,
-        "title": table_handler.WORKFLOW_TITLE,
-        "description": "Build an execution item table for a Change Record.",
-        "renderers": ["raw", "light", "dark", "exp-a", "exp-b", "exp-c", "exp-d"],
-    },
-    "execute-plan": {
-        "handler": execution_handler,
-        "title": execution_handler.WORKFLOW_TITLE,
-        "description": "Execute a Change Record's implementation plan — advance through EIs, record evidence, track pass/fail.",
-        "renderers": ["raw", "light", "dark", "exp-a", "exp-b", "exp-c", "exp-d"],
-    },
-}
+
+_ALL_RENDERERS = ["raw", "light", "dark", "exp-a", "exp-b", "exp-c", "exp-d"]
+_CUSTOM_WORKFLOWS_DIR = DATA_DIR / "custom_workflows"
+_CUSTOM_WORKFLOWS_DIR.mkdir(exist_ok=True)
+
+
+def _discover_workflows():
+    """Build the workflow registry from YAML definitions + builder handler."""
+    workflows = {}
+
+    # Built-in YAML workflows — loaded via the unified runtime
+    _BUILTIN_YAMLS = {
+        "create-cr": {
+            "path": DATA_DIR / "agent_create_cr.yaml",
+            "description": "Author a Change Record through the full pre-approval lifecycle.",
+        },
+        "create-executable-table": {
+            "path": DATA_DIR / "agent_create_executable_table.yaml",
+            "description": "Build a structured table with typed columns, acceptance criteria, and integrated execution.",
+        },
+    }
+    for wf_id, info in _BUILTIN_YAMLS.items():
+        try:
+            defn = yaml.safe_load(info["path"].read_text())
+            handler = WorkflowRuntime(defn)
+            workflows[wf_id] = {
+                "handler": handler,
+                "title": handler.WORKFLOW_TITLE,
+                "description": info["description"],
+                "renderers": _ALL_RENDERERS,
+            }
+        except Exception as e:
+            print(f"Warning: Failed to load {wf_id}: {e}")
+
+    # Builder handler (special case — not YAML-driven)
+    workflows["create-workflow"] = {
+        "handler": builder_handler,
+        "title": builder_handler.WORKFLOW_TITLE,
+        "description": "Design a new workflow that agents can run without writing code.",
+        "renderers": _ALL_RENDERERS,
+    }
+
+    # Discover custom workflows from YAML definitions
+    for yaml_path in sorted(_CUSTOM_WORKFLOWS_DIR.glob("*.yaml")):
+        try:
+            defn = yaml.safe_load(yaml_path.read_text())
+            wf_id = yaml_path.stem
+            handler = WorkflowRuntime(defn)
+            workflows[wf_id] = {
+                "handler": handler,
+                "title": handler.WORKFLOW_TITLE,
+                "description": defn.get("workflow_description", ""),
+                "renderers": _ALL_RENDERERS,
+            }
+        except Exception:
+            pass  # skip malformed YAMLs silently
+
+    return workflows
+
+
+_WORKFLOWS = _discover_workflows()
 
 
 def _get_handler(workflow_id):

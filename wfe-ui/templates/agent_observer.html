@@ -328,8 +328,34 @@ function wfRenderFields(fields, fieldCategory) {
 }
 
 function wfRenderStateProps(state) {
-    /* node, node_title rendered by section heading; completed_nodes rendered by lifecycle banner */
-    return '';
+    /* Render any state keys not handled by dedicated building blocks.
+       Known keys (rendered elsewhere): workflow, node, node_title, completed_nodes,
+       lifecycle, lifecycle_current, lifecycle_completed, fields, table, execution_table. */
+    var s = state.state || {};
+    var known = ['workflow','node','node_title','completed_nodes','lifecycle','lifecycle_current','lifecycle_completed','fields','table','execution_table'];
+    var extra = Object.keys(s).filter(function(k) { return known.indexOf(k) === -1; });
+    if (!extra.length) return '';
+    var html = '';
+    for (var i = 0; i < extra.length; i++) {
+        var k = extra[i];
+        var v = s[k];
+        html += '<div class="wf-card">';
+        html += '<div class="wf-card-head">state.' + wfEsc(k) + '</div>';
+        if (Array.isArray(v) && v.length && typeof v[0] === 'string') {
+            /* Array of strings — render as list */
+            html += '<ul class="wf-extra-list">';
+            for (var j = 0; j < v.length; j++) {
+                html += '<li>' + wfEsc(v[j]) + '</li>';
+            }
+            html += '</ul>';
+        } else if (v && typeof v === 'object') {
+            html += wfRenderValue(v);
+        } else {
+            html += '<div class="wf-field-value">' + wfRenderValue(v) + '</div>';
+        }
+        html += '</div>';
+    }
+    return html;
 }
 
 function wfRenderBanner(state) {
@@ -583,6 +609,8 @@ var WF_STRUCTURAL_CSS = ''
     + '.wf-key { width:160px; white-space:nowrap; font-weight:500; font-size:0.8rem; }'
     + '.wf-val { word-break:break-word; }'
     + '.wf-null, .wf-empty-arr, .wf-empty-obj { font-style:italic; font-size:0.8rem; }'
+    + '.wf-extra-list { margin:0.3rem 0; padding-left:1.2rem; list-style:disc; }'
+    + '.wf-extra-list li { margin:0.15rem 0; font-size:0.85rem; }'
     + '.wf-arr { display:flex; flex-direction:column; gap:0.15rem; }'
     + '.wf-arr-item { padding-left:0.5rem; border-left:2px solid; }'
     + '.wf-fields { display:flex; flex-direction:column; gap:0.15rem; }'
@@ -1110,8 +1138,6 @@ var WF_STRUCTURAL_CSS = ''
             html += '<div class="gb-instr">' + wfEsc(state.instructions) + '</div>';
         }
 
-        html += wfRenderStateProps(state);
-
         /* ── Table (if present) ── */
         if (s.execution_table) {
             html += wfRenderExecTable(s.execution_table);
@@ -1151,6 +1177,9 @@ var WF_STRUCTURAL_CSS = ''
                 html += '<div class="gb-empty">(empty)</div>';
             }
         }
+
+        /* ── Extra state (generic) ── */
+        html += wfRenderStateProps(state);
 
         /* ── Affordances as pill toolbar ── */
         if (state.affordances && state.affordances.length) {
@@ -1511,6 +1540,13 @@ var WF_STRUCTURAL_CSS = ''
                     }
                 }
             }
+        }
+
+        /* Extra state keys (generic rendering for unknown keys) */
+        var extraProps = wfRenderStateProps(state);
+        if (extraProps) {
+            lines.push('\u251c\u2500 <span class="tc-key">(extra state)</span>');
+            lines.push('   ' + extraProps.replace(/<[^>]+>/g, '').substring(0, 200));
         }
 
         /* Affordances */
