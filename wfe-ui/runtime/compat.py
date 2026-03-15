@@ -31,7 +31,7 @@ def normalize_definition(raw: dict) -> dict:
         option_sets = {}
         for key in list(d.keys()):
             if key not in ("workflow_id", "workflow_title", "workflow_description",
-                           "lifecycle_banner", "nodes", "column_types", "option_sets"):
+                           "nodes", "column_types", "option_sets"):
                 val = d.get(key)
                 if isinstance(val, list):
                     option_sets[key] = val

@@ -255,9 +255,6 @@ A complete workflow definition:
 workflow_title: My Workflow
 workflow_description: One-line summary.
 
-# Lifecycle
-lifecycle_banner: [Phase 1, Phase 2, Phase 3]
-
 # Shared data (optional)
 option_sets:
   categories: [A, B, C]
@@ -273,7 +270,6 @@ column_types:
 nodes:
   step_one:
     title: Step One
-    lifecycle_label: Phase 1
     instruction: "What to do at this step."
     show_all_fields: false          # true = show fields from all nodes
 

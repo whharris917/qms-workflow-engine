@@ -1,13 +1,6 @@
 workflow_title: Incident Response
 workflow_description: Triage, investigate, and resolve production incidents with structured evidence collection.
 
-lifecycle_banner:
-  - Triage
-  - Investigation
-  - Resolution
-  - Verification
-  - Closure
-
 column_types:
   ne-free-text:
     label: Free Text
@@ -37,7 +30,6 @@ column_types:
 nodes:
   triage:
     title: Incident Triage
-    lifecycle_label: Triage
     instruction: |
       Classify the incident. Severity determines the investigation path:
       - Critical/High → full investigation with evidence table
@@ -114,7 +106,6 @@ nodes:
 
   investigation:
     title: Investigation
-    lifecycle_label: Investigation
     instruction: |
       Document the investigation. Add affected components, then describe timeline, root cause, and impact.
 
@@ -172,7 +163,6 @@ nodes:
 
   resolution:
     title: Resolution Planning
-    lifecycle_label: Resolution
     instruction: |
       Define the resolution actions. For Critical/High incidents, build an evidence table.
       For lower severity, describe the fix and proceed.
@@ -228,7 +218,6 @@ nodes:
 
   verification:
     title: Verification
-    lifecycle_label: Verification
     instruction: |
       Execute the evidence table to verify all resolution actions were completed.
       Each row requires evidence and sign-off before the incident can be closed.
@@ -241,7 +230,6 @@ nodes:
 
   review:
     title: Incident Review
-    lifecycle_label: Closure
     show_all_fields: true
     instruction: |
       Review all incident data before closing. Verify the root cause, resolution, and preventive measures are adequate.
@@ -266,7 +254,6 @@ nodes:
 
   closed:
     title: Incident Closed
-    lifecycle_label: Closure
     show_all_fields: true
     instruction: |
       This incident has been closed. All evidence is recorded and verified.

@@ -1,15 +1,9 @@
 workflow_title: Create Deviation
 workflow_description: Author a deviation report documenting a departure from approved
   procedure or expected product behavior.
-lifecycle_banner:
-- Discovery
-- Analysis
-- Review
-- Closure
 nodes:
   discovery:
     title: Discovery
-    lifecycle_label: Discovery
     instruction: Describe how the deviation was discovered and its immediate context.
       Provide a title, classify the severity, and identify what was affected.
     fields:
@@ -56,7 +50,6 @@ nodes:
       - affected_area
   analysis:
     title: Analysis
-    lifecycle_label: Analysis
     instruction: 'Analyze the deviation: describe what happened, identify the root
       cause, and propose corrective and preventive actions.'
     fields:
@@ -106,7 +99,6 @@ nodes:
       - corrective_action
   review:
     title: Review
-    lifecycle_label: Review
     instruction: Review all fields before submission. Verify the classification is
       appropriate, the root cause analysis is thorough, and the corrective/preventive
       actions are adequate.
@@ -123,7 +115,6 @@ nodes:
       label: Submit Deviation
   submitted:
     title: Submitted
-    lifecycle_label: Closure
     instruction: This deviation report has been submitted for processing. If an investigation
       is required, an INV document should be created as a follow-up.
     show_all_fields: true

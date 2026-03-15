@@ -471,7 +471,7 @@ def _build_table_affordances(defn, node, data, api, affordances, n):
 
         # Choice-list column management
         if "set_choices" in ops:
-            choice_cols = [(i, c) for i, c in enumerate(cols) if c["type"] in ("ex-choice-list", "choice-list")]
+            choice_cols = [(i, c) for i, c in enumerate(cols) if c["type"] == "ex-choice-list"]
             if choice_cols:
                 affordances.append({
                     "id": n, "label": "Set choices for column",
@@ -491,8 +491,7 @@ def _build_table_affordances(defn, node, data, api, affordances, n):
                 exec_col_info = [
                     {"index": i, "name": c["name"], "type": c["type"]}
                     for i, c in enumerate(cols)
-                    if c["type"] in ("ex-free-text", "ex-choice-list", "ex-cross-reference", "ex-signature",
-                                     "free-text", "choice-list", "cross-reference", "signature")
+                    if c["type"] in ("ex-free-text", "ex-choice-list", "ex-cross-reference", "ex-signature")
                 ]
                 affordances.append({
                     "id": n, "label": "Set acceptance rule for column",

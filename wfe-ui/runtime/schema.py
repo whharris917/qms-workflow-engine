@@ -158,7 +158,6 @@ class NodeDef:
     id: str
     title: str
     instruction: str = ""
-    lifecycle_label: str = ""
     show_all_fields: bool = False
     pause: bool = True  # True = always stop here; False = may auto-advance
     fields: dict[str, FieldDef] = field(default_factory=dict)
@@ -194,7 +193,6 @@ class NodeDef:
             id=nid,
             title=d.get("title", nid),
             instruction=d.get("instruction", ""),
-            lifecycle_label=d.get("lifecycle_label", ""),
             show_all_fields=d.get("show_all_fields", False),
             pause=d.get("pause", True),
             fields=fields,
@@ -213,7 +211,6 @@ class WorkflowDef:
     workflow_id: str
     workflow_title: str
     workflow_description: str = ""
-    lifecycle_banner: list[str] = field(default_factory=list)
     option_sets: dict[str, list] = field(default_factory=dict)
     column_types: dict[str, dict] = field(default_factory=dict)
     nodes: dict[str, NodeDef] = field(default_factory=dict)
@@ -253,7 +250,6 @@ class WorkflowDef:
             workflow_id=d.get("workflow_id", d.get("workflow_title", "unknown")),
             workflow_title=d.get("workflow_title", "Untitled"),
             workflow_description=d.get("workflow_description", ""),
-            lifecycle_banner=d.get("lifecycle_banner", []),
             option_sets=d.get("option_sets", {}),
             column_types=d.get("column_types", {}),
             nodes=nodes,

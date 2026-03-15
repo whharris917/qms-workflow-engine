@@ -971,14 +971,8 @@
         'ex-cross-reference': 'Cross Reference',
         'ex-signature': 'Signature',
         'ae-acceptance-criteria': 'Acceptance Criteria',
-        // legacy compat
-        'free-text': 'Free Text',
-        'choice-list': 'Choice List',
-        'cross-reference': 'Cross Reference',
-        'signature': 'Signature',
     };
-    const EXECUTABLE_TYPES = ['ex-free-text', 'ex-choice-list', 'ex-cross-reference', 'ex-signature',
-                              'free-text', 'choice-list', 'cross-reference', 'signature'];
+    const EXECUTABLE_TYPES = ['ex-free-text', 'ex-choice-list', 'ex-cross-reference', 'ex-signature'];
     const AUTO_EXECUTED_TYPES = ['ae-acceptance-criteria'];
 
     function typeIsExecutable(t) {
@@ -990,7 +984,7 @@
     }
 
     function isChoiceList(t) {
-        return t === 'ex-choice-list' || t === 'choice-list';
+        return t === 'ex-choice-list';
     }
 
     function typeDotClass(t) {
@@ -1280,7 +1274,7 @@
 
     function updateChoiceEditor() {
         const editor = document.getElementById('choice-editor');
-        if (typePickerCol === null || columns[typePickerCol].type !== 'choice-list') {
+        if (typePickerCol === null || columns[typePickerCol].type !== 'ex-choice-list') {
             editor.classList.remove('open');
             return;
         }
@@ -1354,11 +1348,6 @@
         'ex-free-text':       [{ value: 'is-filled', label: 'is filled' }],
         'ex-signature':       [{ value: 'is-signed', label: 'is signed' }],
         'ex-cross-reference': [{ value: 'ref-status', label: 'reference status is' }],
-        // legacy
-        'choice-list':        [{ value: 'equals', label: 'equals' }],
-        'free-text':          [{ value: 'is-filled', label: 'is filled' }],
-        'signature':          [{ value: 'is-signed', label: 'is signed' }],
-        'cross-reference':    [{ value: 'ref-status', label: 'reference status is' }],
     };
 
     const REF_STATUSES = [
@@ -2030,7 +2019,7 @@
                             });
                         }
                         td.appendChild(sel);
-                    } else if (colType === 'ex-signature' || colType === 'signature') {
+                    } else if (colType === 'ex-signature') {
                         const signed = cellState.status === 'signed';
                         if (signed) {
                             classes.push('exec-signed');
@@ -2054,7 +2043,7 @@
                             }
                             td.appendChild(btn);
                         }
-                    } else if (colType === 'ex-cross-reference' || colType === 'cross-reference') {
+                    } else if (colType === 'ex-cross-reference') {
                         const isSelRef = previewSelection && previewSelection.row === ri && previewSelection.col === ci;
                         if (isSelRef) classes.push('exec-selected-ref');
                         if (seqLocked) classes.push('seq-locked');
@@ -2151,7 +2140,7 @@
                             displayVal = '';
                         } else if (val === 'N/A') {
                             displayVal = 'N/A';
-                        } else if ((colType === 'ex-cross-reference' || colType === 'cross-reference') && val.startsWith('{')) {
+                        } else if ((colType === 'ex-cross-reference') && val.startsWith('{')) {
                             try {
                                 const ref = JSON.parse(val);
                                 displayVal = ref.id + ' (' + ref.status + ')';
@@ -2196,7 +2185,7 @@
         }
         const { row: ri, col: ci } = previewSelection;
         const colType = columns[ci].type;
-        const isCrossRef = colType === 'ex-cross-reference' || colType === 'cross-reference';
+        const isCrossRef = colType === 'ex-cross-reference';
         const gated = isRowGated(ri);
         const seqLocked = isCellSeqLocked(ri, ci);
         naBtn.disabled = !isCrossRef || gated || seqLocked;

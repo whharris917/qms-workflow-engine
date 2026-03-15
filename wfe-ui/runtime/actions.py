@@ -398,7 +398,7 @@ def _set_choices(defn, data, workflow_id, body):
     if not isinstance(ci, int) or ci < 0 or ci >= len(t["columns"]):
         return {"error": "Invalid column index."}
     col = t["columns"][ci]
-    if col["type"] not in ("ex-choice-list", "choice-list"):
+    if col["type"] != "ex-choice-list":
         return {"error": f"Column {ci} ({col['name']}) is not a choice-list column."}
     if not isinstance(choices, list) or not all(isinstance(c, str) for c in choices):
         return {"error": "choices must be an array of strings."}

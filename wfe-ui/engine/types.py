@@ -9,16 +9,14 @@ from dataclasses import dataclass, field
 
 EXECUTABLE_TYPES = frozenset({
     "ex-free-text", "ex-choice-list", "ex-cross-reference", "ex-signature",
-    # legacy compat
-    "free-text", "choice-list", "cross-reference", "signature",
 })
 
 AUTO_EXECUTED_TYPES = frozenset({"ae-acceptance-criteria"})
 
-CHOICE_LIST_TYPES = frozenset({"ex-choice-list", "choice-list"})
-CROSS_REF_TYPES = frozenset({"ex-cross-reference", "cross-reference"})
-SIGNATURE_TYPES = frozenset({"ex-signature", "signature"})
-FREE_TEXT_EXEC_TYPES = frozenset({"ex-free-text", "free-text"})
+CHOICE_LIST_TYPES = frozenset({"ex-choice-list"})
+CROSS_REF_TYPES = frozenset({"ex-cross-reference"})
+SIGNATURE_TYPES = frozenset({"ex-signature"})
+FREE_TEXT_EXEC_TYPES = frozenset({"ex-free-text"})
 
 
 def is_executable(col_type: str) -> bool:
