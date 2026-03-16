@@ -73,7 +73,98 @@
             </div>
         </div>
     </div>
+<script src="https://unpkg.com/elkjs@0.9.3/lib/elk.bundled.js"></script>
 <script>
+/* ======================================================================
+   ELK.js INTEGRATION — automatic graph layout via Sugiyama algorithm
+   ====================================================================== */
+var _elk = typeof ELK !== 'undefined' ? new ELK() : null;
+
+/**
+ * Build an ELK graph from workflow definition nodes.
+ * direction: 'DOWN' (vertical chart) or 'RIGHT' (horizontal banner)
+ * nodeSizeFn: function(node) -> {width, height}
+ * Returns: ELK graph object ready for elk.layout()
+ */
+function _elkBuildGraph(defnNodes, edges, direction, nodeSizeFn) {
+    var children = [];
+    for (var i = 0; i < defnNodes.length; i++) {
+        var nd = defnNodes[i];
+        var sz = nodeSizeFn(nd);
+        children.push({ id: 'n' + i, width: sz.width, height: sz.height, _idx: i });
+    }
+    var elkEdges = [];
+    for (var i = 0; i < edges.length; i++) {
+        var e = edges[i];
+        elkEdges.push({ id: 'e' + i, sources: ['n' + e.from], targets: ['n' + e.to], _edge: e });
+    }
+    return {
+        id: 'root',
+        layoutOptions: {
+            'elk.algorithm': 'layered',
+            'elk.direction': direction,
+            'elk.spacing.nodeNode': '20',
+            'elk.layered.spacing.nodeNodeBetweenLayers': direction === 'RIGHT' ? '40' : '60',
+            'elk.layered.spacing.edgeNodeBetweenLayers': '20',
+            'elk.edgeRouting': 'ORTHOGONAL',
+            'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
+            'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF'
+        },
+        children: children,
+        edges: elkEdges
+    };
+}
+
+/**
+ * Run ELK layout and call callback with positioned slots.
+ * callback(slots, edges, totalW, totalH) where slots[i] = {x, y, w, h, cx, cy}
+ */
+function _elkLayout(defnNodes, edges, direction, nodeSizeFn, callback) {
+    if (!_elk) { callback(null); return; }
+    var graph = _elkBuildGraph(defnNodes, edges, direction, nodeSizeFn);
+    _elk.layout(graph).then(function(result) {
+        var slots = new Array(defnNodes.length);
+        for (var i = 0; i < result.children.length; i++) {
+            var c = result.children[i];
+            var idx = c._idx;
+            slots[idx] = {
+                x: c.x, y: c.y, w: c.width, h: c.height,
+                cx: c.x + c.width / 2, cy: c.y + c.height / 2
+            };
+        }
+        /* Compute total bounds */
+        var maxX = 0, maxY = 0;
+        for (var i = 0; i < slots.length; i++) {
+            if (!slots[i]) continue;
+            var r = slots[i].x + slots[i].w;
+            var b = slots[i].y + slots[i].h;
+            if (r > maxX) maxX = r;
+            if (b > maxY) maxY = b;
+        }
+        /* Extract ELK's edge routing points */
+        var routedEdges = [];
+        for (var i = 0; i < result.edges.length; i++) {
+            var re = result.edges[i];
+            var orig = re._edge || edges[i];
+            var sections = re.sections || [];
+            var points = [];
+            for (var si = 0; si < sections.length; si++) {
+                var sec = sections[si];
+                if (sec.startPoint) points.push(sec.startPoint);
+                if (sec.bendPoints) {
+                    for (var bi = 0; bi < sec.bendPoints.length; bi++) points.push(sec.bendPoints[bi]);
+                }
+                if (sec.endPoint) points.push(sec.endPoint);
+            }
+            routedEdges.push({ type: orig.type, label: orig.label, points: points });
+        }
+        callback(slots, routedEdges, maxX + 20, maxY + 20);
+    }).catch(function(err) {
+        console.error('ELK layout failed:', err);
+        callback(null);
+    });
+}
+
 /* ======================================================================
    RENDERER REGISTRY — pluggable rendering system
    Each renderer is an object with:
@@ -699,214 +790,197 @@ function wfRenderBanner(state) {
     return html + '</div>';
 }
 
-/* ── Mini flowchart banner — pure SVG, horizontal layout ── */
+/* ── Mini flowchart banner — ELK-powered horizontal layout ── */
 var _MB = {
     h: 24, minW: 60, charW: 5, px: 10, r: 4,   /* node: height, min-width, char-width, padding, corner-radius */
-    colGap: 32, rowGap: 10,                       /* gaps between nodes */
-    marginT: 24, marginB: 24, marginL: 10, marginR: 10, /* edge channel zones */
     fontSize: 9
 };
 
+function _mbW(title) { return Math.max(_MB.minW, title.length * _MB.charW + _MB.px * 2); }
+
 function _wfMiniFlowchart(defn, current, completed) {
+    /* Return a container div; ELK fills it asynchronously */
+    var containerId = 'mb-' + Math.random().toString(36).substr(2, 6);
     var nodes = defn.nodes;
     var items = _fcBuildLayout(nodes);
     var edges = _fcEdges(nodes, items);
 
-    /* Compute horizontal slots */
-    var slots = new Array(nodes.length);
-    var contentH = _MB.h;
-    for (var ii = 0; ii < items.length; ii++) {
-        var ih = _mbH(items[ii], nodes);
-        if (ih > contentH) contentH = ih;
-    }
-    var totalH = _MB.marginT + contentH + _MB.marginB;
-    var midY = _MB.marginT + contentH / 2;
-    var cx = _MB.marginL;
-    for (var ii = 0; ii < items.length; ii++) {
-        if (ii > 0) cx += _MB.colGap;
-        cx = _mbPlace(nodes, items[ii], slots, cx, midY, contentH);
-    }
-    var totalW = cx + _MB.marginR;
+    setTimeout(function() {
+        var el = document.getElementById(containerId);
+        if (!el) return;
 
-    /* Render everything as one SVG */
+        /* Build simplified banner: collapse fork branches into single placeholder cards */
+        var bNodes = [];  /* banner nodes */
+        var bMeta = [];   /* per-node metadata */
+        var bEdges = [];
+        var idxMap = {};  /* original node index -> banner node index */
+
+        for (var ii = 0; ii < items.length; ii++) {
+            var item = items[ii];
+            if (item.type === 'node' || item.type === 'router') {
+                idxMap[item.idx] = bNodes.length;
+                bNodes.push(nodes[item.idx]);
+                bMeta.push({ kind: 'node', origIdx: item.idx });
+            }
+            else if (item.type === 'fork_group') {
+                /* Fork card */
+                var fbi = bNodes.length;
+                idxMap[item.fork_idx] = fbi;
+                bNodes.push(nodes[item.fork_idx]);
+                bMeta.push({ kind: 'node', origIdx: item.fork_idx });
+
+                /* Single placeholder for all branches */
+                var labels = [];
+                for (var b = 0; b < item.branches.length; b++) {
+                    labels.push(item.branches[b].label);
+                    for (var n = 0; n < item.branches[b].node_indices.length; n++)
+                        idxMap[item.branches[b].node_indices[n]] = bNodes.length;
+                }
+                bNodes.push({ id: '__par_' + item.fork_idx, title: labels.join(' | '), _labels: labels });
+                bMeta.push({ kind: 'parallel', labels: labels });
+
+                /* Merge card */
+                var mbi = bNodes.length;
+                idxMap[item.merge_idx] = mbi;
+                bNodes.push(nodes[item.merge_idx]);
+                bMeta.push({ kind: 'node', origIdx: item.merge_idx });
+
+                /* Internal edges: fork -> placeholder -> merge */
+                bEdges.push({ from: fbi, to: fbi + 1, type: 'forward', label: '' });
+                bEdges.push({ from: fbi + 1, to: mbi, type: 'forward', label: '' });
+            }
+        }
+        /* Sequential edges between layout items */
+        for (var ii = 0; ii < items.length - 1; ii++) {
+            var cur = items[ii], nxt = items[ii + 1];
+            var fromBi = cur.type === 'fork_group' ? idxMap[cur.merge_idx] : idxMap[cur.idx];
+            var toBi = nxt.type === 'fork_group' ? idxMap[nxt.fork_idx] : idxMap[nxt.idx];
+            if (fromBi !== undefined && toBi !== undefined)
+                bEdges.push({ from: fromBi, to: toBi, type: 'forward', label: '' });
+        }
+
+        _elkLayout(bNodes, bEdges, 'RIGHT', function(nd) {
+            if (nd._labels) {
+                var maxL = 0;
+                for (var i = 0; i < nd._labels.length; i++)
+                    if (nd._labels[i].length > maxL) maxL = nd._labels[i].length;
+                return { width: _mbW(Array(maxL + 1).join('x')), height: nd._labels.length * 16 + 8 };
+            }
+            return { width: _mbW(nd.title), height: _MB.h };
+        }, function(slots, routedEdges, totalW, totalH) {
+            if (!slots) { el.textContent = '(layout failed)'; return; }
+            el.innerHTML = _mbRenderBannerSvg(bNodes, bMeta, slots, routedEdges, totalW, totalH, current, completed);
+            el.style.height = totalH + 'px';
+        });
+    }, 0);
+
+    return '<div class="wf-banner wf-banner-flow" id="' + containerId + '" style="min-height:' + (_MB.h + 20) + 'px;"></div>';
+}
+
+function _mbRenderSvg(nodes, slots, routedEdges, totalW, totalH, current, completed) {
     var svg = '<svg xmlns="http://www.w3.org/2000/svg" class="mb-svg" width="' + totalW + '" height="' + totalH + '" viewBox="0 0 ' + totalW + ' ' + totalH + '">';
-    svg += '<defs>';
-    svg += '<marker id="mb-a" markerWidth="5" markerHeight="4" refX="4" refY="2" orient="auto"><polygon points="0 0,5 2,0 4" fill="#4caf50"/></marker>';
-    svg += '<marker id="mb-ak" markerWidth="5" markerHeight="4" refX="4" refY="2" orient="auto"><polygon points="0 0,5 2,0 4" fill="#4caf50"/></marker>';
-    svg += '<marker id="mb-ar" markerWidth="5" markerHeight="4" refX="4" refY="2" orient="auto"><polygon points="0 0,5 2,0 4" fill="#e65100"/></marker>';
-    svg += '<marker id="mb-ag" markerWidth="5" markerHeight="4" refX="4" refY="2" orient="auto"><polygon points="0 0,5 2,0 4" fill="#7b1fa2"/></marker>';
-    svg += '<marker id="mb-ab" markerWidth="5" markerHeight="4" refX="4" refY="2" orient="auto"><polygon points="0 0,5 2,0 4" fill="#2a6bcf"/></marker>';
-    svg += '</defs>';
 
-    /* Draw edges first (behind nodes) */
-    svg += _mbDrawEdges(slots, edges, totalW, totalH);
+    /* Draw ELK-routed edges — uniform style, no labels */
+    for (var i = 0; i < routedEdges.length; i++) {
+        var re = routedEdges[i], pts = re.points;
+        if (pts.length < 2) continue;
+        var d = 'M' + pts[0].x + ' ' + pts[0].y;
+        for (var p = 1; p < pts.length; p++) d += ' L' + pts[p].x + ' ' + pts[p].y;
+        svg += '<path d="' + d + '" stroke="#aaa" fill="none" stroke-width="1"/>';
+
+        /* Arrowhead */
+        if (pts.length >= 2) {
+            var lp = pts[pts.length - 2], ep = pts[pts.length - 1];
+            svg += _mbArrow(lp.x, lp.y, ep.x, ep.y, '#aaa');
+        }
+    }
 
     /* Draw nodes */
     for (var i = 0; i < nodes.length; i++) {
-        var sl = slots[i];
-        if (!sl) continue;
+        var sl = slots[i]; if (!sl) continue;
         var nd = nodes[i];
-        var isCur = nd.id === current;
-        var isDone = completed.indexOf(nd.id) !== -1;
-        var isRtr = nd.router && nd.router.length > 0;
-        var isFrk = nd.fork && nd.fork.branches;
-
+        var isCur = nd.id === current, isDone = completed.indexOf(nd.id) !== -1;
+        var isRtr = nd.router && nd.router.length > 0, isFrk = nd.fork && nd.fork.branches;
         var fill = isDone ? '#e8f5e9' : isCur ? '#e3f2fd' : '#fff';
         var stroke = isDone ? '#4caf50' : isCur ? '#2a6bcf' : isRtr ? '#e65100' : isFrk ? '#2e7d32' : '#ccc';
         var sw = (isCur || isDone) ? 2 : 1;
         var textFill = isDone ? '#2e7d32' : isCur ? '#1a1a2e' : '#555';
         var fw = (isCur || isDone) ? 'bold' : 'normal';
-
-        svg += '<rect x="' + sl.x + '" y="' + sl.y + '" width="' + sl.w + '" height="' + sl.h
-            + '" rx="' + _MB.r + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + sw + '"/>';
-        svg += '<text x="' + (sl.x + sl.w / 2) + '" y="' + (sl.y + sl.h / 2)
-            + '" text-anchor="middle" dominant-baseline="central" font-size="' + _MB.fontSize
-            + '" font-family="-apple-system,sans-serif" fill="' + textFill + '" font-weight="' + fw + '">'
-            + wfEsc(nd.title) + '</text>';
+        svg += '<rect x="' + sl.x + '" y="' + sl.y + '" width="' + sl.w + '" height="' + sl.h + '" rx="' + _MB.r + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + sw + '"/>';
+        svg += '<text x="' + sl.cx + '" y="' + sl.cy + '" text-anchor="middle" dominant-baseline="central" font-size="' + _MB.fontSize + '" font-family="-apple-system,sans-serif" fill="' + textFill + '" font-weight="' + fw + '">' + wfEsc(nd.title) + '</text>';
     }
 
     svg += '</svg>';
-    return '<div class="wf-banner wf-banner-flow">' + svg + '</div>';
-}
-
-function _mbW(title) { return Math.max(_MB.minW, title.length * _MB.charW + _MB.px * 2); }
-function _mbH(item, nodes) {
-    if (item.type === 'fork_group') return item.branches.length * _MB.h + (item.branches.length - 1) * _MB.rowGap;
-    return _MB.h;
-}
-
-function _mbPlace(nodes, item, slots, cx, midY, contentH) {
-    if (item.type === 'node' || item.type === 'router') {
-        var w = _mbW(nodes[item.idx].title);
-        slots[item.idx] = { x: cx, y: midY - _MB.h / 2, w: w, h: _MB.h, cy: midY };
-        return cx + w;
-    }
-    if (item.type === 'fork_group') return _mbPlaceFork(nodes, item, slots, cx, midY, contentH);
-    return cx;
-}
-
-function _mbPlaceFork(nodes, item, slots, cx, midY, contentH) {
-    var nBr = item.branches.length;
-    /* Fork card */
-    var fw = _mbW(nodes[item.fork_idx].title);
-    slots[item.fork_idx] = { x: cx, y: midY - _MB.h / 2, w: fw, h: _MB.h, cy: midY };
-    cx += fw + _MB.colGap;
-
-    /* Column-aligned branches */
-    var blockH = nBr * _MB.h + (nBr - 1) * _MB.rowGap;
-    var topY = midY - blockH / 2;
-    var maxCols = 0;
-    for (var bi = 0; bi < nBr; bi++) {
-        if (item.branches[bi].node_indices.length > maxCols)
-            maxCols = item.branches[bi].node_indices.length;
-    }
-    /* Compute uniform column widths */
-    var colWs = [];
-    for (var ci = 0; ci < maxCols; ci++) {
-        var mw = _MB.minW;
-        for (var bi = 0; bi < nBr; bi++) {
-            var br = item.branches[bi];
-            if (ci < br.node_indices.length) {
-                var w = _mbW(nodes[br.node_indices[ci]].title);
-                if (w > mw) mw = w;
-            }
-        }
-        colWs.push(mw);
-    }
-    /* Place in grid */
-    var colX = cx;
-    for (var ci = 0; ci < maxCols; ci++) {
-        for (var bi = 0; bi < nBr; bi++) {
-            var br = item.branches[bi];
-            if (ci < br.node_indices.length) {
-                var idx = br.node_indices[ci];
-                var w = _mbW(nodes[idx].title);
-                var bx = colX + (colWs[ci] - w) / 2;
-                var by = topY + bi * (_MB.h + _MB.rowGap);
-                slots[idx] = { x: bx, y: by, w: w, h: _MB.h, cy: by + _MB.h / 2 };
-            }
-        }
-        colX += colWs[ci];
-        if (ci < maxCols - 1) colX += _MB.colGap;
-    }
-    cx = colX + _MB.colGap;
-
-    /* Merge card */
-    var mw = _mbW(nodes[item.merge_idx].title);
-    slots[item.merge_idx] = { x: cx, y: midY - _MB.h / 2, w: mw, h: _MB.h, cy: midY };
-    return cx + mw;
-}
-
-function _mbDrawEdges(slots, edges, totalW, totalH) {
-    var svg = '';
-    /* Separate fork/merge from others */
-    var forkG = {}, mergeG = {}, rest = [];
-    for (var i = 0; i < edges.length; i++) {
-        var e = edges[i];
-        if (e.type === 'fork') (forkG[e.from] = forkG[e.from] || []).push(e);
-        else if (e.type === 'merge') (mergeG[e.to] = mergeG[e.to] || []).push(e);
-        else rest.push(e);
-    }
-
-    /* Fork bus bars */
-    for (var fk in forkG) {
-        var grp = forkG[fk], fs = slots[fk]; if (!fs) continue;
-        var busX = fs.x + fs.w + _MB.colGap * 0.4;
-        var cys = [];
-        for (var g = 0; g < grp.length; g++) { var ts = slots[grp[g].to]; if (ts) cys.push(ts.cy); }
-        if (!cys.length) continue;
-        svg += '<path d="M' + (fs.x + fs.w) + ' ' + fs.cy + ' H' + busX + '" stroke="#4caf50" fill="none" stroke-width="1.5"/>';
-        svg += '<path d="M' + busX + ' ' + Math.min.apply(null, cys) + ' V' + Math.max.apply(null, cys) + '" stroke="#4caf50" fill="none" stroke-width="1.5"/>';
-        for (var g = 0; g < grp.length; g++) {
-            var ts = slots[grp[g].to]; if (!ts) continue;
-            svg += '<path d="M' + busX + ' ' + ts.cy + ' H' + ts.x + '" stroke="#4caf50" fill="none" stroke-width="1.5" marker-end="url(#mb-ak)"/>';
-        }
-    }
-
-    /* Merge bus bars */
-    for (var mk in mergeG) {
-        var grp = mergeG[mk], ts = slots[mk]; if (!ts) continue;
-        var busX = ts.x - _MB.colGap * 0.4;
-        var cys = [];
-        for (var g = 0; g < grp.length; g++) { var fs2 = slots[grp[g].from]; if (fs2) cys.push(fs2.cy); }
-        if (!cys.length) continue;
-        for (var g = 0; g < grp.length; g++) {
-            var fs2 = slots[grp[g].from]; if (!fs2) continue;
-            svg += '<path d="M' + (fs2.x + fs2.w) + ' ' + fs2.cy + ' H' + busX + '" stroke="#4caf50" fill="none" stroke-width="1.5"/>';
-        }
-        svg += '<path d="M' + busX + ' ' + Math.min.apply(null, cys) + ' V' + Math.max.apply(null, cys) + '" stroke="#4caf50" fill="none" stroke-width="1.5"/>';
-        svg += '<path d="M' + busX + ' ' + ts.cy + ' H' + ts.x + '" stroke="#4caf50" fill="none" stroke-width="1.5" marker-end="url(#mb-ak)"/>';
-    }
-
-    /* Other edges */
-    var botCh = 0, topCh = 0;
-    for (var i = 0; i < rest.length; i++) {
-        var e = rest[i], fs = slots[e.from], ts = slots[e.to];
-        if (!fs || !ts) continue;
-        if (e.type === 'forward') {
-            if (Math.abs(fs.cy - ts.cy) < 2) {
-                svg += '<path d="M' + (fs.x + fs.w) + ' ' + fs.cy + ' H' + ts.x + '" stroke="#4caf50" fill="none" stroke-width="1.5" marker-end="url(#mb-a)"/>';
-            } else {
-                var mx = (fs.x + fs.w + ts.x) / 2;
-                svg += '<path d="M' + (fs.x + fs.w) + ' ' + fs.cy + ' H' + mx + ' V' + ts.cy + ' H' + ts.x + '" stroke="#4caf50" fill="none" stroke-width="1.5" marker-end="url(#mb-a)"/>';
-            }
-        } else if (e.type === 'router' || e.type === 'goto') {
-            var chY = totalH - _MB.marginB + 6 + botCh * 12;
-            botCh++;
-            var col = e.type === 'router' ? '#e65100' : '#7b1fa2';
-            var mk = e.type === 'router' ? 'url(#mb-ar)' : 'url(#mb-ag)';
-            var da = e.type === 'router' ? ' stroke-dasharray="5 3"' : ' stroke-dasharray="3 3"';
-            svg += '<path d="M' + (fs.x + fs.w / 2) + ' ' + (fs.y + fs.h) + ' V' + chY + ' H' + (ts.x + ts.w / 2) + ' V' + (ts.y + ts.h) + '" stroke="' + col + '" fill="none" stroke-width="1"' + da + ' marker-end="' + mk + '"/>';
-            if (e.label) {
-                svg += '<text x="' + ((fs.x + fs.w / 2 + ts.x + ts.w / 2) / 2) + '" y="' + (chY - 2) + '" text-anchor="middle" dominant-baseline="auto" font-size="7" font-family="-apple-system,sans-serif" fill="' + col + '">' + wfEsc(e.label) + '</text>';
-            }
-        } else if (e.type === 'back') {
-            var chY = _MB.marginT - 6 - topCh * 12;
-            topCh++;
-            svg += '<path d="M' + (fs.x + fs.w / 2) + ' ' + fs.y + ' V' + chY + ' H' + (ts.x + ts.w / 2) + ' V' + ts.y + '" stroke="#2a6bcf" fill="none" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#mb-ab)"/>';
-        }
-    }
     return svg;
+}
+
+function _mbRenderBannerSvg(bNodes, bMeta, slots, routedEdges, totalW, totalH, current, completed) {
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" class="mb-svg" width="' + totalW + '" height="' + totalH + '" viewBox="0 0 ' + totalW + ' ' + totalH + '">';
+
+    /* Edges — uniform gray */
+    for (var i = 0; i < routedEdges.length; i++) {
+        var re = routedEdges[i], pts = re.points;
+        if (pts.length < 2) continue;
+        var d = 'M' + pts[0].x + ' ' + pts[0].y;
+        for (var p = 1; p < pts.length; p++) d += ' L' + pts[p].x + ' ' + pts[p].y;
+        svg += '<path d="' + d + '" stroke="#aaa" fill="none" stroke-width="1"/>';
+        var lp = pts[pts.length - 2], ep = pts[pts.length - 1];
+        svg += _mbArrow(lp.x, lp.y, ep.x, ep.y, '#aaa');
+    }
+
+    /* Nodes */
+    for (var i = 0; i < bNodes.length; i++) {
+        var sl = slots[i]; if (!sl) continue;
+        var meta = bMeta[i];
+        var nd = bNodes[i];
+
+        if (meta.kind === 'parallel') {
+            /* Parallel placeholder: dashed border, stacked branch labels */
+            svg += '<rect x="' + sl.x + '" y="' + sl.y + '" width="' + sl.w + '" height="' + sl.h
+                + '" rx="' + _MB.r + '" fill="#f8fdf8" stroke="#4caf50" stroke-width="1" stroke-dasharray="4 3"/>';
+            var labels = meta.labels;
+            var lineH = 14;
+            var startY = sl.y + (sl.h - labels.length * lineH) / 2 + lineH * 0.75;
+            for (var li = 0; li < labels.length; li++) {
+                svg += '<text x="' + sl.cx + '" y="' + (startY + li * lineH)
+                    + '" text-anchor="middle" dominant-baseline="auto" font-size="' + _MB.fontSize
+                    + '" font-family="-apple-system,sans-serif" fill="#2e7d32">' + wfEsc(labels[li]) + '</text>';
+            }
+        } else {
+            /* Regular node */
+            var origIdx = meta.origIdx;
+            var isCur = nd.id === current;
+            var isDone = completed.indexOf(nd.id) !== -1;
+            var isRtr = nd.router && nd.router.length > 0;
+            var isFrk = nd.fork && nd.fork.branches;
+            var fill = isDone ? '#e8f5e9' : isCur ? '#e3f2fd' : '#fff';
+            var stroke = isDone ? '#4caf50' : isCur ? '#2a6bcf' : isRtr ? '#e65100' : isFrk ? '#2e7d32' : '#ccc';
+            var sw = (isCur || isDone) ? 2 : 1;
+            var textFill = isDone ? '#2e7d32' : isCur ? '#1a1a2e' : '#555';
+            var fw = (isCur || isDone) ? 'bold' : 'normal';
+            svg += '<rect x="' + sl.x + '" y="' + sl.y + '" width="' + sl.w + '" height="' + sl.h
+                + '" rx="' + _MB.r + '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + sw + '"/>';
+            svg += '<text x="' + sl.cx + '" y="' + sl.cy
+                + '" text-anchor="middle" dominant-baseline="central" font-size="' + _MB.fontSize
+                + '" font-family="-apple-system,sans-serif" fill="' + textFill + '" font-weight="' + fw + '">'
+                + wfEsc(nd.title) + '</text>';
+        }
+    }
+
+    svg += '</svg>';
+    return svg;
+}
+
+function _mbArrow(x1, y1, x2, y2, color) {
+    /* Small triangle arrowhead at (x2,y2) pointing in direction from (x1,y1) */
+    var dx = x2 - x1, dy = y2 - y1;
+    var len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 1) return '';
+    var ux = dx / len, uy = dy / len;
+    var px = -uy, py = ux;
+    var sz = 4;
+    var bx = x2 - ux * sz, by = y2 - uy * sz;
+    return '<polygon points="' + x2 + ',' + y2 + ' ' + (bx + px * sz * 0.5) + ',' + (by + py * sz * 0.5) + ' ' + (bx - px * sz * 0.5) + ',' + (by - py * sz * 0.5) + '" fill="' + color + '"/>';
 }
 
 function wfRenderTable(table) {
@@ -1278,7 +1352,7 @@ var WF_STRUCTURAL_CSS = ''
     + '.wf-branch-sep { font-size:0.5rem; opacity:0.5; }'
     + '.wf-step-targets { display:flex; flex-direction:column; gap:0.1rem; margin-top:0.15rem; }'
     + '.wf-target { font-size:0.55rem; padding:0.05rem 0.25rem; border-radius:2px; border:1px dashed; text-align:center; }'
-    + '.wf-banner-flow { overflow-x:auto !important; padding:0.25rem !important; display:block !important; }'
+    + '.wf-banner-flow { overflow:hidden !important; padding:0.25rem !important; display:block !important; }'
     + '.mb-svg { display:block; }'
     + '.wf-section { padding:0.5rem 1.5rem 0; }'
     + '.wf-section-head { font-size:1.1rem; font-weight:600; }'

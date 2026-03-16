@@ -17,6 +17,9 @@
 ##   proceed    → gated on required fields being non-null
 ##   actions    → unconditional node actions (submit, restart)
 
+workflow_title: Create Change Record
+workflow_description: Author a new Change Record for review and approval.
+
 submodules:
   - flow-state
   - qms-cli
