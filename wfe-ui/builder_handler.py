@@ -36,7 +36,26 @@ WORKFLOW_TITLE = "Create Workflow"
 _CUSTOM_DIR = Path(__file__).parent / "data" / "custom_workflows"
 _CUSTOM_DIR.mkdir(exist_ok=True)
 
-_VALID_FIELD_TYPES = ["text", "boolean", "select"]
+_VALID_FIELD_TYPES = ["text", "boolean", "select", "computed"]
+
+_VALID_LIST_OPS = ["add", "edit", "remove", "reorder"]
+
+_VALID_TABLE_OPS = [
+    "add_column", "remove_column", "rename_column", "set_column_type",
+    "add_row", "remove_row", "set_cell", "set_choices", "set_rule",
+    "set_prerequisites", "set_property",
+]
+
+_VALID_COLUMN_CATEGORIES = ["non-executable", "executable", "auto-executed"]
+
+_EXPR_HINT = (
+    'Expression dict. Leaf: {"type":"field_truthy","key":"k"}, '
+    '{"type":"field_equals","key":"k","value":"v"}, '
+    '{"type":"field_not_null","key":"k"}, '
+    '{"type":"set_membership","key":"k","set_ref":"set_name"}, '
+    '{"type":"table_has_rows"}, {"type":"table_has_columns"}. '
+    'Composite: {"op":"AND"|"OR"|"NOT","conditions":[...]}.'
+)
 
 # ---------------------------------------------------------------------------
 # State helpers
@@ -52,6 +71,8 @@ def default_data() -> dict:
         "workflow_id": None,
         "workflow_title": None,
         "workflow_description": None,
+        "option_sets": {},
+        "column_types": {},
         "wf_nodes": [],
         "focused_node": None,
     }
@@ -63,6 +84,8 @@ def _ensure(data: dict) -> dict:
     data.setdefault("completed_nodes", [])
     data.setdefault("wf_nodes", [])
     data.setdefault("focused_node", None)
+    data.setdefault("option_sets", {})
+    data.setdefault("column_types", {})
     return data
 
 
@@ -75,6 +98,8 @@ def _validate(data: dict) -> list[str]:
     errors = []
     wf_nodes = data.get("wf_nodes", [])
     node_ids = {n["id"] for n in wf_nodes}
+    option_sets = data.get("option_sets", {})
+    column_types = data.get("column_types", {})
 
     if not wf_nodes:
         errors.append("No nodes defined.")
@@ -120,6 +145,13 @@ def _validate(data: dict) -> list[str]:
                     if bnid not in node_ids:
                         errors.append(f"Node '{nid}': fork branch '{bid}' references unknown node '{bnid}'.")
 
+        # Table validation
+        if wn.get("table"):
+            tbl = wn["table"]
+            cat = tbl.get("column_type_catalog")
+            if cat and not column_types:
+                errors.append(f"Node '{nid}': table references column_type_catalog but no column_types defined.")
+
     seen = set()
     for key in all_keys:
         if key in seen:
@@ -132,12 +164,30 @@ def _validate(data: dict) -> list[str]:
             for rk in proceed.get("requires", []):
                 if rk not in seen:
                     errors.append(f"Node '{wn['id']}': proceed requires unknown key '{rk}'.")
+            if proceed.get("target") and proceed["target"] not in node_ids:
+                errors.append(f"Node '{wn['id']}': proceed target '{proceed['target']}' does not exist.")
 
         for fld in wn.get("fields", []):
-            if fld.get("visible_when"):
-                for vk in fld["visible_when"]:
+            vw = fld.get("visible_when")
+            if vw and isinstance(vw, dict) and "op" not in vw and "type" not in vw:
+                for vk in vw:
                     if vk not in seen:
                         errors.append(f"Field '{fld['key']}': visible_when references unknown key '{vk}'.")
+            if fld.get("options_from") and fld["options_from"] not in option_sets:
+                errors.append(f"Field '{fld['key']}': options_from '{fld['options_from']}' not found in option_sets.")
+            dyn = fld.get("dynamic_options")
+            if dyn and isinstance(dyn, dict):
+                sk = dyn.get("source_key")
+                if sk and sk not in seen:
+                    errors.append(f"Field '{fld['key']}': dynamic_options source_key '{sk}' not found in fields.")
+
+        # List item_schema validation
+        for lkey, ldef in wn.get("lists", {}).items():
+            schema = ldef.get("item_schema", {})
+            for fkey, finfo in schema.items():
+                ftype = finfo.get("type", "text")
+                if ftype not in ("text", "boolean", "select"):
+                    errors.append(f"List '{lkey}' field '{fkey}': invalid type '{ftype}'.")
 
     if not has_exit:
         errors.append("No proceed gate, terminal action, router, or fork defined in any node.")
@@ -157,8 +207,14 @@ def _publish(data: dict) -> str | None:
     defn = {
         "workflow_title": data["workflow_title"],
         "workflow_description": data["workflow_description"] or "",
-        "nodes": {},
     }
+
+    if data.get("option_sets"):
+        defn["option_sets"] = data["option_sets"]
+    if data.get("column_types"):
+        defn["column_types"] = data["column_types"]
+
+    defn["nodes"] = {}
 
     for wn in data["wf_nodes"]:
         nd = {
@@ -167,17 +223,59 @@ def _publish(data: dict) -> str | None:
         }
         if wn.get("show_all_fields"):
             nd["show_all_fields"] = True
+        if wn.get("pause") is False:
+            nd["pause"] = False
+        if wn.get("execution"):
+            nd["execution"] = True
+
+        # Fields
         if wn.get("fields"):
             nd["fields"] = {}
             for fld in wn["fields"]:
-                fd = {"label": fld["label"], "type": fld["type"], "key": fld["key"], "default": fld.get("default")}
+                fd = {"label": fld["label"], "type": fld["type"], "key": fld["key"]}
+                if fld.get("default") is not None:
+                    fd["default"] = fld["default"]
                 if fld.get("instruction"):
                     fd["instruction"] = fld["instruction"]
                 if fld["type"] == "select" and fld.get("options"):
                     fd["options"] = fld["options"]
+                if fld.get("options_from"):
+                    fd["options_from"] = fld["options_from"]
+                if fld.get("dynamic_options"):
+                    fd["dynamic_options"] = fld["dynamic_options"]
+                if fld.get("side_effects"):
+                    fd["side_effects"] = fld["side_effects"]
                 if fld.get("visible_when"):
                     fd["visible_when"] = fld["visible_when"]
+                if fld.get("compute"):
+                    fd["compute"] = fld["compute"]
+                if fld.get("instruction_when_true"):
+                    fd["instruction_when_true"] = fld["instruction_when_true"]
+                if fld.get("instruction_when_false"):
+                    fd["instruction_when_false"] = fld["instruction_when_false"]
+                if fld.get("annotate_from"):
+                    fd["annotate_from"] = fld["annotate_from"]
+                if fld.get("annotation"):
+                    fd["annotation"] = fld["annotation"]
                 nd["fields"][fld["key"]] = fd
+
+        # Lists
+        if wn.get("lists"):
+            nd["lists"] = {}
+            for lkey, ldef in wn["lists"].items():
+                ld = {"label": ldef["label"], "key": lkey}
+                if ldef.get("item_schema"):
+                    ld["item_schema"] = ldef["item_schema"]
+                if ldef.get("operations"):
+                    ld["operations"] = ldef["operations"]
+                if ldef.get("focus"):
+                    ld["focus"] = True
+                nd["lists"][lkey] = ld
+
+        # Table
+        if wn.get("table"):
+            nd["table"] = wn["table"]
+
         if wn.get("navigation"):
             nd["navigation"] = wn["navigation"]
         if wn.get("proceed"):
@@ -215,17 +313,30 @@ def _summary(data: dict) -> dict:
             "proceed": wn.get("proceed"),
             "actions": wn.get("actions", []),
         }
+        if wn.get("pause") is False:
+            nd["pause"] = False
+        if wn.get("execution"):
+            nd["execution"] = True
+        if wn.get("lists"):
+            nd["lists"] = wn["lists"]
+        if wn.get("table"):
+            nd["table"] = wn["table"]
         if wn.get("router"):
             nd["router"] = wn["router"]
         if wn.get("fork"):
             nd["fork"] = wn["fork"]
         nodes.append(nd)
-    return {
+    result = {
         "workflow_id": data.get("workflow_id"),
         "workflow_title": data.get("workflow_title"),
         "workflow_description": data.get("workflow_description"),
         "nodes": nodes,
     }
+    if data.get("option_sets"):
+        result["option_sets"] = data["option_sets"]
+    if data.get("column_types"):
+        result["column_types"] = data["column_types"]
+    return result
 
 
 def render_node(data: dict, workflow_id: str) -> dict:
@@ -291,7 +402,10 @@ def _build_affordances(data: dict, workflow_id: str) -> list[dict]:
     elif node == "node_builder":
         wf_nodes = data.get("wf_nodes", [])
         focused = data.get("focused_node")
+        option_sets = data.get("option_sets", {})
+        column_types = data.get("column_types", {})
 
+        # --- Node management ---
         affs.append({"id": n, "label": "Add node", "method": "POST", "url": f"{api}/add_node",
                       "body": {"id": "<id>", "title": "<title>", "instruction": "<instruction>"},
                       "parameters": {"id": {"description": "Lowercase, underscores"}, "title": {}, "instruction": {}}})
@@ -312,36 +426,163 @@ def _build_affordances(data: dict, workflow_id: str) -> list[dict]:
                 affs.append({"id": n, "label": "Move node up", "method": "POST", "url": f"{api}/reorder_node", "body": {"index": "<index>", "direction": "up"}, "parameters": {"index": {"options": ni, "labels": nl}}})
                 n += 1
 
+        # --- Workflow-level: option sets ---
+        affs.append({"id": n, "label": f"Add option set (current: {list(option_sets.keys()) or 'none'})",
+                      "method": "POST", "url": f"{api}/add_option_set",
+                      "body": {"name": "<name>", "options": "<options>"},
+                      "parameters": {"name": {"description": "Lowercase with underscores"}, "options": {"description": "Array of option strings"}}})
+        n += 1
+        if option_sets:
+            affs.append({"id": n, "label": "Edit option set", "method": "POST", "url": f"{api}/edit_option_set",
+                          "body": {"name": "<name>", "options": "<options>"},
+                          "parameters": {"name": {"options": list(option_sets.keys())}, "options": {"description": "Array of option strings"}}})
+            n += 1
+            affs.append({"id": n, "label": "Remove option set", "method": "POST", "url": f"{api}/remove_option_set",
+                          "body": {"name": "<name>"}, "parameters": {"name": {"options": list(option_sets.keys())}}})
+            n += 1
+
+        # --- Workflow-level: column types ---
+        affs.append({"id": n, "label": f"Add column type (current: {list(column_types.keys()) or 'none'})",
+                      "method": "POST", "url": f"{api}/add_column_type",
+                      "body": {"type_id": "<type_id>", "label": "<label>", "category": "<category>", "description": "<description>"},
+                      "parameters": {"type_id": {"description": "e.g. ex-free-text, ne-prerequisite"},
+                                     "label": {}, "category": {"options": _VALID_COLUMN_CATEGORIES},
+                                     "description": {}}})
+        n += 1
+        if column_types:
+            affs.append({"id": n, "label": "Edit column type", "method": "POST", "url": f"{api}/edit_column_type",
+                          "body": {"type_id": "<type_id>"},
+                          "parameters": {"type_id": {"options": list(column_types.keys())},
+                                         "label": {}, "category": {"options": _VALID_COLUMN_CATEGORIES},
+                                         "description": {}}})
+            n += 1
+            affs.append({"id": n, "label": "Remove column type", "method": "POST", "url": f"{api}/remove_column_type",
+                          "body": {"type_id": "<type_id>"}, "parameters": {"type_id": {"options": list(column_types.keys())}}})
+            n += 1
+
+        # --- Focused node ---
         if focused is not None and focused < len(wf_nodes):
             fn = wf_nodes[focused]
             fn_fields = fn.get("fields", [])
             all_fk = [fld["key"] for wn in wf_nodes for fld in wn.get("fields", [])]
+            os_names = list(option_sets.keys())
 
+            # Fields
             affs.append({"id": n, "label": f"Add field to '{fn['id']}'", "method": "POST", "url": f"{api}/add_field",
                           "body": {"label": "<label>", "type": "<type>", "key": "<key>"},
-                          "parameters": {"label": {}, "type": {"options": _VALID_FIELD_TYPES}, "key": {"description": "Unique state key"}}})
+                          "parameters": {
+                              "label": {}, "type": {"options": _VALID_FIELD_TYPES},
+                              "key": {"description": "Unique state key"},
+                              "instruction": {"description": "Optional guidance text"},
+                              "default": {"description": "Optional default value"},
+                              "options": {"description": "Array of options (select type)"},
+                              "options_from": {"description": f"Reference to option_set. Available: {os_names}" if os_names else "Reference to option_set (define one first)"},
+                              "dynamic_options": {"description": 'Cascading options: {"source_key":"field_key","mapping":{"val1":["opt1","opt2"]},"default":[]}'},
+                              "side_effects": {"description": 'Array of [{when: <expr>, set: {field_key: value}}]. ' + _EXPR_HINT},
+                              "compute": {"description": "Computed field evaluation spec. " + _EXPR_HINT},
+                              "instruction_when_true": {"description": "Instruction shown when compute is true (computed type)"},
+                              "instruction_when_false": {"description": "Instruction shown when compute is false (computed type)"},
+                              "annotate_from": {"description": f"Annotation source set. Available: {os_names}" if os_names else "Annotation source (define option_set first)"},
+                              "visible_when": {"description": "Show field conditionally. " + _EXPR_HINT},
+                          }})
             n += 1
 
             if fn_fields:
                 fi = list(range(len(fn_fields)))
                 fl = [f["key"] for f in fn_fields]
                 affs.append({"id": n, "label": f"Edit field in '{fn['id']}'", "method": "POST", "url": f"{api}/edit_field",
-                              "body": {"field_index": "<field_index>"}, "parameters": {"field_index": {"options": fi, "labels": fl}, "label": {}, "type": {"options": _VALID_FIELD_TYPES}, "instruction": {}, "options": {}, "visible_when": {}}})
+                              "body": {"field_index": "<field_index>"},
+                              "parameters": {
+                                  "field_index": {"options": fi, "labels": fl},
+                                  "label": {}, "type": {"options": _VALID_FIELD_TYPES},
+                                  "instruction": {}, "options": {},
+                                  "default": {},
+                                  "options_from": {"description": f"Reference to option_set. Available: {os_names}" if os_names else ""},
+                                  "dynamic_options": {"description": 'Cascading: {"source_key":"field_key","mapping":{"val":["opts"]},"default":[]}'},
+                                  "side_effects": {"description": 'Array of [{when: <expr>, set: {key: val}}]'},
+                                  "compute": {"description": _EXPR_HINT},
+                                  "instruction_when_true": {}, "instruction_when_false": {},
+                                  "annotate_from": {},
+                                  "visible_when": {"description": _EXPR_HINT},
+                              }})
                 n += 1
                 affs.append({"id": n, "label": f"Remove field from '{fn['id']}'", "method": "POST", "url": f"{api}/remove_field",
                               "body": {"field_index": "<field_index>"}, "parameters": {"field_index": {"options": fi, "labels": fl}}})
                 n += 1
 
-            if all_fk:
-                affs.append({"id": n, "label": f"Set proceed gate for '{fn['id']}' (current: {json.dumps(fn.get('proceed'))})",
-                              "method": "POST", "url": f"{api}/set_proceed", "body": {"label": "<label>", "requires": "<requires>"},
-                              "parameters": {"label": {}, "requires": {"description": f"Array of required field keys. Available: {all_fk}"}}})
+            # Lists
+            fn_lists = fn.get("lists", {})
+            affs.append({"id": n, "label": f"Add list to '{fn['id']}' (current: {list(fn_lists.keys()) or 'none'})",
+                          "method": "POST", "url": f"{api}/add_list",
+                          "body": {"key": "<key>", "label": "<label>"},
+                          "parameters": {
+                              "key": {"description": "Lowercase with underscores (state key)"},
+                              "label": {},
+                              "operations": {"description": f"Array from: {_VALID_LIST_OPS}. Default: all."},
+                              "focus": {"options": [True, False], "description": "Enable focused-item scoping"},
+                          }})
+            n += 1
+
+            if fn_lists:
+                lk = list(fn_lists.keys())
+                affs.append({"id": n, "label": f"Edit list in '{fn['id']}'", "method": "POST", "url": f"{api}/edit_list",
+                              "body": {"list_key": "<list_key>"},
+                              "parameters": {"list_key": {"options": lk}, "label": {}, "operations": {"description": f"Array from: {_VALID_LIST_OPS}"}, "focus": {"options": [True, False]}}})
+                n += 1
+                affs.append({"id": n, "label": f"Remove list from '{fn['id']}'", "method": "POST", "url": f"{api}/remove_list",
+                              "body": {"list_key": "<list_key>"}, "parameters": {"list_key": {"options": lk}}})
                 n += 1
 
+                for lkey, ldef in fn_lists.items():
+                    schema = ldef.get("item_schema", {})
+                    affs.append({"id": n, "label": f"Add field to list '{lkey}'", "method": "POST", "url": f"{api}/add_list_field",
+                                  "body": {"list_key": lkey, "field_key": "<field_key>", "type": "<type>"},
+                                  "parameters": {"field_key": {"description": "Lowercase with underscores"}, "type": {"options": ["text", "boolean", "select"]},
+                                                 "required": {"options": [True, False]}, "options": {"description": "Array of options (select type)"}}})
+                    n += 1
+                    if schema:
+                        sfk = list(schema.keys())
+                        affs.append({"id": n, "label": f"Remove field from list '{lkey}'", "method": "POST", "url": f"{api}/remove_list_field",
+                                      "body": {"list_key": lkey, "field_key": "<field_key>"}, "parameters": {"field_key": {"options": sfk}}})
+                        n += 1
+
+            # Table
+            tbl = fn.get("table")
+            if not tbl:
+                ct_names = list(column_types.keys())
+                affs.append({"id": n, "label": f"Set table on '{fn['id']}'", "method": "POST", "url": f"{api}/set_table",
+                              "body": {},
+                              "parameters": {
+                                  "column_type_catalog": {"description": "Set to 'column_types' to reference workflow-level definitions" if ct_names else "Define column_types first to use a catalog"},
+                                  "properties": {"description": 'Dict of table properties, e.g. {"sequential_execution":{"type":"boolean","default":false}}'},
+                                  "operations": {"description": f"Array from: {_VALID_TABLE_OPS}. Default: all."},
+                              }})
+                n += 1
+            else:
+                affs.append({"id": n, "label": f"Remove table from '{fn['id']}'", "method": "POST", "url": f"{api}/remove_table", "body": {}})
+                n += 1
+
+            # Proceed gate (only in standard mode)
+            if fn.get("router") is None and fn.get("fork") is None:
+                other_ids = [w["id"] for w in wf_nodes if w["id"] != fn["id"]]
+                affs.append({"id": n, "label": f"Set proceed gate for '{fn['id']}' (current: {json.dumps(fn.get('proceed'))})",
+                              "method": "POST", "url": f"{api}/set_proceed",
+                              "body": {"label": "<label>"},
+                              "parameters": {
+                                  "label": {},
+                                  "gate": {"description": "Optional gate expression. " + _EXPR_HINT},
+                                  "target": {"description": "Optional explicit next node", "options": other_ids} if other_ids else {"description": "Optional explicit next node"},
+                                  "requires": {"description": f"Legacy shorthand: array of field keys -> AND gate. Available: {all_fk}"},
+                              }})
+                n += 1
+
+            # Navigation
             other_ids = [w["id"] for w in wf_nodes if w["id"] != fn["id"]]
             affs.append({"id": n, "label": f"Add navigation to '{fn['id']}'", "method": "POST", "url": f"{api}/add_navigation",
                           "body": {"nav_action": "<nav_action>", "label": "<label>"},
-                          "parameters": {"nav_action": {"options": ["go_back", "go_to"]}, "label": {}, "node": {"options": other_ids}}})
+                          "parameters": {"nav_action": {"options": ["go_back", "go_to"]}, "label": {},
+                                         "node": {"options": other_ids},
+                                         "when": {"description": "Optional conditional guard. " + _EXPR_HINT}}})
             n += 1
 
             if fn.get("navigation"):
@@ -351,6 +592,7 @@ def _build_affordances(data: dict, workflow_id: str) -> list[dict]:
                               "body": {"nav_index": "<nav_index>"}, "parameters": {"nav_index": {"options": nvi, "labels": nvl}}})
                 n += 1
 
+            # Actions
             affs.append({"id": n, "label": f"Add action to '{fn['id']}'", "method": "POST", "url": f"{api}/add_action",
                           "body": {"action_type": "<action_type>", "label": "<label>"}, "parameters": {"action_type": {"options": ["submit", "restart"]}, "label": {}}})
             n += 1
@@ -362,8 +604,19 @@ def _build_affordances(data: dict, workflow_id: str) -> list[dict]:
                               "body": {"action_index": "<action_index>"}, "parameters": {"action_index": {"options": ai, "labels": al}}})
                 n += 1
 
+            # Node flags
             affs.append({"id": n, "label": f"Set show_all_fields for '{fn['id']}' (current: {fn.get('show_all_fields', False)})",
                           "method": "POST", "url": f"{api}/set_show_all_fields", "body": {"value": "<value>"}, "parameters": {"value": {"options": [True, False]}}})
+            n += 1
+
+            affs.append({"id": n, "label": f"Set pause for '{fn['id']}' (current: {fn.get('pause', True)})",
+                          "method": "POST", "url": f"{api}/set_pause", "body": {"value": "<value>"},
+                          "parameters": {"value": {"options": [True, False], "description": "True=stop here (default), False=may auto-advance if gate passes"}}})
+            n += 1
+
+            affs.append({"id": n, "label": f"Set execution for '{fn['id']}' (current: {fn.get('execution', False)})",
+                          "method": "POST", "url": f"{api}/set_execution", "body": {"value": "<value>"},
+                          "parameters": {"value": {"options": [True, False], "description": "True=execution node with table engine"}}})
             n += 1
 
             # Node mode selector
@@ -379,7 +632,8 @@ def _build_affordances(data: dict, workflow_id: str) -> list[dict]:
                 node_options = [w["id"] for w in wf_nodes if w["id"] != fn["id"]]
                 affs.append({"id": n, "label": f"Add route to '{fn['id']}'", "method": "POST", "url": f"{api}/add_route",
                               "body": {"target": "<target>"},
-                              "parameters": {"target": {"options": node_options}, "when": {"description": "Optional condition dict, e.g. {\"type\":\"field_equals\",\"key\":\"severity\",\"value\":\"Low\"}"}}})
+                              "parameters": {"target": {"options": node_options},
+                                             "when": {"description": "Optional condition. " + _EXPR_HINT}}})
                 n += 1
                 if routes:
                     ri = list(range(len(routes)))
@@ -410,17 +664,20 @@ def _build_affordances(data: dict, workflow_id: str) -> list[dict]:
                     affs.append({"id": n, "label": f"Remove branch from '{fn['id']}'", "method": "POST", "url": f"{api}/remove_branch",
                                   "body": {"branch_id": "<branch_id>"}, "parameters": {"branch_id": {"options": bl}}})
                     n += 1
-                if all_fk:
-                    affs.append({"id": n, "label": f"Set fork gate for '{fn['id']}' (requires before forking)",
-                                  "method": "POST", "url": f"{api}/set_fork_gate",
-                                  "body": {"requires": "<requires>"},
-                                  "parameters": {"requires": {"description": f"Array of required field keys. Available: {all_fk}"}}})
-                    n += 1
+                affs.append({"id": n, "label": f"Set fork gate for '{fn['id']}' (current: {json.dumps(fork.get('gate'))})",
+                              "method": "POST", "url": f"{api}/set_fork_gate",
+                              "body": {},
+                              "parameters": {
+                                  "gate": {"description": _EXPR_HINT},
+                                  "requires": {"description": f"Legacy shorthand: array of field keys -> AND gate. Available: {all_fk}"},
+                              }})
+                n += 1
 
+        # Builder navigation
         affs.append({"id": n, "label": "Go back to Lifecycle", "method": "POST", "url": f"{api}/go_back", "body": {}})
         n += 1
 
-        if wf_nodes and any(wn.get("fields") for wn in wf_nodes):
+        if wf_nodes and any(wn.get("fields") or wn.get("lists") or wn.get("table") for wn in wf_nodes):
             affs.append({"id": n, "label": "Proceed to Preview", "method": "POST", "url": f"{api}/proceed", "body": {}})
             n += 1
 
@@ -454,7 +711,10 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         data.update(fresh)
         return render_node(data, workflow_id)
 
+    # -----------------------------------------------------------------------
     # Metadata
+    # -----------------------------------------------------------------------
+
     if action == "set_workflow_id":
         v = body.get("value", "").strip()
         if not v:
@@ -478,7 +738,85 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         data["workflow_description"] = body.get("value", "").strip() or None
         return render_node(data, workflow_id)
 
+    # -----------------------------------------------------------------------
+    # Option sets (workflow-level)
+    # -----------------------------------------------------------------------
+
+    if action == "add_option_set":
+        name = body.get("name", "").strip()
+        if not name or not re.match(r"^[a-z][a-z0-9_]*$", name):
+            return {"error": "Option set name must be lowercase with underscores."}
+        options = body.get("options")
+        if not isinstance(options, list) or not options:
+            return {"error": "Options must be a non-empty array."}
+        if name in data["option_sets"]:
+            return {"error": f"Option set '{name}' already exists. Use edit to modify."}
+        data["option_sets"][name] = options
+        return render_node(data, workflow_id)
+
+    if action == "edit_option_set":
+        name = body.get("name", "").strip()
+        if name not in data.get("option_sets", {}):
+            return {"error": f"Option set '{name}' does not exist."}
+        options = body.get("options")
+        if not isinstance(options, list) or not options:
+            return {"error": "Options must be a non-empty array."}
+        data["option_sets"][name] = options
+        return render_node(data, workflow_id)
+
+    if action == "remove_option_set":
+        name = body.get("name", "").strip()
+        if name not in data.get("option_sets", {}):
+            return {"error": f"Option set '{name}' does not exist."}
+        del data["option_sets"][name]
+        return render_node(data, workflow_id)
+
+    # -----------------------------------------------------------------------
+    # Column types (workflow-level)
+    # -----------------------------------------------------------------------
+
+    if action == "add_column_type":
+        type_id = body.get("type_id", "").strip()
+        if not type_id:
+            return {"error": "Column type ID is required."}
+        label = body.get("label", "").strip()
+        category = body.get("category", "").strip()
+        description = body.get("description", "").strip()
+        if not label:
+            return {"error": "Column type label is required."}
+        if category not in _VALID_COLUMN_CATEGORIES:
+            return {"error": f"Invalid category. Choose: {', '.join(_VALID_COLUMN_CATEGORIES)}"}
+        if type_id in data["column_types"]:
+            return {"error": f"Column type '{type_id}' already exists. Use edit to modify."}
+        data["column_types"][type_id] = {"label": label, "category": category, "description": description}
+        return render_node(data, workflow_id)
+
+    if action == "edit_column_type":
+        type_id = body.get("type_id", "").strip()
+        if type_id not in data.get("column_types", {}):
+            return {"error": f"Column type '{type_id}' does not exist."}
+        ct = data["column_types"][type_id]
+        if body.get("label"):
+            ct["label"] = body["label"].strip()
+        if body.get("category"):
+            if body["category"] not in _VALID_COLUMN_CATEGORIES:
+                return {"error": f"Invalid category. Choose: {', '.join(_VALID_COLUMN_CATEGORIES)}"}
+            ct["category"] = body["category"]
+        if body.get("description"):
+            ct["description"] = body["description"].strip()
+        return render_node(data, workflow_id)
+
+    if action == "remove_column_type":
+        type_id = body.get("type_id", "").strip()
+        if type_id not in data.get("column_types", {}):
+            return {"error": f"Column type '{type_id}' does not exist."}
+        del data["column_types"][type_id]
+        return render_node(data, workflow_id)
+
+    # -----------------------------------------------------------------------
     # Node builder
+    # -----------------------------------------------------------------------
+
     if action == "add_node":
         nid = body.get("id", "").strip()
         title = body.get("title", "").strip()
@@ -489,7 +827,11 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
             return {"error": f"Node '{nid}' already exists."}
         if not title:
             return {"error": "Node title is required."}
-        data["wf_nodes"].append({"id": nid, "title": title, "instruction": instruction, "show_all_fields": False, "fields": [], "navigation": [], "proceed": None, "actions": []})
+        data["wf_nodes"].append({
+            "id": nid, "title": title, "instruction": instruction,
+            "show_all_fields": False, "fields": [], "lists": {},
+            "table": None, "navigation": [], "proceed": None, "actions": [],
+        })
         data["focused_node"] = len(data["wf_nodes"]) - 1
         return render_node(data, workflow_id)
 
@@ -543,7 +885,10 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
                 data["focused_node"] = idx
         return render_node(data, workflow_id)
 
+    # -----------------------------------------------------------------------
     # Fields (scoped to focused node)
+    # -----------------------------------------------------------------------
+
     if action == "add_field":
         focused = data.get("focused_node")
         if focused is None or focused >= len(data["wf_nodes"]):
@@ -561,9 +906,29 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
             for fld in wn.get("fields", []):
                 if fld["key"] == key:
                     return {"error": f"Key '{key}' already exists in node '{wn['id']}'."}
-        new_field = {"label": label, "type": ftype, "key": key, "instruction": body.get("instruction", "").strip() or None, "default": None}
+        new_field = {
+            "label": label, "type": ftype, "key": key,
+            "instruction": body.get("instruction", "").strip() or None,
+            "default": body.get("default"),
+        }
         if ftype == "select" and isinstance(body.get("options"), list):
             new_field["options"] = body["options"]
+        if body.get("options_from"):
+            new_field["options_from"] = body["options_from"]
+        if isinstance(body.get("dynamic_options"), dict):
+            new_field["dynamic_options"] = body["dynamic_options"]
+        if isinstance(body.get("side_effects"), list):
+            new_field["side_effects"] = body["side_effects"]
+        if isinstance(body.get("visible_when"), dict):
+            new_field["visible_when"] = body["visible_when"]
+        if isinstance(body.get("compute"), dict):
+            new_field["compute"] = body["compute"]
+        if body.get("instruction_when_true"):
+            new_field["instruction_when_true"] = body["instruction_when_true"]
+        if body.get("instruction_when_false"):
+            new_field["instruction_when_false"] = body["instruction_when_false"]
+        if body.get("annotate_from"):
+            new_field["annotate_from"] = body["annotate_from"]
         data["wf_nodes"][focused]["fields"].append(new_field)
         return render_node(data, workflow_id)
 
@@ -586,6 +951,22 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
             fld["options"] = body["options"]
         if isinstance(body.get("visible_when"), dict):
             fld["visible_when"] = body["visible_when"]
+        if "default" in body:
+            fld["default"] = body["default"]
+        if "options_from" in body:
+            fld["options_from"] = body["options_from"] or None
+        if isinstance(body.get("dynamic_options"), dict):
+            fld["dynamic_options"] = body["dynamic_options"]
+        if isinstance(body.get("side_effects"), list):
+            fld["side_effects"] = body["side_effects"]
+        if isinstance(body.get("compute"), dict):
+            fld["compute"] = body["compute"]
+        if "instruction_when_true" in body:
+            fld["instruction_when_true"] = body["instruction_when_true"] or None
+        if "instruction_when_false" in body:
+            fld["instruction_when_false"] = body["instruction_when_false"] or None
+        if "annotate_from" in body:
+            fld["annotate_from"] = body["annotate_from"] or None
         return render_node(data, workflow_id)
 
     if action == "remove_field":
@@ -599,16 +980,168 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         flds.pop(fi)
         return render_node(data, workflow_id)
 
+    # -----------------------------------------------------------------------
+    # Lists (scoped to focused node)
+    # -----------------------------------------------------------------------
+
+    if action == "add_list":
+        focused = data.get("focused_node")
+        if focused is None or focused >= len(data["wf_nodes"]):
+            return {"error": "No node is focused."}
+        key = body.get("key", "").strip()
+        label = body.get("label", "").strip()
+        if not key or not re.match(r"^[a-z][a-z0-9_]*$", key):
+            return {"error": "List key must be lowercase with underscores."}
+        if not label:
+            return {"error": "List label is required."}
+        fn = data["wf_nodes"][focused]
+        fn.setdefault("lists", {})
+        if key in fn["lists"]:
+            return {"error": f"List '{key}' already exists in node '{fn['id']}'."}
+        ops = body.get("operations")
+        if isinstance(ops, list):
+            ops = [o for o in ops if o in _VALID_LIST_OPS]
+        else:
+            ops = list(_VALID_LIST_OPS)
+        fn["lists"][key] = {
+            "label": label,
+            "item_schema": {},
+            "operations": ops,
+            "focus": bool(body.get("focus", False)),
+        }
+        return render_node(data, workflow_id)
+
+    if action == "edit_list":
+        focused = data.get("focused_node")
+        if focused is None or focused >= len(data["wf_nodes"]):
+            return {"error": "No node is focused."}
+        lk = body.get("list_key", "").strip()
+        fn = data["wf_nodes"][focused]
+        lists = fn.get("lists", {})
+        if lk not in lists:
+            return {"error": f"List '{lk}' does not exist."}
+        ldef = lists[lk]
+        if body.get("label"):
+            ldef["label"] = body["label"].strip()
+        if isinstance(body.get("operations"), list):
+            ldef["operations"] = [o for o in body["operations"] if o in _VALID_LIST_OPS]
+        if "focus" in body:
+            ldef["focus"] = bool(body["focus"])
+        return render_node(data, workflow_id)
+
+    if action == "remove_list":
+        focused = data.get("focused_node")
+        if focused is None or focused >= len(data["wf_nodes"]):
+            return {"error": "No node is focused."}
+        lk = body.get("list_key", "").strip()
+        fn = data["wf_nodes"][focused]
+        lists = fn.get("lists", {})
+        if lk not in lists:
+            return {"error": f"List '{lk}' does not exist."}
+        del lists[lk]
+        return render_node(data, workflow_id)
+
+    if action == "add_list_field":
+        focused = data.get("focused_node")
+        if focused is None or focused >= len(data["wf_nodes"]):
+            return {"error": "No node is focused."}
+        lk = body.get("list_key", "").strip()
+        fn = data["wf_nodes"][focused]
+        lists = fn.get("lists", {})
+        if lk not in lists:
+            return {"error": f"List '{lk}' does not exist."}
+        fkey = body.get("field_key", "").strip()
+        if not fkey or not re.match(r"^[a-z][a-z0-9_]*$", fkey):
+            return {"error": "Field key must be lowercase with underscores."}
+        schema = lists[lk].setdefault("item_schema", {})
+        if fkey in schema:
+            return {"error": f"Field '{fkey}' already exists in list '{lk}'."}
+        ftype = body.get("type", "text")
+        if ftype not in ("text", "boolean", "select"):
+            return {"error": "List field type must be text, boolean, or select."}
+        fdef = {"type": ftype, "required": bool(body.get("required", False))}
+        if ftype == "select" and isinstance(body.get("options"), list):
+            fdef["options"] = body["options"]
+        schema[fkey] = fdef
+        return render_node(data, workflow_id)
+
+    if action == "remove_list_field":
+        focused = data.get("focused_node")
+        if focused is None or focused >= len(data["wf_nodes"]):
+            return {"error": "No node is focused."}
+        lk = body.get("list_key", "").strip()
+        fn = data["wf_nodes"][focused]
+        lists = fn.get("lists", {})
+        if lk not in lists:
+            return {"error": f"List '{lk}' does not exist."}
+        fkey = body.get("field_key", "").strip()
+        schema = lists[lk].get("item_schema", {})
+        if fkey not in schema:
+            return {"error": f"Field '{fkey}' does not exist in list '{lk}'."}
+        del schema[fkey]
+        return render_node(data, workflow_id)
+
+    # -----------------------------------------------------------------------
+    # Table (scoped to focused node)
+    # -----------------------------------------------------------------------
+
+    if action == "set_table":
+        focused = data.get("focused_node")
+        if focused is None or focused >= len(data["wf_nodes"]):
+            return {"error": "No node is focused."}
+        fn = data["wf_nodes"][focused]
+        tbl = {}
+        cat = body.get("column_type_catalog")
+        if cat:
+            tbl["column_type_catalog"] = cat
+        props = body.get("properties")
+        if isinstance(props, dict):
+            tbl["properties"] = props
+        else:
+            tbl["properties"] = {}
+        ops = body.get("operations")
+        if isinstance(ops, list):
+            tbl["operations"] = [o for o in ops if o in _VALID_TABLE_OPS]
+        else:
+            tbl["operations"] = list(_VALID_TABLE_OPS)
+        fn["table"] = tbl
+        return render_node(data, workflow_id)
+
+    if action == "remove_table":
+        focused = data.get("focused_node")
+        if focused is None or focused >= len(data["wf_nodes"]):
+            return {"error": "No node is focused."}
+        data["wf_nodes"][focused]["table"] = None
+        return render_node(data, workflow_id)
+
+    # -----------------------------------------------------------------------
     # Node config (scoped to focused node)
+    # -----------------------------------------------------------------------
+
     if action == "set_proceed":
         focused = data.get("focused_node")
         if focused is None or focused >= len(data["wf_nodes"]):
             return {"error": "No node is focused."}
         label = body.get("label", "").strip()
+        if not label:
+            return {"error": "Proceed label is required."}
+        proceed = {"label": label}
+        gate = body.get("gate")
         requires = body.get("requires")
-        if not label or not isinstance(requires, list):
-            return {"error": "Proceed label and requires array are required."}
-        data["wf_nodes"][focused]["proceed"] = {"label": label, "requires": requires}
+        if isinstance(gate, dict):
+            proceed["gate"] = gate
+        elif isinstance(requires, list) and requires:
+            proceed["gate"] = {
+                "op": "AND",
+                "conditions": [{"type": "field_truthy", "key": k} for k in requires],
+            }
+        target = body.get("target")
+        if target:
+            target = target.strip() if isinstance(target, str) else target
+            if not any(w["id"] == target for w in data["wf_nodes"]):
+                return {"error": f"Target node '{target}' does not exist."}
+            proceed["target"] = target
+        data["wf_nodes"][focused]["proceed"] = proceed
         return render_node(data, workflow_id)
 
     if action == "add_navigation":
@@ -625,6 +1158,9 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
             if not target or not any(w["id"] == target for w in data["wf_nodes"]):
                 return {"error": f"Target node '{target}' does not exist."}
             entry["node"] = target
+        when = body.get("when")
+        if isinstance(when, dict):
+            entry["when"] = when
         data["wf_nodes"][focused].setdefault("navigation", []).append(entry)
         return render_node(data, workflow_id)
 
@@ -671,7 +1207,30 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         data["wf_nodes"][focused]["show_all_fields"] = v
         return render_node(data, workflow_id)
 
+    if action == "set_pause":
+        focused = data.get("focused_node")
+        if focused is None or focused >= len(data["wf_nodes"]):
+            return {"error": "No node is focused."}
+        v = body.get("value")
+        if v is not True and v is not False:
+            return {"error": "value must be true or false."}
+        data["wf_nodes"][focused]["pause"] = v
+        return render_node(data, workflow_id)
+
+    if action == "set_execution":
+        focused = data.get("focused_node")
+        if focused is None or focused >= len(data["wf_nodes"]):
+            return {"error": "No node is focused."}
+        v = body.get("value")
+        if v is not True and v is not False:
+            return {"error": "value must be true or false."}
+        data["wf_nodes"][focused]["execution"] = v
+        return render_node(data, workflow_id)
+
+    # -----------------------------------------------------------------------
     # Set node mode (standard / router / fork)
+    # -----------------------------------------------------------------------
+
     if action == "set_node_mode":
         focused = data.get("focused_node")
         if focused is None or focused >= len(data["wf_nodes"]):
@@ -694,7 +1253,10 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
             fn.pop("fork", None)
         return render_node(data, workflow_id)
 
-    # Router: add route
+    # -----------------------------------------------------------------------
+    # Router: add / remove route
+    # -----------------------------------------------------------------------
+
     if action == "add_route":
         focused = data.get("focused_node")
         if focused is None or focused >= len(data["wf_nodes"]):
@@ -712,7 +1274,6 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         fn["router"].append(route)
         return render_node(data, workflow_id)
 
-    # Router: remove route
     if action == "remove_route":
         focused = data.get("focused_node")
         if focused is None or focused >= len(data["wf_nodes"]):
@@ -725,7 +1286,10 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         routes.pop(ri)
         return render_node(data, workflow_id)
 
-    # Fork: set merge target
+    # -----------------------------------------------------------------------
+    # Fork: merge, label, branch, gate
+    # -----------------------------------------------------------------------
+
     if action == "set_fork_merge":
         focused = data.get("focused_node")
         if focused is None or focused >= len(data["wf_nodes"]):
@@ -740,7 +1304,6 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         fork["merge"] = merge
         return render_node(data, workflow_id)
 
-    # Fork: set label
     if action == "set_fork_label":
         focused = data.get("focused_node")
         if focused is None or focused >= len(data["wf_nodes"]):
@@ -752,7 +1315,6 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         fork["label"] = body.get("label", "Continue").strip()
         return render_node(data, workflow_id)
 
-    # Fork: add branch
     if action == "add_branch":
         focused = data.get("focused_node")
         if focused is None or focused >= len(data["wf_nodes"]):
@@ -778,7 +1340,6 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         fork.setdefault("branches", {})[bid] = {"label": label, "nodes": nodes_list}
         return render_node(data, workflow_id)
 
-    # Fork: remove branch
     if action == "remove_branch":
         focused = data.get("focused_node")
         if focused is None or focused >= len(data["wf_nodes"]):
@@ -794,7 +1355,6 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         del branches[bid]
         return render_node(data, workflow_id)
 
-    # Fork: set gate
     if action == "set_fork_gate":
         focused = data.get("focused_node")
         if focused is None or focused >= len(data["wf_nodes"]):
@@ -803,16 +1363,23 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         fork = fn.get("fork")
         if not fork:
             return {"error": "Node is not in fork mode."}
+        gate = body.get("gate")
         requires = body.get("requires")
-        if not isinstance(requires, list):
-            return {"error": "requires must be an array of field keys."}
-        fork["gate"] = {
-            "op": "AND",
-            "conditions": [{"type": "field_truthy", "key": k} for k in requires],
-        }
+        if isinstance(gate, dict):
+            fork["gate"] = gate
+        elif isinstance(requires, list) and requires:
+            fork["gate"] = {
+                "op": "AND",
+                "conditions": [{"type": "field_truthy", "key": k} for k in requires],
+            }
+        else:
+            return {"error": "Provide gate (expression dict) or requires (array of field keys)."}
         return render_node(data, workflow_id)
 
-    # Navigation
+    # -----------------------------------------------------------------------
+    # Builder navigation
+    # -----------------------------------------------------------------------
+
     if action == "proceed":
         idx = _NODES.index(node)
         if idx >= len(_NODES) - 1:
@@ -870,9 +1437,15 @@ _BODY = {
     "add_field", "edit_field", "remove_field",
     "set_proceed", "add_navigation", "remove_navigation",
     "add_action", "remove_action", "set_show_all_fields",
+    "set_pause", "set_execution",
     "set_node_mode",
     "add_route", "remove_route",
     "set_fork_merge", "set_fork_label", "add_branch", "remove_branch", "set_fork_gate",
+    "add_option_set", "edit_option_set", "remove_option_set",
+    "add_column_type", "edit_column_type", "remove_column_type",
+    "add_list", "edit_list", "remove_list",
+    "add_list_field", "remove_list_field",
+    "set_table", "remove_table",
 }
 VALID_RESOURCES = _SIMPLE | _BODY
 
