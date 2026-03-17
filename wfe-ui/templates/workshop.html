@@ -300,7 +300,43 @@ function flattenSpine(spine, depth, rejoinRef) {
     cur.elements.push({ kind:'ref', label: rejoinRef, type:'rejoin' });
   }
   if (cur.elements.length > 0) lines.push(cur);
+
+  reorderContinuations(lines);
+
   return lines;
+}
+
+function reorderContinuations(lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const bpElem = lines[i].elements.find(e => e.kind === 'branch-point' && e.groupId);
+    if (!bpElem) continue;
+    const gid = bpElem.groupId;
+
+    let rejoinLabel = null;
+    for (let j = i + 1; j < lines.length; j++) {
+      if (lines[j].groups) {
+        for (const g of lines[j].groups) {
+          if (g.gid === gid) {
+            if (lines[j].rejoinLabel) rejoinLabel = lines[j].rejoinLabel;
+            break;
+          }
+        }
+      }
+      if (rejoinLabel) break;
+    }
+    if (!rejoinLabel) continue;
+
+    for (let j = i + 2; j < lines.length; j++) {
+      const firstRef = lines[j].elements.find(e => e.kind === 'ref');
+      if (!firstRef || firstRef.type !== 'rejoin' || firstRef.label !== rejoinLabel) continue;
+      if (lines[j].elements[0] !== firstRef) continue;
+      if (j === i + 1) break;
+      const [cont] = lines.splice(j, 1);
+      cont._shareRowWithPrev = true; // render on same Y as branch-point line
+      lines.splice(i + 1, 0, cont);
+      break;
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -364,9 +400,11 @@ function layout(lines) {
   let totalW = 0;
 
   // First pass: lay out each line left-to-right, record content width (before rejoin)
+  let nextY = C.padY;
   for (let li = 0; li < lines.length; li++) {
     const line = lines[li];
-    const y = C.padY + li * (C.lineH + C.lineGap);
+    const y = line._shareRowWithPrev && li > 0 ? positioned[li - 1].y : nextY;
+    if (!line._shareRowWithPrev) nextY = y + C.lineH + C.lineGap;
     const indent = C.padX + line.depth * C.depthIndent;
     let x = indent;
     const items = [];
@@ -657,7 +695,8 @@ function layout(lines) {
     }
   }
 
-  const totalH = C.padY * 2 + positioned.length * (C.lineH + C.lineGap) - C.lineGap;
+  const lastLine = positioned[positioned.length - 1];
+  const totalH = lastLine ? lastLine.y + C.lineH + C.padY : C.padY * 2;
   return { width: totalW, height: totalH, lines: positioned, vbars };
 }
 
