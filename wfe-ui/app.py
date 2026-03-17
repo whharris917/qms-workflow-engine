@@ -772,5 +772,10 @@ def manual_page(slug):
     )
 
 
+@app.route("/workshop")
+def workshop():
+    return render_template("workshop.html", active_page="workshop")
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000, threaded=True)
