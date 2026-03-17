@@ -175,6 +175,8 @@ function flattenSpine(spine, depth, rejoinRef) {
 
   function emitSimplePath(pathSegs, startElements, d, endRef) {
     const line = { depth: d, elements: [...startElements], rejoinLabel: endRef };
+    const sr = startElements.find(e => e.kind === 'ref');
+    if (sr) { line.branchLabel = sr.label; line.branchType = sr.type; if (sr.type === 'rejoin') line.isContinuation = true; }
     for (const s of pathSegs) {
       line.elements.push({ kind:'wire' });
       line.elements.push({ kind:'step', title: s.title });
@@ -189,6 +191,8 @@ function flattenSpine(spine, depth, rejoinRef) {
   function emitPath(pathSegs, startElements, d, endRef) {
     if (pathSegs.length === 0) {
       const line = { depth: d, elements: [...startElements], rejoinLabel: endRef };
+      const sr = startElements.find(e => e.kind === 'ref');
+      if (sr) { line.branchLabel = sr.label; line.branchType = sr.type; if (sr.type === 'rejoin') line.isContinuation = true; }
       line.elements.push({ kind:'rejoin-arrow' });
       line.elements.push({ kind:'ref', label: endRef, type:'rejoin' });
       lines.push(line);
@@ -269,7 +273,8 @@ function flattenSpine(spine, depth, rejoinRef) {
         lines.push(...cont); // continuation right after this route's lines
       }
       tagGroupByRefs(lines, gs, routeRefs, 'gate', gid);
-      cur = { depth, elements: [{ kind:'ref', label: rejoinLabel, type:'rejoin' }] };
+      cur = { depth, elements: [{ kind:'ref', label: rejoinLabel, type:'rejoin' }],
+              branchLabel: rejoinLabel, branchType: 'rejoin', isContinuation: true };
     }
     else if (seg.type === 'split') {
       wire();
@@ -289,13 +294,15 @@ function flattenSpine(spine, depth, rejoinRef) {
         lines.push(...cont); // continuation right after this branch's lines
       }
       tagGroupByRefs(lines, gs2, branchRefs, 'split', gid);
-      cur = { depth, elements: [{ kind:'ref', label: mergeLabel, type:'rejoin' }] };
+      cur = { depth, elements: [{ kind:'ref', label: mergeLabel, type:'rejoin' }],
+              branchLabel: mergeLabel, branchType: 'rejoin', isContinuation: true };
       if (seg.merge) { cur.elements.push({ kind:'step', title: seg.merge.title }); }
     }
   }
 
   if (rejoinRef && cur.elements.length > 0) {
     cur.rejoinLabel = rejoinRef;
+    if (!cur.branchLabel) { cur.branchLabel = rejoinRef; cur.branchType = 'rejoin'; cur.isContinuation = true; }
     cur.elements.push({ kind:'rejoin-arrow' });
     cur.elements.push({ kind:'ref', label: rejoinRef, type:'rejoin' });
   }
