@@ -212,9 +212,8 @@ function flattenSpine(spine, depth, rejoinRef) {
     let lastRejoinStart = -1;
 
     for (let si = 0; si < subLines.length; si++) {
-      const firstElem = subLines[si].elements.find(e => e.kind === 'branch-point' || e.kind === 'ref');
-      if (firstElem && firstElem.kind === 'branch-point') seenBranchPoint = true;
-      if (seenBranchPoint && firstElem && firstElem.kind === 'ref' && firstElem.type === 'rejoin') {
+      if (subLines[si].elements.find(e => e.kind === 'branch-point')) seenBranchPoint = true;
+      if (seenBranchPoint && subLines[si].isContinuation) {
         lastRejoinStart = si;
       }
     }
@@ -229,9 +228,15 @@ function flattenSpine(spine, depth, rejoinRef) {
       branchLines.push(...subLines);
     }
 
-    // Prepend startElements onto the first branch line
+    // Prepend startElements onto the first branch line and update metadata
     if (branchLines.length > 0) {
       branchLines[0].elements = [...startElements, { kind:'wire' }, ...branchLines[0].elements];
+      const sr = startElements.find(e => e.kind === 'ref');
+      if (sr) {
+        branchLines[0].branchLabel = sr.label;
+        branchLines[0].branchType = sr.type;
+        if (sr.type === 'rejoin') branchLines[0].isContinuation = true;
+      }
     }
 
     lines.push(...branchLines);
@@ -243,8 +248,7 @@ function flattenSpine(spine, depth, rejoinRef) {
   // continuation lines after nested branch points.
   function tagGroupByRefs(arr, startIdx, refLabels, type, gid) {
     for (let gi = startIdx; gi < arr.length; gi++) {
-      const firstRef = arr[gi].elements.find(e => e.kind === 'ref');
-      if (firstRef && refLabels.includes(firstRef.label)) {
+      if (arr[gi].branchLabel && refLabels.includes(arr[gi].branchLabel)) {
         if (!arr[gi].groups) arr[gi].groups = [];
         arr[gi].groups.push({ type, gid });
       }
@@ -334,14 +338,13 @@ function reorderContinuations(lines) {
     if (!rejoinLabel) continue;
 
     for (let j = i + 2; j < lines.length; j++) {
-      const firstRef = lines[j].elements.find(e => e.kind === 'ref');
-      if (!firstRef || firstRef.type !== 'rejoin' || firstRef.label !== rejoinLabel) continue;
-      if (lines[j].elements[0] !== firstRef) continue;
+      if (!lines[j].isContinuation || lines[j].branchLabel !== rejoinLabel) continue;
       if (j === i + 1) break;
       const [cont] = lines.splice(j, 1);
       cont._shareRowWithPrev = true;
-      if (cont.elements.length >= 2 && cont.elements[0].kind === 'ref' && cont.elements[1].kind === 'wire') {
-        cont.elements.splice(1, 1);
+      // Strip leading ref + wire so content starts directly
+      while (cont.elements.length > 0 && (cont.elements[0].kind === 'ref' || cont.elements[0].kind === 'wire')) {
+        cont.elements.shift();
       }
       lines.splice(i + 1, 0, cont);
       break;
@@ -475,6 +478,8 @@ function layout(lines) {
 
     positioned.push({ y, items, contentEndX, rejoinStartIdx, depth: line.depth,
                        rejoinLabel: line.rejoinLabel, groups: line.groups,
+                       isContinuation: line.isContinuation, branchLabel: line.branchLabel,
+                       _shareRowWithPrev: line._shareRowWithPrev,
                        totalContentW: x });
     totalW = Math.max(totalW, x + C.padX);
   }
@@ -525,7 +530,7 @@ function layout(lines) {
       }
       if (deepestGid !== gid) continue;
       const condItem = pl.items.find(it => it.kind === 'cond');
-      const anchor = condItem || pl.items.find(it => it.kind === 'ref');
+      const anchor = condItem || pl.items.find(it => it.kind === 'step' || it.kind === 'wire');
       if (!anchor) continue;
       const anchorCx = anchor.x + anchor.w / 2;
       const shift = targetX - anchorCx;
@@ -539,10 +544,16 @@ function layout(lines) {
     }
   }
 
-  // Third pass: align rejoin markers AND continuation lines together.
-  // These interact: continuation lines shift to meet convergence columns,
-  // which changes their content width, which affects other rejoin columns.
-  // Iterate until stable.
+  // Third pass: align rejoin markers and continuation lines using node centers.
+  //
+  // For each rejoin label:
+  //   1. Find the continuation line's first step (merge node) → its center X
+  //   2. Find the max of (route arrow tips, merge node center X) → convergenceX
+  //   3. Shift route rejoin sections so arrow tips align to convergenceX
+  //   4. Shift continuation line so merge node center aligns to convergenceX
+  //   5. Store convergenceX on each line for vertical bar computation
+  //
+  // Iterate until stable (nested convergence columns depend on each other).
   const rejoinGroups = {};
   for (const pl of positioned) {
     if (pl.rejoinLabel) {
@@ -551,63 +562,59 @@ function layout(lines) {
     }
   }
 
+  // Also index continuation lines by their branchLabel
+  const contLinesByLabel = {};
+  for (const pl of positioned) {
+    if (pl.isContinuation && pl.branchLabel) {
+      if (!contLinesByLabel[pl.branchLabel]) contLinesByLabel[pl.branchLabel] = [];
+      contLinesByLabel[pl.branchLabel].push(pl);
+    }
+  }
+
+  // Sort rejoin labels: inner (deeper) labels first so their shifts
+  // are visible when outer labels process.
+  const rejoinLabelOrder = Object.entries(rejoinGroups);
+  rejoinLabelOrder.sort((a, b) => {
+    const depthA = Math.max(...a[1].map(pl => pl.depth));
+    const depthB = Math.max(...b[1].map(pl => pl.depth));
+    return depthB - depthA; // deeper first
+  });
+
   for (let iter = 0; iter < 10; iter++) {
     let changed = false;
 
-    // Step A: align continuation lines to convergence columns.
-    // A continuation line starts with a rejoin ref. If route/branch lines
-    // end with that same ref, shift the continuation so it aligns.
-    for (const [label, plines] of Object.entries(rejoinGroups)) {
-      if (plines.length < 2) continue;
-      // Find the X of the rejoin ref on the route lines (last ref of type rejoin)
-      let convergenceX = null;
-      for (const pl of plines) {
-        const lastRef = [...pl.items].reverse().find(it => it.kind === 'ref' && it.type === 'rejoin');
-        if (lastRef) { convergenceX = lastRef.x + lastRef.w / 2; break; }
-      }
-      if (convergenceX === null) continue;
+    for (const [label, plines] of rejoinLabelOrder) {
+      // Find the continuation line(s) for this label (lines that START with this label)
+      const contLines = contLinesByLabel[label] || [];
 
-      for (const pl of positioned) {
-        // Skip lines that are IN the rejoin group for this label
-        // (those are the route lines that END with this label).
-        if (plines.includes(pl)) continue;
-        const firstRef = pl.items.find(it => it.kind === 'ref');
-        if (!firstRef || firstRef.type !== 'rejoin' || firstRef.label !== label) continue;
-        const currentCx = firstRef.x + firstRef.w / 2;
-        const shift = convergenceX - currentCx;
-        if (Math.abs(shift) > 0.5) {
-          for (const item of pl.items) {
-            item.x += shift;
-            if (item.wireFromX !== undefined) item.wireFromX += shift;
-          }
-          pl.totalContentW += shift;
-          pl._convergesAt = { label, x: convergenceX };
-          changed = true;
-        }
-      }
-    }
+      // Compute convergenceX: the max of all route arrow tips and merge node centers.
+      let convergenceX = 0;
 
-    // Step B: align rejoin columns.
-    // For each label, compute the max content-end X (the rejoin-arrow's
-    // current X, which reflects content that may have been shifted by Step A).
-    for (const [label, plines] of Object.entries(rejoinGroups)) {
-      let maxRejoinX = 0;
+      // Route arrow tips
       for (const pl of plines) {
         if (pl.rejoinStartIdx >= 0) {
-          maxRejoinX = Math.max(maxRejoinX, pl.items[pl.rejoinStartIdx].x);
-        }
-      }
-      // Also check content end for lines without rejoinStartIdx
-      for (const pl of plines) {
-        if (pl.rejoinStartIdx < 0) {
-          maxRejoinX = Math.max(maxRejoinX, pl.totalContentW);
+          const arrow = pl.items[pl.rejoinStartIdx];
+          convergenceX = Math.max(convergenceX, arrow.x + arrow.w);
         }
       }
 
+      // Merge node centers (first step on continuation lines)
+      for (const cl of contLines) {
+        if (plines.includes(cl)) continue; // skip if it's also a route line
+        const firstStep = cl.items.find(it => it.kind === 'step');
+        if (firstStep) {
+          convergenceX = Math.max(convergenceX, firstStep.x + firstStep.w / 2);
+        }
+      }
+
+      if (convergenceX === 0) continue;
+
+      // Shift route rejoin sections so arrow tips align to convergenceX
       for (const pl of plines) {
         if (pl.rejoinStartIdx >= 0) {
-          const currentX = pl.items[pl.rejoinStartIdx].x;
-          const shift = maxRejoinX - currentX;
+          const arrow = pl.items[pl.rejoinStartIdx];
+          const currentTip = arrow.x + arrow.w;
+          const shift = convergenceX - currentTip;
           if (Math.abs(shift) > 0.5) {
             for (let i = pl.rejoinStartIdx; i < pl.items.length; i++) {
               pl.items[i].x += shift;
@@ -615,6 +622,27 @@ function layout(lines) {
             changed = true;
           }
         }
+        if (!pl._convergenceXByLabel) pl._convergenceXByLabel = {};
+        pl._convergenceXByLabel[label] = convergenceX;
+      }
+
+      // Shift continuation lines so merge node center aligns to convergenceX
+      for (const cl of contLines) {
+        if (plines.includes(cl)) continue;
+        const firstStep = cl.items.find(it => it.kind === 'step');
+        if (!firstStep) continue;
+        const currentCx = firstStep.x + firstStep.w / 2;
+        const shift = convergenceX - currentCx;
+        if (Math.abs(shift) > 0.5) {
+          for (const item of cl.items) {
+            item.x += shift;
+            if (item.wireFromX !== undefined) item.wireFromX += shift;
+          }
+          cl.totalContentW += shift;
+          changed = true;
+        }
+        if (!cl._convergenceXByLabel) cl._convergenceXByLabel = {};
+        cl._convergenceXByLabel[label] = convergenceX;
       }
     }
 
@@ -656,36 +684,36 @@ function layout(lines) {
     }
   }
 
-  // Convergence bars: connect all rejoin refs sharing the same label
-  // that are at the same X position (i.e., visually aligned).
-  // Also include continuation lines whose first ref matches the label.
+  // Convergence bars: connect lines sharing the same convergenceX.
+  // Uses _convergenceX stored during alignment pass.
   for (const [label, plines] of Object.entries(rejoinGroups)) {
     const points = [];
     let type = 'gate';
 
-    // Collect ending rejoin refs from route/branch lines
+    // Collect from route/branch lines
     for (const pl of plines) {
-      const lastRef = [...pl.items].reverse().find(it => it.kind === 'ref' && it.type === 'rejoin');
-      if (lastRef) {
-        points.push({ cx: lastRef.x + lastRef.w / 2, cy: pl.y + C.lineH / 2 });
+      const cx = pl._convergenceXByLabel && pl._convergenceXByLabel[label];
+      if (cx !== undefined) {
+        points.push({ cx, cy: pl.y + C.lineH / 2 });
       }
       if (pl.groups && pl.groups.length > 0 && type === 'gate') {
         type = pl.groups[0].type;
       }
     }
 
-    // Collect starting rejoin refs from continuation lines
-    for (const pl of positioned) {
-      if (plines.includes(pl)) continue;
-      const firstRef = pl.items.find(it => it.kind === 'ref');
-      if (firstRef && firstRef.type === 'rejoin' && firstRef.label === label) {
-        points.push({ cx: firstRef.x + firstRef.w / 2, cy: pl.y + C.lineH / 2 });
+    // Collect from continuation lines
+    const contLines = contLinesByLabel[label] || [];
+    for (const cl of contLines) {
+      if (plines.includes(cl)) continue;
+      const cx = cl._convergenceXByLabel && cl._convergenceXByLabel[label];
+      if (cx !== undefined) {
+        points.push({ cx, cy: cl.y + C.lineH / 2 });
       }
     }
 
     if (points.length < 2) continue;
 
-    // Sub-group by X position — only connect points that are actually aligned
+    // Sub-group by X position
     const byX = {};
     for (const p of points) {
       const key = Math.round(p.cx);
