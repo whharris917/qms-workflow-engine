@@ -290,7 +290,7 @@ function flattenSpine(spine, depth, rejoinRef) {
       }
       tagGroupByRefs(lines, gs2, branchRefs, 'split', gid);
       cur = { depth, elements: [{ kind:'ref', label: mergeLabel, type:'rejoin' }] };
-      if (seg.merge) { cur.elements.push({ kind:'wire' }); cur.elements.push({ kind:'step', title: seg.merge.title }); }
+      if (seg.merge) { cur.elements.push({ kind:'step', title: seg.merge.title }); }
     }
   }
 
@@ -332,7 +332,10 @@ function reorderContinuations(lines) {
       if (lines[j].elements[0] !== firstRef) continue;
       if (j === i + 1) break;
       const [cont] = lines.splice(j, 1);
-      cont._shareRowWithPrev = true; // render on same Y as branch-point line
+      cont._shareRowWithPrev = true;
+      if (cont.elements.length >= 2 && cont.elements[0].kind === 'ref' && cont.elements[1].kind === 'wire') {
+        cont.elements.splice(1, 1);
+      }
       lines.splice(i + 1, 0, cont);
       break;
     }
@@ -430,9 +433,7 @@ function layout(lines) {
           break;
         }
         case 'ref': {
-          const d = C.refR * 2;
-          item = { kind:'ref', x, y, w: d, h: d, label: elem.label, type: elem.type };
-          x += d;
+          item = { kind:'ref', x, y, w: 0, h: 0, label: elem.label, type: elem.type };
           break;
         }
         case 'branch-point': {
@@ -516,9 +517,11 @@ function layout(lines) {
         if (d > deepestDepth) { deepestDepth = d; deepestGid = g.gid; }
       }
       if (deepestGid !== gid) continue;
-      const firstRef = pl.items.find(it => it.kind === 'ref');
-      if (!firstRef) continue;
-      const shift = targetX - (firstRef.x + firstRef.w / 2);
+      const condItem = pl.items.find(it => it.kind === 'cond');
+      const anchor = condItem || pl.items.find(it => it.kind === 'ref');
+      if (!anchor) continue;
+      const anchorCx = anchor.x + anchor.w / 2;
+      const shift = targetX - anchorCx;
       if (Math.abs(shift) > 0.5) {
         for (const item of pl.items) {
           item.x += shift;
@@ -759,7 +762,7 @@ function drawSchematic(canvas, layoutData) {
           break;
 
         case 'ref':
-          drawRef(ctx, item.x + item.w / 2, cy, C.refR, item.label, item.type);
+          // Invisible anchor — not drawn
           break;
 
         case 'branch-point': {
