@@ -664,6 +664,68 @@ function layout(lines) {
     if (!changed) break;
   }
 
+  // Even-spacing pass: distribute content nodes evenly across the available
+  // span (from first content item to rejoin-arrow) on branch/route lines.
+  // Wires become elastic spacers filling the gaps between solid items.
+  for (const pl of positioned) {
+    if (pl.rejoinStartIdx < 0) continue; // no rejoin = not a branch line
+
+    // Collect solid items (items with visual width, before the rejoin-arrow)
+    const solidItems = [];
+    const wireItems = [];
+    for (let i = 0; i < pl.rejoinStartIdx; i++) {
+      const it = pl.items[i];
+      if (it.kind === 'wire') {
+        wireItems.push(i);
+      } else if (it.w > 0) {
+        solidItems.push(i);
+      }
+    }
+
+    if (solidItems.length < 2) continue; // nothing to distribute
+
+    // Available span: from first solid item's current X to the rejoin-arrow's X
+    const firstSolid = pl.items[solidItems[0]];
+    const arrow = pl.items[pl.rejoinStartIdx];
+    const spanStart = firstSolid.x;
+    const spanEnd = arrow.x; // arrow sits at the right end
+
+    // Total solid width
+    let totalSolidW = 0;
+    for (const si of solidItems) totalSolidW += pl.items[si].w;
+
+    // Available gap space
+    const totalGap = spanEnd - spanStart - totalSolidW;
+    if (totalGap <= 0) continue; // no room to distribute
+
+    // Distribute gaps evenly between solid items
+    const gapCount = solidItems.length; // gaps: before nothing, between each pair, and after last to arrow
+    const gap = totalGap / gapCount;
+
+    // Reposition: place each solid item with even gaps
+    let x = spanStart;
+    for (let si = 0; si < solidItems.length; si++) {
+      const item = pl.items[solidItems[si]];
+      item.x = x;
+      x += item.w + gap;
+    }
+
+    // Reposition wires to fill between solid items
+    for (const wi of wireItems) {
+      const wire = pl.items[wi];
+      // Find the solid item before and after this wire
+      let prevSolidEnd = spanStart;
+      let nextSolidStart = spanEnd;
+      for (const si of solidItems) {
+        const it = pl.items[si];
+        if (si < wi && it.x + it.w > prevSolidEnd) prevSolidEnd = it.x + it.w;
+        if (si > wi && it.x < nextSolidStart) nextSolidStart = it.x;
+      }
+      wire.x = prevSolidEnd;
+      wire.w = nextSolidStart - prevSolidEnd;
+    }
+  }
+
   // Update totalW
   for (const pl of positioned) {
     const lastItem = pl.items[pl.items.length - 1];
