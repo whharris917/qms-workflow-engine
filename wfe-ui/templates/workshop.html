@@ -377,7 +377,7 @@ const C = {
   arrowW: 12,      // rejoin arrow width
   dotR: 3.5,       // step dot radius
 
-  // Colors
+  // Colors (monochrome — structure communicates semantics)
   white: '#fff',
   bg: '#fafbfc',
   grayBorder: '#e5e7eb',
@@ -388,18 +388,12 @@ const C = {
   grayRefBg: '#f9fafb',
   grayRefBorder: '#9ca3af',
   grayRefText: '#6b7280',
-  amberBg: '#fffbeb',
-  amberBorder: '#fcd34d',
-  amberText: '#92400e',
-  amberRefBorder: '#f59e0b',
-  amberLine: '#f59e0b',
-  amberCondBg: '#fef3c7',
-  blueBg: '#eff6ff',
-  blueBorder: '#93c5fd',
-  blueText: '#1e40af',
-  blueRefBorder: '#3b82f6',
-  blueLine: '#93c5fd',
-  blueCondBg: '#dbeafe',
+  bpBg: '#f3f4f6',
+  bpBorder: '#9ca3af',
+  bpText: '#374151',
+  barColor: '#9ca3af',
+  condBg: '#f3f4f6',
+  condText: '#374151',
 };
 
 // Shared measurement canvas
@@ -448,10 +442,17 @@ function layout(lines) {
         }
         case 'branch-point': {
           const textW = tw(elem.title, C.fontBold);
-          const iconW = 14;
-          const w = iconW + textW + C.stepPadX * 2;
-          item = { kind:'branch-point', x, y, w, h: C.stepH, title: elem.title,
-                   type: elem.type, groupId: elem.groupId, textW, iconW };
+          const h = C.stepH;
+          let w;
+          if (elem.type === 'gate') {
+            // Hexagon: text area + chevron points on each side
+            w = textW + C.stepPadX * 2 + h * 0.5;
+          } else {
+            // Fork: rectangle with double bars on each side
+            w = textW + C.stepPadX * 2 + 16;
+          }
+          item = { kind:'branch-point', x, y, w, h, title: elem.title,
+                   type: elem.type, groupId: elem.groupId, textW };
           x += w;
           break;
         }
@@ -771,7 +772,7 @@ function drawSchematic(canvas, layoutData) {
     ctx.beginPath();
     ctx.moveTo(vb.x, vb.y1);
     ctx.lineTo(vb.x, vb.y2);
-    ctx.strokeStyle = vb.type === 'gate' ? C.amberLine : C.blueLine;
+    ctx.strokeStyle = C.barColor;
     ctx.lineWidth = 2;
     if (vb.type === 'gate') ctx.setLineDash([4, 3]);
     else ctx.setLineDash([]);
@@ -816,28 +817,57 @@ function drawSchematic(canvas, layoutData) {
           break;
 
         case 'branch-point': {
-          const bg = item.type === 'gate' ? C.amberBg : C.blueBg;
-          const border = item.type === 'gate' ? C.amberBorder : C.blueBorder;
-          const text = item.type === 'gate' ? C.amberText : C.blueText;
-          drawPill(ctx, item.x, cy - item.h / 2, item.w, item.h, C.stepR, bg, border, 1.5);
-          // Icon
-          ctx.font = C.fontSmall;
-          ctx.fillStyle = text;
-          ctx.textBaseline = 'middle';
-          const icon = item.type === 'gate' ? '\u25C7' : '\u2225';
-          ctx.fillText(icon, item.x + 10, cy);
-          // Title
+          if (item.type === 'gate') {
+            // Hexagon: rectangle with < on left and > on right
+            const hh = item.h / 2;
+            const pointW = hh * 0.5; // how far the < and > extend
+            ctx.beginPath();
+            ctx.moveTo(item.x + pointW, cy - hh);          // top-left
+            ctx.lineTo(item.x + item.w - pointW, cy - hh); // top-right
+            ctx.lineTo(item.x + item.w, cy);                // right point
+            ctx.lineTo(item.x + item.w - pointW, cy + hh); // bottom-right
+            ctx.lineTo(item.x + pointW, cy + hh);          // bottom-left
+            ctx.lineTo(item.x, cy);                         // left point
+            ctx.closePath();
+            ctx.fillStyle = C.bpBg;
+            ctx.fill();
+            ctx.strokeStyle = C.bpBorder;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          } else {
+            // Fork: rounded rect with double vertical bars on each side
+            drawPill(ctx, item.x, cy - item.h / 2, item.w, item.h, 4, C.bpBg, C.bpBorder, 1.5);
+            // Left double bars
+            ctx.strokeStyle = C.bpBorder;
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(item.x + 6, cy - item.h / 2 + 5);
+            ctx.lineTo(item.x + 6, cy + item.h / 2 - 5);
+            ctx.moveTo(item.x + 10, cy - item.h / 2 + 5);
+            ctx.lineTo(item.x + 10, cy + item.h / 2 - 5);
+            ctx.stroke();
+            // Right double bars
+            ctx.beginPath();
+            ctx.moveTo(item.x + item.w - 6, cy - item.h / 2 + 5);
+            ctx.lineTo(item.x + item.w - 6, cy + item.h / 2 - 5);
+            ctx.moveTo(item.x + item.w - 10, cy - item.h / 2 + 5);
+            ctx.lineTo(item.x + item.w - 10, cy + item.h / 2 - 5);
+            ctx.stroke();
+          }
+          // Title (centered)
           ctx.font = C.fontBold;
-          ctx.fillText(item.title, item.x + item.iconW + 10, cy);
+          ctx.fillStyle = C.bpText;
+          ctx.textBaseline = 'middle';
+          ctx.textAlign = 'center';
+          ctx.fillText(item.title, item.x + item.w / 2, cy);
+          ctx.textAlign = 'start';
           break;
         }
 
         case 'cond': {
-          const bg = item.type === 'gate' ? C.amberCondBg : C.blueCondBg;
-          const text = item.type === 'gate' ? C.amberText : C.blueText;
-          drawPill(ctx, item.x, cy - item.h / 2, item.w, item.h, item.h / 2, bg, 'transparent', 0);
+          drawPill(ctx, item.x, cy - item.h / 2, item.w, item.h, item.h / 2, C.condBg, C.grayBorder, 1.5);
           ctx.font = C.fontSmall;
-          ctx.fillStyle = text;
+          ctx.fillStyle = C.condText;
           ctx.textBaseline = 'middle';
           ctx.fillText(item.text, item.x + C.condPadX, cy);
           break;
