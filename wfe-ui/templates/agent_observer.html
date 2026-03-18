@@ -74,6 +74,7 @@
         </div>
     </div>
 <script src="https://unpkg.com/elkjs@0.9.3/lib/elk.bundled.js"></script>
+<script src="/static/schematic.js"></script>
 <script>
 /* ======================================================================
    ELK.js INTEGRATION — automatic graph layout via Sugiyama algorithm
@@ -765,9 +766,9 @@ function wfRenderBanner(state) {
     var current = s.lifecycle_current || '';
     var completed = s.lifecycle_completed || [];
 
-    /* If we have a topology-aware definition, render mini flowchart */
+    /* If we have a topology-aware definition, render schematic banner */
     if (defn && defn.nodes && defn.nodes.length) {
-        return _wfMiniFlowchart(defn, current, completed);
+        return _wfSchematicBanner(defn, current, completed);
     }
 
     /* Legacy flat banner */
@@ -790,7 +791,31 @@ function wfRenderBanner(state) {
     return html + '</div>';
 }
 
-/* ── Mini flowchart banner — ELK-powered horizontal layout ── */
+/* ── Schematic banner — canvas-based spine model layout ── */
+function _wfSchematicBanner(defn, current, completed) {
+    var containerId = 'sch-banner-' + Math.random().toString(36).substr(2, 6);
+
+    // Render synchronously after the DOM element exists
+    setTimeout(function() {
+        var el = document.getElementById(containerId);
+        if (!el) return;
+        try {
+            var spine = Schematic.definitionToSpine(defn);
+            var execState = { current: current, completed: completed };
+            var canvas = document.createElement('canvas');
+            canvas.style.display = 'block';
+            var layoutData = Schematic.renderWorkflow(spine, canvas, execState);
+            el.appendChild(canvas);
+            el.style.height = layoutData.height + 'px';
+        } catch (e) {
+            el.innerHTML = '<span style="color:#999;font-size:0.8rem;">Banner error: ' + e.message + '</span>';
+        }
+    }, 0);
+
+    return '<div class="wf-banner wf-banner-flow" id="' + containerId + '" style="min-height:52px;"></div>';
+}
+
+/* ── Mini flowchart banner — ELK-powered horizontal layout (legacy) ── */
 var _MB = {
     h: 24, minW: 60, charW: 5, px: 10, r: 4,   /* node: height, min-width, char-width, padding, corner-radius */
     fontSize: 9
@@ -3753,6 +3778,43 @@ function _scopeFC(sel, css) { return css.replace(/\.fc-/g, sel + ' .fc-'); }
         },
         update: function(state, msg, feedback) { _expDPage(container, state, msg, feedback, true); },
         activate: function() {}, deactivate: function() {}
+    });
+})();
+
+
+/* ======================================================================
+   SCHEMATIC RENDERER (exp-e) — canvas-based spine model layout
+   ====================================================================== */
+(function() {
+    var canvas;
+    registerRenderer({
+        id: 'exp-e', label: 'Schematic', format: 'schematic',
+        style: 'light', style_label: 'Light',
+        init: function(c) {
+            c.style.cssText = 'overflow:auto;padding:0;background:#fafbfc;';
+            canvas = document.createElement('canvas');
+            canvas.style.display = 'block';
+            c.appendChild(canvas);
+        },
+        update: function(state, msg, feedback) {
+            if (!state || !state.state) return;
+            var s = state.state;
+            var defn = s.definition;
+            if (!defn || !defn.nodes || !defn.nodes.length) return;
+
+            try {
+                var spine = Schematic.definitionToSpine(defn);
+                var execState = {
+                    current: s.node || s.lifecycle_current || null,
+                    completed: s.completed_nodes || s.lifecycle_completed || []
+                };
+                Schematic.renderWorkflow(spine, canvas, execState);
+            } catch (e) {
+                canvas.parentNode.innerHTML = '<pre style="color:red;padding:1rem;">Schematic error: ' + e.message + '\n' + e.stack + '</pre>';
+            }
+        },
+        activate: function() {},
+        deactivate: function() {}
     });
 })();
 

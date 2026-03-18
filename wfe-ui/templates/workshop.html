@@ -22,6 +22,7 @@
 
 <div id="workshop"></div>
 
+<script src="/static/schematic.js"></script>
 <script>
 // ═══════════════════════════════════════════════════════════════════
 // DATA
@@ -297,14 +298,11 @@ const WORKFLOWS = [
     desc: 'Adversarial layout: 4 sequential BPs on main spine, sequential BPs inside branches, fork-inside-fork, gate-inside-branch-of-fork-inside-route-of-gate (5 nesting levels), asymmetric branch depths.',
     spine: [
       { type:'step', id:'detect', title:'Detect' },
-      // ── Sequential BP #1: gate ──
       { type:'gate', id:'severity', title:'Severity', routes: [
         { label:'Critical', condition:'sev = Critical', path: [
-          // Sequential BPs WITHIN a route: fork then step
           { type:'split', id:'mobilize', title:'Mobilize', branches: [
             { label:'Command', path: [
               { type:'step', id:'activate', title:'Activate' },
-              // Gate inside branch of fork inside route of gate = 4 deep
               { type:'gate', id:'scope', title:'Scope', routes: [
                 { label:'Full', condition:'scope = Full', path: [
                   { type:'step', id:'full_lockdown', title:'Full Lockdown' },
@@ -324,7 +322,6 @@ const WORKFLOWS = [
             ]},
             { label:'Technical', path: [
               { type:'step', id:'triage', title:'Triage' },
-              // Fork inside branch of fork = nested fork
               { type:'split', id:'parallel_fix', title:'Parallel Fix', branches: [
                 { label:'Primary', path: [
                   { type:'step', id:'hotfix', title:'Hotfix' },
@@ -351,7 +348,6 @@ const WORKFLOWS = [
         ]},
       ]},
       { type:'step', id:'checkpoint', title:'Checkpoint' },
-      // ── Sequential BP #2: fork ──
       { type:'split', id:'remediation', title:'Remediation', branches: [
         { label:'Short-term', path: [
           { type:'step', id:'patch', title:'Patch' },
@@ -359,7 +355,6 @@ const WORKFLOWS = [
         ]},
         { label:'Long-term', path: [
           { type:'step', id:'design', title:'Design' },
-          // Gate inside branch of fork = sequential BP inside branch
           { type:'gate', id:'approach', title:'Approach', routes: [
             { label:'Refactor', condition:'approach = Refactor', path: [
               { type:'step', id:'plan_refactor', title:'Plan' },
@@ -379,7 +374,6 @@ const WORKFLOWS = [
           { type:'step', id:'train_staff', title:'Train Staff' },
         ]},
       ], merge: { id:'remed_merge', title:'Consolidate' }},
-      // ── Sequential BP #3: gate ──
       { type:'gate', id:'disposition', title:'Disposition', routes: [
         { label:'Closed', condition:'status = Closed', path: [
           { type:'step', id:'signoff', title:'Sign Off' },
@@ -390,7 +384,6 @@ const WORKFLOWS = [
           { type:'step', id:'final_assessment', title:'Final Assessment' },
         ]},
       ]},
-      // ── Sequential BP #4: fork (lightweight, tests 4-way overlap) ──
       { type:'split', id:'closeout', title:'Close-out', branches: [
         { label:'Internal', path: [
           { type:'step', id:'lessons', title:'Lessons Learned' },
@@ -422,7 +415,6 @@ const WORKFLOWS = [
           { type:'step', id:'safety_profile', title:'Safety Profile' },
         ]},
         { label:'Phase II', condition:'phase = Phase II', path: [
-          // Fork inside route: parallel efficacy tracks
           { type:'split', id:'efficacy_fork', title:'Efficacy Tracks', branches: [
             { label:'Primary Endpoint', path: [
               { type:'step', id:'primary_enroll', title:'Enroll' },
@@ -437,12 +429,10 @@ const WORKFLOWS = [
           { type:'step', id:'phase2_report', title:'Interim Report' },
         ]},
         { label:'Phase III', condition:'phase = Phase III', path: [
-          // Fork inside route, with a router inside one branch
           { type:'split', id:'p3_fork', title:'Multi-Site Trial', branches: [
             { label:'Site A', path: [
               { type:'step', id:'a_recruit', title:'Recruit' },
               { type:'step', id:'a_run', title:'Run Protocol' },
-              // Router inside branch of fork inside route of gate
               { type:'gate', id:'a_interim', title:'Interim Analysis', routes: [
                 { label:'Continue', condition:'result = Favorable', path: [
                   { type:'step', id:'a_continue', title:'Continue Enrollment' },
@@ -465,7 +455,6 @@ const WORKFLOWS = [
             { label:'Site C', path: [
               { type:'step', id:'c_recruit', title:'Recruit' },
               { type:'step', id:'c_run', title:'Run Protocol' },
-              // Fork inside branch of fork (fork-in-fork)
               { type:'split', id:'c_sub_fork', title:'Sub-Study', branches: [
                 { label:'Genomic', path: [
                   { type:'step', id:'c_genomic', title:'Sequence' },
@@ -489,11 +478,9 @@ const WORKFLOWS = [
         ]},
       ]},
       { type:'step', id:'data_lock', title:'Data Lock' },
-      // ── Main spine BP #2: fork (parallel workstreams, one with nested router) ──
       { type:'split', id:'submission_fork', title:'Submission Prep', branches: [
         { label:'Regulatory', path: [
           { type:'step', id:'compile_csr', title:'Compile CSR' },
-          // Router inside branch of fork on main spine
           { type:'gate', id:'reg_pathway', title:'Reg Pathway', routes: [
             { label:'Standard', condition:'pathway = Standard', path: [
               { type:'step', id:'nda_draft', title:'Draft NDA' },
@@ -519,7 +506,6 @@ const WORKFLOWS = [
         ]},
         { label:'Commercial', path: [
           { type:'step', id:'market_analysis', title:'Market Analysis' },
-          // Fork inside branch of fork (nested fork)
           { type:'split', id:'launch_prep', title:'Launch Prep', branches: [
             { label:'Medical Affairs', path: [
               { type:'step', id:'kol_engage', title:'KOL Engagement' },
@@ -532,7 +518,6 @@ const WORKFLOWS = [
           ], merge: { id:'launch_merge', title:'Launch Readiness' }},
         ]},
       ], merge: { id:'sub_merge', title:'Dossier Complete' }},
-      // ── Main spine BP #3: gate ──
       { type:'gate', id:'agency_decision', title:'Agency Decision', routes: [
         { label:'Approved', condition:'decision = Approved', path: [
           { type:'step', id:'label_negotiate', title:'Label Negotiation' },
@@ -546,7 +531,6 @@ const WORKFLOWS = [
           { type:'step', id:'appeal', title:'Appeal' },
         ]},
       ]},
-      // ── Main spine BP #4: fork ──
       { type:'split', id:'launch_fork', title:'Launch', branches: [
         { label:'Supply Chain', path: [
           { type:'step', id:'produce', title:'Production Run' },
@@ -555,7 +539,6 @@ const WORKFLOWS = [
         { label:'Market Access', path: [
           { type:'step', id:'pricing', title:'Pricing' },
           { type:'step', id:'payer_negotiate', title:'Payer Negotiation' },
-          // Router inside branch of launch fork
           { type:'gate', id:'reimburse', title:'Reimbursement', routes: [
             { label:'Formulary', condition:'type = Formulary', path: [
               { type:'step', id:'formulary_app', title:'Application' },
@@ -568,7 +551,6 @@ const WORKFLOWS = [
           { type:'step', id:'access_confirm', title:'Confirm Access' },
         ]},
       ], merge: { id:'launch_merge2', title:'Market Entry' }},
-      // ── Main spine BP #5: gate ──
       { type:'gate', id:'lifecycle', title:'Lifecycle', routes: [
         { label:'Grow', condition:'strategy = Grow', path: [
           { type:'step', id:'line_ext', title:'Line Extension' },
@@ -633,27 +615,21 @@ const WORKFLOWS = [
     spine: [
       { type:'step', id:'cc_start', title:'Start' },
       { type:'gate', id:'cc_outer', title:'Outer Gate', routes: [
-        // Route 1: minimal content — pulls convergenceX left
         { label:'Trivial', condition:'path = Trivial', path: [
           { type:'step', id:'cc_done', title:'Done' },
         ]},
-        // Route 2: massive nested content — pushes convergenceX far right
         { label:'Complex', condition:'path = Complex', path: [
           { type:'step', id:'cc_initial', title:'Initial Assessment With Extended Review Period' },
           { type:'split', id:'cc_mid_fork', title:'Parallel Workstreams', branches: [
-            // Branch A: minimal — creates max asymmetry with Branch B
             { label:'Quick Track', path: [
               { type:'step', id:'cc_qt', title:'Fast' },
             ]},
-            // Branch B: deep nesting with wide content at every level
             { label:'Comprehensive Analysis Track', path: [
               { type:'step', id:'cc_gather', title:'Gather Requirements From All Stakeholders' },
               { type:'gate', id:'cc_inner_gate', title:'Complexity Assessment', routes: [
-                // Inner route 1: minimal
                 { label:'Straightforward', condition:'complexity = Low', path: [
                   { type:'step', id:'cc_simple', title:'Apply Standard Resolution' },
                 ]},
-                // Inner route 2: another fork with wide content
                 { label:'Multi-Dimensional', condition:'complexity = High', path: [
                   { type:'split', id:'cc_deep_fork', title:'Deep Investigation', branches: [
                     { label:'Root Cause Analysis Stream', path: [
@@ -684,7 +660,6 @@ const WORKFLOWS = [
           ], merge: { id:'cc_mid_merge', title:'Reconcile Parallel Findings' }},
           { type:'step', id:'cc_document', title:'Document Final Determination With Full Traceability' },
         ]},
-        // Route 3: medium content — convergenceX must accommodate this too
         { label:'Moderate', condition:'path = Moderate', path: [
           { type:'step', id:'cc_eval', title:'Evaluate Intermediate Criteria' },
           { type:'step', id:'cc_decide', title:'Make Determination Based On Available Evidence' },
@@ -694,972 +669,6 @@ const WORKFLOWS = [
     ],
   },
 ];
-
-// ═══════════════════════════════════════════════════════════════════
-// FLATTEN SPINE → LINES
-// ═══════════════════════════════════════════════════════════════════
-
-let _refCounter = 0;
-function resetRefs() { _refCounter = 0; }
-function nextRef() {
-  const n = _refCounter++;
-  return String.fromCharCode(65 + (n % 26)) + (n >= 26 ? Math.floor(n / 26) : '');
-}
-
-function flattenSpine(spine, depth, rejoinRef) {
-  const lines = [];
-  let cur = { depth, elements: [] };
-
-  function wire() { if (cur.elements.length > 0) cur.elements.push({ kind:'wire' }); }
-
-  function emitSimplePath(pathSegs, startElements, d, endRef) {
-    const line = { depth: d, elements: [...startElements], rejoinLabel: endRef };
-    const sr = startElements.find(e => e.kind === 'ref');
-    if (sr) { line.branchLabel = sr.label; line.branchType = sr.type; if (sr.type === 'rejoin') line.isContinuation = true; }
-    for (const s of pathSegs) {
-      line.elements.push({ kind:'wire' });
-      line.elements.push({ kind:'step', title: s.title });
-    }
-    line.elements.push({ kind:'rejoin-arrow' });
-    line.elements.push({ kind:'ref', label: endRef, type:'rejoin' });
-    lines.push(line);
-  }
-
-  // Returns an array of "deferred" lines that should be emitted after the
-  // parent group closes (continuation lines that escape nested branches).
-  function emitPath(pathSegs, startElements, d, endRef) {
-    if (pathSegs.length === 0) {
-      const line = { depth: d, elements: [...startElements], rejoinLabel: endRef };
-      const sr = startElements.find(e => e.kind === 'ref');
-      if (sr) { line.branchLabel = sr.label; line.branchType = sr.type; if (sr.type === 'rejoin') line.isContinuation = true; }
-      line.elements.push({ kind:'rejoin-arrow' });
-      line.elements.push({ kind:'ref', label: endRef, type:'rejoin' });
-      lines.push(line);
-      return [];
-    }
-    const hasBranch = pathSegs.some(s => s.type === 'gate' || s.type === 'split');
-    if (!hasBranch) { emitSimplePath(pathSegs, startElements, d, endRef); return []; }
-    const subLines = flattenSpine(pathSegs, d, endRef);
-    if (subLines.length === 0) return [];
-
-    // Split sub-lines BEFORE prepending startElements.
-    // Find the last line that starts with a rejoin ref and has branch-scoped
-    // lines before it — that's the post-branch continuation that should escape.
-    const branchLines = [];
-    const contLines = [];
-    let seenBranchPoint = false;
-    let lastRejoinStart = -1;
-
-    for (let si = 0; si < subLines.length; si++) {
-      if (subLines[si].elements.find(e => e.kind === 'branch-point')) seenBranchPoint = true;
-      if (seenBranchPoint && subLines[si].isContinuation) {
-        lastRejoinStart = si;
-      }
-    }
-
-    if (lastRejoinStart > 0) {
-      for (let si = 0; si < lastRejoinStart; si++) branchLines.push(subLines[si]);
-      for (let si = lastRejoinStart; si < subLines.length; si++) {
-        subLines[si].depth = Math.max(0, d - 1);
-        contLines.push(subLines[si]);
-      }
-    } else {
-      branchLines.push(...subLines);
-    }
-
-    // Prepend startElements onto the first branch line and update metadata
-    if (branchLines.length > 0) {
-      branchLines[0].elements = [...startElements, { kind:'wire' }, ...branchLines[0].elements];
-      const sr = startElements.find(e => e.kind === 'ref');
-      if (sr) {
-        branchLines[0].branchLabel = sr.label;
-        branchLines[0].branchType = sr.type;
-        if (sr.type === 'rejoin') branchLines[0].isContinuation = true;
-      }
-    }
-
-    lines.push(...branchLines);
-    return contLines;
-  }
-
-  // Tag lines whose first ref marker label is in the given set.
-  // This ensures only direct branch/route lines get tagged, not
-  // continuation lines after nested branch points.
-  function tagGroupByRefs(arr, startIdx, refLabels, type, gid, rejoinLabel) {
-    for (let gi = startIdx; gi < arr.length; gi++) {
-      if (arr[gi].branchLabel && refLabels.includes(arr[gi].branchLabel)) {
-        if (!arr[gi].groups) arr[gi].groups = [];
-        arr[gi].groups.push({ type, gid, rejoinLabel });
-      }
-    }
-  }
-
-  for (let i = 0; i < spine.length; i++) {
-    const seg = spine[i];
-    if (seg.type === 'step') {
-      wire();
-      cur.elements.push({ kind:'step', title: seg.title });
-    }
-    else if (seg.type === 'gate') {
-      wire();
-      const gid = 'g' + _refCounter;
-      cur.elements.push({ kind:'branch-point', title: seg.title, type:'gate', groupId: gid });
-      const rejoinLabel = nextRef();
-      const routeRefs = seg.routes.map(() => nextRef());
-      lines.push(cur);
-      const gs = lines.length;
-      for (let ri = 0; ri < seg.routes.length; ri++) {
-        const route = seg.routes[ri];
-        const start = [{ kind:'ref', label: routeRefs[ri], type:'gate' }];
-        if (route.condition) start.push({ kind:'cond', text: route.condition, type:'gate' });
-        const cont = emitPath(route.path, start, depth + 1, rejoinLabel);
-        lines.push(...cont); // continuation right after this route's lines
-      }
-      tagGroupByRefs(lines, gs, routeRefs, 'gate', gid, rejoinLabel);
-      cur = { depth, elements: [{ kind:'ref', label: rejoinLabel, type:'rejoin' }],
-              branchLabel: rejoinLabel, branchType: 'rejoin', isContinuation: true };
-    }
-    else if (seg.type === 'split') {
-      wire();
-      const gid = 'g' + _refCounter;
-      cur.elements.push({ kind:'branch-point', title: seg.title, type:'split', groupId: gid });
-      const mergeLabel = nextRef();
-      const branchRefs = seg.branches.map(() => nextRef());
-      lines.push(cur);
-      const gs2 = lines.length;
-      for (let bi = 0; bi < seg.branches.length; bi++) {
-        const branch = seg.branches[bi];
-        const start = [
-          { kind:'ref', label: branchRefs[bi], type:'split' },
-          { kind:'cond', text: branch.label, type:'split' },
-        ];
-        const cont = emitPath(branch.path, start, depth + 1, mergeLabel);
-        lines.push(...cont); // continuation right after this branch's lines
-      }
-      tagGroupByRefs(lines, gs2, branchRefs, 'split', gid, mergeLabel);
-      cur = { depth, elements: [{ kind:'ref', label: mergeLabel, type:'rejoin' }],
-              branchLabel: mergeLabel, branchType: 'rejoin', isContinuation: true };
-      if (seg.merge) { cur.elements.push({ kind:'step', title: seg.merge.title }); }
-    }
-  }
-
-  if (rejoinRef && cur.elements.length > 0) {
-    cur.rejoinLabel = rejoinRef;
-    if (!cur.branchLabel) { cur.branchLabel = rejoinRef; cur.branchType = 'rejoin'; cur.isContinuation = true; }
-    cur.elements.push({ kind:'rejoin-arrow' });
-    cur.elements.push({ kind:'ref', label: rejoinRef, type:'rejoin' });
-  }
-  if (cur.elements.length > 0) lines.push(cur);
-
-  return lines;
-}
-
-// Tree-based ordering and Y-assignment. Walks the branch-point tree depth-first,
-// assigning Y positions recursively so each spine segment computes its own Y range
-// independently. The only coupling between sequential segments is the bridge point
-// where one segment's total height determines the next segment's starting Y.
-//
-// Leaf continuations (no BP) share Y with their BP line.
-// Non-leaf continuations (containing a BP) get their own row — a bridge that
-// starts a new independent Y context for the next segment.
-function treeOrderLines(lines) {
-  const rowStep = C.lineH + C.lineGap;
-
-  // Index: groupId → member line indices (branch/route lines)
-  const groupMembers = {};
-  // Index: groupId → rejoin label (from group tags set during flattening)
-  const groupRejoinLabel = {};
-  // Index: rejoinLabel → continuation line index
-  const continuationFor = {};
-
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].groups) {
-      for (const g of lines[i].groups) {
-        if (!groupMembers[g.gid]) groupMembers[g.gid] = [];
-        groupMembers[g.gid].push(i);
-        if (g.rejoinLabel) groupRejoinLabel[g.gid] = g.rejoinLabel;
-      }
-    }
-    if (lines[i].isContinuation && lines[i].branchLabel) {
-      continuationFor[lines[i].branchLabel] = i;
-    }
-  }
-
-  const visited = new Set();
-  const result = [];
-
-  // Recursively assign Y positions. Returns the next free Y after this
-  // line and its entire subtree.
-  function assignY(idx, startY) {
-    if (visited.has(idx)) return startY;
-    visited.add(idx);
-    const line = lines[idx];
-    line._assignedY = startY;
-    result.push(line);
-
-    // If no branch-point, this is a leaf line — consumes one row.
-    const bp = line.elements.find(e => e.kind === 'branch-point');
-    if (!bp) return startY + rowStep;
-
-    const gid = bp.groupId;
-    const members = groupMembers[gid] || [];
-
-    // Continuation — process first to determine if it shares this row
-    const rejoinLabel = groupRejoinLabel[gid];
-    let contSubtreeBottom = startY + rowStep; // default: no continuation subtree
-
-    if (rejoinLabel && continuationFor[rejoinLabel] !== undefined) {
-      const contIdx = continuationFor[rejoinLabel];
-      const contLine = lines[contIdx];
-      const hasBP = contLine.elements.find(e => e.kind === 'branch-point');
-
-      // Strip leading ref + wire so content starts directly
-      while (contLine.elements.length > 0 &&
-             (contLine.elements[0].kind === 'ref' || contLine.elements[0].kind === 'wire')) {
-        contLine.elements.shift();
-      }
-
-      if (!hasBP) {
-        // Leaf continuation: share row, no subtree of its own
-        contLine._assignedY = startY;
-        visited.add(contIdx);
-        result.push(contLine);
-      } else {
-        // Non-leaf continuation: shares this row, but its BP starts an
-        // independent subtree. Both this BP's branches and the continuation's
-        // branches start at startY + rowStep, occupying overlapping Y space
-        // at different X positions.
-        contSubtreeBottom = assignY(contIdx, startY);
-      }
-    }
-
-    // Branches occupy Y slots below this line (same starting Y as
-    // any continuation subtree — they coexist at different X positions)
-    let branchY = startY + rowStep;
-    for (const mi of members) {
-      branchY = assignY(mi, branchY);
-    }
-
-    // Total height = whichever subtree is taller
-    return Math.max(branchY, contSubtreeBottom);
-  }
-
-  // Start from line 0; loop ensures no orphaned lines are dropped.
-  let y = C.padY;
-  for (let i = 0; i < lines.length; i++) {
-    if (!visited.has(i)) {
-      y = assignY(i, y);
-    }
-  }
-
-  return result;
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// CANVAS LAYOUT ENGINE
-// ═══════════════════════════════════════════════════════════════════
-
-const C = {
-  font: '13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  fontBold: '600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  fontSmall: '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  fontSmallBold: '600 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  fontRef: 'bold 9px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  lineH: 36,       // line height (vertical space per line)
-  lineGap: 4,      // gap between lines
-  padX: 20,        // left/right canvas padding
-  padY: 16,        // top/bottom canvas padding
-  depthIndent: 28,  // pixels per depth level
-  wireW: 20,       // wire length
-  refR: 12,        // ref circle radius
-  stepPadX: 13,    // step pill horizontal padding
-  stepH: 30,       // step pill height
-  stepR: 15,       // step pill corner radius
-  condPadX: 8,     // condition label horizontal padding
-  condH: 20,       // condition label height
-  arrowW: 12,      // rejoin arrow width
-  dotR: 3.5,       // step dot radius
-
-  // Colors (monochrome — structure communicates semantics)
-  white: '#fff',
-  bg: '#fafbfc',
-  grayBorder: '#e5e7eb',
-  grayText: '#374151',
-  grayDot: '#6b7280',
-  grayWire: '#d1d5db',
-  grayLight: '#9ca3af',
-  grayRefBg: '#f9fafb',
-  grayRefBorder: '#9ca3af',
-  grayRefText: '#6b7280',
-  bpBg: '#f3f4f6',
-  bpBorder: '#9ca3af',
-  bpText: '#374151',
-  barColor: '#9ca3af',
-  condBg: '#f3f4f6',
-  condText: '#374151',
-};
-
-// Shared measurement canvas
-const _mc = document.createElement('canvas').getContext('2d');
-function tw(text, font) { _mc.font = font || C.font; return _mc.measureText(text).width; }
-
-// Layout: compute x,y,w,h for every element on every line.
-// Returns { width, height, lines: [ { y, items: [ {kind,x,y,w,h,...} ] } ], vbars: [] }
-function layout(lines) {
-  const positioned = [];
-  let totalW = 0;
-
-  // First pass: lay out each line left-to-right, record content width (before rejoin)
-  // Y positions are pre-assigned by treeOrderLines via _assignedY.
-  for (let li = 0; li < lines.length; li++) {
-    const line = lines[li];
-    const y = line._assignedY;
-    const indent = C.padX + line.depth * C.depthIndent;
-    let x = indent;
-    const items = [];
-    let contentEndX = 0; // X after the last non-rejoin element
-    let rejoinStartIdx = -1;
-
-    for (let ei = 0; ei < line.elements.length; ei++) {
-      const elem = line.elements[ei];
-      let item;
-
-      switch (elem.kind) {
-        case 'step': {
-          const textW = tw(elem.title, C.font);
-          const dotSpace = C.dotR * 2 + 5; // dot diameter + gap
-          const w = C.stepPadX + dotSpace + textW + C.stepPadX;
-          item = { kind:'step', x, y, w, h: C.stepH, title: elem.title, textW, dotSpace };
-          x += w;
-          break;
-        }
-        case 'wire': {
-          item = { kind:'wire', x, y, w: C.wireW };
-          x += C.wireW;
-          break;
-        }
-        case 'ref': {
-          item = { kind:'ref', x, y, w: 0, h: 0, label: elem.label, type: elem.type };
-          break;
-        }
-        case 'branch-point': {
-          const textW = tw(elem.title, C.fontBold);
-          const h = C.stepH;
-          let w;
-          if (elem.type === 'gate') {
-            // Hexagon: text area + chevron points on each side
-            w = textW + C.stepPadX * 2 + h * 0.5;
-          } else {
-            // Fork: rectangle with double bars on each side
-            w = textW + C.stepPadX * 2 + 16;
-          }
-          item = { kind:'branch-point', x, y, w, h, title: elem.title,
-                   type: elem.type, groupId: elem.groupId, textW };
-          x += w;
-          break;
-        }
-        case 'cond': {
-          const textW = tw(elem.text, C.fontSmall);
-          const w = textW + C.condPadX * 2;
-          item = { kind:'cond', x: x + 4, y, w, h: C.condH, text: elem.text, type: elem.type };
-          x += w + 4;
-          break;
-        }
-        case 'rejoin-arrow': {
-          rejoinStartIdx = items.length;
-          item = { kind:'rejoin-arrow', x, y, w: C.arrowW };
-          x += C.arrowW;
-          break;
-        }
-      }
-
-      if (item) {
-        if (rejoinStartIdx === -1) contentEndX = x;
-        items.push(item);
-      }
-    }
-
-    positioned.push({ y, items, contentEndX, rejoinStartIdx, depth: line.depth,
-                       rejoinLabel: line.rejoinLabel, groups: line.groups,
-                       isContinuation: line.isContinuation, branchLabel: line.branchLabel,
-                       _assignedY: line._assignedY,
-                       totalContentW: x });
-    totalW = Math.max(totalW, x + C.padX);
-  }
-
-  // Identify continuation lines whose first visible item is a branch-point.
-  // These nodes have both an incoming convergence bar and an outgoing divergence
-  // bar, which need horizontal displacement to read as two distinct connections.
-  const contWithBP = new Set();
-  for (const pl of positioned) {
-    if (pl.isContinuation) {
-      const first = pl.items.find(it => it.kind === 'step' || it.kind === 'branch-point');
-      if (first && first.kind === 'branch-point') contWithBP.add(pl);
-    }
-  }
-
-  // For each group whose BP sits on a contWithBP line, compute displacement
-  // from the widest condition label so branches clear the convergence bar.
-  const groupDisplace = {}; // gid → displacement pixels
-
-  // Group alignment: center branch lines' cond labels on parent branch-point.
-  // Extracted as a function so it can be re-run after convergence shifts.
-  const groupOrder = [];
-  for (const pl of positioned) {
-    for (const item of pl.items) {
-      if (item.kind === 'branch-point' && item.groupId) {
-        groupOrder.push({ gid: item.groupId, depth: pl.depth });
-        // Compute displacement for BPs on continuation lines
-        if (contWithBP.has(pl)) {
-          let maxCondW = 0;
-          for (const pl2 of positioned) {
-            if (!pl2.groups) continue;
-            for (const g of pl2.groups) {
-              if (g.gid === item.groupId) {
-                const ci = pl2.items.find(it => it.kind === 'cond');
-                if (ci) maxCondW = Math.max(maxCondW, ci.w);
-                break;
-              }
-            }
-          }
-          groupDisplace[item.groupId] = maxCondW / 2 + 8;
-        }
-      }
-    }
-  }
-  groupOrder.sort((a, b) => a.depth - b.depth);
-
-  function alignGroups() {
-    for (const { gid } of groupOrder) {
-      let targetX;
-      for (const pl of positioned) {
-        for (const item of pl.items) {
-          if (item.kind === 'branch-point' && item.groupId === gid) {
-            targetX = item.x + item.w / 2;
-          }
-        }
-      }
-      if (targetX === undefined) continue;
-
-      // If this group's BP is on a continuation line, shift the alignment
-      // target right so branch labels clear the incoming convergence bar.
-      targetX += groupDisplace[gid] || 0;
-
-      for (const pl of positioned) {
-        if (!pl.groups) continue;
-        let deepestGid = null;
-        let deepestDepth = -1;
-        for (const g of pl.groups) {
-          const d = groupOrder.find(go => go.gid === g.gid)?.depth ?? -1;
-          if (d > deepestDepth) { deepestDepth = d; deepestGid = g.gid; }
-        }
-        if (deepestGid !== gid) continue;
-        const condItem = pl.items.find(it => it.kind === 'cond');
-        const anchor = condItem || pl.items.find(it => it.kind === 'step' || it.kind === 'wire');
-        if (!anchor) continue;
-        const anchorCx = anchor.x + anchor.w / 2;
-        const shift = targetX - anchorCx;
-        if (Math.abs(shift) > 0.5) {
-          for (const item of pl.items) {
-            item.x += shift;
-          }
-          pl.totalContentW += shift;
-          pl.contentEndX += shift;
-        }
-      }
-    }
-  }
-
-  // Second pass: initial group alignment
-  alignGroups();
-
-  // Third pass: align rejoin markers and continuation lines using node centers.
-  //
-  // For each rejoin label:
-  //   1. Find the continuation line's first step (merge node) → its center X
-  //   2. Find the max of (route arrow tips, merge node center X) → convergenceX
-  //   3. Shift route rejoin sections so arrow tips align to convergenceX
-  //   4. Shift continuation line so merge node center aligns to convergenceX
-  //   5. Store convergenceX on each line for vertical bar computation
-  //
-  // Iterate until stable (nested convergence columns depend on each other).
-  const rejoinGroups = {};
-  for (const pl of positioned) {
-    if (pl.rejoinLabel) {
-      if (!rejoinGroups[pl.rejoinLabel]) rejoinGroups[pl.rejoinLabel] = [];
-      rejoinGroups[pl.rejoinLabel].push(pl);
-    }
-  }
-
-  // Also index continuation lines by their branchLabel
-  const contLinesByLabel = {};
-  for (const pl of positioned) {
-    if (pl.isContinuation && pl.branchLabel) {
-      if (!contLinesByLabel[pl.branchLabel]) contLinesByLabel[pl.branchLabel] = [];
-      contLinesByLabel[pl.branchLabel].push(pl);
-    }
-  }
-
-  // Sort rejoin labels: inner (deeper) labels first so their shifts
-  // are visible when outer labels process.
-  const rejoinLabelOrder = Object.entries(rejoinGroups);
-  rejoinLabelOrder.sort((a, b) => {
-    const depthA = Math.max(...a[1].map(pl => pl.depth));
-    const depthB = Math.max(...b[1].map(pl => pl.depth));
-    return depthB - depthA; // deeper first
-  });
-
-  for (let iter = 0; iter < 10; iter++) {
-    let changed = false;
-
-    for (const [label, plines] of rejoinLabelOrder) {
-      // Find the continuation line(s) for this label (lines that START with this label)
-      const contLines = contLinesByLabel[label] || [];
-
-      // Compute convergenceX: the max of all route arrow tips and merge node centers.
-      let convergenceX = 0;
-
-      // Route arrow tips + inner convergence columns
-      for (const pl of plines) {
-        if (pl.rejoinStartIdx >= 0) {
-          if (pl.isContinuation) {
-            // Use content end + arrow width (not live arrow tip) for continuation
-            // lines — their arrow tips are inflated by inner convergence shifts,
-            // but we still need room for the arrow after the content.
-            convergenceX = Math.max(convergenceX, pl.contentEndX + C.arrowW);
-          } else {
-            const arrow = pl.items[pl.rejoinStartIdx];
-            convergenceX = Math.max(convergenceX, arrow.x + arrow.w);
-          }
-        }
-        // Track inner merge lines for minimum gap enforcement below.
-        if (pl._convergenceXByLabel) {
-          for (const innerCx of Object.values(pl._convergenceXByLabel)) {
-            convergenceX = Math.max(convergenceX, innerCx);
-          }
-        }
-      }
-
-      // Merge node centers (first visible item on continuation lines)
-      for (const cl of contLines) {
-        if (plines.includes(cl)) continue; // skip if it's also a route line
-        const anchor = cl.items.find(it => it.kind === 'step' || it.kind === 'branch-point');
-        if (anchor) {
-          convergenceX = Math.max(convergenceX, anchor.x + anchor.w / 2);
-        }
-      }
-
-      if (convergenceX === 0) continue;
-
-
-      // Shift route rejoin sections so arrow tips align to convergenceX
-      for (const pl of plines) {
-        if (pl.rejoinStartIdx >= 0) {
-          const arrow = pl.items[pl.rejoinStartIdx];
-          const currentTip = arrow.x + arrow.w;
-          const shift = convergenceX - currentTip;
-          if (Math.abs(shift) > 0.5) {
-            for (let i = pl.rejoinStartIdx; i < pl.items.length; i++) {
-              pl.items[i].x += shift;
-            }
-            changed = true;
-          }
-        }
-        if (!pl._convergenceXByLabel) pl._convergenceXByLabel = {};
-        pl._convergenceXByLabel[label] = convergenceX;
-      }
-
-      // Shift continuation lines so first visible item center aligns to convergenceX
-      for (const cl of contLines) {
-        if (plines.includes(cl)) continue;
-        const anchor = cl.items.find(it => it.kind === 'step' || it.kind === 'branch-point');
-        if (!anchor) continue;
-        const currentCx = anchor.x + anchor.w / 2;
-        const shift = convergenceX - currentCx;
-        if (Math.abs(shift) > 0.5) {
-          for (const item of cl.items) {
-            item.x += shift;
-          }
-          cl.totalContentW += shift;
-          cl.contentEndX += shift;
-          changed = true;
-        }
-        if (!cl._convergenceXByLabel) cl._convergenceXByLabel = {};
-        cl._convergenceXByLabel[label] = convergenceX;
-      }
-    }
-
-    // Re-align groups after convergence shifts may have moved branch-points
-    alignGroups();
-
-    if (!changed) break;
-  }
-
-  // Widen and shift BPs on continuation lines so the convergence bar
-  // (at bpCx) and divergence bar (at bpCx + displace) are equidistant
-  // from the node center. Shift center right by displace/2, then ensure
-  // width >= displace so both bars touch the node edges.
-  for (const pl of positioned) {
-    for (const item of pl.items) {
-      if (item.kind === 'branch-point' && item.groupId && groupDisplace[item.groupId]) {
-        const displace = groupDisplace[item.groupId];
-        // Shift center right so both bars are equidistant
-        item.x += displace / 2;
-        // Ensure node is wide enough to span both bars
-        if (item.w < displace) {
-          const extra = displace - item.w;
-          item.x -= extra / 2;
-          item.w = displace;
-        }
-      }
-    }
-  }
-
-  // Even-spacing pass: distribute content nodes evenly across the available
-  // span (from first content item to rejoin-arrow) on branch/route lines.
-  // Wires become elastic spacers filling the gaps between solid items.
-  for (const pl of positioned) {
-    if (pl.rejoinStartIdx < 0) continue; // no rejoin = not a branch line
-
-    // Collect solid items (items with visual width, before the rejoin-arrow)
-    const solidItems = [];
-    const wireItems = [];
-    for (let i = 0; i < pl.rejoinStartIdx; i++) {
-      const it = pl.items[i];
-      if (it.kind === 'wire') {
-        wireItems.push(i);
-      } else if (it.w > 0) {
-        solidItems.push(i);
-      }
-    }
-
-    if (solidItems.length < 2) continue; // nothing to distribute
-
-    // Available span: from first solid item's current X to the rejoin-arrow's X
-    const firstSolid = pl.items[solidItems[0]];
-    const arrow = pl.items[pl.rejoinStartIdx];
-    const spanStart = firstSolid.x;
-    const spanEnd = arrow.x; // arrow sits at the right end
-
-    // Total solid width
-    let totalSolidW = 0;
-    for (const si of solidItems) totalSolidW += pl.items[si].w;
-
-    // Available gap space
-    const totalGap = spanEnd - spanStart - totalSolidW;
-    if (totalGap <= 0) continue; // no room to distribute
-
-    // Distribute gaps evenly between solid items
-    const gapCount = solidItems.length; // gaps: before nothing, between each pair, and after last to arrow
-    const gap = totalGap / gapCount;
-
-    // Reposition: place each solid item with even gaps
-    let x = spanStart;
-    for (let si = 0; si < solidItems.length; si++) {
-      const item = pl.items[solidItems[si]];
-      item.x = x;
-      x += item.w + gap;
-    }
-
-    // Reposition wires to fill between solid items
-    for (const wi of wireItems) {
-      const wire = pl.items[wi];
-      // Find the solid item before and after this wire
-      let prevSolidEnd = spanStart;
-      let nextSolidStart = spanEnd;
-      for (const si of solidItems) {
-        const it = pl.items[si];
-        if (si < wi && it.x + it.w > prevSolidEnd) prevSolidEnd = it.x + it.w;
-        if (si > wi && it.x < nextSolidStart) nextSolidStart = it.x;
-      }
-      wire.x = prevSolidEnd;
-      wire.w = nextSolidStart - prevSolidEnd;
-    }
-  }
-
-  // Update totalW
-  for (const pl of positioned) {
-    const lastItem = pl.items[pl.items.length - 1];
-    if (lastItem) totalW = Math.max(totalW, lastItem.x + (lastItem.w || 0) + C.padX);
-  }
-
-  // Compute vertical bars
-  const vbars = [];
-
-  // Divergence bars: branch-point center → grouped ref markers
-  for (const pl of positioned) {
-    for (const item of pl.items) {
-      if (item.kind === 'branch-point' && item.groupId) {
-        const gid = item.groupId;
-        const bpCx = item.x + item.w / 2;
-        const bpCy = pl.y + C.lineH / 2;
-        // If this group has a displacement (BP on continuation line),
-        // offset from the (already-shifted) center by half the displacement.
-        const x = bpCx + (groupDisplace[gid] ? groupDisplace[gid] / 2 : 0);
-        // Find grouped lines with this gid — their first ref is now aligned to bpCx
-        let lastCy = bpCy;
-        for (const pl2 of positioned) {
-          if (pl2.groups) {
-            for (const g of pl2.groups) {
-              if (g.gid === gid) {
-                lastCy = pl2.y + C.lineH / 2;
-                break;
-              }
-            }
-          }
-        }
-        if (lastCy > bpCy) {
-          vbars.push({ x, y1: bpCy, y2: lastCy, type: item.type });
-        }
-      }
-    }
-  }
-
-  // Convergence bars: connect lines sharing the same convergenceX.
-  // Uses _convergenceX stored during alignment pass.
-  for (const [label, plines] of Object.entries(rejoinGroups)) {
-    const points = [];
-    let type = 'gate';
-
-    // Collect from route/branch lines
-    for (const pl of plines) {
-      const cx = pl._convergenceXByLabel && pl._convergenceXByLabel[label];
-      if (cx !== undefined) {
-        points.push({ cx, cy: pl.y + C.lineH / 2 });
-      }
-      if (pl.groups && pl.groups.length > 0 && type === 'gate') {
-        type = pl.groups[0].type;
-      }
-    }
-
-    // Collect from continuation lines
-    const contLines = contLinesByLabel[label] || [];
-    for (const cl of contLines) {
-      if (plines.includes(cl)) continue;
-      const cx = cl._convergenceXByLabel && cl._convergenceXByLabel[label];
-      if (cx !== undefined) {
-        points.push({ cx, cy: cl.y + C.lineH / 2 });
-      }
-    }
-
-    if (points.length < 2) continue;
-
-    // Sub-group by X position
-    const byX = {};
-    for (const p of points) {
-      const key = Math.round(p.cx);
-      if (!byX[key]) byX[key] = [];
-      byX[key].push(p);
-    }
-
-    for (const [xKey, xPoints] of Object.entries(byX)) {
-      if (xPoints.length < 2) continue;
-      xPoints.sort((a, b) => a.cy - b.cy);
-      vbars.push({
-        x: xPoints[0].cx,
-        y1: xPoints[0].cy,
-        y2: xPoints[xPoints.length - 1].cy,
-        type,
-      });
-    }
-  }
-
-  let maxY = 0;
-  for (const pl of positioned) { if (pl.y > maxY) maxY = pl.y; }
-  const totalH = positioned.length > 0 ? maxY + C.lineH + C.padY : C.padY * 2;
-  return { width: totalW, height: totalH, lines: positioned, vbars };
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// CANVAS DRAW ENGINE
-// ═══════════════════════════════════════════════════════════════════
-
-function drawSchematic(canvas, layoutData) {
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = layoutData.width * dpr;
-  canvas.height = layoutData.height * dpr;
-  canvas.style.width = layoutData.width + 'px';
-  canvas.style.height = layoutData.height + 'px';
-
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-
-  // ── Vertical bars (draw first, behind everything) ──
-  for (const vb of layoutData.vbars) {
-    ctx.beginPath();
-    ctx.moveTo(vb.x, vb.y1);
-    ctx.lineTo(vb.x, vb.y2);
-    ctx.strokeStyle = C.barColor;
-    ctx.lineWidth = 2;
-    if (vb.type === 'gate') ctx.setLineDash([4, 3]);
-    else ctx.setLineDash([]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-  }
-
-  // ── Elements ──
-  for (const line of layoutData.lines) {
-    const cy = line.y + C.lineH / 2; // vertical center of this line
-    let lastItemRight = null;
-
-    for (const item of line.items) {
-      switch (item.kind) {
-        case 'step':
-          drawPill(ctx, item.x, cy - item.h / 2, item.w, item.h, C.stepR,
-                   C.white, C.grayBorder, 1.5);
-          // Dot
-          ctx.beginPath();
-          ctx.arc(item.x + C.stepPadX + C.dotR, cy, C.dotR, 0, Math.PI * 2);
-          ctx.fillStyle = C.grayDot;
-          ctx.fill();
-          // Text
-          ctx.font = C.font;
-          ctx.fillStyle = C.grayText;
-          ctx.textBaseline = 'middle';
-          ctx.fillText(item.title, item.x + C.stepPadX + C.dotR * 2 + 5, cy);
-          break;
-
-        case 'wire':
-          ctx.beginPath();
-          ctx.moveTo(item.x, cy);
-          ctx.lineTo(item.x + item.w, cy);
-          ctx.strokeStyle = C.grayWire;
-          ctx.lineWidth = 2;
-          ctx.setLineDash([]);
-          ctx.stroke();
-          break;
-
-        case 'ref':
-          // Invisible anchor — not drawn
-          break;
-
-        case 'branch-point': {
-          if (item.type === 'gate') {
-            // Hexagon: rectangle with < on left and > on right
-            const hh = item.h / 2;
-            const pointW = hh * 0.5; // how far the < and > extend
-            ctx.beginPath();
-            ctx.moveTo(item.x + pointW, cy - hh);          // top-left
-            ctx.lineTo(item.x + item.w - pointW, cy - hh); // top-right
-            ctx.lineTo(item.x + item.w, cy);                // right point
-            ctx.lineTo(item.x + item.w - pointW, cy + hh); // bottom-right
-            ctx.lineTo(item.x + pointW, cy + hh);          // bottom-left
-            ctx.lineTo(item.x, cy);                         // left point
-            ctx.closePath();
-            ctx.fillStyle = C.bpBg;
-            ctx.fill();
-            ctx.strokeStyle = C.bpBorder;
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-          } else {
-            // Fork: rounded rect with double vertical bars on each side
-            drawPill(ctx, item.x, cy - item.h / 2, item.w, item.h, 4, C.bpBg, C.bpBorder, 1.5);
-            // Left double bars
-            ctx.strokeStyle = C.bpBorder;
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.moveTo(item.x + 6, cy - item.h / 2 + 5);
-            ctx.lineTo(item.x + 6, cy + item.h / 2 - 5);
-            ctx.moveTo(item.x + 10, cy - item.h / 2 + 5);
-            ctx.lineTo(item.x + 10, cy + item.h / 2 - 5);
-            ctx.stroke();
-            // Right double bars
-            ctx.beginPath();
-            ctx.moveTo(item.x + item.w - 6, cy - item.h / 2 + 5);
-            ctx.lineTo(item.x + item.w - 6, cy + item.h / 2 - 5);
-            ctx.moveTo(item.x + item.w - 10, cy - item.h / 2 + 5);
-            ctx.lineTo(item.x + item.w - 10, cy + item.h / 2 - 5);
-            ctx.stroke();
-          }
-          // Title (centered)
-          ctx.font = C.fontBold;
-          ctx.fillStyle = C.bpText;
-          ctx.textBaseline = 'middle';
-          ctx.textAlign = 'center';
-          ctx.fillText(item.title, item.x + item.w / 2, cy);
-          ctx.textAlign = 'start';
-          break;
-        }
-
-        case 'cond': {
-          drawPill(ctx, item.x, cy - item.h / 2, item.w, item.h, item.h / 2, C.condBg, C.grayBorder, 1.5);
-          ctx.font = C.fontSmall;
-          ctx.fillStyle = C.condText;
-          ctx.textBaseline = 'middle';
-          ctx.fillText(item.text, item.x + C.condPadX, cy);
-          break;
-        }
-
-        case 'rejoin-arrow': {
-          // Wire from end of content all the way to the arrow tip
-          const wireStart = lastItemRight !== null ? lastItemRight : (item.x - 2);
-          ctx.beginPath();
-          ctx.moveTo(wireStart, cy);
-          ctx.lineTo(item.x + item.w - 6, cy);
-          ctx.strokeStyle = C.grayWire;
-          ctx.lineWidth = 2;
-          ctx.setLineDash([]);
-          ctx.stroke();
-          // Triangle
-          ctx.beginPath();
-          ctx.moveTo(item.x + item.w - 6, cy - 4);
-          ctx.lineTo(item.x + item.w, cy);
-          ctx.lineTo(item.x + item.w - 6, cy + 4);
-          ctx.closePath();
-          ctx.fillStyle = C.grayLight;
-          ctx.fill();
-          break;
-        }
-      }
-      // Track right edge of last visible item for wire start computation
-      if (item.kind !== 'ref') {
-        lastItemRight = item.x + (item.w || 0);
-      }
-    }
-  }
-}
-
-function drawPill(ctx, x, y, w, h, r, fill, stroke, lineWidth) {
-  ctx.beginPath();
-  ctx.roundRect(x, y, w, h, r);
-  ctx.fillStyle = fill;
-  ctx.fill();
-  if (stroke !== 'transparent' && lineWidth > 0) {
-    ctx.strokeStyle = stroke;
-    ctx.lineWidth = lineWidth;
-    ctx.stroke();
-  }
-}
-
-function drawRef(ctx, cx, cy, r, label, type) {
-  let bg, border, text;
-  if (type === 'gate') { bg = C.amberBg; border = C.amberRefBorder; text = C.amberText; }
-  else if (type === 'split') { bg = C.blueBg; border = C.blueRefBorder; text = C.blueText; }
-  else { bg = C.grayRefBg; border = C.grayRefBorder; text = C.grayRefText; }
-
-  // White knockout behind (covers vbar)
-  ctx.beginPath();
-  ctx.arc(cx, cy, r + 1, 0, Math.PI * 2);
-  ctx.fillStyle = C.bg;
-  ctx.fill();
-
-  // Circle
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fillStyle = bg;
-  ctx.fill();
-  ctx.strokeStyle = border;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // Label
-  ctx.font = C.fontRef;
-  ctx.fillStyle = text;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(label, cx, cy);
-  ctx.textAlign = 'start';
-}
 
 // ═══════════════════════════════════════════════════════════════════
 // BUILD PAGE
@@ -1682,14 +691,9 @@ function buildWorkshop() {
     section.appendChild(desc);
 
     try {
-      resetRefs();
-      const rawLines = flattenSpine(wf.spine, 0, null);
-      const lines = treeOrderLines(rawLines);
-      const layoutData = layout(lines);
-
       const canvas = document.createElement('canvas');
       canvas.className = 'sch-canvas';
-      drawSchematic(canvas, layoutData);
+      Schematic.renderWorkflow(wf.spine, canvas);
       section.appendChild(canvas);
     } catch (e) {
       const err = document.createElement('pre');
