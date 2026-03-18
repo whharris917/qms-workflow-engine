@@ -627,6 +627,72 @@ const WORKFLOWS = [
       { type:'step', id:'final_decision', title:'Final Investment Decision' },
     ],
   },
+  {
+    name: 'Stress Test: Convergence Cascade',
+    desc: 'Pathological convergence alignment: extreme width asymmetry at every nesting level forces the iterative X-alignment loop to cascade shifts from inner groups outward across multiple passes.',
+    spine: [
+      { type:'step', id:'cc_start', title:'Start' },
+      { type:'gate', id:'cc_outer', title:'Outer Gate', routes: [
+        // Route 1: minimal content — pulls convergenceX left
+        { label:'Trivial', condition:'path = Trivial', path: [
+          { type:'step', id:'cc_done', title:'Done' },
+        ]},
+        // Route 2: massive nested content — pushes convergenceX far right
+        { label:'Complex', condition:'path = Complex', path: [
+          { type:'step', id:'cc_initial', title:'Initial Assessment With Extended Review Period' },
+          { type:'split', id:'cc_mid_fork', title:'Parallel Workstreams', branches: [
+            // Branch A: minimal — creates max asymmetry with Branch B
+            { label:'Quick Track', path: [
+              { type:'step', id:'cc_qt', title:'Fast' },
+            ]},
+            // Branch B: deep nesting with wide content at every level
+            { label:'Comprehensive Analysis Track', path: [
+              { type:'step', id:'cc_gather', title:'Gather Requirements From All Stakeholders' },
+              { type:'gate', id:'cc_inner_gate', title:'Complexity Assessment', routes: [
+                // Inner route 1: minimal
+                { label:'Straightforward', condition:'complexity = Low', path: [
+                  { type:'step', id:'cc_simple', title:'Apply Standard Resolution' },
+                ]},
+                // Inner route 2: another fork with wide content
+                { label:'Multi-Dimensional', condition:'complexity = High', path: [
+                  { type:'split', id:'cc_deep_fork', title:'Deep Investigation', branches: [
+                    { label:'Root Cause Analysis Stream', path: [
+                      { type:'step', id:'cc_rca1', title:'Preliminary Hypothesis Generation' },
+                      { type:'step', id:'cc_rca2', title:'Systematic Experimental Validation' },
+                      { type:'step', id:'cc_rca3', title:'Cross-Functional Impact Assessment Report' },
+                    ]},
+                    { label:'Mitigation Planning Stream', path: [
+                      { type:'step', id:'cc_mit1', title:'Identify Available Countermeasures' },
+                      { type:'gate', id:'cc_deepest', title:'Resource Availability', routes: [
+                        { label:'Sufficient', condition:'resources = Available', path: [
+                          { type:'step', id:'cc_exec', title:'Execute Mitigation Plan Immediately' },
+                        ]},
+                        { label:'Constrained', condition:'resources = Limited', path: [
+                          { type:'step', id:'cc_pri', title:'Prioritize Critical Path Items Only' },
+                          { type:'step', id:'cc_esc', title:'Escalate Resource Request To Executive Committee' },
+                          { type:'step', id:'cc_wait', title:'Await Additional Budget Allocation Cycle' },
+                        ]},
+                      ]},
+                      { type:'step', id:'cc_confirm', title:'Confirm Resource Deployment Complete' },
+                    ]},
+                  ], merge: { id:'cc_deep_merge', title:'Synthesize Investigation Results' }},
+                  { type:'step', id:'cc_integrate', title:'Integrate Findings Into Corrective Action Plan' },
+                ]},
+              ]},
+              { type:'step', id:'cc_validate', title:'Validate Comprehensive Analysis Complete' },
+            ]},
+          ], merge: { id:'cc_mid_merge', title:'Reconcile Parallel Findings' }},
+          { type:'step', id:'cc_document', title:'Document Final Determination With Full Traceability' },
+        ]},
+        // Route 3: medium content — convergenceX must accommodate this too
+        { label:'Moderate', condition:'path = Moderate', path: [
+          { type:'step', id:'cc_eval', title:'Evaluate Intermediate Criteria' },
+          { type:'step', id:'cc_decide', title:'Make Determination Based On Available Evidence' },
+        ]},
+      ]},
+      { type:'step', id:'cc_end', title:'Close' },
+    ],
+  },
 ];
 
 // ═══════════════════════════════════════════════════════════════════
