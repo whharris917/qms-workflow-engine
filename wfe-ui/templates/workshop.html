@@ -154,6 +154,74 @@ const WORKFLOWS = [
       { type:'step', id:'close', title:'Close' },
     ],
   },
+  {
+    name: 'Stress Test: Enterprise Change Assessment',
+    desc: 'Four nesting levels. Router inside fork inside router inside fork. Tests every layout edge case.',
+    spine: [
+      { type:'step', id:'submit', title:'Submit Request' },
+      { type:'step', id:'intake', title:'Intake Review' },
+      { type:'gate', id:'change_type', title:'Change Type', routes: [
+        { label:'Standard', condition:'type = Standard', path: [
+          { type:'step', id:'std_plan', title:'Plan' },
+          { type:'step', id:'std_impl', title:'Implement' },
+          { type:'step', id:'std_test', title:'Test' },
+        ]},
+        { label:'Expedited', condition:'type = Expedited', path: [
+          { type:'split', id:'exp_fork', title:'Fast Parallel', branches: [
+            { label:'Dev', path: [
+              { type:'step', id:'exp_dev', title:'Develop' },
+              { type:'step', id:'exp_unit', title:'Unit Test' },
+            ]},
+            { label:'Ops', path: [
+              { type:'step', id:'exp_infra', title:'Infra Prep' },
+            ]},
+          ], merge: { id:'exp_merge', title:'Integrate' }},
+          { type:'step', id:'exp_deploy', title:'Deploy' },
+        ]},
+        { label:'Emergency', condition:'type = Emergency', path: [
+          { type:'step', id:'emer_hotfix', title:'Hotfix' },
+          { type:'gate', id:'emer_sev', title:'Severity', routes: [
+            { label:'P1', condition:'priority = P1', path: [
+              { type:'split', id:'p1_fork', title:'War Room', branches: [
+                { label:'Engineering', path: [
+                  { type:'step', id:'p1_eng_fix', title:'Root Cause Fix' },
+                  { type:'step', id:'p1_eng_ver', title:'Verify Fix' },
+                ]},
+                { label:'Comms', path: [
+                  { type:'step', id:'p1_comms_notify', title:'Notify Stakeholders' },
+                  { type:'step', id:'p1_comms_status', title:'Status Updates' },
+                  { type:'step', id:'p1_comms_resolve', title:'Resolution Notice' },
+                ]},
+                { label:'Leadership', path: [
+                  { type:'step', id:'p1_lead_brief', title:'Exec Brief' },
+                  { type:'step', id:'p1_lead_approve', title:'Approve Response' },
+                ]},
+              ], merge: { id:'p1_merge', title:'War Room Debrief' }},
+            ]},
+            { label:'P2', condition:'priority = P2', path: [
+              { type:'step', id:'p2_fix', title:'Fix' },
+              { type:'step', id:'p2_verify', title:'Verify' },
+            ]},
+            { label:'P3', condition:'priority = P3', path: [
+              { type:'step', id:'p3_schedule', title:'Schedule Fix' },
+            ]},
+          ]},
+          { type:'step', id:'emer_postmortem', title:'Post-Mortem' },
+        ]},
+      ]},
+      { type:'step', id:'review', title:'Final Review' },
+      { type:'split', id:'close_fork', title:'Closure', branches: [
+        { label:'Documentation', path: [
+          { type:'step', id:'doc_update', title:'Update Docs' },
+          { type:'step', id:'doc_archive', title:'Archive' },
+        ]},
+        { label:'Notification', path: [
+          { type:'step', id:'notify_team', title:'Notify Team' },
+          { type:'step', id:'notify_stakeholders', title:'Notify Stakeholders' },
+        ]},
+      ], merge: { id:'close_merge', title:'Close Record' }},
+    ],
+  },
 ];
 
 // ═══════════════════════════════════════════════════════════════════
@@ -485,18 +553,8 @@ function layout(lines) {
     totalW = Math.max(totalW, x + C.padX);
   }
 
-  // Second pass: align grouped lines so their first ref marker centers
-  // on the parent branch-point's center X.
-  const bpCenters = {};
-  for (const pl of positioned) {
-    for (const item of pl.items) {
-      if (item.kind === 'branch-point' && item.groupId) {
-        bpCenters[item.groupId] = item.x + item.w / 2;
-      }
-    }
-  }
-
-  // Process outermost groups first: sort groups by the depth of their parent line.
+  // Group alignment: center branch lines' cond labels on parent branch-point.
+  // Extracted as a function so it can be re-run after convergence shifts.
   const groupOrder = [];
   for (const pl of positioned) {
     for (const item of pl.items) {
@@ -507,43 +565,45 @@ function layout(lines) {
   }
   groupOrder.sort((a, b) => a.depth - b.depth);
 
-  for (const { gid } of groupOrder) {
-    // Recompute bpCenter after any prior shifts
-    let targetX;
-    for (const pl of positioned) {
-      for (const item of pl.items) {
-        if (item.kind === 'branch-point' && item.groupId === gid) {
-          targetX = item.x + item.w / 2;
-        }
-      }
-    }
-    if (targetX === undefined) continue;
-
-    for (const pl of positioned) {
-      if (!pl.groups) continue;
-      // Only shift if this group is the deepest (highest depth) group for this line.
-      // Find which group has the deepest parent branch-point.
-      let deepestGid = null;
-      let deepestDepth = -1;
-      for (const g of pl.groups) {
-        const d = groupOrder.find(go => go.gid === g.gid)?.depth ?? -1;
-        if (d > deepestDepth) { deepestDepth = d; deepestGid = g.gid; }
-      }
-      if (deepestGid !== gid) continue;
-      const condItem = pl.items.find(it => it.kind === 'cond');
-      const anchor = condItem || pl.items.find(it => it.kind === 'step' || it.kind === 'wire');
-      if (!anchor) continue;
-      const anchorCx = anchor.x + anchor.w / 2;
-      const shift = targetX - anchorCx;
-      if (Math.abs(shift) > 0.5) {
+  function alignGroups() {
+    for (const { gid } of groupOrder) {
+      let targetX;
+      for (const pl of positioned) {
         for (const item of pl.items) {
-          item.x += shift;
+          if (item.kind === 'branch-point' && item.groupId === gid) {
+            targetX = item.x + item.w / 2;
+          }
         }
-        pl.totalContentW += shift;
-        pl.contentEndX += shift;
+      }
+      if (targetX === undefined) continue;
+
+      for (const pl of positioned) {
+        if (!pl.groups) continue;
+        let deepestGid = null;
+        let deepestDepth = -1;
+        for (const g of pl.groups) {
+          const d = groupOrder.find(go => go.gid === g.gid)?.depth ?? -1;
+          if (d > deepestDepth) { deepestDepth = d; deepestGid = g.gid; }
+        }
+        if (deepestGid !== gid) continue;
+        const condItem = pl.items.find(it => it.kind === 'cond');
+        const anchor = condItem || pl.items.find(it => it.kind === 'step' || it.kind === 'wire');
+        if (!anchor) continue;
+        const anchorCx = anchor.x + anchor.w / 2;
+        const shift = targetX - anchorCx;
+        if (Math.abs(shift) > 0.5) {
+          for (const item of pl.items) {
+            item.x += shift;
+          }
+          pl.totalContentW += shift;
+          pl.contentEndX += shift;
+        }
       }
     }
   }
+
+  // Second pass: initial group alignment
+  alignGroups();
 
   // Third pass: align rejoin markers and continuation lines using node centers.
   //
@@ -660,6 +720,9 @@ function layout(lines) {
         cl._convergenceXByLabel[label] = convergenceX;
       }
     }
+
+    // Re-align groups after convergence shifts may have moved branch-points
+    alignGroups();
 
     if (!changed) break;
   }
