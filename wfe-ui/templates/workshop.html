@@ -464,7 +464,7 @@ function layout(lines) {
         }
         case 'rejoin-arrow': {
           rejoinStartIdx = items.length;
-          item = { kind:'rejoin-arrow', x, y, w: C.arrowW, wireFromX: contentEndX };
+          item = { kind:'rejoin-arrow', x, y, w: C.arrowW };
           x += C.arrowW;
           break;
         }
@@ -537,9 +537,9 @@ function layout(lines) {
       if (Math.abs(shift) > 0.5) {
         for (const item of pl.items) {
           item.x += shift;
-          if (item.wireFromX !== undefined) item.wireFromX += shift;
         }
         pl.totalContentW += shift;
+        pl.contentEndX += shift;
       }
     }
   }
@@ -590,11 +590,24 @@ function layout(lines) {
       // Compute convergenceX: the max of all route arrow tips and merge node centers.
       let convergenceX = 0;
 
-      // Route arrow tips
+      // Route arrow tips + inner convergence columns
       for (const pl of plines) {
         if (pl.rejoinStartIdx >= 0) {
-          const arrow = pl.items[pl.rejoinStartIdx];
-          convergenceX = Math.max(convergenceX, arrow.x + arrow.w);
+          if (pl.isContinuation) {
+            // Use content end + arrow width (not live arrow tip) for continuation
+            // lines — their arrow tips are inflated by inner convergence shifts,
+            // but we still need room for the arrow after the content.
+            convergenceX = Math.max(convergenceX, pl.contentEndX + C.arrowW);
+          } else {
+            const arrow = pl.items[pl.rejoinStartIdx];
+            convergenceX = Math.max(convergenceX, arrow.x + arrow.w);
+          }
+        }
+        // Track inner merge lines for minimum gap enforcement below.
+        if (pl._convergenceXByLabel) {
+          for (const innerCx of Object.values(pl._convergenceXByLabel)) {
+            convergenceX = Math.max(convergenceX, innerCx);
+          }
         }
       }
 
@@ -608,6 +621,7 @@ function layout(lines) {
       }
 
       if (convergenceX === 0) continue;
+
 
       // Shift route rejoin sections so arrow tips align to convergenceX
       for (const pl of plines) {
@@ -636,9 +650,9 @@ function layout(lines) {
         if (Math.abs(shift) > 0.5) {
           for (const item of cl.items) {
             item.x += shift;
-            if (item.wireFromX !== undefined) item.wireFromX += shift;
           }
           cl.totalContentW += shift;
+          cl.contentEndX += shift;
           changed = true;
         }
         if (!cl._convergenceXByLabel) cl._convergenceXByLabel = {};
@@ -768,6 +782,7 @@ function drawSchematic(canvas, layoutData) {
   // ── Elements ──
   for (const line of layoutData.lines) {
     const cy = line.y + C.lineH / 2; // vertical center of this line
+    let lastItemRight = null;
 
     for (const item of line.items) {
       switch (item.kind) {
@@ -830,7 +845,7 @@ function drawSchematic(canvas, layoutData) {
 
         case 'rejoin-arrow': {
           // Wire from end of content all the way to the arrow tip
-          const wireStart = item.wireFromX || (item.x - 2);
+          const wireStart = lastItemRight !== null ? lastItemRight : (item.x - 2);
           ctx.beginPath();
           ctx.moveTo(wireStart, cy);
           ctx.lineTo(item.x + item.w - 6, cy);
@@ -848,6 +863,10 @@ function drawSchematic(canvas, layoutData) {
           ctx.fill();
           break;
         }
+      }
+      // Track right edge of last visible item for wire start computation
+      if (item.kind !== 'ref') {
+        lastItemRight = item.x + (item.w || 0);
       }
     }
   }
