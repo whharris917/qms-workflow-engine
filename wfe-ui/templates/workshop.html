@@ -222,6 +222,411 @@ const WORKFLOWS = [
       ], merge: { id:'close_merge', title:'Close Record' }},
     ],
   },
+  {
+    name: 'Stress Test: Regulatory Compliance Audit',
+    desc: 'Three sequential BPs on the main spine (gate → fork → gate). Nested gate-inside-fork. Tests triple overlapping Y space.',
+    spine: [
+      { type:'step', id:'register', title:'Register' },
+      { type:'gate', id:'priority', title:'Priority', routes: [
+        { label:'Routine', condition:'priority = Routine', path: [
+          { type:'step', id:'schedule', title:'Schedule' },
+        ]},
+        { label:'Urgent', condition:'priority = Urgent', path: [
+          { type:'split', id:'assess_fork', title:'Parallel Assessment', branches: [
+            { label:'Legal', path: [
+              { type:'step', id:'legal_review', title:'Legal Review' },
+              { type:'step', id:'legal_signoff', title:'Legal Sign-off' },
+            ]},
+            { label:'Technical', path: [
+              { type:'step', id:'tech_review', title:'Tech Review' },
+              { type:'gate', id:'complexity', title:'Complexity', routes: [
+                { label:'Simple', condition:'complexity = Simple', path: [
+                  { type:'step', id:'quick_fix', title:'Quick Fix' },
+                ]},
+                { label:'Complex', condition:'complexity = Complex', path: [
+                  { type:'step', id:'arch_review', title:'Architecture Review' },
+                  { type:'step', id:'impl_plan', title:'Implementation Plan' },
+                  { type:'step', id:'peer_review', title:'Peer Review' },
+                ]},
+              ]},
+              { type:'step', id:'tech_signoff', title:'Tech Sign-off' },
+            ]},
+          ], merge: { id:'assess_merge', title:'Assessment Complete' }},
+        ]},
+        { label:'Critical', condition:'priority = Critical', path: [
+          { type:'step', id:'exec_escalation', title:'Executive Escalation' },
+          { type:'step', id:'board_review', title:'Board Review' },
+        ]},
+      ]},
+      { type:'step', id:'approval_gate', title:'Approval Gate' },
+      { type:'split', id:'impl_fork', title:'Implementation', branches: [
+        { label:'Development', path: [
+          { type:'step', id:'code', title:'Code' },
+          { type:'step', id:'test', title:'Test' },
+          { type:'step', id:'deploy', title:'Deploy' },
+        ]},
+        { label:'Documentation', path: [
+          { type:'step', id:'write_docs', title:'Write Docs' },
+          { type:'step', id:'review_docs', title:'Review Docs' },
+        ]},
+        { label:'Training', path: [
+          { type:'step', id:'create_materials', title:'Create Materials' },
+          { type:'step', id:'schedule_sessions', title:'Schedule Sessions' },
+        ]},
+      ], merge: { id:'impl_merge', title:'Integration' }},
+      { type:'step', id:'validation', title:'Validation' },
+      { type:'gate', id:'outcome', title:'Outcome', routes: [
+        { label:'Pass', condition:'result = Pass', path: [
+          { type:'step', id:'certificate', title:'Certificate' },
+        ]},
+        { label:'Conditional', condition:'result = Conditional', path: [
+          { type:'step', id:'remediation', title:'Remediation Plan' },
+          { type:'step', id:'revalidate', title:'Re-Validate' },
+        ]},
+        { label:'Fail', condition:'result = Fail', path: [
+          { type:'step', id:'rca', title:'Root Cause Analysis' },
+          { type:'step', id:'corrective', title:'Corrective Action' },
+          { type:'step', id:'resubmit', title:'Re-Submit' },
+        ]},
+      ]},
+      { type:'step', id:'archive', title:'Archive' },
+    ],
+  },
+  {
+    name: 'Stress Test: Global Incident Response Matrix',
+    desc: 'Adversarial layout: 4 sequential BPs on main spine, sequential BPs inside branches, fork-inside-fork, gate-inside-branch-of-fork-inside-route-of-gate (5 nesting levels), asymmetric branch depths.',
+    spine: [
+      { type:'step', id:'detect', title:'Detect' },
+      // ── Sequential BP #1: gate ──
+      { type:'gate', id:'severity', title:'Severity', routes: [
+        { label:'Critical', condition:'sev = Critical', path: [
+          // Sequential BPs WITHIN a route: fork then step
+          { type:'split', id:'mobilize', title:'Mobilize', branches: [
+            { label:'Command', path: [
+              { type:'step', id:'activate', title:'Activate' },
+              // Gate inside branch of fork inside route of gate = 4 deep
+              { type:'gate', id:'scope', title:'Scope', routes: [
+                { label:'Full', condition:'scope = Full', path: [
+                  { type:'step', id:'full_lockdown', title:'Full Lockdown' },
+                  { type:'step', id:'full_audit', title:'Full Audit' },
+                  { type:'step', id:'full_report', title:'Report' },
+                ]},
+                { label:'Partial', condition:'scope = Partial', path: [
+                  { type:'step', id:'partial_isolate', title:'Isolate' },
+                ]},
+              ]},
+              { type:'step', id:'command_brief', title:'Brief' },
+            ]},
+            { label:'Comms', path: [
+              { type:'step', id:'draft', title:'Draft' },
+              { type:'step', id:'approve_msg', title:'Approve' },
+              { type:'step', id:'send', title:'Send' },
+            ]},
+            { label:'Technical', path: [
+              { type:'step', id:'triage', title:'Triage' },
+              // Fork inside branch of fork = nested fork
+              { type:'split', id:'parallel_fix', title:'Parallel Fix', branches: [
+                { label:'Primary', path: [
+                  { type:'step', id:'hotfix', title:'Hotfix' },
+                  { type:'step', id:'verify_fix', title:'Verify' },
+                ]},
+                { label:'Fallback', path: [
+                  { type:'step', id:'rollback', title:'Rollback Plan' },
+                ]},
+              ], merge: { id:'fix_merge', title:'Select Path' }},
+              { type:'step', id:'confirm_fix', title:'Confirm' },
+            ]},
+          ], merge: { id:'mobilize_merge', title:'Debrief' }},
+        ]},
+        { label:'High', condition:'sev = High', path: [
+          { type:'step', id:'assign', title:'Assign' },
+          { type:'step', id:'investigate', title:'Investigate' },
+          { type:'step', id:'resolve', title:'Resolve' },
+        ]},
+        { label:'Medium', condition:'sev = Medium', path: [
+          { type:'step', id:'queue', title:'Queue' },
+        ]},
+        { label:'Low', condition:'sev = Low', path: [
+          { type:'step', id:'log', title:'Log' },
+        ]},
+      ]},
+      { type:'step', id:'checkpoint', title:'Checkpoint' },
+      // ── Sequential BP #2: fork ──
+      { type:'split', id:'remediation', title:'Remediation', branches: [
+        { label:'Short-term', path: [
+          { type:'step', id:'patch', title:'Patch' },
+          { type:'step', id:'validate_patch', title:'Validate' },
+        ]},
+        { label:'Long-term', path: [
+          { type:'step', id:'design', title:'Design' },
+          // Gate inside branch of fork = sequential BP inside branch
+          { type:'gate', id:'approach', title:'Approach', routes: [
+            { label:'Refactor', condition:'approach = Refactor', path: [
+              { type:'step', id:'plan_refactor', title:'Plan' },
+              { type:'step', id:'exec_refactor', title:'Execute' },
+            ]},
+            { label:'Replace', condition:'approach = Replace', path: [
+              { type:'step', id:'evaluate', title:'Evaluate' },
+              { type:'step', id:'procure', title:'Procure' },
+              { type:'step', id:'migrate', title:'Migrate' },
+              { type:'step', id:'cutover', title:'Cutover' },
+            ]},
+          ]},
+          { type:'step', id:'verify_longterm', title:'Verify' },
+        ]},
+        { label:'Process', path: [
+          { type:'step', id:'update_sops', title:'Update SOPs' },
+          { type:'step', id:'train_staff', title:'Train Staff' },
+        ]},
+      ], merge: { id:'remed_merge', title:'Consolidate' }},
+      // ── Sequential BP #3: gate ──
+      { type:'gate', id:'disposition', title:'Disposition', routes: [
+        { label:'Closed', condition:'status = Closed', path: [
+          { type:'step', id:'signoff', title:'Sign Off' },
+        ]},
+        { label:'Monitoring', condition:'status = Monitoring', path: [
+          { type:'step', id:'set_alerts', title:'Set Alerts' },
+          { type:'step', id:'review_period', title:'Review Period' },
+          { type:'step', id:'final_assessment', title:'Final Assessment' },
+        ]},
+      ]},
+      // ── Sequential BP #4: fork (lightweight, tests 4-way overlap) ──
+      { type:'split', id:'closeout', title:'Close-out', branches: [
+        { label:'Internal', path: [
+          { type:'step', id:'lessons', title:'Lessons Learned' },
+          { type:'step', id:'metrics', title:'Update Metrics' },
+        ]},
+        { label:'External', path: [
+          { type:'step', id:'customer_notice', title:'Customer Notice' },
+          { type:'step', id:'regulatory_filing', title:'Regulatory Filing' },
+          { type:'step', id:'public_report', title:'Public Report' },
+        ]},
+      ], merge: { id:'closeout_merge', title:'Archive' }},
+    ],
+  },
+  {
+    name: 'Stress Test: Pharmaceutical Clinical Trial Pipeline',
+    desc: 'Maximum complexity: entire 5-BP pipeline nested inside a parallel fork alongside regulatory and financial tracks. Tests deep nesting with sequential BPs inside a branch of a top-level fork.',
+    spine: [
+      { type:'step', id:'board_approve', title:'Board Approval' },
+      { type:'split', id:'program_fork', title:'Program Tracks', branches: [
+        { label:'Clinical', path: [
+      { type:'step', id:'proposal', title:'Proposal' },
+      // ── Clinical track BP #1: gate (5 routes, nested structures in 3) ──
+      { type:'gate', id:'trial_phase', title:'Trial Phase', routes: [
+        { label:'Pre-clinical', condition:'phase = Pre-clinical', path: [
+          { type:'step', id:'lab_study', title:'Lab Study' },
+        ]},
+        { label:'Phase I', condition:'phase = Phase I', path: [
+          { type:'step', id:'dose_finding', title:'Dose Finding' },
+          { type:'step', id:'safety_profile', title:'Safety Profile' },
+        ]},
+        { label:'Phase II', condition:'phase = Phase II', path: [
+          // Fork inside route: parallel efficacy tracks
+          { type:'split', id:'efficacy_fork', title:'Efficacy Tracks', branches: [
+            { label:'Primary Endpoint', path: [
+              { type:'step', id:'primary_enroll', title:'Enroll' },
+              { type:'step', id:'primary_treat', title:'Treat' },
+              { type:'step', id:'primary_measure', title:'Measure' },
+            ]},
+            { label:'Biomarker', path: [
+              { type:'step', id:'bio_collect', title:'Collect Samples' },
+              { type:'step', id:'bio_analyze', title:'Analyze' },
+            ]},
+          ], merge: { id:'efficacy_merge', title:'Correlate' }},
+          { type:'step', id:'phase2_report', title:'Interim Report' },
+        ]},
+        { label:'Phase III', condition:'phase = Phase III', path: [
+          // Fork inside route, with a router inside one branch
+          { type:'split', id:'p3_fork', title:'Multi-Site Trial', branches: [
+            { label:'Site A', path: [
+              { type:'step', id:'a_recruit', title:'Recruit' },
+              { type:'step', id:'a_run', title:'Run Protocol' },
+              // Router inside branch of fork inside route of gate
+              { type:'gate', id:'a_interim', title:'Interim Analysis', routes: [
+                { label:'Continue', condition:'result = Favorable', path: [
+                  { type:'step', id:'a_continue', title:'Continue Enrollment' },
+                ]},
+                { label:'Modify', condition:'result = Concerning', path: [
+                  { type:'step', id:'a_amend', title:'Amend Protocol' },
+                  { type:'step', id:'a_resubmit', title:'IRB Re-Submit' },
+                ]},
+                { label:'Stop', condition:'result = Futile', path: [
+                  { type:'step', id:'a_stop', title:'Early Termination' },
+                ]},
+              ]},
+              { type:'step', id:'a_close', title:'Close Site' },
+            ]},
+            { label:'Site B', path: [
+              { type:'step', id:'b_recruit', title:'Recruit' },
+              { type:'step', id:'b_run', title:'Run Protocol' },
+              { type:'step', id:'b_close', title:'Close Site' },
+            ]},
+            { label:'Site C', path: [
+              { type:'step', id:'c_recruit', title:'Recruit' },
+              { type:'step', id:'c_run', title:'Run Protocol' },
+              // Fork inside branch of fork (fork-in-fork)
+              { type:'split', id:'c_sub_fork', title:'Sub-Study', branches: [
+                { label:'Genomic', path: [
+                  { type:'step', id:'c_genomic', title:'Sequence' },
+                  { type:'step', id:'c_annotate', title:'Annotate' },
+                ]},
+                { label:'Pharmacokinetic', path: [
+                  { type:'step', id:'c_pk_sample', title:'Sample' },
+                  { type:'step', id:'c_pk_model', title:'Model' },
+                  { type:'step', id:'c_pk_validate', title:'Validate' },
+                ]},
+              ], merge: { id:'c_sub_merge', title:'Integrate Sub-Study' }},
+              { type:'step', id:'c_close', title:'Close Site' },
+            ]},
+          ], merge: { id:'p3_merge', title:'Pool Data' }},
+          { type:'step', id:'p3_stats', title:'Statistical Analysis' },
+        ]},
+        { label:'Phase IV', condition:'phase = Phase IV', path: [
+          { type:'step', id:'post_market', title:'Post-Market Surveillance' },
+          { type:'step', id:'adverse_events', title:'Adverse Event Tracking' },
+          { type:'step', id:'periodic_report', title:'Periodic Safety Report' },
+        ]},
+      ]},
+      { type:'step', id:'data_lock', title:'Data Lock' },
+      // ── Main spine BP #2: fork (parallel workstreams, one with nested router) ──
+      { type:'split', id:'submission_fork', title:'Submission Prep', branches: [
+        { label:'Regulatory', path: [
+          { type:'step', id:'compile_csr', title:'Compile CSR' },
+          // Router inside branch of fork on main spine
+          { type:'gate', id:'reg_pathway', title:'Reg Pathway', routes: [
+            { label:'Standard', condition:'pathway = Standard', path: [
+              { type:'step', id:'nda_draft', title:'Draft NDA' },
+              { type:'step', id:'nda_review', title:'Internal Review' },
+              { type:'step', id:'nda_submit', title:'Submit to FDA' },
+            ]},
+            { label:'Accelerated', condition:'pathway = Accelerated', path: [
+              { type:'step', id:'bt_request', title:'Breakthrough Request' },
+              { type:'step', id:'bt_meeting', title:'Pre-BLA Meeting' },
+              { type:'step', id:'bt_submit', title:'Rolling Submission' },
+            ]},
+            { label:'Conditional', condition:'pathway = Conditional', path: [
+              { type:'step', id:'cond_evidence', title:'Compile Evidence' },
+              { type:'step', id:'cond_submit', title:'Conditional Filing' },
+            ]},
+          ]},
+          { type:'step', id:'reg_track', title:'Track Review' },
+        ]},
+        { label:'Manufacturing', path: [
+          { type:'step', id:'scale_up', title:'Scale Up' },
+          { type:'step', id:'validation_batch', title:'Validation Batches' },
+          { type:'step', id:'stability', title:'Stability Testing' },
+        ]},
+        { label:'Commercial', path: [
+          { type:'step', id:'market_analysis', title:'Market Analysis' },
+          // Fork inside branch of fork (nested fork)
+          { type:'split', id:'launch_prep', title:'Launch Prep', branches: [
+            { label:'Medical Affairs', path: [
+              { type:'step', id:'kol_engage', title:'KOL Engagement' },
+              { type:'step', id:'med_materials', title:'Medical Materials' },
+            ]},
+            { label:'Sales', path: [
+              { type:'step', id:'train_field', title:'Train Field Force' },
+              { type:'step', id:'territory_plan', title:'Territory Planning' },
+            ]},
+          ], merge: { id:'launch_merge', title:'Launch Readiness' }},
+        ]},
+      ], merge: { id:'sub_merge', title:'Dossier Complete' }},
+      // ── Main spine BP #3: gate ──
+      { type:'gate', id:'agency_decision', title:'Agency Decision', routes: [
+        { label:'Approved', condition:'decision = Approved', path: [
+          { type:'step', id:'label_negotiate', title:'Label Negotiation' },
+        ]},
+        { label:'CRL', condition:'decision = CRL', path: [
+          { type:'step', id:'crl_analyze', title:'Analyze CRL' },
+          { type:'step', id:'crl_respond', title:'Prepare Response' },
+          { type:'step', id:'crl_resubmit', title:'Re-Submit' },
+        ]},
+        { label:'Rejected', condition:'decision = Rejected', path: [
+          { type:'step', id:'appeal', title:'Appeal' },
+        ]},
+      ]},
+      // ── Main spine BP #4: fork ──
+      { type:'split', id:'launch_fork', title:'Launch', branches: [
+        { label:'Supply Chain', path: [
+          { type:'step', id:'produce', title:'Production Run' },
+          { type:'step', id:'distribute', title:'Distribution' },
+        ]},
+        { label:'Market Access', path: [
+          { type:'step', id:'pricing', title:'Pricing' },
+          { type:'step', id:'payer_negotiate', title:'Payer Negotiation' },
+          // Router inside branch of launch fork
+          { type:'gate', id:'reimburse', title:'Reimbursement', routes: [
+            { label:'Formulary', condition:'type = Formulary', path: [
+              { type:'step', id:'formulary_app', title:'Application' },
+              { type:'step', id:'formulary_review', title:'Committee Review' },
+            ]},
+            { label:'Exception', condition:'type = Exception', path: [
+              { type:'step', id:'exception_process', title:'Exception Process' },
+            ]},
+          ]},
+          { type:'step', id:'access_confirm', title:'Confirm Access' },
+        ]},
+      ], merge: { id:'launch_merge2', title:'Market Entry' }},
+      // ── Main spine BP #5: gate ──
+      { type:'gate', id:'lifecycle', title:'Lifecycle', routes: [
+        { label:'Grow', condition:'strategy = Grow', path: [
+          { type:'step', id:'line_ext', title:'Line Extension' },
+          { type:'step', id:'new_indication', title:'New Indication' },
+        ]},
+        { label:'Maintain', condition:'strategy = Maintain', path: [
+          { type:'step', id:'pharmacovigilance', title:'Pharmacovigilance' },
+        ]},
+        { label:'Sunset', condition:'strategy = Sunset', path: [
+          { type:'step', id:'generic_prep', title:'Generic Entry Prep' },
+          { type:'step', id:'wind_down', title:'Wind Down' },
+          { type:'step', id:'divest', title:'Divest' },
+        ]},
+      ]},
+      { type:'step', id:'close_program', title:'Close Program' },
+        ]},
+        { label:'Regulatory Affairs', path: [
+          { type:'step', id:'ra_landscape', title:'Regulatory Landscape' },
+          { type:'gate', id:'ra_strategy', title:'Filing Strategy', routes: [
+            { label:'Centralized', condition:'strategy = Centralized', path: [
+              { type:'step', id:'ra_ema', title:'EMA Submission' },
+              { type:'step', id:'ra_chmp', title:'CHMP Review' },
+            ]},
+            { label:'Decentralized', condition:'strategy = Decentralized', path: [
+              { type:'step', id:'ra_rms', title:'RMS Filing' },
+              { type:'step', id:'ra_cms', title:'CMS Recognition' },
+              { type:'step', id:'ra_national', title:'National Approvals' },
+            ]},
+            { label:'Mutual Recognition', condition:'strategy = MRP', path: [
+              { type:'step', id:'ra_ref_state', title:'Reference State' },
+              { type:'step', id:'ra_extend', title:'Extend to CMS' },
+            ]},
+          ]},
+          { type:'step', id:'ra_variations', title:'Manage Variations' },
+        ]},
+        { label:'Finance', path: [
+          { type:'step', id:'fin_model', title:'Financial Model' },
+          { type:'split', id:'fin_fork', title:'Parallel Analysis', branches: [
+            { label:'Revenue', path: [
+              { type:'step', id:'fin_forecast', title:'Revenue Forecast' },
+              { type:'step', id:'fin_scenarios', title:'Scenario Analysis' },
+            ]},
+            { label:'Cost', path: [
+              { type:'step', id:'fin_cogs', title:'COGS Projection' },
+              { type:'step', id:'fin_opex', title:'OpEx Budget' },
+            ]},
+            { label:'Pricing', path: [
+              { type:'step', id:'fin_hta', title:'HTA Dossier' },
+              { type:'step', id:'fin_icer', title:'ICER Analysis' },
+              { type:'step', id:'fin_price_set', title:'Set Price' },
+            ]},
+          ], merge: { id:'fin_merge', title:'Business Case' }},
+          { type:'step', id:'fin_board', title:'Board Presentation' },
+        ]},
+      ], merge: { id:'program_merge', title:'Program Review' }},
+      { type:'step', id:'final_decision', title:'Final Investment Decision' },
+    ],
+  },
 ];
 
 // ═══════════════════════════════════════════════════════════════════
@@ -314,11 +719,11 @@ function flattenSpine(spine, depth, rejoinRef) {
   // Tag lines whose first ref marker label is in the given set.
   // This ensures only direct branch/route lines get tagged, not
   // continuation lines after nested branch points.
-  function tagGroupByRefs(arr, startIdx, refLabels, type, gid) {
+  function tagGroupByRefs(arr, startIdx, refLabels, type, gid, rejoinLabel) {
     for (let gi = startIdx; gi < arr.length; gi++) {
       if (arr[gi].branchLabel && refLabels.includes(arr[gi].branchLabel)) {
         if (!arr[gi].groups) arr[gi].groups = [];
-        arr[gi].groups.push({ type, gid });
+        arr[gi].groups.push({ type, gid, rejoinLabel });
       }
     }
   }
@@ -344,7 +749,7 @@ function flattenSpine(spine, depth, rejoinRef) {
         const cont = emitPath(route.path, start, depth + 1, rejoinLabel);
         lines.push(...cont); // continuation right after this route's lines
       }
-      tagGroupByRefs(lines, gs, routeRefs, 'gate', gid);
+      tagGroupByRefs(lines, gs, routeRefs, 'gate', gid, rejoinLabel);
       cur = { depth, elements: [{ kind:'ref', label: rejoinLabel, type:'rejoin' }],
               branchLabel: rejoinLabel, branchType: 'rejoin', isContinuation: true };
     }
@@ -365,7 +770,7 @@ function flattenSpine(spine, depth, rejoinRef) {
         const cont = emitPath(branch.path, start, depth + 1, mergeLabel);
         lines.push(...cont); // continuation right after this branch's lines
       }
-      tagGroupByRefs(lines, gs2, branchRefs, 'split', gid);
+      tagGroupByRefs(lines, gs2, branchRefs, 'split', gid, mergeLabel);
       cur = { depth, elements: [{ kind:'ref', label: mergeLabel, type:'rejoin' }],
               branchLabel: mergeLabel, branchType: 'rejoin', isContinuation: true };
       if (seg.merge) { cur.elements.push({ kind:'step', title: seg.merge.title }); }
@@ -380,44 +785,108 @@ function flattenSpine(spine, depth, rejoinRef) {
   }
   if (cur.elements.length > 0) lines.push(cur);
 
-  reorderContinuations(lines);
-
   return lines;
 }
 
-function reorderContinuations(lines) {
+// Tree-based ordering and Y-assignment. Walks the branch-point tree depth-first,
+// assigning Y positions recursively so each spine segment computes its own Y range
+// independently. The only coupling between sequential segments is the bridge point
+// where one segment's total height determines the next segment's starting Y.
+//
+// Leaf continuations (no BP) share Y with their BP line.
+// Non-leaf continuations (containing a BP) get their own row — a bridge that
+// starts a new independent Y context for the next segment.
+function treeOrderLines(lines) {
+  const rowStep = C.lineH + C.lineGap;
+
+  // Index: groupId → member line indices (branch/route lines)
+  const groupMembers = {};
+  // Index: groupId → rejoin label (from group tags set during flattening)
+  const groupRejoinLabel = {};
+  // Index: rejoinLabel → continuation line index
+  const continuationFor = {};
+
   for (let i = 0; i < lines.length; i++) {
-    const bpElem = lines[i].elements.find(e => e.kind === 'branch-point' && e.groupId);
-    if (!bpElem) continue;
-    const gid = bpElem.groupId;
-
-    let rejoinLabel = null;
-    for (let j = i + 1; j < lines.length; j++) {
-      if (lines[j].groups) {
-        for (const g of lines[j].groups) {
-          if (g.gid === gid) {
-            if (lines[j].rejoinLabel) rejoinLabel = lines[j].rejoinLabel;
-            break;
-          }
-        }
+    if (lines[i].groups) {
+      for (const g of lines[i].groups) {
+        if (!groupMembers[g.gid]) groupMembers[g.gid] = [];
+        groupMembers[g.gid].push(i);
+        if (g.rejoinLabel) groupRejoinLabel[g.gid] = g.rejoinLabel;
       }
-      if (rejoinLabel) break;
     }
-    if (!rejoinLabel) continue;
-
-    for (let j = i + 2; j < lines.length; j++) {
-      if (!lines[j].isContinuation || lines[j].branchLabel !== rejoinLabel) continue;
-      if (j === i + 1) break;
-      const [cont] = lines.splice(j, 1);
-      cont._shareRowWithPrev = true;
-      // Strip leading ref + wire so content starts directly
-      while (cont.elements.length > 0 && (cont.elements[0].kind === 'ref' || cont.elements[0].kind === 'wire')) {
-        cont.elements.shift();
-      }
-      lines.splice(i + 1, 0, cont);
-      break;
+    if (lines[i].isContinuation && lines[i].branchLabel) {
+      continuationFor[lines[i].branchLabel] = i;
     }
   }
+
+  const visited = new Set();
+  const result = [];
+
+  // Recursively assign Y positions. Returns the next free Y after this
+  // line and its entire subtree.
+  function assignY(idx, startY) {
+    if (visited.has(idx)) return startY;
+    visited.add(idx);
+    const line = lines[idx];
+    line._assignedY = startY;
+    result.push(line);
+
+    // If no branch-point, this is a leaf line — consumes one row.
+    const bp = line.elements.find(e => e.kind === 'branch-point');
+    if (!bp) return startY + rowStep;
+
+    const gid = bp.groupId;
+    const members = groupMembers[gid] || [];
+
+    // Continuation — process first to determine if it shares this row
+    const rejoinLabel = groupRejoinLabel[gid];
+    let contSubtreeBottom = startY + rowStep; // default: no continuation subtree
+
+    if (rejoinLabel && continuationFor[rejoinLabel] !== undefined) {
+      const contIdx = continuationFor[rejoinLabel];
+      const contLine = lines[contIdx];
+      const hasBP = contLine.elements.find(e => e.kind === 'branch-point');
+
+      // Strip leading ref + wire so content starts directly
+      while (contLine.elements.length > 0 &&
+             (contLine.elements[0].kind === 'ref' || contLine.elements[0].kind === 'wire')) {
+        contLine.elements.shift();
+      }
+
+      if (!hasBP) {
+        // Leaf continuation: share row, no subtree of its own
+        contLine._assignedY = startY;
+        visited.add(contIdx);
+        result.push(contLine);
+      } else {
+        // Non-leaf continuation: shares this row, but its BP starts an
+        // independent subtree. Both this BP's branches and the continuation's
+        // branches start at startY + rowStep, occupying overlapping Y space
+        // at different X positions.
+        contSubtreeBottom = assignY(contIdx, startY);
+      }
+    }
+
+    // Branches occupy Y slots below this line (same starting Y as
+    // any continuation subtree — they coexist at different X positions)
+    let branchY = startY + rowStep;
+    for (const mi of members) {
+      branchY = assignY(mi, branchY);
+    }
+
+    // Total height = whichever subtree is taller
+    return Math.max(branchY, contSubtreeBottom);
+  }
+
+  // Start from line 0; loop ensures no orphaned lines are dropped.
+  let y = C.padY;
+  for (let i = 0; i < lines.length; i++) {
+    if (!visited.has(i)) {
+      y = assignY(i, y);
+    }
+  }
+
+  return result;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -475,11 +944,10 @@ function layout(lines) {
   let totalW = 0;
 
   // First pass: lay out each line left-to-right, record content width (before rejoin)
-  let nextY = C.padY;
+  // Y positions are pre-assigned by treeOrderLines via _assignedY.
   for (let li = 0; li < lines.length; li++) {
     const line = lines[li];
-    const y = line._shareRowWithPrev && li > 0 ? positioned[li - 1].y : nextY;
-    if (!line._shareRowWithPrev) nextY = y + C.lineH + C.lineGap;
+    const y = line._assignedY;
     const indent = C.padX + line.depth * C.depthIndent;
     let x = indent;
     const items = [];
@@ -548,10 +1016,25 @@ function layout(lines) {
     positioned.push({ y, items, contentEndX, rejoinStartIdx, depth: line.depth,
                        rejoinLabel: line.rejoinLabel, groups: line.groups,
                        isContinuation: line.isContinuation, branchLabel: line.branchLabel,
-                       _shareRowWithPrev: line._shareRowWithPrev,
+                       _assignedY: line._assignedY,
                        totalContentW: x });
     totalW = Math.max(totalW, x + C.padX);
   }
+
+  // Identify continuation lines whose first visible item is a branch-point.
+  // These nodes have both an incoming convergence bar and an outgoing divergence
+  // bar, which need horizontal displacement to read as two distinct connections.
+  const contWithBP = new Set();
+  for (const pl of positioned) {
+    if (pl.isContinuation) {
+      const first = pl.items.find(it => it.kind === 'step' || it.kind === 'branch-point');
+      if (first && first.kind === 'branch-point') contWithBP.add(pl);
+    }
+  }
+
+  // For each group whose BP sits on a contWithBP line, compute displacement
+  // from the widest condition label so branches clear the convergence bar.
+  const groupDisplace = {}; // gid → displacement pixels
 
   // Group alignment: center branch lines' cond labels on parent branch-point.
   // Extracted as a function so it can be re-run after convergence shifts.
@@ -560,6 +1043,21 @@ function layout(lines) {
     for (const item of pl.items) {
       if (item.kind === 'branch-point' && item.groupId) {
         groupOrder.push({ gid: item.groupId, depth: pl.depth });
+        // Compute displacement for BPs on continuation lines
+        if (contWithBP.has(pl)) {
+          let maxCondW = 0;
+          for (const pl2 of positioned) {
+            if (!pl2.groups) continue;
+            for (const g of pl2.groups) {
+              if (g.gid === item.groupId) {
+                const ci = pl2.items.find(it => it.kind === 'cond');
+                if (ci) maxCondW = Math.max(maxCondW, ci.w);
+                break;
+              }
+            }
+          }
+          groupDisplace[item.groupId] = maxCondW / 2 + 8;
+        }
       }
     }
   }
@@ -576,6 +1074,10 @@ function layout(lines) {
         }
       }
       if (targetX === undefined) continue;
+
+      // If this group's BP is on a continuation line, shift the alignment
+      // target right so branch labels clear the incoming convergence bar.
+      targetX += groupDisplace[gid] || 0;
 
       for (const pl of positioned) {
         if (!pl.groups) continue;
@@ -672,12 +1174,12 @@ function layout(lines) {
         }
       }
 
-      // Merge node centers (first step on continuation lines)
+      // Merge node centers (first visible item on continuation lines)
       for (const cl of contLines) {
         if (plines.includes(cl)) continue; // skip if it's also a route line
-        const firstStep = cl.items.find(it => it.kind === 'step');
-        if (firstStep) {
-          convergenceX = Math.max(convergenceX, firstStep.x + firstStep.w / 2);
+        const anchor = cl.items.find(it => it.kind === 'step' || it.kind === 'branch-point');
+        if (anchor) {
+          convergenceX = Math.max(convergenceX, anchor.x + anchor.w / 2);
         }
       }
 
@@ -701,12 +1203,12 @@ function layout(lines) {
         pl._convergenceXByLabel[label] = convergenceX;
       }
 
-      // Shift continuation lines so merge node center aligns to convergenceX
+      // Shift continuation lines so first visible item center aligns to convergenceX
       for (const cl of contLines) {
         if (plines.includes(cl)) continue;
-        const firstStep = cl.items.find(it => it.kind === 'step');
-        if (!firstStep) continue;
-        const currentCx = firstStep.x + firstStep.w / 2;
+        const anchor = cl.items.find(it => it.kind === 'step' || it.kind === 'branch-point');
+        if (!anchor) continue;
+        const currentCx = anchor.x + anchor.w / 2;
         const shift = convergenceX - currentCx;
         if (Math.abs(shift) > 0.5) {
           for (const item of cl.items) {
@@ -725,6 +1227,26 @@ function layout(lines) {
     alignGroups();
 
     if (!changed) break;
+  }
+
+  // Widen and shift BPs on continuation lines so the convergence bar
+  // (at bpCx) and divergence bar (at bpCx + displace) are equidistant
+  // from the node center. Shift center right by displace/2, then ensure
+  // width >= displace so both bars touch the node edges.
+  for (const pl of positioned) {
+    for (const item of pl.items) {
+      if (item.kind === 'branch-point' && item.groupId && groupDisplace[item.groupId]) {
+        const displace = groupDisplace[item.groupId];
+        // Shift center right so both bars are equidistant
+        item.x += displace / 2;
+        // Ensure node is wide enough to span both bars
+        if (item.w < displace) {
+          const extra = displace - item.w;
+          item.x -= extra / 2;
+          item.w = displace;
+        }
+      }
+    }
   }
 
   // Even-spacing pass: distribute content nodes evenly across the available
@@ -805,6 +1327,9 @@ function layout(lines) {
         const gid = item.groupId;
         const bpCx = item.x + item.w / 2;
         const bpCy = pl.y + C.lineH / 2;
+        // If this group has a displacement (BP on continuation line),
+        // offset from the (already-shifted) center by half the displacement.
+        const x = bpCx + (groupDisplace[gid] ? groupDisplace[gid] / 2 : 0);
         // Find grouped lines with this gid — their first ref is now aligned to bpCx
         let lastCy = bpCy;
         for (const pl2 of positioned) {
@@ -818,7 +1343,7 @@ function layout(lines) {
           }
         }
         if (lastCy > bpCy) {
-          vbars.push({ x: bpCx, y1: bpCy, y2: lastCy, type: item.type });
+          vbars.push({ x, y1: bpCy, y2: lastCy, type: item.type });
         }
       }
     }
@@ -873,8 +1398,9 @@ function layout(lines) {
     }
   }
 
-  const lastLine = positioned[positioned.length - 1];
-  const totalH = lastLine ? lastLine.y + C.lineH + C.padY : C.padY * 2;
+  let maxY = 0;
+  for (const pl of positioned) { if (pl.y > maxY) maxY = pl.y; }
+  const totalH = positioned.length > 0 ? maxY + C.lineH + C.padY : C.padY * 2;
   return { width: totalW, height: totalH, lines: positioned, vbars };
 }
 
@@ -1091,7 +1617,8 @@ function buildWorkshop() {
 
     try {
       resetRefs();
-      const lines = flattenSpine(wf.spine, 0, null);
+      const rawLines = flattenSpine(wf.spine, 0, null);
+      const lines = treeOrderLines(rawLines);
       const layoutData = layout(lines);
 
       const canvas = document.createElement('canvas');
