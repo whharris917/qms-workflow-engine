@@ -1020,7 +1020,8 @@ function _nodeStatus(item, execState) {
   return 'pending';
 }
 
-function drawSchematic(canvas, layoutData, execState) {
+function drawSchematic(canvas, layoutData, execState, opts) {
+  var wiresOnly = opts && opts.wiresOnly;  // skip node shapes, draw only topology
   var dpr = window.devicePixelRatio || 1;
   canvas.width = layoutData.width * dpr;
   canvas.height = layoutData.height * dpr;
@@ -1075,12 +1076,11 @@ function drawSchematic(canvas, layoutData, execState) {
   }
 
   // Elements (drawn on top of topology lines)
+  if (!wiresOnly) {
   for (var li2 = 0; li2 < layoutData.lines.length; li2++) {
     var line2 = layoutData.lines[li2];
     var cy = line2.y + (line2._rowH || C.lineH) / 2;
     var lastItemRight = null;
-
-
 
     for (var ii9 = 0; ii9 < line2.items.length; ii9++) {
       var item3 = line2.items[ii9];
@@ -1196,6 +1196,7 @@ function drawSchematic(canvas, layoutData, execState) {
       }
     }
   }
+  } // end if (!wiresOnly)
 
 }
 

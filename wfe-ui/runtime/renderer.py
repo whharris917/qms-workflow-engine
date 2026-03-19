@@ -97,8 +97,9 @@ def _cond_label(when: dict | None) -> str:
 
 def _serialize_definition(defn: WorkflowDef) -> dict:
     """Serialize a WorkflowDef for the observer UI (Exp-D flowchart)."""
+    node_id_list = defn.node_ids  # ordered list for resolving implicit targets
     nodes = []
-    for nid, nd in defn.nodes.items():
+    for idx, (nid, nd) in enumerate(defn.nodes.items()):
         entry = {
             "id": nid,
             "title": nd.title,
@@ -121,8 +122,12 @@ def _serialize_definition(defn: WorkflowDef) -> dict:
                     for c in nd.proceed.gate.get("conditions", [])
                     if c.get("type") == "field_truthy"
                 ] if nd.proceed.gate.get("op") == "AND" else []
-            if nd.proceed.target:
-                p["target"] = nd.proceed.target
+            # Resolve target: explicit if set, otherwise next sequential node
+            target = nd.proceed.target
+            if not target and idx + 1 < len(node_id_list):
+                target = node_id_list[idx + 1]
+            if target:
+                p["target"] = target
             entry["proceed"] = p
         # Router
         if nd.router:
