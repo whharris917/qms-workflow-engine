@@ -5,12 +5,17 @@
   .ws-section { margin-bottom: 2.5rem; }
   .ws-section > h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
   .ws-section > .desc { font-size: 0.85rem; color: #888; margin-bottom: 1rem; }
-  .sch-canvas {
-    background: #fafbfc;
-    border: 1px solid #e1e4e8;
-    border-radius: 10px;
-    display: block;
-  }
+  /* Pill nodes */
+  .sch-pill { display:inline-flex; align-items:center; gap:5px; padding:0 13px; border-radius:15px; height:30px; background:#fff; border:1.5px solid #e5e7eb; font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:#374151; box-sizing:border-box; white-space:nowrap; overflow:hidden; }
+  .sch-pill-dot { width:7px; height:7px; border-radius:50%; background:#6b7280; flex-shrink:0; }
+  .sch-pill-title { overflow:hidden; text-overflow:ellipsis; }
+  .sch-bp { display:inline-flex; align-items:center; justify-content:center; padding:0 13px; height:30px; background:#f3f4f6; border:1.5px solid #9ca3af; font:600 13px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:#374151; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-align:center; }
+  .sch-bp-gate { clip-path:polygon(8% 0%,92% 0%,100% 50%,92% 100%,8% 100%,0% 50%); padding:0 20px; }
+  .sch-bp-split { border-radius:4px; }
+  .sch-bp-split-bars { position:absolute; top:5px; bottom:5px; width:4px; }
+  .sch-bp-split-bars-l { left:4px; border-left:1.5px solid #9ca3af; border-right:1.5px solid #9ca3af; }
+  .sch-bp-split-bars-r { right:4px; border-left:1.5px solid #9ca3af; border-right:1.5px solid #9ca3af; }
+  .sch-cond { display:inline-flex; align-items:center; justify-content:center; padding:0 8px; border-radius:10px; height:20px; border:1.5px solid #e5e7eb; background:#f3f4f6; font:500 11px -apple-system,BlinkMacSystemFont,sans-serif; color:#374151; white-space:nowrap; }
 </style>
 
 <h1>Spine Model — Workflow Banner Workshop</h1>
@@ -708,10 +713,27 @@ function buildWorkshop() {
     section.appendChild(desc);
 
     try {
-      const canvas = document.createElement('canvas');
-      canvas.className = 'sch-canvas';
-      Schematic.renderWorkflow(wf.spine, canvas);
-      section.appendChild(canvas);
+      const graphDiv = document.createElement('div');
+      function workshopNodeRenderer(item, status) {
+        if (item.kind === 'branch-point') {
+          if (item.type === 'gate') {
+            return '<div class="sch-bp sch-bp-gate">' + item.title + '</div>';
+          }
+          return '<div class="sch-bp sch-bp-split" style="position:relative;">'
+            + '<div class="sch-bp-split-bars sch-bp-split-bars-l"></div>'
+            + item.title
+            + '<div class="sch-bp-split-bars sch-bp-split-bars-r"></div>'
+            + '</div>';
+        }
+        return '<div class="sch-pill">'
+          + '<span class="sch-pill-dot"></span>'
+          + '<span class="sch-pill-title">' + item.title + '</span>'
+          + '</div>';
+      }
+      Schematic.renderHybrid(wf.spine, graphDiv, null, {
+        nodeRenderer: workshopNodeRenderer
+      });
+      section.appendChild(graphDiv);
     } catch (e) {
       const err = document.createElement('pre');
       err.style.cssText = 'color:red; font-size:0.8rem; padding:1rem; background:#fff0f0; border-radius:8px;';

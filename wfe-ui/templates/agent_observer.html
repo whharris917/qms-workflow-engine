@@ -791,22 +791,39 @@ function wfRenderBanner(state) {
     return html + '</div>';
 }
 
-/* ── Schematic banner — canvas-based spine model layout ── */
+/* ── Pill node renderer — compact banner-style nodes ── */
+function _pillNodeRenderer(item, status) {
+    if (item.kind === 'branch-point') {
+        if (item.type === 'gate') {
+            return '<div class="sch-bp sch-bp-gate">' + wfEsc(item.title) + '</div>';
+        }
+        // split (fork)
+        return '<div class="sch-bp sch-bp-split" style="position:relative;">'
+            + '<div class="sch-bp-split-bars sch-bp-split-bars-l"></div>'
+            + wfEsc(item.title)
+            + '<div class="sch-bp-split-bars sch-bp-split-bars-r"></div>'
+            + '</div>';
+    }
+    return '<div class="sch-pill">'
+        + '<span class="sch-pill-dot"></span>'
+        + '<span class="sch-pill-title">' + wfEsc(item.title) + '</span>'
+        + '</div>';
+}
+
+/* ── Schematic banner — HTML nodes over canvas topology ── */
 function _wfSchematicBanner(defn, current, completed) {
     var containerId = 'sch-banner-' + Math.random().toString(36).substr(2, 6);
 
-    // Render synchronously after the DOM element exists
     setTimeout(function() {
         var el = document.getElementById(containerId);
         if (!el) return;
         try {
             var spine = Schematic.definitionToSpine(defn);
             var execState = { current: current, completed: completed };
-            var canvas = document.createElement('canvas');
-            canvas.style.display = 'block';
-            var layoutData = Schematic.renderWorkflow(spine, canvas, execState);
-            el.appendChild(canvas);
-            el.style.height = layoutData.height + 'px';
+            var layoutData = Schematic.renderHybrid(spine, el, execState, {
+                nodeRenderer: _pillNodeRenderer
+            });
+            if (layoutData) el.style.height = layoutData.height + 'px';
         } catch (e) {
             el.innerHTML = '<span style="color:#999;font-size:0.8rem;">Banner error: ' + e.message + '</span>';
         }
@@ -1472,6 +1489,28 @@ var WF_STRUCTURAL_CSS = ''
     + '.wf-exec-locked { opacity:0.5; }'
     + '.wf-exec-reason { font-size:0.7rem; font-style:italic; margin-top:0.15rem; }'
     + '.wf-row-gated { opacity:0.6; }'
+    /* Schematic hybrid renderer — HTML nodes over canvas topology */
+    + '.sch-node-wrap { z-index:1; }'
+    + '.sch-cond-wrap { z-index:1; }'
+    + '.sch-cond { display:inline-flex; align-items:center; justify-content:center; padding:0 8px; border-radius:10px; height:20px; border:1.5px solid #e5e7eb; background:#f3f4f6; font:500 11px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:#374151; white-space:nowrap; }'
+    /* Pill node (compact banner-style) */
+    + '.sch-pill { display:inline-flex; align-items:center; gap:5px; padding:0 13px; border-radius:15px; height:30px; background:#fff; border:1.5px solid #e5e7eb; font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:#374151; box-sizing:border-box; white-space:nowrap; overflow:hidden; }'
+    + '.sch-pill-dot { width:7px; height:7px; border-radius:50%; background:#6b7280; flex-shrink:0; }'
+    + '.sch-pill-title { overflow:hidden; text-overflow:ellipsis; }'
+    /* Branch-point pill — gate (diamond shape via clip-path) */
+    + '.sch-bp { display:inline-flex; align-items:center; justify-content:center; padding:0 13px; height:30px; background:#f3f4f6; border:1.5px solid #9ca3af; font:600 13px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:#374151; box-sizing:border-box; white-space:nowrap; overflow:hidden; text-align:center; }'
+    + '.sch-bp-gate { clip-path:polygon(8% 0%,92% 0%,100% 50%,92% 100%,8% 100%,0% 50%); padding:0 20px; }'
+    + '.sch-bp-split { border-radius:4px; }'
+    + '.sch-bp-split-bars { position:absolute; top:5px; bottom:5px; width:4px; }'
+    + '.sch-bp-split-bars-l { left:4px; border-left:1.5px solid #9ca3af; border-right:1.5px solid #9ca3af; }'
+    + '.sch-bp-split-bars-r { right:4px; border-left:1.5px solid #9ca3af; border-right:1.5px solid #9ca3af; }'
+    /* Execution state colors */
+    + '.sch-node-current .sch-pill { background:#e3f2fd; border-color:#2a6bcf; color:#1a1a2e; }'
+    + '.sch-node-current .sch-pill-dot { background:#2a6bcf; }'
+    + '.sch-node-current .sch-bp { background:#e3f2fd; border-color:#2a6bcf; color:#1a1a2e; }'
+    + '.sch-node-completed .sch-pill { background:#e8f5e9; border-color:#4caf50; color:#2e7d32; }'
+    + '.sch-node-completed .sch-pill-dot { background:#4caf50; }'
+    + '.sch-node-completed .sch-bp { background:#e8f5e9; border-color:#4caf50; color:#2e7d32; }'
     ;
 
 /* ======================================================================
@@ -3347,6 +3386,19 @@ function _fcComputeSlots(nodes, items) {
     return {slots: slots, totalW: totalW, totalH: totalH};
 }
 
+/* ── Detailed card node renderer — rich cards with fields, actions, etc. ── */
+function _cardNodeRenderer(item, status) {
+    // Look up the full node definition from the closure
+    var nd = _fcDefnNodes && _fcDefnNodes[item.id];
+    if (!nd) return _pillNodeRenderer(item, status);
+    var idx = _fcDefnIdx && _fcDefnIdx[item.id];
+    return _fcNodeCard(nd, idx != null ? idx : 0);
+}
+
+// Closures for _cardNodeRenderer to access the definition index
+var _fcDefnNodes = null;
+var _fcDefnIdx = null;
+
 /* ── Schematic-positioned detailed flowchart ── */
 function _expDSchematicFlowchart(defn, stateObj) {
     if (!defn || !defn.nodes || !defn.nodes.length) return '';
@@ -3354,12 +3406,12 @@ function _expDSchematicFlowchart(defn, stateObj) {
     var current = stateObj.lifecycle_current || stateObj.node || '';
     var completed = stateObj.lifecycle_completed || stateObj.completed_nodes || [];
 
-    // Index nodes by ID
-    var nodeById = {};
-    var nodeIdx = {};
+    // Build index for the card renderer
+    _fcDefnNodes = {};
+    _fcDefnIdx = {};
     for (var i = 0; i < nodes.length; i++) {
-        nodeById[nodes[i].id] = nodes[i];
-        nodeIdx[nodes[i].id] = i;
+        _fcDefnNodes[nodes[i].id] = nodes[i];
+        _fcDefnIdx[nodes[i].id] = i;
     }
 
     var spine;
@@ -3370,97 +3422,19 @@ function _expDSchematicFlowchart(defn, stateObj) {
     }
 
     var graphId = 'sch-fc-' + Math.random().toString(36).substr(2, 6);
-
-    // Phase 1: Measure card heights by rendering into a hidden container.
-    var measurer = document.createElement('div');
-    measurer.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:' + _FC.nodeW + 'px;visibility:hidden;';
-    document.body.appendChild(measurer);
-
-    var cardHeights = {}; // nodeId → measured pixel height
-    for (var mi = 0; mi < nodes.length; mi++) {
-        var mnd = nodes[mi];
-        var mDiv = document.createElement('div');
-        mDiv.innerHTML = _fcNodeCard(mnd, mi);
-        measurer.appendChild(mDiv);
-        cardHeights[mnd.id] = mDiv.offsetHeight;
-        measurer.removeChild(mDiv);
-    }
-    document.body.removeChild(measurer);
-
-    // Phase 2: Set measured heights on spine elements so the layout engine
-    // computes correct per-row spacing natively.
-    function setSpineHeights(spineArr) {
-        for (var si = 0; si < spineArr.length; si++) {
-            var seg = spineArr[si];
-            if (seg.id && cardHeights[seg.id]) {
-                seg.height = cardHeights[seg.id];
-            }
-            if (seg.type === 'gate' && seg.routes) {
-                for (var ri = 0; ri < seg.routes.length; ri++) {
-                    setSpineHeights(seg.routes[ri].path);
-                }
-            }
-            if (seg.type === 'split' && seg.branches) {
-                for (var bi = 0; bi < seg.branches.length; bi++) {
-                    setSpineHeights(seg.branches[bi].path);
-                }
-                if (seg.merge && seg.merge.id && cardHeights[seg.merge.id]) {
-                    seg.merge.height = cardHeights[seg.merge.id];
-                }
-            }
-        }
-    }
-    setSpineHeights(spine);
-
-    // Phase 3: Run the layout with actual card heights — correct from the start.
     var execState = { current: current, completed: completed };
-    var layoutData = Schematic.renderWorkflow(spine, null, execState, {
-        nodeW: _FC.nodeW, lineGap: 16
-    });
 
-    // Phase 4: Build HTML. Cards and topology canvas positioned absolutely.
-    var cardsHtml = '';
-    for (var li = 0; li < layoutData.lines.length; li++) {
-        var ln = layoutData.lines[li];
-        var rowH = ln._rowH || Schematic.C.lineH;
-        for (var ii = 0; ii < ln.items.length; ii++) {
-            var itm = ln.items[ii];
-            if ((itm.kind === 'step' || itm.kind === 'branch-point') && itm.id && nodeById[itm.id]) {
-                var nd = nodeById[itm.id];
-                var idx = nodeIdx[itm.id];
-                var isCur = itm.id === current;
-                var isDone = completed.indexOf(itm.id) >= 0;
-                var stateClass = isCur ? ' fc-card-current' : isDone ? ' fc-card-done' : '';
-                // Vertically center card in its row
-                var ch = cardHeights[itm.id] || rowH;
-                var cardTop = ln.y + (rowH - ch) / 2;
-                cardsHtml += '<div class="fc-card-wrap' + stateClass
-                    + '" style="position:absolute;left:' + itm.x + 'px;top:' + cardTop + 'px;width:' + itm.w + 'px;z-index:1;">'
-                    + _fcNodeCard(nd, idx) + '</div>';
-            }
-            if (itm.kind === 'cond') {
-                var condCy = ln.y + rowH / 2;
-                cardsHtml += '<div class="fc-sch-cond" style="position:absolute;left:' + itm.x + 'px;top:' + (condCy - itm.h / 2)
-                    + 'px;width:' + itm.w + 'px;height:' + itm.h + 'px;z-index:1;'
-                    + 'display:flex;align-items:center;justify-content:center;'
-                    + 'background:#f3f4f6;border:1px solid #e5e7eb;border-radius:' + (itm.h / 2) + 'px;'
-                    + 'font-size:11px;font-weight:500;color:#374151;white-space:nowrap;overflow:hidden;'
-                    + 'font-family:-apple-system,BlinkMacSystemFont,sans-serif;">'
-                    + wfEsc(itm.text) + '</div>';
-            }
-        }
-    }
-
-    // Topology canvas — wires and bars only (HTML cards replace node shapes)
-    var topoCanvas = document.createElement('canvas');
-    topoCanvas.style.cssText = 'position:absolute;left:0;top:0;z-index:0;pointer-events:none;';
-    Schematic.drawSchematic(topoCanvas, layoutData, execState, { wiresOnly: true });
-
-    // Schedule canvas insertion after DOM render
     setTimeout(function() {
-        var graph = document.getElementById(graphId);
-        if (graph) {
-            graph.insertBefore(topoCanvas, graph.firstChild);
+        var el = document.getElementById(graphId);
+        if (!el) return;
+        try {
+            Schematic.renderHybrid(spine, el, execState, {
+                nodeW: _FC.nodeW,
+                lineGap: 16,
+                nodeRenderer: _cardNodeRenderer
+            });
+        } catch (e) {
+            el.innerHTML = '<pre style="color:red;padding:1rem;">Flowchart error: ' + e.message + '</pre>';
         }
     }, 0);
 
@@ -3472,9 +3446,7 @@ function _expDSchematicFlowchart(defn, stateObj) {
     hdr += '</div>';
 
     return '<div class="fc-wrap">' + hdr
-        + '<div class="fc-graph" id="' + graphId + '" style="position:relative;width:' + layoutData.width + 'px;min-height:' + layoutData.height + 'px;">'
-        + cardsHtml
-        + '</div></div>';
+        + '<div class="fc-graph" id="' + graphId + '" style="min-height:200px;"></div></div>';
 }
 
 /* ── Main definition renderer (legacy ELK-based) ── */
@@ -3714,6 +3686,8 @@ var EXP_D_FC_CSS = ''
     + '.fc-card-wrap { z-index:1; }'
     + '.fc-card-current .fc-card { border-color:#2a6bcf !important; box-shadow:0 0 0 2px rgba(42,107,207,0.2); }'
     + '.fc-card-done .fc-card { border-color:#4caf50 !important; opacity:0.85; }'
+    + '.sch-node-current .fc-card { border-color:#2a6bcf !important; box-shadow:0 0 0 2px rgba(42,107,207,0.2); }'
+    + '.sch-node-completed .fc-card { border-color:#4caf50 !important; opacity:0.85; }'
     /* Card */
     + '.fc-card { border:1px solid; border-radius:8px; overflow:hidden; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:#fff; }'
     + '.fc-card-head { display:flex; align-items:center; gap:0.4rem; padding:0.45rem 0.65rem; flex-wrap:wrap; }'
@@ -3918,15 +3892,13 @@ function _scopeFC(sel, css) { return css.replace(/\.fc-/g, sel + ' .fc-'); }
    SCHEMATIC RENDERER (exp-e) — canvas-based spine model layout
    ====================================================================== */
 (function() {
-    var canvas;
+    var container;
     registerRenderer({
         id: 'exp-e', label: 'Schematic', format: 'schematic',
         style: 'light', style_label: 'Light',
         init: function(c) {
             c.style.cssText = 'overflow:auto;padding:0;background:#fafbfc;';
-            canvas = document.createElement('canvas');
-            canvas.style.display = 'block';
-            c.appendChild(canvas);
+            container = c;
         },
         update: function(state, msg, feedback) {
             if (!state || !state.state) return;
@@ -3940,9 +3912,14 @@ function _scopeFC(sel, css) { return css.replace(/\.fc-/g, sel + ' .fc-'); }
                     current: s.node || s.lifecycle_current || null,
                     completed: s.completed_nodes || s.lifecycle_completed || []
                 };
-                Schematic.renderWorkflow(spine, canvas, execState);
+                var graphDiv = document.createElement('div');
+                container.innerHTML = '';
+                container.appendChild(graphDiv);
+                Schematic.renderHybrid(spine, graphDiv, execState, {
+                    nodeRenderer: _pillNodeRenderer
+                });
             } catch (e) {
-                canvas.parentNode.innerHTML = '<pre style="color:red;padding:1rem;">Schematic error: ' + e.message + '\n' + e.stack + '</pre>';
+                container.innerHTML = '<pre style="color:red;padding:1rem;">Schematic error: ' + e.message + '\n' + e.stack + '</pre>';
             }
         },
         activate: function() {},

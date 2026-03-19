@@ -1,10 +1,15 @@
 // ═══════════════════════════════════════════════════════════════════
 // Schematic Renderer — shared module
 //
-// Pure data pipeline for workflow topology visualization:
-//   definitionToSpine → flattenSpine → treeOrderLines → layout → drawSchematic
+// Workflow topology visualization pipeline:
+//   definitionToSpine → flattenSpine → treeOrderLines → layout → renderHybrid
 //
-// Consumed by workshop.html (test harness) and agent_observer.html (live renderer).
+// renderHybrid: unified HTML-over-canvas renderer. Callers provide a
+// nodeRenderer(item, status) callback returning HTML for each node.
+// The canvas draws only topology (wires + bars); nodes are real DOM elements.
+//
+// Consumed by agent_observer.html (banner, flowchart, standalone) and
+// workshop.html (test harness).
 // ═══════════════════════════════════════════════════════════════════
 
 var Schematic = (function() {
@@ -1212,6 +1217,181 @@ function renderWorkflow(spine, canvas, execState, layoutOpts) {
   return layoutData;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// SET SPINE HEIGHTS — inject measured heights into spine tree
+// ═══════════════════════════════════════════════════════════════════
+
+function setSpineHeights(spineArr, heightMap) {
+  for (var si = 0; si < spineArr.length; si++) {
+    var seg = spineArr[si];
+    if (seg.id && heightMap[seg.id]) {
+      seg.height = heightMap[seg.id];
+    }
+    if (seg.type === 'gate' && seg.routes) {
+      for (var ri = 0; ri < seg.routes.length; ri++) {
+        setSpineHeights(seg.routes[ri].path, heightMap);
+      }
+    }
+    if (seg.type === 'split' && seg.branches) {
+      for (var bi = 0; bi < seg.branches.length; bi++) {
+        setSpineHeights(seg.branches[bi].path, heightMap);
+      }
+      if (seg.merge && seg.merge.id && heightMap[seg.merge.id]) {
+        seg.merge.height = heightMap[seg.merge.id];
+      }
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// HYBRID RENDERER — HTML nodes over canvas topology
+// ═══════════════════════════════════════════════════════════════════
+//
+// Unified rendering pipeline:
+//   1. Caller provides nodeRenderer(item, status) → HTML string
+//   2. Measure node HTML in hidden container → height map
+//   3. Inject heights into spine → run layout
+//   4. Draw wires/bars on canvas (z:0)
+//   5. Position HTML nodes absolutely (z:1)
+//
+// opts:
+//   nodeRenderer(item, status)  — required, returns HTML string
+//   condRenderer(item, status)  — optional, returns HTML for condition labels
+//   nodeW        — fixed node width (0 = text-measured)
+//   lineGap      — vertical gap between rows
+//   onLayout(layoutData)  — optional callback after layout, before DOM population
+
+function renderHybrid(spine, container, execState, opts) {
+  if (!container || !spine || !spine.length) return null;
+  opts = opts || {};
+
+  var nodeRenderer = opts.nodeRenderer;
+  if (!nodeRenderer) return null;
+
+  var nodeW = opts.nodeW || 0;
+  var lineGap = opts.lineGap !== undefined ? opts.lineGap : C.lineGap;
+
+  // Collect all node IDs from the spine for measurement
+  var nodeIds = [];
+  (function collectIds(arr) {
+    for (var i = 0; i < arr.length; i++) {
+      var seg = arr[i];
+      if (seg.id) nodeIds.push(seg.id);
+      if (seg.type === 'gate' && seg.routes) {
+        for (var ri = 0; ri < seg.routes.length; ri++) collectIds(seg.routes[ri].path);
+      }
+      if (seg.type === 'split' && seg.branches) {
+        for (var bi = 0; bi < seg.branches.length; bi++) collectIds(seg.branches[bi].path);
+        if (seg.merge && seg.merge.id) nodeIds.push(seg.merge.id);
+      }
+    }
+  })(spine);
+
+  // Build a title/kind map from spine for nodeRenderer calls during measurement
+  var spineInfo = {};
+  (function mapInfo(arr) {
+    for (var i = 0; i < arr.length; i++) {
+      var seg = arr[i];
+      if (seg.id) spineInfo[seg.id] = { title: seg.title, kind: seg.type === 'gate' || seg.type === 'split' ? 'branch-point' : 'step', type: seg.type };
+      if (seg.type === 'gate' && seg.routes) {
+        for (var ri = 0; ri < seg.routes.length; ri++) mapInfo(seg.routes[ri].path);
+      }
+      if (seg.type === 'split' && seg.branches) {
+        for (var bi = 0; bi < seg.branches.length; bi++) mapInfo(seg.branches[bi].path);
+        if (seg.merge) spineInfo[seg.merge.id] = { title: seg.merge.title, kind: 'step', type: 'merge' };
+      }
+    }
+  })(spine);
+
+  // Phase 1: Measure — render each node into a hidden container
+  var measurer = document.createElement('div');
+  var measureW = nodeW || 200;
+  measurer.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:' + measureW + 'px;visibility:hidden;';
+  document.body.appendChild(measurer);
+
+  var heightMap = {};
+  for (var ni = 0; ni < nodeIds.length; ni++) {
+    var nid = nodeIds[ni];
+    var info = spineInfo[nid] || { title: nid, kind: 'step', type: 'step' };
+    var status = _nodeStatus({ id: nid }, execState);
+    var html = nodeRenderer({ id: nid, kind: info.kind, type: info.type, title: info.title }, status);
+    var mDiv = document.createElement('div');
+    mDiv.innerHTML = html;
+    measurer.appendChild(mDiv);
+    heightMap[nid] = mDiv.offsetHeight;
+    measurer.removeChild(mDiv);
+  }
+  document.body.removeChild(measurer);
+
+  // Phase 2: Inject heights + run layout
+  setSpineHeights(spine, heightMap);
+  var layoutOpts = { lineGap: lineGap };
+  if (nodeW) layoutOpts.nodeW = nodeW;
+  var layoutData = renderWorkflow(spine, null, execState, layoutOpts);
+
+  if (opts.onLayout) opts.onLayout(layoutData);
+
+  // Phase 3: Draw topology canvas
+  var topoCanvas = document.createElement('canvas');
+  topoCanvas.style.cssText = 'position:absolute;left:0;top:0;z-index:0;pointer-events:none;';
+  drawSchematic(topoCanvas, layoutData, execState || null, { wiresOnly: true });
+
+  // Phase 4: Build positioned HTML nodes
+  var nodesHtml = '';
+  var condRenderer = opts.condRenderer || null;
+
+  for (var li = 0; li < layoutData.lines.length; li++) {
+    var ln = layoutData.lines[li];
+    var rowH = ln._rowH || C.lineH;
+    for (var ii = 0; ii < ln.items.length; ii++) {
+      var itm = ln.items[ii];
+
+      if ((itm.kind === 'step' || itm.kind === 'branch-point') && itm.id) {
+        var itemInfo = spineInfo[itm.id] || { title: itm.title, kind: itm.kind, type: itm.kind };
+        var itemStatus = _nodeStatus(itm, execState);
+        var nodeHtml = nodeRenderer(
+          { id: itm.id, kind: itm.kind, type: itemInfo.type, title: itm.title, w: itm.w, h: itm.h },
+          itemStatus
+        );
+        var ch = heightMap[itm.id] || rowH;
+        var nodeTop = ln.y + (rowH - ch) / 2;
+        nodesHtml += '<div class="sch-node-wrap sch-node-' + itemStatus
+            + '" style="position:absolute;left:' + itm.x + 'px;top:' + nodeTop + 'px;width:' + itm.w + 'px;z-index:1;">'
+            + nodeHtml + '</div>';
+      }
+
+      if (itm.kind === 'cond') {
+        var condCy = ln.y + rowH / 2;
+        if (condRenderer) {
+          var condStatus = 'pending';
+          nodesHtml += '<div class="sch-cond-wrap" style="position:absolute;left:' + itm.x + 'px;top:' + (condCy - itm.h / 2)
+              + 'px;width:' + itm.w + 'px;height:' + itm.h + 'px;z-index:1;">'
+              + condRenderer({ text: itm.text, type: itm.type, w: itm.w, h: itm.h }, condStatus)
+              + '</div>';
+        } else {
+          // Default condition label
+          nodesHtml += '<div class="sch-cond-wrap" style="position:absolute;left:' + itm.x + 'px;top:' + (condCy - itm.h / 2)
+              + 'px;z-index:1;"><div class="sch-cond">' + _escHtml(itm.text) + '</div></div>';
+        }
+      }
+    }
+  }
+
+  // Phase 5: Populate container
+  container.style.position = 'relative';
+  container.style.width = layoutData.width + 'px';
+  container.style.minHeight = layoutData.height + 'px';
+  container.innerHTML = nodesHtml;
+  container.insertBefore(topoCanvas, container.firstChild);
+
+  return layoutData;
+}
+
+// Minimal HTML escaping for default renderers
+function _escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 // ── Public API ─────────────────────────────────────────────────────
 
 return {
@@ -1224,6 +1404,9 @@ return {
   drawPill: drawPill,
   definitionToSpine: definitionToSpine,
   renderWorkflow: renderWorkflow,
+  renderHybrid: renderHybrid,
+  setSpineHeights: setSpineHeights,
+  _nodeStatus: _nodeStatus,
   tw: tw,
 };
 
