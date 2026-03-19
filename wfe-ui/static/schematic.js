@@ -1261,7 +1261,38 @@ function setSpineHeights(spineArr, heightMap) {
 //   lineGap      — vertical gap between rows
 //   onLayout(layoutData)  — optional callback after layout, before DOM population
 
+var _cssInjected = false;
+var _CSS = ''
+  + '.sch-node-wrap { z-index:1; }'
+  + '.sch-cond-wrap { z-index:1; }'
+  + '.sch-cond { display:inline-flex; align-items:center; justify-content:center; padding:0 8px; border-radius:10px; height:20px; border:1.5px solid #e5e7eb; background:#f3f4f6; font:500 11px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:#374151; white-space:nowrap; }'
+  + '.sch-pill { display:inline-flex; align-items:center; gap:5px; padding:4px 13px; border-radius:15px; min-height:30px; background:#fff; border:1.5px solid #e5e7eb; font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:#374151; box-sizing:border-box; }'
+  + '.sch-pill-dot { width:7px; height:7px; border-radius:50%; background:#6b7280; flex-shrink:0; }'
+  + '.sch-pill-title { white-space:pre-line; line-height:1.3; }'
+  + '.sch-bp { display:inline-flex; align-items:center; justify-content:center; padding:4px 13px; min-height:30px; background:#f3f4f6; border:1.5px solid #9ca3af; font:600 13px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:#374151; box-sizing:border-box; white-space:pre-line; text-align:center; line-height:1.3; }'
+  + '.sch-bp-gate { clip-path:polygon(8% 0%,92% 0%,100% 50%,92% 100%,8% 100%,0% 50%); padding:4px 20px; }'
+  + '.sch-bp-split { border-radius:4px; }'
+  + '.sch-bp-split-bars { position:absolute; top:5px; bottom:5px; width:4px; }'
+  + '.sch-bp-split-bars-l { left:4px; border-left:1.5px solid #9ca3af; border-right:1.5px solid #9ca3af; }'
+  + '.sch-bp-split-bars-r { right:4px; border-left:1.5px solid #9ca3af; border-right:1.5px solid #9ca3af; }'
+  + '.sch-node-current .sch-pill { background:#e3f2fd; border-color:#2a6bcf; color:#1a1a2e; }'
+  + '.sch-node-current .sch-pill-dot { background:#2a6bcf; }'
+  + '.sch-node-current .sch-bp { background:#e3f2fd; border-color:#2a6bcf; color:#1a1a2e; }'
+  + '.sch-node-completed .sch-pill { background:#e8f5e9; border-color:#4caf50; color:#2e7d32; }'
+  + '.sch-node-completed .sch-pill-dot { background:#4caf50; }'
+  + '.sch-node-completed .sch-bp { background:#e8f5e9; border-color:#4caf50; color:#2e7d32; }'
+  ;
+
+function _injectCSS() {
+  if (_cssInjected) return;
+  var style = document.createElement('style');
+  style.textContent = _CSS;
+  document.head.appendChild(style);
+  _cssInjected = true;
+}
+
 function renderHybrid(spine, container, execState, opts) {
+  _injectCSS();
   if (!container || !spine || !spine.length) return null;
   opts = opts || {};
 
