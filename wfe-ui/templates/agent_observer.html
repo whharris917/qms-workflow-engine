@@ -3409,9 +3409,19 @@ function _expDSchematicFlowchart(defn, stateObj) {
         var el = document.getElementById(graphId);
         if (!el) return;
         try {
+            // Measure card header height for wire handle positioning
+            var sampleDiv = document.createElement('div');
+            sampleDiv.style.cssText = 'position:absolute;left:-9999px;visibility:hidden;width:' + _FC.nodeW + 'px;';
+            sampleDiv.innerHTML = _fcNodeCard(nodes[0], 0);
+            document.body.appendChild(sampleDiv);
+            var headEl = sampleDiv.querySelector('.fc-card-head');
+            var handlePx = headEl ? headEl.getBoundingClientRect().height / 2 : 18;
+            document.body.removeChild(sampleDiv);
+
             Schematic.renderHybrid(spine, el, execState, {
                 nodeW: _FC.nodeW,
                 lineGap: 16,
+                handlePx: handlePx,
                 nodeRenderer: _cardNodeRenderer
             });
         } catch (e) {
@@ -3666,9 +3676,9 @@ var EXP_D_FC_CSS = ''
     + '.fc-edge-svg { display:block; }'
     + '.fc-card-wrap { z-index:1; }'
     + '.fc-card-current .fc-card { border-color:#2a6bcf !important; box-shadow:0 0 0 2px rgba(42,107,207,0.2); }'
-    + '.fc-card-done .fc-card { border-color:#4caf50 !important; opacity:0.85; }'
+    + '.fc-card-done .fc-card { border-color:#4caf50 !important; background:#f6faf6; }'
     + '.sch-node-current .fc-card { border-color:#2a6bcf !important; box-shadow:0 0 0 2px rgba(42,107,207,0.2); }'
-    + '.sch-node-completed .fc-card { border-color:#4caf50 !important; opacity:0.85; }'
+    + '.sch-node-completed .fc-card { border-color:#4caf50 !important; background:#f6faf6; }'
     /* Card */
     + '.fc-card { border:1px solid; border-radius:8px; overflow:hidden; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:#fff; }'
     + '.fc-card-head { display:flex; align-items:center; gap:0.4rem; padding:0.45rem 0.65rem; flex-wrap:wrap; }'

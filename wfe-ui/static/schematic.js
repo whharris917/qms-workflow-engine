@@ -561,6 +561,11 @@ function treeOrderLines(lines, opts) {
 function layout(lines, opts) {
   var nodeW = (opts && opts.nodeW) || 0;   // 0 = text-measured (default)
   var nodeH = (opts && opts.nodeH) || C.stepH;
+  var handleY = (opts && opts.handleY !== undefined) ? opts.handleY : 0.5;
+  var handlePx = (opts && opts.handlePx !== undefined) ? opts.handlePx : null;
+
+  // Wire offset from row top: fixed pixels when handlePx is set, else fraction of row height
+  function wireOff(rowH) { return handlePx !== null ? Math.min(handlePx, rowH) : rowH * handleY; }
 
   var positioned = [];
   var totalW = 0;
@@ -914,14 +919,14 @@ function layout(lines, opts) {
       if (itm3.kind === 'branch-point' && itm3.groupId) {
         var gid2 = itm3.groupId;
         var bpCx = itm3.x + itm3.w / 2;
-        var bpCy = positioned[pi10].y + positioned[pi10]._rowH / 2;
+        var bpCy = positioned[pi10].y + wireOff(positioned[pi10]._rowH);
         var barX = bpCx + (groupDisplace[gid2] ? groupDisplace[gid2] / 2 : 0);
         var lastCy = bpCy;
         for (var pi11 = 0; pi11 < positioned.length; pi11++) {
           if (positioned[pi11].groups) {
             for (var gi5 = 0; gi5 < positioned[pi11].groups.length; gi5++) {
               if (positioned[pi11].groups[gi5].gid === gid2) {
-                lastCy = positioned[pi11].y + positioned[pi11]._rowH / 2;
+                lastCy = positioned[pi11].y + wireOff(positioned[pi11]._rowH);
                 break;
               }
             }
@@ -943,7 +948,7 @@ function layout(lines, opts) {
     for (var pli3 = 0; pli3 < plines2.length; pli3++) {
       var pl5 = plines2[pli3];
       var cx = pl5._convergenceXByLabel && pl5._convergenceXByLabel[rlabel2];
-      if (cx !== undefined) points.push({ cx: cx, cy: pl5.y + pl5._rowH / 2 });
+      if (cx !== undefined) points.push({ cx: cx, cy: pl5.y + wireOff(pl5._rowH) });
       if (pl5.groups && pl5.groups.length > 0 && type === 'gate') type = pl5.groups[0].type;
     }
 
@@ -952,7 +957,7 @@ function layout(lines, opts) {
       var cl3 = clLines2[cli3];
       if (plines2.indexOf(cl3) >= 0) continue;
       var cx2 = cl3._convergenceXByLabel && cl3._convergenceXByLabel[rlabel2];
-      if (cx2 !== undefined) points.push({ cx: cx2, cy: cl3.y + cl3._rowH / 2 });
+      if (cx2 !== undefined) points.push({ cx: cx2, cy: cl3.y + wireOff(cl3._rowH) });
     }
 
     if (points.length < 2) continue;
@@ -1012,6 +1017,9 @@ function _nodeStatus(item, execState) {
 
 function drawSchematic(canvas, layoutData, execState, opts) {
   var wiresOnly = opts && opts.wiresOnly;  // skip node shapes, draw only topology
+  var handleY = (opts && opts.handleY !== undefined) ? opts.handleY : 0.5;
+  var handlePx = (opts && opts.handlePx !== undefined) ? opts.handlePx : null;
+  function wireOff(rowH) { return handlePx !== null ? Math.min(handlePx, rowH) : rowH * handleY; }
   var dpr = window.devicePixelRatio || 1;
   canvas.width = layoutData.width * dpr;
   canvas.height = layoutData.height * dpr;
@@ -1026,7 +1034,7 @@ function drawSchematic(canvas, layoutData, execState, opts) {
   // Horizontal wires: one continuous line per layout row
   for (var li3 = 0; li3 < layoutData.lines.length; li3++) {
     var line3 = layoutData.lines[li3];
-    var cy3 = line3.y + (line3._rowH || C.lineH) / 2;
+    var cy3 = line3.y + wireOff(line3._rowH || C.lineH);
     var spanLeft = Infinity, spanRight = -Infinity;
     for (var si = 0; si < line3.items.length; si++) {
       var sit = line3.items[si];
@@ -1069,7 +1077,7 @@ function drawSchematic(canvas, layoutData, execState, opts) {
   if (!wiresOnly) {
   for (var li2 = 0; li2 < layoutData.lines.length; li2++) {
     var line2 = layoutData.lines[li2];
-    var cy = line2.y + (line2._rowH || C.lineH) / 2;
+    var cy = line2.y + wireOff(line2._rowH || C.lineH);
     var lastItemRight = null;
 
     for (var ii9 = 0; ii9 < line2.items.length; ii9++) {
@@ -1243,14 +1251,16 @@ function setSpineHeights(spineArr, heightMap) {
 //   condRenderer(item, status)  — optional, returns HTML for condition labels
 //   nodeW        — fixed node width (0 = text-measured)
 //   lineGap      — vertical gap between rows
+//   handleY      — vertical handle as fraction of row height (0=top, 0.5=center, 1=bottom; default 0.5)
+//   handlePx     — vertical handle as fixed pixels from node top (overrides handleY when set)
+//                  nodes top-align and hang below the wire; use for card layouts where
+//                  the wire should pass through a fixed-height header
 //   onLayout(layoutData)  — optional callback after layout, before DOM population
 
 var _cssInjected = false;
 var _CSS = ''
   + '.sch-node-wrap { z-index:2; position:relative; display:flex; flex-direction:column; }'
-  + '.sch-node-wrap::after { content:""; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(128,0,255,0.25); z-index:999; pointer-events:none; }'
   + '.sch-cond-wrap { z-index:2; position:relative; }'
-  + '.sch-cond-wrap::after { content:""; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(128,0,255,0.25); z-index:999; pointer-events:none; }'
   + '.sch-cond { display:inline-flex; align-items:center; justify-content:center; padding:0 8px; border-radius:10px; height:20px; border:1.5px solid #e5e7eb; background:#f3f4f6; font:500 11px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:#374151; white-space:nowrap; }'
   + '.sch-pill { display:inline-flex; align-items:center; gap:5px; padding:4px 13px; border-radius:15px; min-height:30px; background:#fff; border:1.5px solid #e5e7eb; font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:#374151; box-sizing:border-box; }'
   + '.sch-pill-dot { width:7px; height:7px; border-radius:50%; background:#6b7280; flex-shrink:0; }'
@@ -1291,6 +1301,8 @@ function renderHybrid(spine, container, execState, opts) {
 
   var nodeW = opts.nodeW || 0;
   var lineGap = opts.lineGap !== undefined ? opts.lineGap : C.lineGap;
+  var handleY = opts.handleY !== undefined ? opts.handleY : 0.5;
+  var handlePx = opts.handlePx !== undefined ? opts.handlePx : null;
 
   // Collect all node IDs from the spine for measurement
   var nodeIds = [];
@@ -1360,7 +1372,7 @@ function renderHybrid(spine, container, execState, opts) {
 
   // Phase 2: Inject heights + run layout
   setSpineHeights(spine, heightMap);
-  var layoutOpts = { lineGap: lineGap };
+  var layoutOpts = { lineGap: lineGap, handleY: handleY, handlePx: handlePx };
   if (nodeW) layoutOpts.nodeW = nodeW;
   var layoutData = renderWorkflow(spine, null, execState, layoutOpts);
 
@@ -1386,7 +1398,7 @@ function renderHybrid(spine, container, execState, opts) {
   // Phase 3: Draw topology canvas
   var topoCanvas = document.createElement('canvas');
   topoCanvas.style.cssText = 'position:absolute;left:0;top:0;z-index:0;pointer-events:none;';
-  drawSchematic(topoCanvas, layoutData, execState || null, { wiresOnly: true });
+  drawSchematic(topoCanvas, layoutData, execState || null, { wiresOnly: true, handleY: handleY, handlePx: handlePx });
 
   // Phase 4: Build positioned HTML nodes
   var nodesHtml = '';
@@ -1406,14 +1418,14 @@ function renderHybrid(spine, container, execState, opts) {
           itemStatus
         );
         var ch = heightMap[itm.id] || rowH;
-        var nodeTop = ln.y + (rowH - ch) / 2;
+        var nodeTop = handlePx !== null ? ln.y : ln.y + handleY * (rowH - ch);
         nodesHtml += '<div class="sch-node-wrap sch-node-' + itemStatus
             + '" style="position:absolute;left:' + itm.x + 'px;top:' + nodeTop + 'px;width:' + itm.w + 'px;z-index:1;">'
             + nodeHtml + '</div>';
       }
 
       if (itm.kind === 'cond') {
-        var condCy = ln.y + rowH / 2;
+        var condCy = handlePx !== null ? ln.y + Math.min(handlePx, rowH) : ln.y + rowH * handleY;
         if (condRenderer) {
           var condStatus = 'pending';
           nodesHtml += '<div class="sch-cond-wrap" style="position:absolute;left:' + itm.x + 'px;top:' + (condCy - itm.h / 2)
