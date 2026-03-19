@@ -1263,8 +1263,10 @@ function setSpineHeights(spineArr, heightMap) {
 
 var _cssInjected = false;
 var _CSS = ''
-  + '.sch-node-wrap { z-index:1; }'
-  + '.sch-cond-wrap { z-index:1; }'
+  + '.sch-node-wrap { z-index:2; position:relative; }'
+  + '.sch-node-wrap::after { content:""; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(128,0,255,0.25); z-index:999; pointer-events:none; }'
+  + '.sch-cond-wrap { z-index:2; position:relative; }'
+  + '.sch-cond-wrap::after { content:""; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(128,0,255,0.25); z-index:999; pointer-events:none; }'
   + '.sch-cond { display:inline-flex; align-items:center; justify-content:center; padding:0 8px; border-radius:10px; height:20px; border:1.5px solid #e5e7eb; background:#f3f4f6; font:500 11px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:#374151; white-space:nowrap; }'
   + '.sch-pill { display:inline-flex; align-items:center; gap:5px; padding:4px 13px; border-radius:15px; min-height:30px; background:#fff; border:1.5px solid #e5e7eb; font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:#374151; box-sizing:border-box; }'
   + '.sch-pill-dot { width:7px; height:7px; border-radius:50%; background:#6b7280; flex-shrink:0; }'
@@ -1336,20 +1338,23 @@ function renderHybrid(spine, container, execState, opts) {
 
   // Phase 1: Measure — render each node into a hidden container
   var measurer = document.createElement('div');
-  var measureW = nodeW || 200;
-  measurer.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:' + measureW + 'px;visibility:hidden;';
+  measurer.style.cssText = 'position:absolute;left:-9999px;top:-9999px;visibility:hidden;'
+    + (nodeW ? 'width:' + nodeW + 'px;' : '');
   document.body.appendChild(measurer);
 
   var heightMap = {};
+  var widthMap = {};
   for (var ni = 0; ni < nodeIds.length; ni++) {
     var nid = nodeIds[ni];
     var info = spineInfo[nid] || { title: nid, kind: 'step', type: 'step' };
     var status = _nodeStatus({ id: nid }, execState);
     var html = nodeRenderer({ id: nid, kind: info.kind, type: info.type, title: info.title }, status);
     var mDiv = document.createElement('div');
+    if (!nodeW) mDiv.style.display = 'inline-block';  // shrink-wrap for natural width
     mDiv.innerHTML = html;
     measurer.appendChild(mDiv);
     heightMap[nid] = mDiv.offsetHeight;
+    if (!nodeW) widthMap[nid] = mDiv.offsetWidth;
     measurer.removeChild(mDiv);
   }
   document.body.removeChild(measurer);
@@ -1359,6 +1364,23 @@ function renderHybrid(spine, container, execState, opts) {
   var layoutOpts = { lineGap: lineGap };
   if (nodeW) layoutOpts.nodeW = nodeW;
   var layoutData = renderWorkflow(spine, null, execState, layoutOpts);
+
+  // Phase 2b: When not using fixed nodeW, adjust item widths to match
+  // measured DOM widths while preserving center positions for wire alignment.
+  if (!nodeW) {
+    for (var ali = 0; ali < layoutData.lines.length; ali++) {
+      var aln = layoutData.lines[ali];
+      for (var aii = 0; aii < aln.items.length; aii++) {
+        var aitm = aln.items[aii];
+        if ((aitm.kind === 'step' || aitm.kind === 'branch-point') && aitm.id && widthMap[aitm.id]) {
+          var measuredW = widthMap[aitm.id];
+          var cx = aitm.x + aitm.w / 2;  // preserve center
+          aitm.x = cx - measuredW / 2;
+          aitm.w = measuredW;
+        }
+      }
+    }
+  }
 
   if (opts.onLayout) opts.onLayout(layoutData);
 
