@@ -795,7 +795,9 @@ function wfRenderBanner(state) {
 function _pillNodeRenderer(item, status) {
     if (item.kind === 'branch-point') {
         if (item.type === 'gate') {
-            return '<div class="sch-bp sch-bp-gate">' + wfEsc(item.title) + '</div>';
+            return '<div class="sch-bp sch-bp-gate">'
+                + Schematic.GATE_SVG
+                + '<span style="position:relative">' + wfEsc(item.title) + '</span></div>';
         }
         // split (fork)
         return '<div class="sch-bp sch-bp-split" style="position:relative;">'

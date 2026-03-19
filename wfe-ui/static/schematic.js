@@ -8,6 +8,13 @@
 // nodeRenderer(item, status) callback returning HTML for each node.
 // The canvas draws only topology (wires + bars); nodes are real DOM elements.
 //
+// Node heights: renderHybrid measures actual DOM heights and injects them
+// into the spine via setSpineHeights() before layout runs. The layout engine
+// does NOT guess heights from title text — if no height is set on a spine
+// element, it defaults to C.stepH (uniform). Callers using renderWorkflow
+// directly (canvas-only) who need variable heights must call
+// setSpineHeights() themselves before renderWorkflow().
+//
 // Consumed by agent_observer.html (banner, flowchart, standalone) and
 // workshop.html (test harness).
 // ═══════════════════════════════════════════════════════════════════
@@ -440,27 +447,6 @@ function flattenSpine(spine, depth, rejoinRef) {
 // TREE-BASED ORDERING AND Y-ASSIGNMENT
 // ═══════════════════════════════════════════════════════════════════
 
-// Pre-compute element heights so treeOrderLines has accurate per-row sizing.
-function _precomputeHeights(lines, opts) {
-  var explicitH = opts && opts.nodeH;  // only override when explicitly provided
-  for (var li = 0; li < lines.length; li++) {
-    for (var ei = 0; ei < lines[li].elements.length; ei++) {
-      var elem = lines[li].elements[ei];
-      if (elem.kind === 'step' && !elem.height) {
-        if (explicitH) {
-          elem.height = explicitH;
-        } else {
-          // Auto-compute from multi-line title
-          var titleLines = elem.title.split('\n');
-          if (titleLines.length > 1) {
-            elem.height = Math.max(C.stepH, titleLines.length * 15 + 10);
-          }
-        }
-      }
-    }
-  }
-}
-
 function treeOrderLines(lines, opts) {
   var defaultH = (opts && opts.nodeH) || C.lineH;
   var gap = (opts && opts.lineGap !== undefined) ? opts.lineGap : C.lineGap;
@@ -602,8 +588,7 @@ function layout(lines, opts) {
           }
           var dotSpace = C.dotR * 2 + 5;
           var w = nodeW || (C.stepPadX + dotSpace + textW + C.stepPadX);
-          var naturalH = titleLines.length > 1 ? Math.max(C.stepH, titleLines.length * 15 + 10) : C.stepH;
-          var h = elem.height || (nodeW ? nodeH : naturalH);
+          var h = elem.height || nodeH;
           item = { kind: 'step', x: x, y: y, w: w, h: h, title: elem.title, id: elem.id, textW: textW, dotSpace: dotSpace };
           x += w;
           break;
@@ -1210,7 +1195,6 @@ function drawSchematic(canvas, layoutData, execState, opts) {
 function renderWorkflow(spine, canvas, execState, layoutOpts) {
   resetRefs();
   var rawLines = flattenSpine(spine, 0, null);
-  _precomputeHeights(rawLines, layoutOpts);
   var lines = treeOrderLines(rawLines, layoutOpts);
   var layoutData = layout(lines, layoutOpts);
   if (canvas) drawSchematic(canvas, layoutData, execState || null);
@@ -1263,7 +1247,7 @@ function setSpineHeights(spineArr, heightMap) {
 
 var _cssInjected = false;
 var _CSS = ''
-  + '.sch-node-wrap { z-index:2; position:relative; display:flex; }'
+  + '.sch-node-wrap { z-index:2; position:relative; display:flex; flex-direction:column; }'
   + '.sch-node-wrap::after { content:""; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(128,0,255,0.25); z-index:999; pointer-events:none; }'
   + '.sch-cond-wrap { z-index:2; position:relative; }'
   + '.sch-cond-wrap::after { content:""; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(128,0,255,0.25); z-index:999; pointer-events:none; }'
@@ -1272,7 +1256,11 @@ var _CSS = ''
   + '.sch-pill-dot { width:7px; height:7px; border-radius:50%; background:#6b7280; flex-shrink:0; }'
   + '.sch-pill-title { white-space:pre-line; line-height:1.3; }'
   + '.sch-bp { display:inline-flex; align-items:center; justify-content:center; padding:4px 13px; min-height:30px; background:#f3f4f6; border:1.5px solid #9ca3af; font:600 13px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:#374151; box-sizing:border-box; white-space:pre-line; text-align:center; line-height:1.3; }'
-  + '.sch-bp-gate { clip-path:polygon(8% 0%,92% 0%,100% 50%,92% 100%,8% 100%,0% 50%); padding:4px 20px; }'
+  + '.sch-bp-gate { position:relative; border:none !important; background:transparent !important; padding:4px 20px; }'
+  + '.sch-bp-gate-bg { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; }'
+  + '.sch-bp-gate-bg polygon { fill:#f3f4f6; stroke:#9ca3af; stroke-width:1.5; }'
+  + '.sch-node-current .sch-bp-gate-bg polygon { fill:#e3f2fd; stroke:#2a6bcf; }'
+  + '.sch-node-completed .sch-bp-gate-bg polygon { fill:#e8f5e9; stroke:#4caf50; }'
   + '.sch-bp-split { border-radius:4px; }'
   + '.sch-bp-split-bars { position:absolute; top:5px; bottom:5px; width:4px; }'
   + '.sch-bp-split-bars-l { left:4px; border-left:1.5px solid #9ca3af; border-right:1.5px solid #9ca3af; }'
@@ -1337,11 +1325,12 @@ function renderHybrid(spine, container, execState, opts) {
   })(spine);
 
   // Phase 1: Measure — render each node into a hidden container.
-  // Use display:flex on the wrapper to match the render context and
-  // eliminate inline formatting artifacts (strut, baseline gaps).
+  //
+  // When nodeW is set (fixed-width mode): measure at that width so
+  // text wrapping and heights match the final render context.
+  // When nodeW is 0 (auto mode): shrink-wrap to get natural dimensions.
   var measurer = document.createElement('div');
-  measurer.style.cssText = 'position:absolute;left:-9999px;top:-9999px;visibility:hidden;'
-    + (nodeW ? 'width:' + nodeW + 'px;' : '');
+  measurer.style.cssText = 'position:absolute;left:-9999px;top:-9999px;visibility:hidden;';
   document.body.appendChild(measurer);
 
   var heightMap = {};
@@ -1352,13 +1341,19 @@ function renderHybrid(spine, container, execState, opts) {
     var status = _nodeStatus({ id: nid }, execState);
     var html = nodeRenderer({ id: nid, kind: info.kind, type: info.type, title: info.title }, status);
     var mDiv = document.createElement('div');
-    // display:inline-flex shrink-wraps both dimensions and eliminates
-    // the inline strut that causes height discrepancies vs positioned divs
-    mDiv.style.display = 'inline-flex';
+    if (nodeW) {
+      // Fixed-width: measure at nodeW so height accounts for text wrap.
+      // flex-direction:column + stretch matches the render wrapper.
+      mDiv.style.cssText = 'display:flex;flex-direction:column;width:' + nodeW + 'px;';
+    } else {
+      // Auto-width: shrink-wrap to natural dimensions
+      mDiv.style.display = 'inline-flex';
+    }
     mDiv.innerHTML = html;
     measurer.appendChild(mDiv);
-    heightMap[nid] = mDiv.offsetHeight;
-    if (!nodeW) widthMap[nid] = mDiv.offsetWidth;
+    var rect = mDiv.getBoundingClientRect();
+    heightMap[nid] = rect.height;
+    if (!nodeW) widthMap[nid] = rect.width;
     measurer.removeChild(mDiv);
   }
   document.body.removeChild(measurer);
@@ -1413,7 +1408,7 @@ function renderHybrid(spine, container, execState, opts) {
         var ch = heightMap[itm.id] || rowH;
         var nodeTop = ln.y + (rowH - ch) / 2;
         nodesHtml += '<div class="sch-node-wrap sch-node-' + itemStatus
-            + '" style="position:absolute;left:' + itm.x + 'px;top:' + nodeTop + 'px;width:' + itm.w + 'px;height:' + ch + 'px;z-index:1;overflow:hidden;">'
+            + '" style="position:absolute;left:' + itm.x + 'px;top:' + nodeTop + 'px;width:' + itm.w + 'px;z-index:1;">'
             + nodeHtml + '</div>';
       }
 
@@ -1449,10 +1444,18 @@ function _escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ── Gate SVG shape ────────────────────────────────────────────────
+// Inline SVG hexagon for gate (router) nodes. Stretches to fill its
+// container via preserveAspectRatio="none"; vector-effect keeps the
+// stroke width constant regardless of aspect ratio.
+var GATE_SVG = '<svg class="sch-bp-gate-bg" viewBox="0 0 100 100" preserveAspectRatio="none">'
+  + '<polygon points="8,0 92,0 100,50 92,100 8,100 0,50" vector-effect="non-scaling-stroke"/></svg>';
+
 // ── Public API ─────────────────────────────────────────────────────
 
 return {
   C: C,
+  GATE_SVG: GATE_SVG,
   resetRefs: resetRefs,
   flattenSpine: flattenSpine,
   treeOrderLines: treeOrderLines,

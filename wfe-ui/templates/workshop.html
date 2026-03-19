@@ -707,7 +707,9 @@ function buildWorkshop() {
       function workshopNodeRenderer(item, status) {
         if (item.kind === 'branch-point') {
           if (item.type === 'gate') {
-            return '<div class="sch-bp sch-bp-gate">' + item.title + '</div>';
+            return '<div class="sch-bp sch-bp-gate">'
+              + Schematic.GATE_SVG
+              + '<span style="position:relative">' + item.title + '</span></div>';
           }
           return '<div class="sch-bp sch-bp-split" style="position:relative;">'
             + '<div class="sch-bp-split-bars sch-bp-split-bars-l"></div>'
