@@ -823,7 +823,8 @@ function _wfSchematicBanner(defn, current, completed) {
             var spine = Schematic.definitionToSpine(defn);
             var execState = { current: current, completed: completed };
             var layoutData = Schematic.renderHybrid(spine, el, execState, {
-                nodeRenderer: _pillNodeRenderer
+                nodeRenderer: _pillNodeRenderer,
+                focusNode: current
             });
             if (layoutData) el.style.height = layoutData.height + 'px';
         } catch (e) {
@@ -1494,1314 +1495,7 @@ var WF_STRUCTURAL_CSS = ''
     /* Schematic hybrid renderer — CSS injected by schematic.js on first use */
     ;
 
-/* ======================================================================
-   RENDERER: SIMPLE — Default / Light
-   ====================================================================== */
-(function() {
-    var container;
-    registerRenderer({
-        id: 'light',
-        label: 'Simple',
-        format: 'simple',
-        verbosity: 'default',
-        verbosity_label: 'Default',
-        style: 'light',
-        style_label: 'Light',
-        init: function(c) {
-            c.style.cssText = 'overflow-y:auto;padding:0;';
-            var style = document.createElement('style');
-            style.textContent = WF_STRUCTURAL_CSS
-
-                + '#rc-light { background:#f5f5f5; color:#333; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
-                + '#rc-light .wf-title { color:#1a1a2e; }'
-                + '#rc-light .wf-banner { background:#f8f9fb; border-color:#e8e8e8; }'
-                + '#rc-light .wf-dot { background:#dde1e6; color:#888; }'
-                + '#rc-light .wf-step-label { color:#888; }'
-                + '#rc-light .wf-step-active .wf-dot { background:#2a6bcf; color:#fff; }'
-                + '#rc-light .wf-step-active .wf-step-label { color:#1a1a2e; font-weight:600; }'
-                + '#rc-light .wf-step-done .wf-dot { background:#4caf50; color:#fff; }'
-                + '#rc-light .wf-step-done .wf-step-label { color:#555; }'
-                + '#rc-light .wf-conn { background:#dde1e6; }'
-                + '#rc-light .wf-conn-active { background:#4caf50; }'
-                + '#rc-light .wf-section-head { color:#1a1a2e; }'
-                + '#rc-light .wf-desc { color:#666; }'
-                + '#rc-light .wf-card { background:#fff; border-color:#e8e8e8; }'
-                + '#rc-light .wf-card-head { color:#7f8fa6; }'
-                + '#rc-light .wf-tbl td { border-bottom:1px solid #f0f0f0; }'
-                + '#rc-light .wf-key { color:#7f8fa6; }'
-                + '#rc-light .wf-val { color:#333; }'
-                + '#rc-light .wf-null, #rc-light .wf-empty-arr, #rc-light .wf-empty-obj { color:#bbb; }'
-                + '#rc-light .wf-bool, #rc-light .wf-num { color:#2a6bcf; }'
-                + '#rc-light .wf-str { color:#333; }'
-                + '#rc-light .wf-arr-item { border-left-color:#e8e8e8; }'
-                + '#rc-light .wf-field { border-bottom:1px solid #f0f0f0; }'
-                + '#rc-light .wf-field-label { color:#555; }'
-                + '#rc-light .wf-field-instruction { color:#999; }'
-                + '#rc-light .wf-field-value { color:#333; }'
-                + '#rc-light .wf-field-empty { color:#bbb; }'
-                + '#rc-light .wf-field-options { color:#7f8fa6; }'
-                + '#rc-light .wf-aff { background:#f8f9fb; border-color:#e8e8e8; }'
-                + '#rc-light .wf-aff-id { background:#dde1e6; color:#555; }'
-                + '#rc-light .wf-aff-label { color:#333; }'
-                + '#rc-light .wf-aff-method { color:#7f8fa6; background:#eef1f5; }'
-                + '#rc-light .wf-aff-detail { color:#999; }'
-                + '#rc-light .wf-aff-options { color:#7f8fa6; }'
-                + '#rc-light .wf-aff-primary { border-color:#2a6bcf; background:#f0f5ff; }'
-                + '#rc-light .wf-aff-primary .wf-aff-label { color:#2a6bcf; font-weight:600; }'
-                + '#rc-light .wf-aff-primary .wf-aff-id { background:#2a6bcf; color:#fff; }'
-                + '#rc-light .wf-aff-nav { border-color:#dde1e6; background:#fafafa; }'
-                + '#rc-light .wf-aff-nav .wf-aff-label { color:#888; }'
-                + '#rc-light .wf-aff-selected { border-color:#4caf50; background:#f0fff0; }'
-                + '#rc-light .wf-aff-selected .wf-aff-label { color:#2e7d32; }'
-                + '#rc-light .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; }'
-                + '#rc-light .wf-fb-outcome { border-left:3px solid #2a6bcf; background:#f0f5ff; }'
-                + '#rc-light .wf-fb-new { border-left:3px solid #4caf50; background:#f0faf0; }'
-                + '#rc-light .wf-fb-modified { border-left:3px solid #e6a817; background:#fdf8ed; }'
-                + '#rc-light .wf-aff-new { border-left:3px solid #4caf50; background:#f0faf0; }'
-                + '#rc-light .wf-aff-modified { border-left:3px solid #e6a817; background:#fdf8ed; }'
-                + '#rc-light .wf-tag-outcome { color:#2a6bcf; }'
-                + '#rc-light .wf-tag-new { color:#4caf50; }'
-                + '#rc-light .wf-tag-modified { color:#e6a817; }'
-                + '#rc-light .wf-table th { background:#f4f6f9; border-color:#e8e8e8; }'
-                + '#rc-light .wf-table td { border-color:#e8e8e8; }'
-                + '#rc-light .wf-table-rownum { color:#aaa; background:#fafbfc; }'
-                + '#rc-light .wf-table-coltype { color:#7f8fa6; }'
-                + '#rc-light .wf-table-empty { color:#bbb; }'
-                + '#rc-light .wf-table-summary { color:#7f8fa6; }'
-                + '#rc-light .wf-table-prop { color:#7f8fa6; }'
-                + '#rc-light .bp-header { border-bottom-color:#2a6bcf; }'
-                + '#rc-light .bp-title { color:#1a1a2e; }'
-                + '#rc-light .bp-id { color:#7f8fa6; border-color:#dde1e6; background:#f8f9fb; }'
-                + '#rc-light .bp-desc { color:#666; }'
-                + '#rc-light .bp-lifecycle { background:#f8f9fb; border-color:#e8e8e8; }'
-                + '#rc-light .bp-lc-dot { background:#2a6bcf; color:#fff; }'
-                + '#rc-light .bp-lc-label { color:#555; }'
-                + '#rc-light .bp-lc-conn { background:#dde1e6; }'
-                + '#rc-light .bp-empty { color:#bbb; }'
-                + '#rc-light .bp-node { border-color:#e8e8e8; background:#fff; }'
-                + '#rc-light .bp-node-head { background:#f4f6f9; }'
-                + '#rc-light .bp-node-title { color:#1a1a2e; }'
-                + '#rc-light .bp-node-id { color:#7f8fa6; border-color:#dde1e6; }'
-
-                + '#rc-light .bp-node-flag { color:#e6a817; border-color:#e6a817; }'
-                + '#rc-light .bp-node-section { border-top-color:#f0f0f0; }'
-                + '#rc-light .bp-node-section-label { color:#7f8fa6; }'
-                + '#rc-light .bp-node-instr { color:#666; }'
-                + '#rc-light .bp-node-none { color:#bbb; }'
-                + '#rc-light .bp-fields-table th { color:#7f8fa6; border-bottom:1px solid #f0f0f0; }'
-                + '#rc-light .bp-fields-table td { border-bottom:1px solid #f8f8f8; }'
-                + '#rc-light .bp-field-key { color:#2a6bcf; }'
-                + '#rc-light .bp-field-detail { color:#999; }'
-                + '#rc-light .bp-type-text { background:#e3f2fd; color:#1565c0; }'
-                + '#rc-light .bp-type-select { background:#f3e5f5; color:#7b1fa2; }'
-                + '#rc-light .bp-type-boolean { background:#fff3e0; color:#e65100; }'
-                + '#rc-light .bp-gate-label { color:#2e7d32; }'
-                + '#rc-light .bp-gate-icon { color:#2e7d32; }'
-                + '#rc-light .bp-gate-reqs { color:#666; }'
-                + '#rc-light .bp-gate-key { color:#2a6bcf; border-color:#dde1e6; background:#f8f9fb; }'
-                + '#rc-light .bp-nav-action { color:#7f8fa6; border-color:#dde1e6; }'
-                + '#rc-light .bp-nav-target { color:#2a6bcf; }'
-                + '#rc-light .bp-action-type { color:#fff; background:#e65100; }'
-                + '#rc-light .bp-arrow { color:#dde1e6; }'
-                + '#rc-light .wf-exec-pass { color:#2e7d32; }'
-                + '#rc-light .wf-exec-pending { color:#b0b0b0; }'
-                + '#rc-light [data-completed="true"] { background:#e8f5e9; }'
-                + '#rc-light .wf-exec-reason { color:#999; }'
-                ;
-            document.head.appendChild(style);
-            container = c;
-        },
-        update: function(state, msg, feedback) { wfRenderPageDefault(container, state, msg, feedback); },
-        activate: function() {},
-        deactivate: function() {}
-    });
-})();
-
-/* ======================================================================
-   RENDERER: SIMPLE — Verbose / Light
-   ====================================================================== */
-(function() {
-    var container;
-    registerRenderer({
-        id: 'light-verbose',
-        label: 'Simple',
-        format: 'simple',
-        verbosity: 'verbose',
-        verbosity_label: 'Verbose',
-        style: 'light',
-        style_label: 'Light',
-        init: function(c) {
-            c.style.cssText = 'overflow-y:auto;padding:0;';
-            /* Reuse same light CSS — scoped to #rc-light-verbose */
-            var style = document.createElement('style');
-            var css = WF_STRUCTURAL_CSS;
-            /* Copy all #rc-light rules but target #rc-light-verbose */
-            var lightRules = document.querySelectorAll('style');
-            /* Use same color tokens via shared class */
-            style.textContent = css
-                + '#rc-light-verbose { background:#f5f5f5; color:#333; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
-                + '#rc-light-verbose .wf-title { color:#1a1a2e; }'
-                + '#rc-light-verbose .wf-banner { background:#f8f9fb; border-color:#e8e8e8; }'
-                + '#rc-light-verbose .wf-dot { background:#dde1e6; color:#888; }'
-                + '#rc-light-verbose .wf-step-label { color:#888; }'
-                + '#rc-light-verbose .wf-step-active .wf-dot { background:#2a6bcf; color:#fff; }'
-                + '#rc-light-verbose .wf-step-active .wf-step-label { color:#1a1a2e; font-weight:600; }'
-                + '#rc-light-verbose .wf-step-done .wf-dot { background:#4caf50; color:#fff; }'
-                + '#rc-light-verbose .wf-step-done .wf-step-label { color:#555; }'
-                + '#rc-light-verbose .wf-conn { background:#dde1e6; }'
-                + '#rc-light-verbose .wf-conn-active { background:#4caf50; }'
-                + '#rc-light-verbose .wf-section-head { color:#1a1a2e; }'
-                + '#rc-light-verbose .wf-desc { color:#666; }'
-                + '#rc-light-verbose .wf-card { background:#fff; border-color:#e8e8e8; }'
-                + '#rc-light-verbose .wf-card-head { color:#7f8fa6; }'
-                + '#rc-light-verbose .wf-tbl td { border-bottom:1px solid #f0f0f0; }'
-                + '#rc-light-verbose .wf-key { color:#7f8fa6; }'
-                + '#rc-light-verbose .wf-val { color:#333; }'
-                + '#rc-light-verbose .wf-null, #rc-light-verbose .wf-empty-arr, #rc-light-verbose .wf-empty-obj { color:#bbb; }'
-                + '#rc-light-verbose .wf-bool, #rc-light-verbose .wf-num { color:#2a6bcf; }'
-                + '#rc-light-verbose .wf-str { color:#333; }'
-                + '#rc-light-verbose .wf-arr-item { border-left-color:#e8e8e8; }'
-                + '#rc-light-verbose .wf-field { border-bottom:1px solid #f0f0f0; }'
-                + '#rc-light-verbose .wf-field-label { color:#555; }'
-                + '#rc-light-verbose .wf-field-instruction { color:#999; }'
-                + '#rc-light-verbose .wf-field-value { color:#333; }'
-                + '#rc-light-verbose .wf-field-empty { color:#bbb; }'
-                + '#rc-light-verbose .wf-field-options { color:#7f8fa6; }'
-                + '#rc-light-verbose .wf-aff { background:#f8f9fb; border-color:#e8e8e8; }'
-                + '#rc-light-verbose .wf-aff-id { background:#dde1e6; color:#555; }'
-                + '#rc-light-verbose .wf-aff-label { color:#333; }'
-                + '#rc-light-verbose .wf-aff-method { color:#7f8fa6; background:#eef1f5; }'
-                + '#rc-light-verbose .wf-aff-detail { color:#999; }'
-                + '#rc-light-verbose .wf-aff-options { color:#7f8fa6; }'
-                + '#rc-light-verbose .wf-aff-primary { border-color:#2a6bcf; background:#f0f5ff; }'
-                + '#rc-light-verbose .wf-aff-primary .wf-aff-label { color:#2a6bcf; font-weight:600; }'
-                + '#rc-light-verbose .wf-aff-primary .wf-aff-id { background:#2a6bcf; color:#fff; }'
-                + '#rc-light-verbose .wf-aff-nav { border-color:#dde1e6; background:#fafafa; }'
-                + '#rc-light-verbose .wf-aff-nav .wf-aff-label { color:#888; }'
-                + '#rc-light-verbose .wf-aff-selected { border-color:#4caf50; background:#f0fff0; }'
-                + '#rc-light-verbose .wf-aff-selected .wf-aff-label { color:#2e7d32; }'
-                + '#rc-light-verbose .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; }'
-                + '#rc-light-verbose .wf-fb-outcome { border-left:3px solid #2a6bcf; background:#f0f5ff; }'
-                + '#rc-light-verbose .wf-fb-new { border-left:3px solid #4caf50; background:#f0faf0; }'
-                + '#rc-light-verbose .wf-fb-modified { border-left:3px solid #e6a817; background:#fdf8ed; }'
-                + '#rc-light-verbose .wf-aff-new { border-left:3px solid #4caf50; background:#f0faf0; }'
-                + '#rc-light-verbose .wf-aff-modified { border-left:3px solid #e6a817; background:#fdf8ed; }'
-                + '#rc-light-verbose .wf-tag-outcome { color:#2a6bcf; }'
-                + '#rc-light-verbose .wf-tag-new { color:#4caf50; }'
-                + '#rc-light-verbose .wf-tag-modified { color:#e6a817; }'
-                + '#rc-light-verbose .wf-table th { background:#f4f6f9; border-color:#e8e8e8; }'
-                + '#rc-light-verbose .wf-table td { border-color:#e8e8e8; }'
-                + '#rc-light-verbose .wf-table-rownum { color:#aaa; background:#fafbfc; }'
-                + '#rc-light-verbose .wf-table-coltype { color:#7f8fa6; }'
-                + '#rc-light-verbose .wf-table-empty { color:#bbb; }'
-                + '#rc-light-verbose .wf-table-summary { color:#7f8fa6; }'
-                + '#rc-light-verbose .wf-table-prop { color:#7f8fa6; }'
-                + '#rc-light-verbose .bp-header { border-bottom-color:#2a6bcf; }'
-                + '#rc-light-verbose .bp-title { color:#1a1a2e; }'
-                + '#rc-light-verbose .bp-id { color:#7f8fa6; border-color:#dde1e6; background:#f8f9fb; }'
-                + '#rc-light-verbose .bp-desc { color:#666; }'
-                + '#rc-light-verbose .bp-lifecycle { background:#f8f9fb; border-color:#e8e8e8; }'
-                + '#rc-light-verbose .bp-lc-dot { background:#2a6bcf; color:#fff; }'
-                + '#rc-light-verbose .bp-lc-label { color:#555; }'
-                + '#rc-light-verbose .bp-lc-conn { background:#dde1e6; }'
-                + '#rc-light-verbose .bp-empty { color:#bbb; }'
-                + '#rc-light-verbose .bp-node { border-color:#e8e8e8; background:#fff; }'
-                + '#rc-light-verbose .bp-node-head { background:#f4f6f9; }'
-                + '#rc-light-verbose .bp-node-title { color:#1a1a2e; }'
-                + '#rc-light-verbose .bp-node-id { color:#7f8fa6; border-color:#dde1e6; }'
-
-                + '#rc-light-verbose .bp-node-flag { color:#e6a817; border-color:#e6a817; }'
-                + '#rc-light-verbose .bp-node-section { border-top-color:#f0f0f0; }'
-                + '#rc-light-verbose .bp-node-section-label { color:#7f8fa6; }'
-                + '#rc-light-verbose .bp-node-instr { color:#666; }'
-                + '#rc-light-verbose .bp-node-none { color:#bbb; }'
-                + '#rc-light-verbose .bp-fields-table th { color:#7f8fa6; border-bottom:1px solid #f0f0f0; }'
-                + '#rc-light-verbose .bp-fields-table td { border-bottom:1px solid #f8f8f8; }'
-                + '#rc-light-verbose .bp-field-key { color:#2a6bcf; }'
-                + '#rc-light-verbose .bp-field-detail { color:#999; }'
-                + '#rc-light-verbose .bp-type-text { background:#e3f2fd; color:#1565c0; }'
-                + '#rc-light-verbose .bp-type-select { background:#f3e5f5; color:#7b1fa2; }'
-                + '#rc-light-verbose .bp-type-boolean { background:#fff3e0; color:#e65100; }'
-                + '#rc-light-verbose .bp-gate-label { color:#2e7d32; }'
-                + '#rc-light-verbose .bp-gate-icon { color:#2e7d32; }'
-                + '#rc-light-verbose .bp-gate-reqs { color:#666; }'
-                + '#rc-light-verbose .bp-gate-key { color:#2a6bcf; border-color:#dde1e6; background:#f8f9fb; }'
-                + '#rc-light-verbose .bp-nav-action { color:#7f8fa6; border-color:#dde1e6; }'
-                + '#rc-light-verbose .bp-nav-target { color:#2a6bcf; }'
-                + '#rc-light-verbose .bp-action-type { color:#fff; background:#e65100; }'
-                + '#rc-light-verbose .bp-arrow { color:#dde1e6; }'
-                + '#rc-light-verbose .wf-exec-pass { color:#2e7d32; }'
-                + '#rc-light-verbose .wf-exec-pending { color:#b0b0b0; }'
-                + '#rc-light-verbose [data-completed="true"] { background:#e8f5e9; }'
-                + '#rc-light-verbose .wf-exec-reason { color:#999; }'
-                ;
-            document.head.appendChild(style);
-            container = c;
-        },
-        update: function(state, msg, feedback) { wfRenderPage(container, state, msg, feedback); },
-        activate: function() {},
-        deactivate: function() {}
-    });
-})();
-
-/* ======================================================================
-   RENDERER: SIMPLE — Default / Dark
-   ====================================================================== */
-(function() {
-    var container;
-    registerRenderer({
-        id: 'dark',
-        label: 'Simple',
-        format: 'simple',
-        verbosity: 'default',
-        verbosity_label: 'Default',
-        style: 'dark',
-        style_label: 'Dark',
-        init: function(c) {
-            c.style.cssText = 'overflow-y:auto;padding:0;';
-            var style = document.createElement('style');
-            style.textContent = WF_STRUCTURAL_CSS
-
-                + '#rc-dark { background:#0e0e0e; color:#c8c8c8; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
-                + '#rc-dark .wf-title { color:#e0e0e0; }'
-                + '#rc-dark .wf-banner { background:#1a1a1a; border-color:#2a2a2a; }'
-                + '#rc-dark .wf-dot { background:#333; color:#888; }'
-                + '#rc-dark .wf-step-label { color:#777; }'
-                + '#rc-dark .wf-step-active .wf-dot { background:#4a9eff; color:#fff; }'
-                + '#rc-dark .wf-step-active .wf-step-label { color:#e0e0e0; font-weight:600; }'
-                + '#rc-dark .wf-step-done .wf-dot { background:#4caf50; color:#fff; }'
-                + '#rc-dark .wf-step-done .wf-step-label { color:#888; }'
-                + '#rc-dark .wf-conn { background:#333; }'
-                + '#rc-dark .wf-conn-active { background:#4caf50; }'
-                + '#rc-dark .wf-section-head { color:#e0e0e0; }'
-                + '#rc-dark .wf-desc { color:#999; }'
-                + '#rc-dark .wf-card { background:#141414; border-color:#2a2a2a; }'
-                + '#rc-dark .wf-card-head { color:#666; }'
-                + '#rc-dark .wf-tbl td { border-bottom:1px solid #1e1e1e; }'
-                + '#rc-dark .wf-key { color:#666; }'
-                + '#rc-dark .wf-val { color:#c8c8c8; }'
-                + '#rc-dark .wf-null, #rc-dark .wf-empty-arr, #rc-dark .wf-empty-obj { color:#555; }'
-                + '#rc-dark .wf-bool, #rc-dark .wf-num { color:#4a9eff; }'
-                + '#rc-dark .wf-str { color:#c8c8c8; }'
-                + '#rc-dark .wf-arr-item { border-left-color:#2a2a2a; }'
-                + '#rc-dark .wf-field { border-bottom:1px solid #1e1e1e; }'
-                + '#rc-dark .wf-field-label { color:#999; }'
-                + '#rc-dark .wf-field-instruction { color:#666; }'
-                + '#rc-dark .wf-field-value { color:#c8c8c8; }'
-                + '#rc-dark .wf-field-empty { color:#555; }'
-                + '#rc-dark .wf-field-options { color:#666; }'
-                + '#rc-dark .wf-aff { background:#1a1a1a; border-color:#2a2a2a; }'
-                + '#rc-dark .wf-aff-id { background:#333; color:#aaa; }'
-                + '#rc-dark .wf-aff-label { color:#c8c8c8; }'
-                + '#rc-dark .wf-aff-method { color:#666; background:#1e1e1e; }'
-                + '#rc-dark .wf-aff-detail { color:#555; }'
-                + '#rc-dark .wf-aff-options { color:#666; }'
-                + '#rc-dark .wf-aff-primary { border-color:#4a9eff; background:#0d1a2e; }'
-                + '#rc-dark .wf-aff-primary .wf-aff-label { color:#4a9eff; font-weight:600; }'
-                + '#rc-dark .wf-aff-primary .wf-aff-id { background:#4a9eff; color:#fff; }'
-                + '#rc-dark .wf-aff-nav { border-color:#2a2a2a; background:#111; }'
-                + '#rc-dark .wf-aff-nav .wf-aff-label { color:#666; }'
-                + '#rc-dark .wf-aff-selected { border-color:#4caf50; background:#0d1a0d; }'
-                + '#rc-dark .wf-aff-selected .wf-aff-label { color:#4caf50; }'
-                + '#rc-dark .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; }'
-                + '#rc-dark .wf-fb-outcome { border-left:3px solid #4a9eff; background:#0d1a2e; }'
-                + '#rc-dark .wf-fb-new { border-left:3px solid #4caf50; background:#0d1a0d; }'
-                + '#rc-dark .wf-fb-modified { border-left:3px solid #e6a817; background:#1a1500; }'
-                + '#rc-dark .wf-aff-new { border-left:3px solid #4caf50; background:#0d1a0d; }'
-                + '#rc-dark .wf-aff-modified { border-left:3px solid #e6a817; background:#1a1500; }'
-                + '#rc-dark .wf-tag-outcome { color:#4a9eff; }'
-                + '#rc-dark .wf-tag-new { color:#4caf50; }'
-                + '#rc-dark .wf-tag-modified { color:#e6a817; }'
-                + '#rc-dark .wf-table th { background:#1a1a1a; border-color:#2a2a2a; }'
-                + '#rc-dark .wf-table td { border-color:#2a2a2a; }'
-                + '#rc-dark .wf-table-rownum { color:#555; background:#141414; }'
-                + '#rc-dark .wf-table-coltype { color:#666; }'
-                + '#rc-dark .wf-table-empty { color:#555; }'
-                + '#rc-dark .wf-table-summary { color:#666; }'
-                + '#rc-dark .wf-table-prop { color:#666; }'
-                + '#rc-dark .bp-header { border-bottom-color:#4a9eff; }'
-                + '#rc-dark .bp-title { color:#e0e0e0; }'
-                + '#rc-dark .bp-id { color:#666; border-color:#2a2a2a; background:#1a1a1a; }'
-                + '#rc-dark .bp-desc { color:#999; }'
-                + '#rc-dark .bp-lifecycle { background:#1a1a1a; border-color:#2a2a2a; }'
-                + '#rc-dark .bp-lc-dot { background:#4a9eff; color:#fff; }'
-                + '#rc-dark .bp-lc-label { color:#888; }'
-                + '#rc-dark .bp-lc-conn { background:#333; }'
-                + '#rc-dark .bp-empty { color:#555; }'
-                + '#rc-dark .bp-node { border-color:#2a2a2a; background:#141414; }'
-                + '#rc-dark .bp-node-head { background:#1a1a1a; }'
-                + '#rc-dark .bp-node-title { color:#e0e0e0; }'
-                + '#rc-dark .bp-node-id { color:#666; border-color:#333; }'
-
-                + '#rc-dark .bp-node-flag { color:#e6a817; border-color:#e6a817; }'
-                + '#rc-dark .bp-node-section { border-top-color:#1e1e1e; }'
-                + '#rc-dark .bp-node-section-label { color:#666; }'
-                + '#rc-dark .bp-node-instr { color:#999; }'
-                + '#rc-dark .bp-node-none { color:#555; }'
-                + '#rc-dark .bp-fields-table th { color:#666; border-bottom:1px solid #1e1e1e; }'
-                + '#rc-dark .bp-fields-table td { border-bottom:1px solid #1a1a1a; }'
-                + '#rc-dark .bp-field-key { color:#4a9eff; }'
-                + '#rc-dark .bp-field-detail { color:#666; }'
-                + '#rc-dark .bp-type-text { background:#0d2a40; color:#64b5f6; }'
-                + '#rc-dark .bp-type-select { background:#2a1a30; color:#ce93d8; }'
-                + '#rc-dark .bp-type-boolean { background:#2a1a00; color:#ffb74d; }'
-                + '#rc-dark .bp-gate-label { color:#66bb6a; }'
-                + '#rc-dark .bp-gate-icon { color:#66bb6a; }'
-                + '#rc-dark .bp-gate-reqs { color:#999; }'
-                + '#rc-dark .bp-gate-key { color:#4a9eff; border-color:#333; background:#1a1a1a; }'
-                + '#rc-dark .bp-nav-action { color:#666; border-color:#333; }'
-                + '#rc-dark .bp-nav-target { color:#4a9eff; }'
-                + '#rc-dark .bp-action-type { color:#fff; background:#e65100; }'
-                + '#rc-dark .bp-arrow { color:#333; }'
-                + '#rc-dark .wf-exec-pass { color:#66bb6a; }'
-                + '#rc-dark .wf-exec-pending { color:#666; }'
-                + '#rc-dark [data-completed="true"] { background:#1b3a1b; }'
-                + '#rc-dark .wf-exec-reason { color:#666; }'
-                ;
-            document.head.appendChild(style);
-            container = c;
-        },
-        update: function(state, msg, feedback) { wfRenderPageDefault(container, state, msg, feedback); },
-        activate: function() {},
-        deactivate: function() {}
-    });
-})();
-
-/* ======================================================================
-   RENDERER: SIMPLE — Verbose / Dark
-   ====================================================================== */
-(function() {
-    var container;
-    registerRenderer({
-        id: 'dark-verbose',
-        label: 'Simple',
-        format: 'simple',
-        verbosity: 'verbose',
-        verbosity_label: 'Verbose',
-        style: 'dark',
-        style_label: 'Dark',
-        init: function(c) {
-            c.style.cssText = 'overflow-y:auto;padding:0;';
-            var style = document.createElement('style');
-            style.textContent = WF_STRUCTURAL_CSS
-                + '#rc-dark-verbose { background:#0e0e0e; color:#c8c8c8; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
-                + '#rc-dark-verbose .wf-title { color:#e0e0e0; }'
-                + '#rc-dark-verbose .wf-banner { background:#1a1a1a; border-color:#2a2a2a; }'
-                + '#rc-dark-verbose .wf-dot { background:#333; color:#888; }'
-                + '#rc-dark-verbose .wf-step-label { color:#777; }'
-                + '#rc-dark-verbose .wf-step-active .wf-dot { background:#4a9eff; color:#fff; }'
-                + '#rc-dark-verbose .wf-step-active .wf-step-label { color:#e0e0e0; font-weight:600; }'
-                + '#rc-dark-verbose .wf-step-done .wf-dot { background:#4caf50; color:#fff; }'
-                + '#rc-dark-verbose .wf-step-done .wf-step-label { color:#888; }'
-                + '#rc-dark-verbose .wf-conn { background:#333; }'
-                + '#rc-dark-verbose .wf-conn-active { background:#4caf50; }'
-                + '#rc-dark-verbose .wf-section-head { color:#e0e0e0; }'
-                + '#rc-dark-verbose .wf-desc { color:#999; }'
-                + '#rc-dark-verbose .wf-card { background:#141414; border-color:#2a2a2a; }'
-                + '#rc-dark-verbose .wf-card-head { color:#666; }'
-                + '#rc-dark-verbose .wf-tbl td { border-bottom:1px solid #1e1e1e; }'
-                + '#rc-dark-verbose .wf-key { color:#666; }'
-                + '#rc-dark-verbose .wf-val { color:#c8c8c8; }'
-                + '#rc-dark-verbose .wf-null, #rc-dark-verbose .wf-empty-arr, #rc-dark-verbose .wf-empty-obj { color:#555; }'
-                + '#rc-dark-verbose .wf-bool, #rc-dark-verbose .wf-num { color:#4a9eff; }'
-                + '#rc-dark-verbose .wf-str { color:#c8c8c8; }'
-                + '#rc-dark-verbose .wf-arr-item { border-left-color:#2a2a2a; }'
-                + '#rc-dark-verbose .wf-field { border-bottom:1px solid #1e1e1e; }'
-                + '#rc-dark-verbose .wf-field-label { color:#999; }'
-                + '#rc-dark-verbose .wf-field-instruction { color:#666; }'
-                + '#rc-dark-verbose .wf-field-value { color:#c8c8c8; }'
-                + '#rc-dark-verbose .wf-field-empty { color:#555; }'
-                + '#rc-dark-verbose .wf-field-options { color:#666; }'
-                + '#rc-dark-verbose .wf-aff { background:#1a1a1a; border-color:#2a2a2a; }'
-                + '#rc-dark-verbose .wf-aff-id { background:#333; color:#aaa; }'
-                + '#rc-dark-verbose .wf-aff-label { color:#c8c8c8; }'
-                + '#rc-dark-verbose .wf-aff-method { color:#666; background:#1e1e1e; }'
-                + '#rc-dark-verbose .wf-aff-detail { color:#555; }'
-                + '#rc-dark-verbose .wf-aff-options { color:#666; }'
-                + '#rc-dark-verbose .wf-aff-primary { border-color:#4a9eff; background:#0d1a2e; }'
-                + '#rc-dark-verbose .wf-aff-primary .wf-aff-label { color:#4a9eff; font-weight:600; }'
-                + '#rc-dark-verbose .wf-aff-primary .wf-aff-id { background:#4a9eff; color:#fff; }'
-                + '#rc-dark-verbose .wf-aff-nav { border-color:#2a2a2a; background:#111; }'
-                + '#rc-dark-verbose .wf-aff-nav .wf-aff-label { color:#666; }'
-                + '#rc-dark-verbose .wf-aff-selected { border-color:#4caf50; background:#0d1a0d; }'
-                + '#rc-dark-verbose .wf-aff-selected .wf-aff-label { color:#4caf50; }'
-                + '#rc-dark-verbose .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; }'
-                + '#rc-dark-verbose .wf-fb-outcome { border-left:3px solid #4a9eff; background:#0d1a2e; }'
-                + '#rc-dark-verbose .wf-fb-new { border-left:3px solid #4caf50; background:#0d1a0d; }'
-                + '#rc-dark-verbose .wf-fb-modified { border-left:3px solid #e6a817; background:#1a1500; }'
-                + '#rc-dark-verbose .wf-aff-new { border-left:3px solid #4caf50; background:#0d1a0d; }'
-                + '#rc-dark-verbose .wf-aff-modified { border-left:3px solid #e6a817; background:#1a1500; }'
-                + '#rc-dark-verbose .wf-tag-outcome { color:#4a9eff; }'
-                + '#rc-dark-verbose .wf-tag-new { color:#4caf50; }'
-                + '#rc-dark-verbose .wf-tag-modified { color:#e6a817; }'
-                + '#rc-dark-verbose .wf-table th { background:#1a1a1a; border-color:#2a2a2a; }'
-                + '#rc-dark-verbose .wf-table td { border-color:#2a2a2a; }'
-                + '#rc-dark-verbose .wf-table-rownum { color:#555; background:#141414; }'
-                + '#rc-dark-verbose .wf-table-coltype { color:#666; }'
-                + '#rc-dark-verbose .wf-table-empty { color:#555; }'
-                + '#rc-dark-verbose .wf-table-summary { color:#666; }'
-                + '#rc-dark-verbose .wf-table-prop { color:#666; }'
-                + '#rc-dark-verbose .bp-header { border-bottom-color:#4a9eff; }'
-                + '#rc-dark-verbose .bp-title { color:#e0e0e0; }'
-                + '#rc-dark-verbose .bp-id { color:#666; border-color:#2a2a2a; background:#1a1a1a; }'
-                + '#rc-dark-verbose .bp-desc { color:#999; }'
-                + '#rc-dark-verbose .bp-lifecycle { background:#1a1a1a; border-color:#2a2a2a; }'
-                + '#rc-dark-verbose .bp-lc-dot { background:#4a9eff; color:#fff; }'
-                + '#rc-dark-verbose .bp-lc-label { color:#888; }'
-                + '#rc-dark-verbose .bp-lc-conn { background:#333; }'
-                + '#rc-dark-verbose .bp-empty { color:#555; }'
-                + '#rc-dark-verbose .bp-node { border-color:#2a2a2a; background:#141414; }'
-                + '#rc-dark-verbose .bp-node-head { background:#1a1a1a; }'
-                + '#rc-dark-verbose .bp-node-title { color:#e0e0e0; }'
-                + '#rc-dark-verbose .bp-node-id { color:#666; border-color:#333; }'
-
-                + '#rc-dark-verbose .bp-node-flag { color:#e6a817; border-color:#e6a817; }'
-                + '#rc-dark-verbose .bp-node-section { border-top-color:#1e1e1e; }'
-                + '#rc-dark-verbose .bp-node-section-label { color:#666; }'
-                + '#rc-dark-verbose .bp-node-instr { color:#999; }'
-                + '#rc-dark-verbose .bp-node-none { color:#555; }'
-                + '#rc-dark-verbose .bp-fields-table th { color:#666; border-bottom:1px solid #1e1e1e; }'
-                + '#rc-dark-verbose .bp-fields-table td { border-bottom:1px solid #1a1a1a; }'
-                + '#rc-dark-verbose .bp-field-key { color:#4a9eff; }'
-                + '#rc-dark-verbose .bp-field-detail { color:#666; }'
-                + '#rc-dark-verbose .bp-type-text { background:#0d2a40; color:#64b5f6; }'
-                + '#rc-dark-verbose .bp-type-select { background:#2a1a30; color:#ce93d8; }'
-                + '#rc-dark-verbose .bp-type-boolean { background:#2a1a00; color:#ffb74d; }'
-                + '#rc-dark-verbose .bp-gate-label { color:#66bb6a; }'
-                + '#rc-dark-verbose .bp-gate-icon { color:#66bb6a; }'
-                + '#rc-dark-verbose .bp-gate-reqs { color:#999; }'
-                + '#rc-dark-verbose .bp-gate-key { color:#4a9eff; border-color:#333; background:#1a1a1a; }'
-                + '#rc-dark-verbose .bp-nav-action { color:#666; border-color:#333; }'
-                + '#rc-dark-verbose .bp-nav-target { color:#4a9eff; }'
-                + '#rc-dark-verbose .bp-action-type { color:#fff; background:#e65100; }'
-                + '#rc-dark-verbose .bp-arrow { color:#333; }'
-                + '#rc-dark-verbose .wf-exec-pass { color:#66bb6a; }'
-                + '#rc-dark-verbose .wf-exec-pending { color:#666; }'
-                + '#rc-dark-verbose [data-completed="true"] { background:#1b3a1b; }'
-                + '#rc-dark-verbose .wf-exec-reason { color:#666; }'
-                ;
-            document.head.appendChild(style);
-            container = c;
-        },
-        update: function(state, msg, feedback) { wfRenderPage(container, state, msg, feedback); },
-        activate: function() {},
-        deactivate: function() {}
-    });
-})();
-
-/* ======================================================================
-   RENDERER: EXPERIMENTAL A — two-column blueprint layout
-   ====================================================================== */
-(function() {
-    var container;
-
-    function expARenderPage(c, state, msg, feedback) {
-        if (!c || !state) return;
-
-        var fieldCategory = {};
-        var affCategory = {};
-        if (feedback) {
-            var out = feedback.outcome || {};
-            var eff = feedback.effects || {};
-            for (var k in out) fieldCategory[k] = 'outcome';
-            for (var k in (eff.new_fields || {})) fieldCategory[k] = 'new';
-            for (var k in (eff.modified_fields || {})) fieldCategory[k] = 'modified';
-            (eff.new_affordances || []).forEach(function(a){ affCategory[a.label] = 'new'; });
-            (eff.modified_affordances || []).forEach(function(a){ affCategory[a.label] = 'modified'; });
-        }
-
-        var s = state.state || {};
-        var html = '';
-
-        /* ── Top bar: workflow title + node as breadcrumb ── */
-        html += '<div class="ex-topbar">';
-        html += '<span class="ex-crumb">' + wfEsc(s.workflow || 'Workflow') + '</span>';
-        html += '<span class="ex-sep">&rsaquo;</span>';
-        html += '<span class="ex-crumb ex-crumb-active">' + wfEsc(s.node_title || s.node) + '</span>';
-        html += '</div>';
-
-        /* ── Progress breadcrumb ── */
-        var lifecycle = s.lifecycle || [];
-        var current = s.lifecycle_current || '';
-        var completed = s.lifecycle_completed || [];
-        if (lifecycle.length) {
-            html += '<div class="ex-progress">';
-            for (var i = 0; i < lifecycle.length; i++) {
-                var label = lifecycle[i];
-                var isCurrent = label === current;
-                var isDone = completed.indexOf(label) !== -1;
-                if (i > 0) html += '<span class="ex-arrow">&rarr;</span>';
-                var cls = 'ex-phase';
-                if (isCurrent) cls += ' ex-phase-current';
-                else if (isDone) cls += ' ex-phase-done';
-                html += '<span class="' + cls + '">' + wfEsc(label) + '</span>';
-            }
-            html += '</div>';
-        }
-
-        /* ── Instructions ── */
-        if (state.instructions) {
-            html += '<div class="ex-instructions">' + wfEsc(state.instructions) + '</div>';
-        }
-
-        html += wfRenderStateProps(state);
-
-        /* ── Table (if present) ── */
-        if (s.execution_table) {
-            html += wfRenderExecTable(s.execution_table);
-        } else if (s.table) {
-            html += wfRenderTable(s.table);
-        }
-
-        /* ── Two-column body ── */
-        html += '<div class="ex-columns">';
-
-        /* Left column: fields */
-        html += '<div class="ex-col ex-col-fields">';
-        html += '<div class="ex-col-head">state.fields</div>';
-        if (s.fields) {
-            var fkeys = Object.keys(s.fields);
-            if (fkeys.length) {
-                html += '<table class="ex-ftable"><thead><tr>';
-                html += '<th>Field</th><th>Value</th><th>Options</th><th>Status</th>';
-                html += '</tr></thead><tbody>';
-                for (var i = 0; i < fkeys.length; i++) {
-                    var k = fkeys[i];
-                    var f = s.fields[k];
-                    var cat = fieldCategory[k] || null;
-                    var rowCls = cat ? ' ex-row-' + cat : '';
-                    html += '<tr class="' + rowCls + '">';
-                    html += '<td class="ex-fname">' + wfEsc(k) + '</td>';
-                    if (f && typeof f === 'object' && 'value' in f) {
-                        html += '<td class="ex-fval">';
-                        if (f.value == null) html += '<span class="ex-unset">—</span>';
-                        else html += wfEsc(f.value);
-                        if (f.instruction) html += '<div class="ex-finstr">' + wfEsc(f.instruction) + '</div>';
-                        html += '</td>';
-                        html += '<td class="ex-fopts">';
-                        if (f.options) html += wfEsc(f.options.join(', '));
-                        html += '</td>';
-                    } else {
-                        html += '<td class="ex-fval">' + wfRenderValue(f) + '</td>';
-                        html += '<td class="ex-fopts"></td>';
-                    }
-                    var tagMap = {outcome:'SET', 'new':'NEW', modified:'CHG'};
-                    html += '<td class="ex-fstatus">';
-                    if (cat) html += '<span class="ex-tag ex-tag-' + cat + '">' + tagMap[cat] + '</span>';
-                    html += '</td>';
-                    html += '</tr>';
-                }
-                html += '</tbody></table>';
-            } else {
-                html += '<span class="ex-empty">(empty)</span>';
-            }
-        } else {
-            html += '<span class="ex-empty">(no fields)</span>';
-        }
-        html += '</div>';
-
-        /* Right column: affordances */
-        html += '<div class="ex-col ex-col-affs">';
-        html += '<div class="ex-col-head">affordances</div>';
-        if (state.affordances && state.affordances.length) {
-            html += '<div class="ex-aff-grid">';
-            for (var i = 0; i < state.affordances.length; i++) {
-                var a = state.affordances[i];
-                var cls = 'ex-aff';
-                if (/Proceed|Submit/.test(a.label)) cls += ' ex-aff-primary';
-                else if (/Go back/.test(a.label)) cls += ' ex-aff-nav';
-                else if (/\[Selected\]/.test(a.label)) cls += ' ex-aff-selected';
-                if (affCategory[a.label]) cls += ' ex-aff-fb-' + affCategory[a.label];
-                html += '<div class="' + cls + '">';
-                html += '<div class="ex-aff-head">';
-                html += '<span class="ex-aff-idx">' + a.id + '</span>';
-                html += '<span class="ex-aff-lbl">' + wfEsc(a.label);
-                var ac = affCategory[a.label];
-                if (ac === 'new') html += ' <span class="ex-tag ex-tag-new">NEW</span>';
-                else if (ac === 'modified') html += ' <span class="ex-tag ex-tag-modified">CHG</span>';
-                html += '</span>';
-                html += '</div>';
-                html += '<div class="ex-aff-meta">';
-                html += '<span class="ex-aff-verb">' + wfEsc(a.method) + '</span> ';
-                html += '<span class="ex-aff-url">' + wfEsc(a.url) + '</span>';
-                html += '</div>';
-                html += '<div class="ex-aff-body">' + wfEsc(JSON.stringify(a.body)) + '</div>';
-                var pStr = wfRenderParams(a);
-                if (pStr) {
-                    html += '<div class="ex-aff-opts">' + wfEsc(pStr) + '</div>';
-                }
-                html += '</div>';
-            }
-            html += '</div>';
-        } else {
-            html += '<span class="ex-empty">(none)</span>';
-        }
-        html += '</div>';
-
-        html += '</div>'; /* close ex-columns */
-
-        c.innerHTML = html;
-    }
-
-    var EXP_CSS = ''
-        /* Container */
-        + '#rc-exp-a { background:#0b1622; color:#b0c4d8; font-family:Consolas,Monaco,"Courier New",monospace; overflow-y:auto; padding:0; }'
-
-        /* Top bar */
-        + '#rc-exp-a .ex-topbar { display:flex; align-items:center; gap:0.4rem; padding:0.8rem 1.2rem 0.3rem; border-bottom:1px dashed #1e3a5f; }'
-        + '#rc-exp-a .ex-crumb { font-size:0.9rem; color:#4a7a9b; }'
-        + '#rc-exp-a .ex-crumb-active { color:#7fdbff; font-weight:700; }'
-        + '#rc-exp-a .ex-sep { color:#2a4a6b; font-size:1rem; }'
-
-        /* Progress breadcrumb */
-        + '#rc-exp-a .ex-progress { display:flex; align-items:center; gap:0.3rem; padding:0.5rem 1.2rem; flex-wrap:wrap; }'
-        + '#rc-exp-a .ex-phase { font-size:0.72rem; padding:0.2rem 0.5rem; border:1px solid #1e3a5f; border-radius:2px; color:#4a7a9b; background:#0d1e30; }'
-        + '#rc-exp-a .ex-phase-current { border-color:#7fdbff; color:#7fdbff; background:#0d2a40; box-shadow:0 0 6px rgba(127,219,255,0.15); }'
-        + '#rc-exp-a .ex-phase-done { border-color:#2ecc71; color:#2ecc71; background:#0d2a1a; }'
-        + '#rc-exp-a .ex-arrow { color:#1e3a5f; font-size:0.8rem; }'
-
-        /* Instructions */
-        + '#rc-exp-a .ex-instructions { padding:0.4rem 1.2rem 0.6rem; font-size:0.82rem; color:#6a8fa8; line-height:1.5; border-bottom:1px dashed #1e3a5f; font-style:italic; white-space:pre-line; }'
-
-        /* Two-column layout */
-        + '#rc-exp-a .ex-columns { display:flex; gap:0; min-height:0; }'
-        + '#rc-exp-a .ex-col { flex:1; padding:0.6rem 0.8rem; }'
-        + '#rc-exp-a .ex-col-fields { border-right:1px dashed #1e3a5f; }'
-        + '#rc-exp-a .ex-col-head { font-size:0.68rem; text-transform:uppercase; letter-spacing:0.1em; color:#3a6a8f; margin-bottom:0.5rem; padding-bottom:0.25rem; border-bottom:1px solid #1e3a5f; }'
-
-        /* Fields table */
-        + '#rc-exp-a .ex-ftable { width:100%; border-collapse:collapse; font-size:0.78rem; }'
-        + '#rc-exp-a .ex-ftable th { text-align:left; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.08em; color:#3a6a8f; padding:0.3rem 0.4rem; border-bottom:1px solid #1e3a5f; font-weight:500; }'
-        + '#rc-exp-a .ex-ftable td { padding:0.35rem 0.4rem; border-bottom:1px solid #0f2236; vertical-align:top; }'
-        + '#rc-exp-a .ex-fname { color:#7fdbff; white-space:nowrap; font-weight:600; width:120px; }'
-        + '#rc-exp-a .ex-fval { color:#b0c4d8; word-break:break-word; }'
-        + '#rc-exp-a .ex-unset { color:#2a4a6b; }'
-        + '#rc-exp-a .ex-finstr { font-size:0.7rem; color:#4a6a80; font-style:italic; margin-top:0.15rem; }'
-        + '#rc-exp-a .ex-fopts { color:#4a6a80; font-size:0.72rem; }'
-        + '#rc-exp-a .ex-fstatus { width:40px; text-align:center; }'
-        + '#rc-exp-a .ex-empty { color:#2a4a6b; font-style:italic; font-size:0.8rem; }'
-
-        /* Feedback row highlights */
-        + '#rc-exp-a .ex-row-outcome { background:rgba(127,219,255,0.06); }'
-        + '#rc-exp-a .ex-row-new { background:rgba(46,204,113,0.06); }'
-        + '#rc-exp-a .ex-row-modified { background:rgba(230,168,23,0.06); }'
-
-        /* Tags */
-        + '#rc-exp-a .ex-tag { font-size:0.6rem; font-weight:700; letter-spacing:0.06em; padding:0.1rem 0.3rem; border-radius:2px; }'
-        + '#rc-exp-a .ex-tag-outcome { color:#7fdbff; background:rgba(127,219,255,0.12); }'
-        + '#rc-exp-a .ex-tag-new { color:#2ecc71; background:rgba(46,204,113,0.12); }'
-        + '#rc-exp-a .ex-tag-modified { color:#e6a817; background:rgba(230,168,23,0.12); }'
-
-        /* Affordance grid */
-        + '#rc-exp-a .ex-aff-grid { display:grid; grid-template-columns:1fr; gap:0.4rem; }'
-        + '#rc-exp-a .ex-aff { border:1px solid #1e3a5f; border-radius:3px; padding:0.4rem 0.5rem; background:#0d1e30; }'
-        + '#rc-exp-a .ex-aff-head { display:flex; align-items:center; gap:0.4rem; }'
-        + '#rc-exp-a .ex-aff-idx { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:2px; font-size:0.65rem; font-weight:700; background:#1e3a5f; color:#7fdbff; flex-shrink:0; }'
-        + '#rc-exp-a .ex-aff-lbl { font-size:0.8rem; color:#b0c4d8; }'
-        + '#rc-exp-a .ex-aff-meta { font-size:0.68rem; margin-top:0.2rem; }'
-        + '#rc-exp-a .ex-aff-verb { color:#3a6a8f; font-weight:600; }'
-        + '#rc-exp-a .ex-aff-url { color:#4a7a9b; }'
-        + '#rc-exp-a .ex-aff-body { font-size:0.68rem; color:#3a5a70; margin-top:0.1rem; word-break:break-all; }'
-        + '#rc-exp-a .ex-aff-opts { font-size:0.68rem; color:#3a5a70; margin-top:0.1rem; }'
-
-        /* Affordance variants */
-        + '#rc-exp-a .ex-aff-primary { border-color:#7fdbff; background:#0d2a40; box-shadow:0 0 8px rgba(127,219,255,0.08); }'
-        + '#rc-exp-a .ex-aff-primary .ex-aff-lbl { color:#7fdbff; font-weight:700; }'
-        + '#rc-exp-a .ex-aff-primary .ex-aff-idx { background:#7fdbff; color:#0b1622; }'
-        + '#rc-exp-a .ex-aff-nav { border-color:#1e3a5f; background:#0b1622; border-style:dashed; }'
-        + '#rc-exp-a .ex-aff-nav .ex-aff-lbl { color:#4a6a80; }'
-        + '#rc-exp-a .ex-aff-selected { border-color:#2ecc71; background:#0d2a1a; }'
-        + '#rc-exp-a .ex-aff-selected .ex-aff-lbl { color:#2ecc71; }'
-        + '#rc-exp-a .ex-aff-selected .ex-aff-idx { background:#2ecc71; color:#0b1622; }'
-        + '#rc-exp-a .ex-aff-fb-new { border-left:3px solid #2ecc71; }'
-        + '#rc-exp-a .ex-aff-fb-modified { border-left:3px solid #e6a817; }'
-
-        /* Value types (reused from shared wfRenderValue) */
-        + '#rc-exp-a .wf-null, #rc-exp-a .wf-empty-arr, #rc-exp-a .wf-empty-obj { color:#2a4a6b; font-style:italic; font-size:0.75rem; }'
-        + '#rc-exp-a .wf-bool, #rc-exp-a .wf-num { color:#7fdbff; }'
-        + '#rc-exp-a .wf-str { color:#b0c4d8; }'
-        + '#rc-exp-a .wf-tbl { width:100%; border-collapse:collapse; }'
-        + '#rc-exp-a .wf-tbl td { padding:0.2rem 0.3rem; font-size:0.75rem; border-bottom:1px solid #0f2236; }'
-        + '#rc-exp-a .wf-key { color:#4a7a9b; font-weight:500; width:100px; }'
-        + '#rc-exp-a .wf-val { color:#b0c4d8; }'
-        + '#rc-exp-a .wf-arr { display:flex; flex-direction:column; gap:0.1rem; }'
-        + '#rc-exp-a .wf-arr-item { padding-left:0.4rem; border-left:2px solid #1e3a5f; }'
-        + '#rc-exp-a .wf-table th { background:#0d1e30; border-color:#1e3a5f; color:#7fdbff; }'
-        + '#rc-exp-a .wf-table td { border-color:#1e3a5f; }'
-        + '#rc-exp-a .wf-table-rownum { color:#3a6a8f; background:#0b1622; }'
-        + '#rc-exp-a .wf-table-coltype { color:#3a6a8f; }'
-        + '#rc-exp-a .wf-table-empty { color:#2a4a6b; }'
-        + '#rc-exp-a .wf-table-summary { color:#3a6a8f; }'
-        + '#rc-exp-a .wf-table-prop { color:#3a6a8f; }'
-        ;
-
-    registerRenderer({
-        id: 'exp-a',
-        label: 'Experimental - A',
-        format: 'exp-a',
-        init: function(c) {
-            c.style.cssText = 'overflow-y:auto;padding:0;';
-            var style = document.createElement('style');
-            style.textContent = EXP_CSS;
-            document.head.appendChild(style);
-            container = c;
-        },
-        update: function(state, msg, feedback) { expARenderPage(container, state, msg, feedback); },
-        activate: function() {},
-        deactivate: function() {}
-    });
-})();
-
-/* ======================================================================
-   RENDERER: EXPERIMENTAL B — card grid layout
-   ====================================================================== */
-(function() {
-    var container;
-
-    function expBRenderPage(c, state, msg, feedback) {
-        if (!c || !state) return;
-
-        var fieldCategory = {};
-        var affCategory = {};
-        if (feedback) {
-            var out = feedback.outcome || {};
-            var eff = feedback.effects || {};
-            for (var k in out) fieldCategory[k] = 'outcome';
-            for (var k in (eff.new_fields || {})) fieldCategory[k] = 'new';
-            for (var k in (eff.modified_fields || {})) fieldCategory[k] = 'modified';
-            (eff.new_affordances || []).forEach(function(a){ affCategory[a.label] = 'new'; });
-            (eff.modified_affordances || []).forEach(function(a){ affCategory[a.label] = 'modified'; });
-        }
-
-        var s = state.state || {};
-        var html = '';
-
-        /* ── Header with filled progress bar ── */
-        var lifecycle = s.lifecycle || [];
-        var current = s.lifecycle_current || '';
-        var completed = s.lifecycle_completed || [];
-        var progressCount = completed.length + (current && completed.indexOf(current) === -1 ? 1 : 0);
-        var pct = lifecycle.length ? Math.round((progressCount / lifecycle.length) * 100) : 0;
-
-        html += '<div class="gb-header">';
-        html += '<div class="gb-title">' + wfEsc(s.workflow || 'Workflow') + '</div>';
-        html += '<div class="gb-node">' + wfEsc(s.node_title || s.node) + '</div>';
-        html += '</div>';
-
-        if (lifecycle.length) {
-            html += '<div class="gb-bar-wrap">';
-            html += '<div class="gb-bar-track">';
-            html += '<div class="gb-bar-fill" style="width:' + Math.max(pct, 4) + '%"></div>';
-            html += '</div>';
-            html += '<div class="gb-bar-labels">';
-            for (var i = 0; i < lifecycle.length; i++) {
-                var isCurrent = lifecycle[i] === current;
-                var isDone = completed.indexOf(lifecycle[i]) !== -1;
-                html += '<span class="gb-bar-lbl' + (isCurrent ? ' gb-bar-lbl-cur' : '') + (isDone ? ' gb-bar-lbl-done' : '') + '">' + wfEsc(lifecycle[i]) + '</span>';
-            }
-            html += '</div>';
-            html += '</div>';
-        }
-
-        if (state.instructions) {
-            html += '<div class="gb-instr">' + wfEsc(state.instructions) + '</div>';
-        }
-
-        /* ── Table (if present) ── */
-        if (s.execution_table) {
-            html += wfRenderExecTable(s.execution_table);
-        } else if (s.table) {
-            html += wfRenderTable(s.table);
-        }
-
-        /* ── Field cards in a grid ── */
-        if (s.fields) {
-            html += '<div class="gb-section-label">state.fields</div>';
-            var fkeys = Object.keys(s.fields);
-            if (fkeys.length) {
-                html += '<div class="gb-grid">';
-                for (var i = 0; i < fkeys.length; i++) {
-                    var k = fkeys[i];
-                    var f = s.fields[k];
-                    var cat = fieldCategory[k] || null;
-                    var cls = 'gb-fcard' + (cat ? ' gb-fc-' + cat : '');
-                    html += '<div class="' + cls + '">';
-                    var tagMap = {outcome:'SET', 'new':'NEW', modified:'CHG'};
-                    html += '<div class="gb-fc-head">';
-                    html += '<span class="gb-fc-name">' + wfEsc(k) + '</span>';
-                    if (cat) html += '<span class="gb-tag gb-tag-' + cat + '">' + tagMap[cat] + '</span>';
-                    html += '</div>';
-                    if (f && typeof f === 'object' && 'value' in f) {
-                        if (f.instruction) html += '<div class="gb-fc-instr">' + wfEsc(f.instruction) + '</div>';
-                        if (f.value == null) html += '<div class="gb-fc-val gb-fc-empty">not set</div>';
-                        else html += '<div class="gb-fc-val">' + wfEsc(f.value) + '</div>';
-                        if (f.options) html += '<div class="gb-fc-opts">' + wfEsc(f.options.join(' | ')) + '</div>';
-                    } else {
-                        html += '<div class="gb-fc-val">' + wfRenderValue(f) + '</div>';
-                    }
-                    html += '</div>';
-                }
-                html += '</div>';
-            } else {
-                html += '<div class="gb-empty">(empty)</div>';
-            }
-        }
-
-        /* ── Extra state (generic) ── */
-        html += wfRenderStateProps(state);
-
-        /* ── Affordances as pill toolbar ── */
-        if (state.affordances && state.affordances.length) {
-            html += '<div class="gb-section-label">affordances</div>';
-            html += '<div class="gb-toolbar">';
-            for (var i = 0; i < state.affordances.length; i++) {
-                var a = state.affordances[i];
-                var cls = 'gb-pill';
-                if (/Proceed|Submit/.test(a.label)) cls += ' gb-pill-primary';
-                else if (/Go back/.test(a.label)) cls += ' gb-pill-nav';
-                else if (/\[Selected\]/.test(a.label)) cls += ' gb-pill-selected';
-                var ac = affCategory[a.label];
-                if (ac) cls += ' gb-pill-fb-' + ac;
-                html += '<div class="' + cls + '">';
-                html += '<span class="gb-pill-id">' + a.id + '</span>';
-                html += '<span class="gb-pill-label">' + wfEsc(a.label);
-                if (ac === 'new') html += ' <span class="gb-tag gb-tag-new">NEW</span>';
-                else if (ac === 'modified') html += ' <span class="gb-tag gb-tag-modified">CHG</span>';
-                html += '</span>';
-                html += '<div class="gb-pill-detail">';
-                html += '<span class="gb-pill-method">' + wfEsc(a.method) + '</span> ';
-                html += wfEsc(a.url) + ' ' + wfEsc(JSON.stringify(a.body));
-                html += '</div>';
-                var pStr = wfRenderParams(a);
-                if (pStr) html += '<div class="gb-pill-opts">' + wfEsc(pStr) + '</div>';
-                html += '</div>';
-            }
-            html += '</div>';
-        }
-
-        c.innerHTML = html;
-    }
-
-    var EXP_B_CSS = ''
-        + '#rc-exp-b { background:#1a1226; color:#d4c8e8; font-family:"Segoe UI",Roboto,sans-serif; overflow-y:auto; padding:0; }'
-        + '#rc-exp-b .gb-header { padding:1rem 1.2rem 0.3rem; }'
-        + '#rc-exp-b .gb-title { font-size:0.78rem; text-transform:uppercase; letter-spacing:0.12em; color:#8b6cc1; }'
-        + '#rc-exp-b .gb-node { font-size:1.3rem; font-weight:700; color:#e8ddf5; margin-top:0.15rem; }'
-
-        + '#rc-exp-b .gb-bar-wrap { padding:0.5rem 1.2rem; }'
-        + '#rc-exp-b .gb-bar-track { height:6px; background:#2a1e3e; border-radius:3px; overflow:hidden; }'
-        + '#rc-exp-b .gb-bar-fill { height:100%; background:linear-gradient(90deg,#8b6cc1,#c084fc); border-radius:3px; transition:width 0.3s; }'
-        + '#rc-exp-b .gb-bar-labels { display:flex; justify-content:space-between; margin-top:0.3rem; }'
-        + '#rc-exp-b .gb-bar-lbl { font-size:0.62rem; color:#5a4a70; }'
-        + '#rc-exp-b .gb-bar-lbl-cur { color:#c084fc; font-weight:700; }'
-        + '#rc-exp-b .gb-bar-lbl-done { color:#8b6cc1; }'
-
-        + '#rc-exp-b .gb-instr { padding:0.3rem 1.2rem 0.6rem; font-size:0.82rem; color:#9a8ab0; line-height:1.5; white-space:pre-line; }'
-
-        + '#rc-exp-b .gb-section-label { padding:0.3rem 1.2rem; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.1em; color:#5a4a70; }'
-
-        + '#rc-exp-b .gb-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; padding:0.3rem 1.2rem 0.8rem; }'
-        + '#rc-exp-b .gb-fcard { background:#221a33; border:1px solid #2e2444; border-radius:8px; padding:0.6rem 0.7rem; display:flex; flex-direction:column; gap:0.2rem; }'
-        + '#rc-exp-b .gb-fc-head { display:flex; align-items:center; justify-content:space-between; }'
-        + '#rc-exp-b .gb-fc-name { font-size:0.78rem; font-weight:600; color:#c084fc; }'
-        + '#rc-exp-b .gb-fc-instr { font-size:0.7rem; color:#6a5a80; font-style:italic; }'
-        + '#rc-exp-b .gb-fc-val { font-size:0.85rem; color:#d4c8e8; }'
-        + '#rc-exp-b .gb-fc-empty { color:#4a3a60; font-style:italic; }'
-        + '#rc-exp-b .gb-fc-opts { font-size:0.68rem; color:#6a5a80; font-family:Consolas,monospace; }'
-
-        + '#rc-exp-b .gb-fc-outcome { border-left:3px solid #8b6cc1; background:#251d38; }'
-        + '#rc-exp-b .gb-fc-new { border-left:3px solid #4caf50; background:#1a2a1a; }'
-        + '#rc-exp-b .gb-fc-modified { border-left:3px solid #e6a817; background:#2a2210; }'
-
-        + '#rc-exp-b .gb-tag { font-size:0.55rem; font-weight:700; letter-spacing:0.06em; padding:0.1rem 0.3rem; border-radius:3px; }'
-        + '#rc-exp-b .gb-tag-outcome { color:#c084fc; background:rgba(192,132,252,0.15); }'
-        + '#rc-exp-b .gb-tag-new { color:#4caf50; background:rgba(76,175,80,0.15); }'
-        + '#rc-exp-b .gb-tag-modified { color:#e6a817; background:rgba(230,168,23,0.15); }'
-
-        + '#rc-exp-b .gb-toolbar { display:flex; flex-direction:column; gap:0.35rem; padding:0.3rem 1.2rem 1rem; }'
-        + '#rc-exp-b .gb-pill { display:flex; flex-wrap:wrap; align-items:center; gap:0.4rem; padding:0.5rem 0.7rem; background:#221a33; border:1px solid #2e2444; border-radius:20px; }'
-        + '#rc-exp-b .gb-pill-id { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; font-size:0.65rem; font-weight:700; background:#2e2444; color:#8b6cc1; flex-shrink:0; }'
-        + '#rc-exp-b .gb-pill-label { font-size:0.82rem; color:#d4c8e8; flex:1; }'
-        + '#rc-exp-b .gb-pill-detail { width:100%; font-size:0.65rem; color:#5a4a70; font-family:Consolas,monospace; padding-left:1.8rem; word-break:break-all; }'
-        + '#rc-exp-b .gb-pill-method { font-weight:600; color:#6a5a80; }'
-        + '#rc-exp-b .gb-pill-opts { width:100%; font-size:0.65rem; color:#5a4a70; font-family:Consolas,monospace; padding-left:1.8rem; }'
-
-        + '#rc-exp-b .gb-pill-primary { border-color:#8b6cc1; background:#251d38; }'
-        + '#rc-exp-b .gb-pill-primary .gb-pill-label { color:#c084fc; font-weight:700; }'
-        + '#rc-exp-b .gb-pill-primary .gb-pill-id { background:#8b6cc1; color:#fff; }'
-        + '#rc-exp-b .gb-pill-nav { border-style:dashed; border-color:#2e2444; }'
-        + '#rc-exp-b .gb-pill-nav .gb-pill-label { color:#6a5a80; }'
-        + '#rc-exp-b .gb-pill-selected { border-color:#4caf50; background:#1a2a1a; }'
-        + '#rc-exp-b .gb-pill-selected .gb-pill-label { color:#4caf50; }'
-        + '#rc-exp-b .gb-pill-selected .gb-pill-id { background:#4caf50; color:#fff; }'
-        + '#rc-exp-b .gb-pill-fb-new { border-left:3px solid #4caf50; }'
-        + '#rc-exp-b .gb-pill-fb-modified { border-left:3px solid #e6a817; }'
-
-        + '#rc-exp-b .gb-empty { padding:0.5rem 1.2rem; color:#4a3a60; font-style:italic; font-size:0.8rem; }'
-
-        + '#rc-exp-b .wf-null, #rc-exp-b .wf-empty-arr, #rc-exp-b .wf-empty-obj { color:#4a3a60; font-style:italic; font-size:0.8rem; }'
-        + '#rc-exp-b .wf-bool, #rc-exp-b .wf-num { color:#c084fc; }'
-        + '#rc-exp-b .wf-str { color:#d4c8e8; }'
-        + '#rc-exp-b .wf-tbl { width:100%; border-collapse:collapse; }'
-        + '#rc-exp-b .wf-tbl td { padding:0.2rem 0.3rem; font-size:0.78rem; border-bottom:1px solid #2e2444; }'
-        + '#rc-exp-b .wf-key { color:#8b6cc1; font-weight:500; }'
-        + '#rc-exp-b .wf-val { color:#d4c8e8; }'
-        + '#rc-exp-b .wf-arr { display:flex; flex-direction:column; gap:0.1rem; }'
-        + '#rc-exp-b .wf-arr-item { padding-left:0.4rem; border-left:2px solid #2e2444; }'
-        + '#rc-exp-b .wf-table th { background:#221a33; border-color:#2e2444; color:#c084fc; }'
-        + '#rc-exp-b .wf-table td { border-color:#2e2444; }'
-        + '#rc-exp-b .wf-table-rownum { color:#5a4a70; background:#1a1226; }'
-        + '#rc-exp-b .wf-table-coltype { color:#6a5a80; }'
-        + '#rc-exp-b .wf-table-empty { color:#4a3a60; }'
-        + '#rc-exp-b .wf-table-summary { color:#6a5a80; }'
-        + '#rc-exp-b .wf-table-prop { color:#6a5a80; }'
-        ;
-
-    registerRenderer({
-        id: 'exp-b',
-        label: 'Experimental - B',
-        format: 'exp-b',
-        init: function(c) {
-            c.style.cssText = 'overflow-y:auto;padding:0;';
-            var style = document.createElement('style');
-            style.textContent = EXP_B_CSS;
-            document.head.appendChild(style);
-            container = c;
-        },
-        update: function(state, msg, feedback) { expBRenderPage(container, state, msg, feedback); },
-        activate: function() {},
-        deactivate: function() {}
-    });
-})();
-
-/* ======================================================================
-   RENDERER: EXPERIMENTAL C — tree outline
-   ====================================================================== */
-(function() {
-    var container;
-
-    function treeVal(v, indent) {
-        var pfx = indent;
-        if (v == null) return pfx + '(null)\n';
-        if (typeof v === 'boolean' || typeof v === 'number') return pfx + String(v) + '\n';
-        if (typeof v === 'string') return pfx + '"' + v.replace(/"/g, '\\"') + '"\n';
-        if (Array.isArray(v)) {
-            if (!v.length) return pfx + '(empty list)\n';
-            var out = '';
-            for (var i = 0; i < v.length; i++) {
-                var isLast = i === v.length - 1;
-                var branch = isLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
-                var childPfx = indent + (isLast ? '   ' : '\u2502  ');
-                if (typeof v[i] === 'object' && v[i] !== null) {
-                    out += indent + branch + '[' + i + ']\n';
-                    out += treeObj(v[i], childPfx);
-                } else {
-                    out += indent + branch + treeVal(v[i], '').trim() + '\n';
-                }
-            }
-            return out;
-        }
-        if (typeof v === 'object') return '\n' + treeObj(v, indent);
-        return pfx + String(v) + '\n';
-    }
-
-    function treeObj(obj, indent) {
-        var keys = Object.keys(obj);
-        if (!keys.length) return indent + '(empty)\n';
-        var out = '';
-        for (var i = 0; i < keys.length; i++) {
-            var k = keys[i];
-            var isLast = i === keys.length - 1;
-            var branch = isLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
-            var childPfx = indent + (isLast ? '   ' : '\u2502  ');
-            var val = obj[k];
-            if (val && typeof val === 'object' && !Array.isArray(val)) {
-                out += indent + branch + k + '\n';
-                out += treeObj(val, childPfx);
-            } else if (Array.isArray(val)) {
-                out += indent + branch + k + '\n';
-                out += treeVal(val, childPfx);
-            } else {
-                out += indent + branch + k + ': ' + treeVal(val, '').trim() + '\n';
-            }
-        }
-        return out;
-    }
-
-    function expCRenderPage(c, state, msg, feedback) {
-        if (!c || !state) return;
-
-        var fieldCategory = {};
-        var affCategory = {};
-        if (feedback) {
-            var out = feedback.outcome || {};
-            var eff = feedback.effects || {};
-            for (var k in out) fieldCategory[k] = 'outcome';
-            for (var k in (eff.new_fields || {})) fieldCategory[k] = 'new';
-            for (var k in (eff.modified_fields || {})) fieldCategory[k] = 'modified';
-            (eff.new_affordances || []).forEach(function(a){ affCategory[a.label] = 'new'; });
-            (eff.modified_affordances || []).forEach(function(a){ affCategory[a.label] = 'modified'; });
-        }
-
-        var s = state.state || {};
-        var lines = [];
-
-        /* Root */
-        lines.push('<span class="tc-root">' + wfEsc(s.workflow || 'Workflow') + '</span>');
-
-        /* Lifecycle */
-        var lifecycle = s.lifecycle || [];
-        var current = s.lifecycle_current || '';
-        var completed = s.lifecycle_completed || [];
-        if (lifecycle.length) {
-            lines.push('\u251c\u2500 <span class="tc-key">lifecycle</span>');
-            for (var i = 0; i < lifecycle.length; i++) {
-                var label = lifecycle[i];
-                var isLast = i === lifecycle.length - 1;
-                var branch = isLast ? '   \u2514\u2500 ' : '   \u251c\u2500 ';
-                var cls = 'tc-phase';
-                if (label === current) cls = 'tc-phase-cur';
-                else if (completed.indexOf(label) !== -1) cls = 'tc-phase-done';
-                lines.push(branch + '<span class="' + cls + '">' + wfEsc(label) + '</span>');
-            }
-        }
-
-        /* Node (node_title rendered here; node raw ID and completed_nodes rendered by lifecycle above) */
-        lines.push('\u251c\u2500 <span class="tc-key">node</span>: <span class="tc-node">' + wfEsc(s.node_title || s.node) + '</span>');
-
-        /* Instructions */
-        if (state.instructions) {
-            lines.push('\u251c\u2500 <span class="tc-key">instructions</span>: <span class="tc-str">' + wfEsc(state.instructions) + '</span>');
-        }
-
-        /* Fields */
-        if (s.fields) {
-            var fkeys = Object.keys(s.fields);
-            var hasMore = s.table || (state.affordances && state.affordances.length);
-            var fieldBranch = hasMore ? '\u251c\u2500 ' : '\u2514\u2500 ';
-            var fieldCont = hasMore ? '\u2502  ' : '   ';
-            lines.push(fieldBranch + '<span class="tc-key">state.fields</span>');
-            if (fkeys.length) {
-                for (var i = 0; i < fkeys.length; i++) {
-                    var k = fkeys[i];
-                    var f = s.fields[k];
-                    var isLast = i === fkeys.length - 1;
-                    var fb = isLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
-                    var fc = isLast ? '   ' : '\u2502  ';
-                    var cat = fieldCategory[k] || null;
-                    var tagStr = '';
-                    var tagMap = {outcome:'SET', 'new':'NEW', modified:'CHG'};
-                    if (cat) tagStr = ' <span class="tc-tag tc-tag-' + cat + '">[' + tagMap[cat] + ']</span>';
-                    lines.push(fieldCont + fb + '<span class="tc-fname' + (cat ? ' tc-f-' + cat : '') + '">' + wfEsc(k) + '</span>' + tagStr);
-                    if (f && typeof f === 'object' && 'value' in f) {
-                        var subPfx = fieldCont + fc;
-                        var subParts = [];
-                        if (f.value == null) subParts.push('value: <span class="tc-null">(not set)</span>');
-                        else subParts.push('value: <span class="tc-str">' + wfEsc(f.value) + '</span>');
-                        if (f.instruction) subParts.push('instruction: <span class="tc-instr">' + wfEsc(f.instruction) + '</span>');
-                        if (f.options) subParts.push('options: <span class="tc-opts">' + wfEsc(f.options.join(', ')) + '</span>');
-                        for (var j = 0; j < subParts.length; j++) {
-                            var sIsLast = j === subParts.length - 1;
-                            lines.push(subPfx + (sIsLast ? '\u2514\u2500 ' : '\u251c\u2500 ') + subParts[j]);
-                        }
-                    } else {
-                        lines.push(fieldCont + fc + '\u2514\u2500 ' + treeVal(f, '').trim());
-                    }
-                }
-            } else {
-                lines.push(fieldCont + '\u2514\u2500 <span class="tc-null">(empty)</span>');
-            }
-        }
-
-        /* Table — prefer execution_table during execution, fall back to construction table */
-        var showExec = !!s.execution_table;
-        var tblData = showExec ? s.execution_table : s.table;
-        if (tblData) {
-            var hasAffs = state.affordances && state.affordances.length;
-            var tblBranch = hasAffs ? '\u251c\u2500 ' : '\u2514\u2500 ';
-            var tblCont = hasAffs ? '\u2502  ' : '   ';
-            var tblKey = showExec ? 'state.execution_table' : 'state.table';
-            lines.push(tblBranch + '<span class="tc-key">' + tblKey + '</span>');
-
-            if (showExec) {
-                /* Execution table: rows are objects with cells, acceptance, gating */
-                var etCols = tblData.columns || [];
-                var etRows = tblData.rows || [];
-                lines.push(tblCont + '\u251c\u2500 <span class="tc-key">columns</span>');
-                for (var ci = 0; ci < etCols.length; ci++) {
-                    var cLast = ci === etCols.length - 1;
-                    var colExtra = '';
-                    if (etCols[ci].choices) colExtra += ' choices=' + JSON.stringify(etCols[ci].choices);
-                    if (etCols[ci].rule) colExtra += ' rule=' + wfRuleToExpr(etCols[ci].rule, etCols);
-                    lines.push(tblCont + '\u2502  ' + (cLast ? '\u2514\u2500 ' : '\u251c\u2500 ') + '<span class="tc-fname">' + wfEsc(etCols[ci].name) + '</span> <span class="tc-opts">(' + wfEsc(etCols[ci].type) + ')</span>' + (colExtra ? ' <span class="tc-opts">' + wfEsc(colExtra) + '</span>' : ''));
-                }
-                if (!etCols.length) lines.push(tblCont + '\u2502  \u2514\u2500 <span class="tc-null">(none)</span>');
-                lines.push(tblCont + '\u2514\u2500 <span class="tc-key">rows</span> (' + etRows.length + ')');
-                for (var ri = 0; ri < etRows.length; ri++) {
-                    var rLast = ri === etRows.length - 1;
-                    var rb = rLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
-                    var rc = rLast ? '   ' : '\u2502  ';
-                    var r = etRows[ri];
-                    var acc = r.acceptance || {};
-                    var gTag = r.gated ? ' <span class="tc-null">[gated:true]</span>' : '';
-                    var aTag = acc.passed ? ' <span class="tc-f-new">[acceptance.passed:true]</span>' : ' <span class="tc-null">[acceptance.passed:false]</span>';
-                    lines.push(tblCont + '   ' + rb + '<span class="tc-fname">' + wfEsc(r.row_id || 'row ' + r.row) + '</span>' + gTag + aTag);
-                    if (r.gated_by && r.gated_by.length) {
-                        lines.push(tblCont + '   ' + rc + '\u251c\u2500 <span class="tc-key">gated_by</span>: <span class="tc-str">' + wfEsc(JSON.stringify(r.gated_by)) + '</span>');
-                    }
-                    if (acc.reason) {
-                        lines.push(tblCont + '   ' + rc + '\u251c\u2500 <span class="tc-key">acceptance.reason</span>: <span class="tc-str">' + wfEsc(acc.reason) + '</span>');
-                    }
-                    var cells = r.cells || [];
-                    for (var ci2 = 0; ci2 < cells.length; ci2++) {
-                        var cLast2 = ci2 === cells.length - 1;
-                        var cell = cells[ci2];
-                        var dv = cell.display_value || '';
-                        var statusTag = '<span class="tc-opts">[' + (cell.status || '?') + ']</span>';
-                        var cellLine = wfEsc(cell.column_name) + ' <span class="tc-opts">(' + wfEsc(cell.column_type) + ')</span> ' + statusTag + ': ' + (dv ? '<span class="tc-str">' + wfEsc(dv) + '</span>' : '<span class="tc-null">\u2014</span>');
-                        if (cell.value && cell.value !== cell.display_value) cellLine += ' <span class="tc-opts">value=' + wfEsc(cell.value) + '</span>';
-                        if (cell.available_actions && cell.available_actions.length) cellLine += ' <span class="tc-opts">actions=' + wfEsc(JSON.stringify(cell.available_actions)) + '</span>';
-                        if (cell.locked_reason) cellLine += ' <span class="tc-opts">locked_reason=' + wfEsc(cell.locked_reason) + '</span>';
-                        lines.push(tblCont + '   ' + rc + (cLast2 ? '\u2514\u2500 ' : '\u251c\u2500 ') + cellLine);
-                    }
-                }
-                if (!etRows.length) lines.push(tblCont + '   \u2514\u2500 <span class="tc-null">(none)</span>');
-            } else {
-                /* Construction table: rows are flat arrays */
-                var tbl = tblData;
-                var cols = tbl.columns || [];
-                var rows = tbl.rows || [];
-                if (tbl.summary) {
-                    lines.push(tblCont + '\u251c\u2500 summary: <span class="tc-str">' + wfEsc(tbl.summary) + '</span>');
-                }
-                lines.push(tblCont + '\u251c\u2500 <span class="tc-key">columns</span>');
-                for (var ci = 0; ci < cols.length; ci++) {
-                    var cLast = ci === cols.length - 1;
-                    var cb = cLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
-                    var cExtra = '';
-                    if (cols[ci].choices) cExtra += ' choices=' + JSON.stringify(cols[ci].choices);
-                    if (cols[ci].rule) cExtra += ' rule=' + wfRuleToExpr(cols[ci].rule, cols);
-                    lines.push(tblCont + '\u2502  ' + cb + '<span class="tc-fname">' + wfEsc(cols[ci].name) + '</span> <span class="tc-opts">(' + wfEsc(cols[ci].type) + ')</span>' + (cExtra ? ' <span class="tc-opts">' + wfEsc(cExtra) + '</span>' : ''));
-                }
-                if (!cols.length) lines.push(tblCont + '\u2502  \u2514\u2500 <span class="tc-null">(none)</span>');
-                var hasProps = tbl.properties && Object.keys(tbl.properties).length;
-                var rowBranch = hasProps ? '\u251c\u2500 ' : '\u2514\u2500 ';
-                lines.push(tblCont + rowBranch + '<span class="tc-key">rows</span> (' + rows.length + ')');
-                for (var ri = 0; ri < rows.length; ri++) {
-                    var rLast = ri === rows.length - 1;
-                    var rb = rLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
-                    var rc = rLast ? '   ' : '\u2502  ';
-                    var rowPfx = tblCont + (hasProps ? '\u2502  ' : '   ');
-                    lines.push(rowPfx + rb + '<span class="tc-fname">row ' + ri + '</span>');
-                    for (var ci2 = 0; ci2 < rows[ri].length; ci2++) {
-                        var cLast2 = ci2 === rows[ri].length - 1;
-                        var cn = cols[ci2] ? cols[ci2].name : 'col-' + ci2;
-                        var cv = rows[ri][ci2];
-                        lines.push(rowPfx + rc + (cLast2 ? '\u2514\u2500 ' : '\u251c\u2500 ') + wfEsc(cn) + ': ' + (cv ? '<span class="tc-str">' + wfEsc(cv) + '</span>' : '<span class="tc-null">\u2014</span>'));
-                    }
-                }
-                if (!rows.length) lines.push(tblCont + (hasProps ? '\u2502  ' : '   ') + '\u2514\u2500 <span class="tc-null">(none)</span>');
-                if (hasProps) {
-                    lines.push(tblCont + '\u2514\u2500 <span class="tc-key">properties</span>');
-                    var pk = Object.keys(tbl.properties);
-                    for (var pi = 0; pi < pk.length; pi++) {
-                        var pLast = pi === pk.length - 1;
-                        lines.push(tblCont + '   ' + (pLast ? '\u2514\u2500 ' : '\u251c\u2500 ') + wfEsc(pk[pi]) + ': <span class="tc-str">' + wfEsc(String(tbl.properties[pk[pi]])) + '</span>');
-                    }
-                }
-            }
-        }
-
-        /* Extra state keys (generic rendering for unknown keys) */
-        var extraProps = wfRenderStateProps(state);
-        if (extraProps) {
-            lines.push('\u251c\u2500 <span class="tc-key">(extra state)</span>');
-            lines.push('   ' + extraProps.replace(/<[^>]+>/g, '').substring(0, 200));
-        }
-
-        /* Affordances */
-        if (state.affordances && state.affordances.length) {
-            lines.push('\u2514\u2500 <span class="tc-key">affordances</span>');
-            for (var i = 0; i < state.affordances.length; i++) {
-                var a = state.affordances[i];
-                var isLast = i === state.affordances.length - 1;
-                var ab = isLast ? '   \u2514\u2500 ' : '   \u251c\u2500 ';
-                var ac2 = isLast ? '      ' : '   \u2502  ';
-                var acCat = affCategory[a.label] || null;
-                var acTag = '';
-                if (acCat === 'new') acTag = ' <span class="tc-tag tc-tag-new">[NEW]</span>';
-                else if (acCat === 'modified') acTag = ' <span class="tc-tag tc-tag-modified">[CHG]</span>';
-                var affCls = 'tc-aff';
-                if (/Proceed|Submit/.test(a.label)) affCls += ' tc-aff-primary';
-                else if (/Go back/.test(a.label)) affCls += ' tc-aff-nav';
-                else if (/\[Selected\]/.test(a.label)) affCls += ' tc-aff-selected';
-                lines.push(ab + '<span class="tc-aff-id">[' + a.id + ']</span> <span class="' + affCls + '">' + wfEsc(a.label) + '</span>' + acTag);
-                lines.push(ac2 + '\u251c\u2500 <span class="tc-aff-m">' + wfEsc(a.method) + '</span> <span class="tc-aff-url">' + wfEsc(a.url) + '</span>');
-                var pStr = wfRenderParams(a);
-                var bodyLine = ac2 + (pStr ? '\u251c\u2500 ' : '\u2514\u2500 ') + 'body: <span class="tc-aff-body">' + wfEsc(JSON.stringify(a.body)) + '</span>';
-                lines.push(bodyLine);
-                if (pStr) {
-                    lines.push(ac2 + '\u2514\u2500 <span class="tc-opts">' + wfEsc(pStr) + '</span>');
-                }
-            }
-        }
-
-        c.querySelector('.tc-content').innerHTML = lines.join('\n');
-    }
-
-    var EXP_C_CSS = ''
-        + '#rc-exp-c { background:#0a100a; color:#88b888; font-family:Consolas,"Courier New",monospace; overflow-y:auto; padding:0.8rem 1rem; }'
-        + '#rc-exp-c .tc-content { white-space:pre; line-height:1.6; font-size:0.82rem; }'
-        + '#rc-exp-c .tc-root { font-size:1rem; font-weight:700; color:#50fa7b; }'
-        + '#rc-exp-c .tc-key { color:#6abf6a; font-weight:600; }'
-        + '#rc-exp-c .tc-node { color:#f1fa8c; font-weight:600; }'
-        + '#rc-exp-c .tc-phase { color:#4a6a4a; }'
-        + '#rc-exp-c .tc-phase-cur { color:#50fa7b; font-weight:700; text-decoration:underline; }'
-        + '#rc-exp-c .tc-phase-done { color:#6abf6a; }'
-        + '#rc-exp-c .tc-str { color:#c8e8c8; }'
-        + '#rc-exp-c .tc-null { color:#4a6a4a; font-style:italic; }'
-        + '#rc-exp-c .tc-instr { color:#6a8a6a; font-style:italic; }'
-        + '#rc-exp-c .tc-opts { color:#6a8a6a; }'
-        + '#rc-exp-c .tc-fname { color:#8be88b; font-weight:600; }'
-        + '#rc-exp-c .tc-f-outcome { color:#6abf6a; }'
-        + '#rc-exp-c .tc-f-new { color:#50fa7b; }'
-        + '#rc-exp-c .tc-f-modified { color:#f1fa8c; }'
-        + '#rc-exp-c .tc-tag { font-size:0.7em; font-weight:700; }'
-        + '#rc-exp-c .tc-tag-outcome { color:#6abf6a; }'
-        + '#rc-exp-c .tc-tag-new { color:#50fa7b; }'
-        + '#rc-exp-c .tc-tag-modified { color:#f1fa8c; }'
-        + '#rc-exp-c .tc-aff-id { color:#50fa7b; font-weight:700; }'
-        + '#rc-exp-c .tc-aff { color:#88b888; }'
-        + '#rc-exp-c .tc-aff-primary { color:#50fa7b; font-weight:700; }'
-        + '#rc-exp-c .tc-aff-nav { color:#4a6a4a; }'
-        + '#rc-exp-c .tc-aff-selected { color:#8be88b; text-decoration:underline; }'
-        + '#rc-exp-c .tc-aff-m { color:#6abf6a; font-weight:600; }'
-        + '#rc-exp-c .tc-aff-url { color:#88b888; }'
-        + '#rc-exp-c .tc-aff-body { color:#6a8a6a; }'
-        ;
-
-    registerRenderer({
-        id: 'exp-c',
-        label: 'Experimental - C',
-        format: 'exp-c',
-        init: function(c) {
-            c.style.cssText = 'overflow-y:auto;padding:0;';
-            var style = document.createElement('style');
-            style.textContent = EXP_C_CSS;
-            document.head.appendChild(style);
-            var pre = document.createElement('pre');
-            pre.className = 'tc-content';
-            c.appendChild(pre);
-            container = c;
-        },
-        update: function(state, msg, feedback) { expCRenderPage(container, state, msg, feedback); },
-        activate: function() {},
-        deactivate: function() {}
-    });
-})();
-
-/* ======================================================================
-   RENDERER: EXPERIMENTAL D — Visual workflow renderer
+   RENDERER: SIMPLE — Visual workflow renderer (promoted from Experimental D)
    Shared rendering functions + CSS, then 4 variant registrations
    ====================================================================== */
 
@@ -3808,15 +2502,15 @@ function _scopeFC(sel, css) { return css.replace(/\.fc-/g, sel + ' .fc-'); }
 (function() {
     var container;
     registerRenderer({
-        id: 'exp-d', label: 'Experimental - D', format: 'exp-d',
+        id: 'light', label: 'Simple', format: 'simple',
         verbosity: 'default', verbosity_label: 'Default', style: 'light', style_label: 'Light',
         init: function(c) {
             c.style.cssText = 'overflow-y:auto;padding:0;';
             var style = document.createElement('style');
             style.textContent = WF_STRUCTURAL_CSS + EXP_D_FC_CSS
-                + _scopeFC('#rc-exp-d', EXP_D_FC_LIGHT)
-                + '#rc-exp-d { background:#f5f5f5; color:#333; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
-                + '#rc-exp-d .wf-title { color:#1a1a2e; } #rc-exp-d .wf-banner { background:#f8f9fb; border-color:#e8e8e8; } #rc-exp-d .wf-dot { background:#dde1e6; color:#888; } #rc-exp-d .wf-step-label { color:#888; } #rc-exp-d .wf-step-active .wf-dot { background:#2a6bcf; color:#fff; } #rc-exp-d .wf-step-active .wf-step-label { color:#1a1a2e; font-weight:600; } #rc-exp-d .wf-step-done .wf-dot { background:#4caf50; color:#fff; } #rc-exp-d .wf-step-done .wf-step-label { color:#555; } #rc-exp-d .wf-conn { background:#dde1e6; } #rc-exp-d .wf-conn-active { background:#4caf50; } #rc-exp-d .wf-section-head { color:#1a1a2e; } #rc-exp-d .wf-desc { color:#666; } #rc-exp-d .wf-card { background:#fff; border-color:#e8e8e8; } #rc-exp-d .wf-card-head { color:#7f8fa6; } #rc-exp-d .wf-tbl td { border-bottom:1px solid #f0f0f0; } #rc-exp-d .wf-key { color:#7f8fa6; } #rc-exp-d .wf-val { color:#333; } #rc-exp-d .wf-null, #rc-exp-d .wf-empty-arr, #rc-exp-d .wf-empty-obj { color:#bbb; } #rc-exp-d .wf-bool, #rc-exp-d .wf-num { color:#2a6bcf; } #rc-exp-d .wf-str { color:#333; } #rc-exp-d .wf-arr-item { border-left-color:#e8e8e8; } #rc-exp-d .wf-field { border-bottom:1px solid #f0f0f0; } #rc-exp-d .wf-field-label { color:#555; } #rc-exp-d .wf-field-instruction { color:#999; } #rc-exp-d .wf-field-value { color:#333; } #rc-exp-d .wf-field-empty { color:#bbb; } #rc-exp-d .wf-field-options { color:#7f8fa6; } #rc-exp-d .wf-aff { background:#f8f9fb; border-color:#e8e8e8; } #rc-exp-d .wf-aff-id { background:#dde1e6; color:#555; } #rc-exp-d .wf-aff-label { color:#333; } #rc-exp-d .wf-aff-method { color:#7f8fa6; background:#eef1f5; } #rc-exp-d .wf-aff-detail { color:#999; } #rc-exp-d .wf-aff-options { color:#7f8fa6; } #rc-exp-d .wf-aff-primary { border-color:#2a6bcf; background:#f0f5ff; } #rc-exp-d .wf-aff-primary .wf-aff-label { color:#2a6bcf; font-weight:600; } #rc-exp-d .wf-aff-primary .wf-aff-id { background:#2a6bcf; color:#fff; } #rc-exp-d .wf-aff-nav { border-color:#dde1e6; background:#fafafa; } #rc-exp-d .wf-aff-nav .wf-aff-label { color:#888; } #rc-exp-d .wf-aff-selected { border-color:#4caf50; background:#f0fff0; } #rc-exp-d .wf-aff-selected .wf-aff-label { color:#2e7d32; } #rc-exp-d .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; } #rc-exp-d .wf-fb-outcome { border-left:3px solid #2a6bcf; background:#f0f5ff; } #rc-exp-d .wf-fb-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-exp-d .wf-fb-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-exp-d .wf-aff-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-exp-d .wf-aff-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-exp-d .wf-tag-outcome { color:#2a6bcf; } #rc-exp-d .wf-tag-new { color:#4caf50; } #rc-exp-d .wf-tag-modified { color:#e6a817; } #rc-exp-d .wf-table th { background:#f4f6f9; border-color:#e8e8e8; } #rc-exp-d .wf-table td { border-color:#e8e8e8; } #rc-exp-d .wf-table-rownum { color:#aaa; background:#fafbfc; } #rc-exp-d .wf-table-coltype { color:#7f8fa6; } #rc-exp-d .wf-table-empty { color:#bbb; } #rc-exp-d .wf-table-summary { color:#7f8fa6; } #rc-exp-d .wf-table-prop { color:#7f8fa6; } #rc-exp-d .wf-exec-pass { color:#2e7d32; } #rc-exp-d .wf-exec-pending { color:#b0b0b0; } #rc-exp-d [data-completed="true"] { background:#e8f5e9; } #rc-exp-d .wf-exec-reason { color:#999; } #rc-exp-d .wf-parallel { border-color:#c8e6c9; background:#f8fdf8; } #rc-exp-d .wf-branch-label { color:#2e7d32; } #rc-exp-d .wf-branch-node { background:#fff; border-color:#dde1e6; color:#555; } #rc-exp-d .wf-branch-done { background:#e8f5e9; border-color:#4caf50; color:#2e7d32; } #rc-exp-d .wf-branch-active { background:#e3f2fd; border-color:#2a6bcf; color:#1a1a2e; font-weight:600; } #rc-exp-d .wf-dot-router { background:#e65100; } #rc-exp-d .wf-dot-fork { background:#2e7d32; } #rc-exp-d .wf-target { border-color:#e65100; color:#795548; } #rc-exp-d .wf-target-done { background:#fff3e0; color:#e65100; } #rc-exp-d .wf-target-active { background:#fff3e0; border-color:#e65100; color:#e65100; font-weight:600; } #rc-exp-d .mb-node { background:#fff; border-color:#dde1e6; color:#555; } #rc-exp-d .mb-current { background:#e3f2fd; border-color:#2a6bcf; color:#1a1a2e; font-weight:700; } #rc-exp-d .mb-done { background:#e8f5e9; border-color:#4caf50; color:#2e7d32; } #rc-exp-d .mb-router { border-color:#e65100; } #rc-exp-d .mb-router.mb-done { border-color:#4caf50; } #rc-exp-d .mb-fork { border-color:#2e7d32; } #rc-exp-d .mb-fork.mb-done { border-color:#4caf50; }'
+                + _scopeFC('#rc-light', EXP_D_FC_LIGHT)
+                + '#rc-light { background:#f5f5f5; color:#333; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
+                + '#rc-light .wf-title { color:#1a1a2e; } #rc-light .wf-banner { background:#f8f9fb; border-color:#e8e8e8; } #rc-light .wf-dot { background:#dde1e6; color:#888; } #rc-light .wf-step-label { color:#888; } #rc-light .wf-step-active .wf-dot { background:#2a6bcf; color:#fff; } #rc-light .wf-step-active .wf-step-label { color:#1a1a2e; font-weight:600; } #rc-light .wf-step-done .wf-dot { background:#4caf50; color:#fff; } #rc-light .wf-step-done .wf-step-label { color:#555; } #rc-light .wf-conn { background:#dde1e6; } #rc-light .wf-conn-active { background:#4caf50; } #rc-light .wf-section-head { color:#1a1a2e; } #rc-light .wf-desc { color:#666; } #rc-light .wf-card { background:#fff; border-color:#e8e8e8; } #rc-light .wf-card-head { color:#7f8fa6; } #rc-light .wf-tbl td { border-bottom:1px solid #f0f0f0; } #rc-light .wf-key { color:#7f8fa6; } #rc-light .wf-val { color:#333; } #rc-light .wf-null, #rc-light .wf-empty-arr, #rc-light .wf-empty-obj { color:#bbb; } #rc-light .wf-bool, #rc-light .wf-num { color:#2a6bcf; } #rc-light .wf-str { color:#333; } #rc-light .wf-arr-item { border-left-color:#e8e8e8; } #rc-light .wf-field { border-bottom:1px solid #f0f0f0; } #rc-light .wf-field-label { color:#555; } #rc-light .wf-field-instruction { color:#999; } #rc-light .wf-field-value { color:#333; } #rc-light .wf-field-empty { color:#bbb; } #rc-light .wf-field-options { color:#7f8fa6; } #rc-light .wf-aff { background:#f8f9fb; border-color:#e8e8e8; } #rc-light .wf-aff-id { background:#dde1e6; color:#555; } #rc-light .wf-aff-label { color:#333; } #rc-light .wf-aff-method { color:#7f8fa6; background:#eef1f5; } #rc-light .wf-aff-detail { color:#999; } #rc-light .wf-aff-options { color:#7f8fa6; } #rc-light .wf-aff-primary { border-color:#2a6bcf; background:#f0f5ff; } #rc-light .wf-aff-primary .wf-aff-label { color:#2a6bcf; font-weight:600; } #rc-light .wf-aff-primary .wf-aff-id { background:#2a6bcf; color:#fff; } #rc-light .wf-aff-nav { border-color:#dde1e6; background:#fafafa; } #rc-light .wf-aff-nav .wf-aff-label { color:#888; } #rc-light .wf-aff-selected { border-color:#4caf50; background:#f0fff0; } #rc-light .wf-aff-selected .wf-aff-label { color:#2e7d32; } #rc-light .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; } #rc-light .wf-fb-outcome { border-left:3px solid #2a6bcf; background:#f0f5ff; } #rc-light .wf-fb-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-light .wf-fb-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-light .wf-aff-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-light .wf-aff-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-light .wf-tag-outcome { color:#2a6bcf; } #rc-light .wf-tag-new { color:#4caf50; } #rc-light .wf-tag-modified { color:#e6a817; } #rc-light .wf-table th { background:#f4f6f9; border-color:#e8e8e8; } #rc-light .wf-table td { border-color:#e8e8e8; } #rc-light .wf-table-rownum { color:#aaa; background:#fafbfc; } #rc-light .wf-table-coltype { color:#7f8fa6; } #rc-light .wf-table-empty { color:#bbb; } #rc-light .wf-table-summary { color:#7f8fa6; } #rc-light .wf-table-prop { color:#7f8fa6; } #rc-light .wf-exec-pass { color:#2e7d32; } #rc-light .wf-exec-pending { color:#b0b0b0; } #rc-light [data-completed="true"] { background:#e8f5e9; } #rc-light .wf-exec-reason { color:#999; } #rc-light .wf-parallel { border-color:#c8e6c9; background:#f8fdf8; } #rc-light .wf-branch-label { color:#2e7d32; } #rc-light .wf-branch-node { background:#fff; border-color:#dde1e6; color:#555; } #rc-light .wf-branch-done { background:#e8f5e9; border-color:#4caf50; color:#2e7d32; } #rc-light .wf-branch-active { background:#e3f2fd; border-color:#2a6bcf; color:#1a1a2e; font-weight:600; } #rc-light .wf-dot-router { background:#e65100; } #rc-light .wf-dot-fork { background:#2e7d32; } #rc-light .wf-target { border-color:#e65100; color:#795548; } #rc-light .wf-target-done { background:#fff3e0; color:#e65100; } #rc-light .wf-target-active { background:#fff3e0; border-color:#e65100; color:#e65100; font-weight:600; } #rc-light .mb-node { background:#fff; border-color:#dde1e6; color:#555; } #rc-light .mb-current { background:#e3f2fd; border-color:#2a6bcf; color:#1a1a2e; font-weight:700; } #rc-light .mb-done { background:#e8f5e9; border-color:#4caf50; color:#2e7d32; } #rc-light .mb-router { border-color:#e65100; } #rc-light .mb-router.mb-done { border-color:#4caf50; } #rc-light .mb-fork { border-color:#2e7d32; } #rc-light .mb-fork.mb-done { border-color:#4caf50; }'
                 ; document.head.appendChild(style); container = c;
         },
         update: function(state, msg, feedback) { _expDPage(container, state, msg, feedback, false); },
@@ -3826,15 +2520,15 @@ function _scopeFC(sel, css) { return css.replace(/\.fc-/g, sel + ' .fc-'); }
 (function() {
     var container;
     registerRenderer({
-        id: 'exp-d-verbose', label: 'Experimental - D', format: 'exp-d',
+        id: 'light-verbose', label: 'Simple', format: 'simple',
         verbosity: 'verbose', verbosity_label: 'Verbose', style: 'light', style_label: 'Light',
         init: function(c) {
             c.style.cssText = 'overflow-y:auto;padding:0;';
             var style = document.createElement('style');
             style.textContent = WF_STRUCTURAL_CSS + EXP_D_FC_CSS
-                + _scopeFC('#rc-exp-d-verbose', EXP_D_FC_LIGHT)
-                + '#rc-exp-d-verbose { background:#f5f5f5; color:#333; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
-                + '#rc-exp-d-verbose .wf-title { color:#1a1a2e; } #rc-exp-d-verbose .wf-banner { background:#f8f9fb; border-color:#e8e8e8; } #rc-exp-d-verbose .wf-dot { background:#dde1e6; color:#888; } #rc-exp-d-verbose .wf-step-label { color:#888; } #rc-exp-d-verbose .wf-step-active .wf-dot { background:#2a6bcf; color:#fff; } #rc-exp-d-verbose .wf-step-active .wf-step-label { color:#1a1a2e; font-weight:600; } #rc-exp-d-verbose .wf-step-done .wf-dot { background:#4caf50; color:#fff; } #rc-exp-d-verbose .wf-step-done .wf-step-label { color:#555; } #rc-exp-d-verbose .wf-conn { background:#dde1e6; } #rc-exp-d-verbose .wf-conn-active { background:#4caf50; } #rc-exp-d-verbose .wf-section-head { color:#1a1a2e; } #rc-exp-d-verbose .wf-desc { color:#666; } #rc-exp-d-verbose .wf-card { background:#fff; border-color:#e8e8e8; } #rc-exp-d-verbose .wf-card-head { color:#7f8fa6; } #rc-exp-d-verbose .wf-tbl td { border-bottom:1px solid #f0f0f0; } #rc-exp-d-verbose .wf-key { color:#7f8fa6; } #rc-exp-d-verbose .wf-val { color:#333; } #rc-exp-d-verbose .wf-null, #rc-exp-d-verbose .wf-empty-arr, #rc-exp-d-verbose .wf-empty-obj { color:#bbb; } #rc-exp-d-verbose .wf-bool, #rc-exp-d-verbose .wf-num { color:#2a6bcf; } #rc-exp-d-verbose .wf-str { color:#333; } #rc-exp-d-verbose .wf-arr-item { border-left-color:#e8e8e8; } #rc-exp-d-verbose .wf-field { border-bottom:1px solid #f0f0f0; } #rc-exp-d-verbose .wf-field-label { color:#555; } #rc-exp-d-verbose .wf-field-instruction { color:#999; } #rc-exp-d-verbose .wf-field-value { color:#333; } #rc-exp-d-verbose .wf-field-empty { color:#bbb; } #rc-exp-d-verbose .wf-field-options { color:#7f8fa6; } #rc-exp-d-verbose .wf-aff { background:#f8f9fb; border-color:#e8e8e8; } #rc-exp-d-verbose .wf-aff-id { background:#dde1e6; color:#555; } #rc-exp-d-verbose .wf-aff-label { color:#333; } #rc-exp-d-verbose .wf-aff-method { color:#7f8fa6; background:#eef1f5; } #rc-exp-d-verbose .wf-aff-detail { color:#999; } #rc-exp-d-verbose .wf-aff-options { color:#7f8fa6; } #rc-exp-d-verbose .wf-aff-primary { border-color:#2a6bcf; background:#f0f5ff; } #rc-exp-d-verbose .wf-aff-primary .wf-aff-label { color:#2a6bcf; font-weight:600; } #rc-exp-d-verbose .wf-aff-primary .wf-aff-id { background:#2a6bcf; color:#fff; } #rc-exp-d-verbose .wf-aff-nav { border-color:#dde1e6; background:#fafafa; } #rc-exp-d-verbose .wf-aff-nav .wf-aff-label { color:#888; } #rc-exp-d-verbose .wf-aff-selected { border-color:#4caf50; background:#f0fff0; } #rc-exp-d-verbose .wf-aff-selected .wf-aff-label { color:#2e7d32; } #rc-exp-d-verbose .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; } #rc-exp-d-verbose .wf-fb-outcome { border-left:3px solid #2a6bcf; background:#f0f5ff; } #rc-exp-d-verbose .wf-fb-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-exp-d-verbose .wf-fb-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-exp-d-verbose .wf-aff-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-exp-d-verbose .wf-aff-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-exp-d-verbose .wf-tag-outcome { color:#2a6bcf; } #rc-exp-d-verbose .wf-tag-new { color:#4caf50; } #rc-exp-d-verbose .wf-tag-modified { color:#e6a817; } #rc-exp-d-verbose .wf-table th { background:#f4f6f9; border-color:#e8e8e8; } #rc-exp-d-verbose .wf-table td { border-color:#e8e8e8; } #rc-exp-d-verbose .wf-table-rownum { color:#aaa; background:#fafbfc; } #rc-exp-d-verbose .wf-table-coltype { color:#7f8fa6; } #rc-exp-d-verbose .wf-table-empty { color:#bbb; } #rc-exp-d-verbose .wf-table-summary { color:#7f8fa6; } #rc-exp-d-verbose .wf-table-prop { color:#7f8fa6; } #rc-exp-d-verbose .wf-exec-pass { color:#2e7d32; } #rc-exp-d-verbose .wf-exec-pending { color:#b0b0b0; } #rc-exp-d-verbose [data-completed="true"] { background:#e8f5e9; } #rc-exp-d-verbose .wf-exec-reason { color:#999; }'
+                + _scopeFC('#rc-light-verbose', EXP_D_FC_LIGHT)
+                + '#rc-light-verbose { background:#f5f5f5; color:#333; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
+                + '#rc-light-verbose .wf-title { color:#1a1a2e; } #rc-light-verbose .wf-banner { background:#f8f9fb; border-color:#e8e8e8; } #rc-light-verbose .wf-dot { background:#dde1e6; color:#888; } #rc-light-verbose .wf-step-label { color:#888; } #rc-light-verbose .wf-step-active .wf-dot { background:#2a6bcf; color:#fff; } #rc-light-verbose .wf-step-active .wf-step-label { color:#1a1a2e; font-weight:600; } #rc-light-verbose .wf-step-done .wf-dot { background:#4caf50; color:#fff; } #rc-light-verbose .wf-step-done .wf-step-label { color:#555; } #rc-light-verbose .wf-conn { background:#dde1e6; } #rc-light-verbose .wf-conn-active { background:#4caf50; } #rc-light-verbose .wf-section-head { color:#1a1a2e; } #rc-light-verbose .wf-desc { color:#666; } #rc-light-verbose .wf-card { background:#fff; border-color:#e8e8e8; } #rc-light-verbose .wf-card-head { color:#7f8fa6; } #rc-light-verbose .wf-tbl td { border-bottom:1px solid #f0f0f0; } #rc-light-verbose .wf-key { color:#7f8fa6; } #rc-light-verbose .wf-val { color:#333; } #rc-light-verbose .wf-null, #rc-light-verbose .wf-empty-arr, #rc-light-verbose .wf-empty-obj { color:#bbb; } #rc-light-verbose .wf-bool, #rc-light-verbose .wf-num { color:#2a6bcf; } #rc-light-verbose .wf-str { color:#333; } #rc-light-verbose .wf-arr-item { border-left-color:#e8e8e8; } #rc-light-verbose .wf-field { border-bottom:1px solid #f0f0f0; } #rc-light-verbose .wf-field-label { color:#555; } #rc-light-verbose .wf-field-instruction { color:#999; } #rc-light-verbose .wf-field-value { color:#333; } #rc-light-verbose .wf-field-empty { color:#bbb; } #rc-light-verbose .wf-field-options { color:#7f8fa6; } #rc-light-verbose .wf-aff { background:#f8f9fb; border-color:#e8e8e8; } #rc-light-verbose .wf-aff-id { background:#dde1e6; color:#555; } #rc-light-verbose .wf-aff-label { color:#333; } #rc-light-verbose .wf-aff-method { color:#7f8fa6; background:#eef1f5; } #rc-light-verbose .wf-aff-detail { color:#999; } #rc-light-verbose .wf-aff-options { color:#7f8fa6; } #rc-light-verbose .wf-aff-primary { border-color:#2a6bcf; background:#f0f5ff; } #rc-light-verbose .wf-aff-primary .wf-aff-label { color:#2a6bcf; font-weight:600; } #rc-light-verbose .wf-aff-primary .wf-aff-id { background:#2a6bcf; color:#fff; } #rc-light-verbose .wf-aff-nav { border-color:#dde1e6; background:#fafafa; } #rc-light-verbose .wf-aff-nav .wf-aff-label { color:#888; } #rc-light-verbose .wf-aff-selected { border-color:#4caf50; background:#f0fff0; } #rc-light-verbose .wf-aff-selected .wf-aff-label { color:#2e7d32; } #rc-light-verbose .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; } #rc-light-verbose .wf-fb-outcome { border-left:3px solid #2a6bcf; background:#f0f5ff; } #rc-light-verbose .wf-fb-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-light-verbose .wf-fb-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-light-verbose .wf-aff-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-light-verbose .wf-aff-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-light-verbose .wf-tag-outcome { color:#2a6bcf; } #rc-light-verbose .wf-tag-new { color:#4caf50; } #rc-light-verbose .wf-tag-modified { color:#e6a817; } #rc-light-verbose .wf-table th { background:#f4f6f9; border-color:#e8e8e8; } #rc-light-verbose .wf-table td { border-color:#e8e8e8; } #rc-light-verbose .wf-table-rownum { color:#aaa; background:#fafbfc; } #rc-light-verbose .wf-table-coltype { color:#7f8fa6; } #rc-light-verbose .wf-table-empty { color:#bbb; } #rc-light-verbose .wf-table-summary { color:#7f8fa6; } #rc-light-verbose .wf-table-prop { color:#7f8fa6; } #rc-light-verbose .wf-exec-pass { color:#2e7d32; } #rc-light-verbose .wf-exec-pending { color:#b0b0b0; } #rc-light-verbose [data-completed="true"] { background:#e8f5e9; } #rc-light-verbose .wf-exec-reason { color:#999; }'
                 ; document.head.appendChild(style); container = c;
         },
         update: function(state, msg, feedback) { _expDPage(container, state, msg, feedback, true); },
@@ -3844,15 +2538,15 @@ function _scopeFC(sel, css) { return css.replace(/\.fc-/g, sel + ' .fc-'); }
 (function() {
     var container;
     registerRenderer({
-        id: 'exp-d-dark', label: 'Experimental - D', format: 'exp-d',
+        id: 'dark', label: 'Simple', format: 'simple',
         verbosity: 'default', verbosity_label: 'Default', style: 'dark', style_label: 'Dark',
         init: function(c) {
             c.style.cssText = 'overflow-y:auto;padding:0;';
             var style = document.createElement('style');
             style.textContent = WF_STRUCTURAL_CSS + EXP_D_FC_CSS
-                + _scopeFC('#rc-exp-d-dark', EXP_D_FC_DARK)
-                + '#rc-exp-d-dark { background:#0e0e0e; color:#c8c8c8; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
-                + '#rc-exp-d-dark .wf-title { color:#e0e0e0; } #rc-exp-d-dark .wf-banner { background:#1a1a1a; border-color:#2a2a2a; } #rc-exp-d-dark .wf-dot { background:#333; color:#888; } #rc-exp-d-dark .wf-step-label { color:#777; } #rc-exp-d-dark .wf-step-active .wf-dot { background:#4a9eff; color:#fff; } #rc-exp-d-dark .wf-step-active .wf-step-label { color:#e0e0e0; font-weight:600; } #rc-exp-d-dark .wf-step-done .wf-dot { background:#4caf50; color:#fff; } #rc-exp-d-dark .wf-step-done .wf-step-label { color:#888; } #rc-exp-d-dark .wf-conn { background:#333; } #rc-exp-d-dark .wf-conn-active { background:#4caf50; } #rc-exp-d-dark .wf-section-head { color:#e0e0e0; } #rc-exp-d-dark .wf-desc { color:#999; } #rc-exp-d-dark .wf-card { background:#141414; border-color:#2a2a2a; } #rc-exp-d-dark .wf-card-head { color:#666; } #rc-exp-d-dark .wf-tbl td { border-bottom:1px solid #1e1e1e; } #rc-exp-d-dark .wf-key { color:#666; } #rc-exp-d-dark .wf-val { color:#c8c8c8; } #rc-exp-d-dark .wf-null, #rc-exp-d-dark .wf-empty-arr, #rc-exp-d-dark .wf-empty-obj { color:#555; } #rc-exp-d-dark .wf-bool, #rc-exp-d-dark .wf-num { color:#4a9eff; } #rc-exp-d-dark .wf-str { color:#c8c8c8; } #rc-exp-d-dark .wf-arr-item { border-left-color:#2a2a2a; } #rc-exp-d-dark .wf-field { border-bottom:1px solid #1e1e1e; } #rc-exp-d-dark .wf-field-label { color:#999; } #rc-exp-d-dark .wf-field-instruction { color:#666; } #rc-exp-d-dark .wf-field-value { color:#c8c8c8; } #rc-exp-d-dark .wf-field-empty { color:#555; } #rc-exp-d-dark .wf-field-options { color:#666; } #rc-exp-d-dark .wf-aff { background:#1a1a1a; border-color:#2a2a2a; } #rc-exp-d-dark .wf-aff-id { background:#333; color:#aaa; } #rc-exp-d-dark .wf-aff-label { color:#c8c8c8; } #rc-exp-d-dark .wf-aff-method { color:#666; background:#1e1e1e; } #rc-exp-d-dark .wf-aff-detail { color:#555; } #rc-exp-d-dark .wf-aff-options { color:#666; } #rc-exp-d-dark .wf-aff-primary { border-color:#4a9eff; background:#0d1a2e; } #rc-exp-d-dark .wf-aff-primary .wf-aff-label { color:#4a9eff; font-weight:600; } #rc-exp-d-dark .wf-aff-primary .wf-aff-id { background:#4a9eff; color:#fff; } #rc-exp-d-dark .wf-aff-nav { border-color:#2a2a2a; background:#111; } #rc-exp-d-dark .wf-aff-nav .wf-aff-label { color:#666; } #rc-exp-d-dark .wf-aff-selected { border-color:#4caf50; background:#0d1a0d; } #rc-exp-d-dark .wf-aff-selected .wf-aff-label { color:#4caf50; } #rc-exp-d-dark .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; } #rc-exp-d-dark .wf-fb-outcome { border-left:3px solid #4a9eff; background:#0d1a2e; } #rc-exp-d-dark .wf-fb-new { border-left:3px solid #4caf50; background:#0d1a0d; } #rc-exp-d-dark .wf-fb-modified { border-left:3px solid #e6a817; background:#1a1500; } #rc-exp-d-dark .wf-aff-new { border-left:3px solid #4caf50; background:#0d1a0d; } #rc-exp-d-dark .wf-aff-modified { border-left:3px solid #e6a817; background:#1a1500; } #rc-exp-d-dark .wf-tag-outcome { color:#4a9eff; } #rc-exp-d-dark .wf-tag-new { color:#4caf50; } #rc-exp-d-dark .wf-tag-modified { color:#e6a817; } #rc-exp-d-dark .wf-table th { background:#1a1a1a; border-color:#2a2a2a; } #rc-exp-d-dark .wf-table td { border-color:#2a2a2a; } #rc-exp-d-dark .wf-table-rownum { color:#555; background:#141414; } #rc-exp-d-dark .wf-table-coltype { color:#666; } #rc-exp-d-dark .wf-table-empty { color:#555; } #rc-exp-d-dark .wf-table-summary { color:#666; } #rc-exp-d-dark .wf-table-prop { color:#666; } #rc-exp-d-dark .wf-exec-pass { color:#66bb6a; } #rc-exp-d-dark .wf-exec-pending { color:#666; } #rc-exp-d-dark [data-completed="true"] { background:#1b3a1b; } #rc-exp-d-dark .wf-exec-reason { color:#666; }'
+                + _scopeFC('#rc-dark', EXP_D_FC_DARK)
+                + '#rc-dark { background:#0e0e0e; color:#c8c8c8; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
+                + '#rc-dark .wf-title { color:#e0e0e0; } #rc-dark .wf-banner { background:#1a1a1a; border-color:#2a2a2a; } #rc-dark .wf-dot { background:#333; color:#888; } #rc-dark .wf-step-label { color:#777; } #rc-dark .wf-step-active .wf-dot { background:#4a9eff; color:#fff; } #rc-dark .wf-step-active .wf-step-label { color:#e0e0e0; font-weight:600; } #rc-dark .wf-step-done .wf-dot { background:#4caf50; color:#fff; } #rc-dark .wf-step-done .wf-step-label { color:#888; } #rc-dark .wf-conn { background:#333; } #rc-dark .wf-conn-active { background:#4caf50; } #rc-dark .wf-section-head { color:#e0e0e0; } #rc-dark .wf-desc { color:#999; } #rc-dark .wf-card { background:#141414; border-color:#2a2a2a; } #rc-dark .wf-card-head { color:#666; } #rc-dark .wf-tbl td { border-bottom:1px solid #1e1e1e; } #rc-dark .wf-key { color:#666; } #rc-dark .wf-val { color:#c8c8c8; } #rc-dark .wf-null, #rc-dark .wf-empty-arr, #rc-dark .wf-empty-obj { color:#555; } #rc-dark .wf-bool, #rc-dark .wf-num { color:#4a9eff; } #rc-dark .wf-str { color:#c8c8c8; } #rc-dark .wf-arr-item { border-left-color:#2a2a2a; } #rc-dark .wf-field { border-bottom:1px solid #1e1e1e; } #rc-dark .wf-field-label { color:#999; } #rc-dark .wf-field-instruction { color:#666; } #rc-dark .wf-field-value { color:#c8c8c8; } #rc-dark .wf-field-empty { color:#555; } #rc-dark .wf-field-options { color:#666; } #rc-dark .wf-aff { background:#1a1a1a; border-color:#2a2a2a; } #rc-dark .wf-aff-id { background:#333; color:#aaa; } #rc-dark .wf-aff-label { color:#c8c8c8; } #rc-dark .wf-aff-method { color:#666; background:#1e1e1e; } #rc-dark .wf-aff-detail { color:#555; } #rc-dark .wf-aff-options { color:#666; } #rc-dark .wf-aff-primary { border-color:#4a9eff; background:#0d1a2e; } #rc-dark .wf-aff-primary .wf-aff-label { color:#4a9eff; font-weight:600; } #rc-dark .wf-aff-primary .wf-aff-id { background:#4a9eff; color:#fff; } #rc-dark .wf-aff-nav { border-color:#2a2a2a; background:#111; } #rc-dark .wf-aff-nav .wf-aff-label { color:#666; } #rc-dark .wf-aff-selected { border-color:#4caf50; background:#0d1a0d; } #rc-dark .wf-aff-selected .wf-aff-label { color:#4caf50; } #rc-dark .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; } #rc-dark .wf-fb-outcome { border-left:3px solid #4a9eff; background:#0d1a2e; } #rc-dark .wf-fb-new { border-left:3px solid #4caf50; background:#0d1a0d; } #rc-dark .wf-fb-modified { border-left:3px solid #e6a817; background:#1a1500; } #rc-dark .wf-aff-new { border-left:3px solid #4caf50; background:#0d1a0d; } #rc-dark .wf-aff-modified { border-left:3px solid #e6a817; background:#1a1500; } #rc-dark .wf-tag-outcome { color:#4a9eff; } #rc-dark .wf-tag-new { color:#4caf50; } #rc-dark .wf-tag-modified { color:#e6a817; } #rc-dark .wf-table th { background:#1a1a1a; border-color:#2a2a2a; } #rc-dark .wf-table td { border-color:#2a2a2a; } #rc-dark .wf-table-rownum { color:#555; background:#141414; } #rc-dark .wf-table-coltype { color:#666; } #rc-dark .wf-table-empty { color:#555; } #rc-dark .wf-table-summary { color:#666; } #rc-dark .wf-table-prop { color:#666; } #rc-dark .wf-exec-pass { color:#66bb6a; } #rc-dark .wf-exec-pending { color:#666; } #rc-dark [data-completed="true"] { background:#1b3a1b; } #rc-dark .wf-exec-reason { color:#666; }'
                 ; document.head.appendChild(style); container = c;
         },
         update: function(state, msg, feedback) { _expDPage(container, state, msg, feedback, false); },
@@ -3862,15 +2556,15 @@ function _scopeFC(sel, css) { return css.replace(/\.fc-/g, sel + ' .fc-'); }
 (function() {
     var container;
     registerRenderer({
-        id: 'exp-d-dark-verbose', label: 'Experimental - D', format: 'exp-d',
+        id: 'dark-verbose', label: 'Simple', format: 'simple',
         verbosity: 'verbose', verbosity_label: 'Verbose', style: 'dark', style_label: 'Dark',
         init: function(c) {
             c.style.cssText = 'overflow-y:auto;padding:0;';
             var style = document.createElement('style');
             style.textContent = WF_STRUCTURAL_CSS + EXP_D_FC_CSS
-                + _scopeFC('#rc-exp-d-dark-verbose', EXP_D_FC_DARK)
-                + '#rc-exp-d-dark-verbose { background:#0e0e0e; color:#c8c8c8; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
-                + '#rc-exp-d-dark-verbose .wf-title { color:#e0e0e0; } #rc-exp-d-dark-verbose .wf-banner { background:#1a1a1a; border-color:#2a2a2a; } #rc-exp-d-dark-verbose .wf-dot { background:#333; color:#888; } #rc-exp-d-dark-verbose .wf-step-label { color:#777; } #rc-exp-d-dark-verbose .wf-step-active .wf-dot { background:#4a9eff; color:#fff; } #rc-exp-d-dark-verbose .wf-step-active .wf-step-label { color:#e0e0e0; font-weight:600; } #rc-exp-d-dark-verbose .wf-step-done .wf-dot { background:#4caf50; color:#fff; } #rc-exp-d-dark-verbose .wf-step-done .wf-step-label { color:#888; } #rc-exp-d-dark-verbose .wf-conn { background:#333; } #rc-exp-d-dark-verbose .wf-conn-active { background:#4caf50; } #rc-exp-d-dark-verbose .wf-section-head { color:#e0e0e0; } #rc-exp-d-dark-verbose .wf-desc { color:#999; } #rc-exp-d-dark-verbose .wf-card { background:#141414; border-color:#2a2a2a; } #rc-exp-d-dark-verbose .wf-card-head { color:#666; } #rc-exp-d-dark-verbose .wf-tbl td { border-bottom:1px solid #1e1e1e; } #rc-exp-d-dark-verbose .wf-key { color:#666; } #rc-exp-d-dark-verbose .wf-val { color:#c8c8c8; } #rc-exp-d-dark-verbose .wf-null, #rc-exp-d-dark-verbose .wf-empty-arr, #rc-exp-d-dark-verbose .wf-empty-obj { color:#555; } #rc-exp-d-dark-verbose .wf-bool, #rc-exp-d-dark-verbose .wf-num { color:#4a9eff; } #rc-exp-d-dark-verbose .wf-str { color:#c8c8c8; } #rc-exp-d-dark-verbose .wf-arr-item { border-left-color:#2a2a2a; } #rc-exp-d-dark-verbose .wf-field { border-bottom:1px solid #1e1e1e; } #rc-exp-d-dark-verbose .wf-field-label { color:#999; } #rc-exp-d-dark-verbose .wf-field-instruction { color:#666; } #rc-exp-d-dark-verbose .wf-field-value { color:#c8c8c8; } #rc-exp-d-dark-verbose .wf-field-empty { color:#555; } #rc-exp-d-dark-verbose .wf-field-options { color:#666; } #rc-exp-d-dark-verbose .wf-aff { background:#1a1a1a; border-color:#2a2a2a; } #rc-exp-d-dark-verbose .wf-aff-id { background:#333; color:#aaa; } #rc-exp-d-dark-verbose .wf-aff-label { color:#c8c8c8; } #rc-exp-d-dark-verbose .wf-aff-method { color:#666; background:#1e1e1e; } #rc-exp-d-dark-verbose .wf-aff-detail { color:#555; } #rc-exp-d-dark-verbose .wf-aff-options { color:#666; } #rc-exp-d-dark-verbose .wf-aff-primary { border-color:#4a9eff; background:#0d1a2e; } #rc-exp-d-dark-verbose .wf-aff-primary .wf-aff-label { color:#4a9eff; font-weight:600; } #rc-exp-d-dark-verbose .wf-aff-primary .wf-aff-id { background:#4a9eff; color:#fff; } #rc-exp-d-dark-verbose .wf-aff-nav { border-color:#2a2a2a; background:#111; } #rc-exp-d-dark-verbose .wf-aff-nav .wf-aff-label { color:#666; } #rc-exp-d-dark-verbose .wf-aff-selected { border-color:#4caf50; background:#0d1a0d; } #rc-exp-d-dark-verbose .wf-aff-selected .wf-aff-label { color:#4caf50; } #rc-exp-d-dark-verbose .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; } #rc-exp-d-dark-verbose .wf-fb-outcome { border-left:3px solid #4a9eff; background:#0d1a2e; } #rc-exp-d-dark-verbose .wf-fb-new { border-left:3px solid #4caf50; background:#0d1a0d; } #rc-exp-d-dark-verbose .wf-fb-modified { border-left:3px solid #e6a817; background:#1a1500; } #rc-exp-d-dark-verbose .wf-aff-new { border-left:3px solid #4caf50; background:#0d1a0d; } #rc-exp-d-dark-verbose .wf-aff-modified { border-left:3px solid #e6a817; background:#1a1500; } #rc-exp-d-dark-verbose .wf-tag-outcome { color:#4a9eff; } #rc-exp-d-dark-verbose .wf-tag-new { color:#4caf50; } #rc-exp-d-dark-verbose .wf-tag-modified { color:#e6a817; } #rc-exp-d-dark-verbose .wf-table th { background:#1a1a1a; border-color:#2a2a2a; } #rc-exp-d-dark-verbose .wf-table td { border-color:#2a2a2a; } #rc-exp-d-dark-verbose .wf-table-rownum { color:#555; background:#141414; } #rc-exp-d-dark-verbose .wf-table-coltype { color:#666; } #rc-exp-d-dark-verbose .wf-table-empty { color:#555; } #rc-exp-d-dark-verbose .wf-table-summary { color:#666; } #rc-exp-d-dark-verbose .wf-table-prop { color:#666; } #rc-exp-d-dark-verbose .wf-exec-pass { color:#66bb6a; } #rc-exp-d-dark-verbose .wf-exec-pending { color:#666; } #rc-exp-d-dark-verbose [data-completed="true"] { background:#1b3a1b; } #rc-exp-d-dark-verbose .wf-exec-reason { color:#666; }'
+                + _scopeFC('#rc-dark-verbose', EXP_D_FC_DARK)
+                + '#rc-dark-verbose { background:#0e0e0e; color:#c8c8c8; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
+                + '#rc-dark-verbose .wf-title { color:#e0e0e0; } #rc-dark-verbose .wf-banner { background:#1a1a1a; border-color:#2a2a2a; } #rc-dark-verbose .wf-dot { background:#333; color:#888; } #rc-dark-verbose .wf-step-label { color:#777; } #rc-dark-verbose .wf-step-active .wf-dot { background:#4a9eff; color:#fff; } #rc-dark-verbose .wf-step-active .wf-step-label { color:#e0e0e0; font-weight:600; } #rc-dark-verbose .wf-step-done .wf-dot { background:#4caf50; color:#fff; } #rc-dark-verbose .wf-step-done .wf-step-label { color:#888; } #rc-dark-verbose .wf-conn { background:#333; } #rc-dark-verbose .wf-conn-active { background:#4caf50; } #rc-dark-verbose .wf-section-head { color:#e0e0e0; } #rc-dark-verbose .wf-desc { color:#999; } #rc-dark-verbose .wf-card { background:#141414; border-color:#2a2a2a; } #rc-dark-verbose .wf-card-head { color:#666; } #rc-dark-verbose .wf-tbl td { border-bottom:1px solid #1e1e1e; } #rc-dark-verbose .wf-key { color:#666; } #rc-dark-verbose .wf-val { color:#c8c8c8; } #rc-dark-verbose .wf-null, #rc-dark-verbose .wf-empty-arr, #rc-dark-verbose .wf-empty-obj { color:#555; } #rc-dark-verbose .wf-bool, #rc-dark-verbose .wf-num { color:#4a9eff; } #rc-dark-verbose .wf-str { color:#c8c8c8; } #rc-dark-verbose .wf-arr-item { border-left-color:#2a2a2a; } #rc-dark-verbose .wf-field { border-bottom:1px solid #1e1e1e; } #rc-dark-verbose .wf-field-label { color:#999; } #rc-dark-verbose .wf-field-instruction { color:#666; } #rc-dark-verbose .wf-field-value { color:#c8c8c8; } #rc-dark-verbose .wf-field-empty { color:#555; } #rc-dark-verbose .wf-field-options { color:#666; } #rc-dark-verbose .wf-aff { background:#1a1a1a; border-color:#2a2a2a; } #rc-dark-verbose .wf-aff-id { background:#333; color:#aaa; } #rc-dark-verbose .wf-aff-label { color:#c8c8c8; } #rc-dark-verbose .wf-aff-method { color:#666; background:#1e1e1e; } #rc-dark-verbose .wf-aff-detail { color:#555; } #rc-dark-verbose .wf-aff-options { color:#666; } #rc-dark-verbose .wf-aff-primary { border-color:#4a9eff; background:#0d1a2e; } #rc-dark-verbose .wf-aff-primary .wf-aff-label { color:#4a9eff; font-weight:600; } #rc-dark-verbose .wf-aff-primary .wf-aff-id { background:#4a9eff; color:#fff; } #rc-dark-verbose .wf-aff-nav { border-color:#2a2a2a; background:#111; } #rc-dark-verbose .wf-aff-nav .wf-aff-label { color:#666; } #rc-dark-verbose .wf-aff-selected { border-color:#4caf50; background:#0d1a0d; } #rc-dark-verbose .wf-aff-selected .wf-aff-label { color:#4caf50; } #rc-dark-verbose .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; } #rc-dark-verbose .wf-fb-outcome { border-left:3px solid #4a9eff; background:#0d1a2e; } #rc-dark-verbose .wf-fb-new { border-left:3px solid #4caf50; background:#0d1a0d; } #rc-dark-verbose .wf-fb-modified { border-left:3px solid #e6a817; background:#1a1500; } #rc-dark-verbose .wf-aff-new { border-left:3px solid #4caf50; background:#0d1a0d; } #rc-dark-verbose .wf-aff-modified { border-left:3px solid #e6a817; background:#1a1500; } #rc-dark-verbose .wf-tag-outcome { color:#4a9eff; } #rc-dark-verbose .wf-tag-new { color:#4caf50; } #rc-dark-verbose .wf-tag-modified { color:#e6a817; } #rc-dark-verbose .wf-table th { background:#1a1a1a; border-color:#2a2a2a; } #rc-dark-verbose .wf-table td { border-color:#2a2a2a; } #rc-dark-verbose .wf-table-rownum { color:#555; background:#141414; } #rc-dark-verbose .wf-table-coltype { color:#666; } #rc-dark-verbose .wf-table-empty { color:#555; } #rc-dark-verbose .wf-table-summary { color:#666; } #rc-dark-verbose .wf-table-prop { color:#666; } #rc-dark-verbose .wf-exec-pass { color:#66bb6a; } #rc-dark-verbose .wf-exec-pending { color:#666; } #rc-dark-verbose [data-completed="true"] { background:#1b3a1b; } #rc-dark-verbose .wf-exec-reason { color:#666; }'
                 ; document.head.appendChild(style); container = c;
         },
         update: function(state, msg, feedback) { _expDPage(container, state, msg, feedback, true); },
@@ -3878,47 +2572,818 @@ function _scopeFC(sel, css) { return css.replace(/\.fc-/g, sel + ' .fc-'); }
     });
 })();
 
-
 /* ======================================================================
-   SCHEMATIC RENDERER (exp-e) — canvas-based spine model layout
+   RENDERER: EXPERIMENTAL A — two-column blueprint layout
    ====================================================================== */
 (function() {
     var container;
+
+    function expARenderPage(c, state, msg, feedback) {
+        if (!c || !state) return;
+
+        var fieldCategory = {};
+        var affCategory = {};
+        if (feedback) {
+            var out = feedback.outcome || {};
+            var eff = feedback.effects || {};
+            for (var k in out) fieldCategory[k] = 'outcome';
+            for (var k in (eff.new_fields || {})) fieldCategory[k] = 'new';
+            for (var k in (eff.modified_fields || {})) fieldCategory[k] = 'modified';
+            (eff.new_affordances || []).forEach(function(a){ affCategory[a.label] = 'new'; });
+            (eff.modified_affordances || []).forEach(function(a){ affCategory[a.label] = 'modified'; });
+        }
+
+        var s = state.state || {};
+        var html = '';
+
+        /* ── Top bar: workflow title + node as breadcrumb ── */
+        html += '<div class="ex-topbar">';
+        html += '<span class="ex-crumb">' + wfEsc(s.workflow || 'Workflow') + '</span>';
+        html += '<span class="ex-sep">&rsaquo;</span>';
+        html += '<span class="ex-crumb ex-crumb-active">' + wfEsc(s.node_title || s.node) + '</span>';
+        html += '</div>';
+
+        /* ── Progress breadcrumb ── */
+        var lifecycle = s.lifecycle || [];
+        var current = s.lifecycle_current || '';
+        var completed = s.lifecycle_completed || [];
+        if (lifecycle.length) {
+            html += '<div class="ex-progress">';
+            for (var i = 0; i < lifecycle.length; i++) {
+                var label = lifecycle[i];
+                var isCurrent = label === current;
+                var isDone = completed.indexOf(label) !== -1;
+                if (i > 0) html += '<span class="ex-arrow">&rarr;</span>';
+                var cls = 'ex-phase';
+                if (isCurrent) cls += ' ex-phase-current';
+                else if (isDone) cls += ' ex-phase-done';
+                html += '<span class="' + cls + '">' + wfEsc(label) + '</span>';
+            }
+            html += '</div>';
+        }
+
+        /* ── Instructions ── */
+        if (state.instructions) {
+            html += '<div class="ex-instructions">' + wfEsc(state.instructions) + '</div>';
+        }
+
+        html += wfRenderStateProps(state);
+
+        /* ── Table (if present) ── */
+        if (s.execution_table) {
+            html += wfRenderExecTable(s.execution_table);
+        } else if (s.table) {
+            html += wfRenderTable(s.table);
+        }
+
+        /* ── Two-column body ── */
+        html += '<div class="ex-columns">';
+
+        /* Left column: fields */
+        html += '<div class="ex-col ex-col-fields">';
+        html += '<div class="ex-col-head">state.fields</div>';
+        if (s.fields) {
+            var fkeys = Object.keys(s.fields);
+            if (fkeys.length) {
+                html += '<table class="ex-ftable"><thead><tr>';
+                html += '<th>Field</th><th>Value</th><th>Options</th><th>Status</th>';
+                html += '</tr></thead><tbody>';
+                for (var i = 0; i < fkeys.length; i++) {
+                    var k = fkeys[i];
+                    var f = s.fields[k];
+                    var cat = fieldCategory[k] || null;
+                    var rowCls = cat ? ' ex-row-' + cat : '';
+                    html += '<tr class="' + rowCls + '">';
+                    html += '<td class="ex-fname">' + wfEsc(k) + '</td>';
+                    if (f && typeof f === 'object' && 'value' in f) {
+                        html += '<td class="ex-fval">';
+                        if (f.value == null) html += '<span class="ex-unset">—</span>';
+                        else html += wfEsc(f.value);
+                        if (f.instruction) html += '<div class="ex-finstr">' + wfEsc(f.instruction) + '</div>';
+                        html += '</td>';
+                        html += '<td class="ex-fopts">';
+                        if (f.options) html += wfEsc(f.options.join(', '));
+                        html += '</td>';
+                    } else {
+                        html += '<td class="ex-fval">' + wfRenderValue(f) + '</td>';
+                        html += '<td class="ex-fopts"></td>';
+                    }
+                    var tagMap = {outcome:'SET', 'new':'NEW', modified:'CHG'};
+                    html += '<td class="ex-fstatus">';
+                    if (cat) html += '<span class="ex-tag ex-tag-' + cat + '">' + tagMap[cat] + '</span>';
+                    html += '</td>';
+                    html += '</tr>';
+                }
+                html += '</tbody></table>';
+            } else {
+                html += '<span class="ex-empty">(empty)</span>';
+            }
+        } else {
+            html += '<span class="ex-empty">(no fields)</span>';
+        }
+        html += '</div>';
+
+        /* Right column: affordances */
+        html += '<div class="ex-col ex-col-affs">';
+        html += '<div class="ex-col-head">affordances</div>';
+        if (state.affordances && state.affordances.length) {
+            html += '<div class="ex-aff-grid">';
+            for (var i = 0; i < state.affordances.length; i++) {
+                var a = state.affordances[i];
+                var cls = 'ex-aff';
+                if (/Proceed|Submit/.test(a.label)) cls += ' ex-aff-primary';
+                else if (/Go back/.test(a.label)) cls += ' ex-aff-nav';
+                else if (/\[Selected\]/.test(a.label)) cls += ' ex-aff-selected';
+                if (affCategory[a.label]) cls += ' ex-aff-fb-' + affCategory[a.label];
+                html += '<div class="' + cls + '">';
+                html += '<div class="ex-aff-head">';
+                html += '<span class="ex-aff-idx">' + a.id + '</span>';
+                html += '<span class="ex-aff-lbl">' + wfEsc(a.label);
+                var ac = affCategory[a.label];
+                if (ac === 'new') html += ' <span class="ex-tag ex-tag-new">NEW</span>';
+                else if (ac === 'modified') html += ' <span class="ex-tag ex-tag-modified">CHG</span>';
+                html += '</span>';
+                html += '</div>';
+                html += '<div class="ex-aff-meta">';
+                html += '<span class="ex-aff-verb">' + wfEsc(a.method) + '</span> ';
+                html += '<span class="ex-aff-url">' + wfEsc(a.url) + '</span>';
+                html += '</div>';
+                html += '<div class="ex-aff-body">' + wfEsc(JSON.stringify(a.body)) + '</div>';
+                var pStr = wfRenderParams(a);
+                if (pStr) {
+                    html += '<div class="ex-aff-opts">' + wfEsc(pStr) + '</div>';
+                }
+                html += '</div>';
+            }
+            html += '</div>';
+        } else {
+            html += '<span class="ex-empty">(none)</span>';
+        }
+        html += '</div>';
+
+        html += '</div>'; /* close ex-columns */
+
+        c.innerHTML = html;
+    }
+
+    var EXP_CSS = ''
+        /* Container */
+        + '#rc-exp-a { background:#0b1622; color:#b0c4d8; font-family:Consolas,Monaco,"Courier New",monospace; overflow-y:auto; padding:0; }'
+
+        /* Top bar */
+        + '#rc-exp-a .ex-topbar { display:flex; align-items:center; gap:0.4rem; padding:0.8rem 1.2rem 0.3rem; border-bottom:1px dashed #1e3a5f; }'
+        + '#rc-exp-a .ex-crumb { font-size:0.9rem; color:#4a7a9b; }'
+        + '#rc-exp-a .ex-crumb-active { color:#7fdbff; font-weight:700; }'
+        + '#rc-exp-a .ex-sep { color:#2a4a6b; font-size:1rem; }'
+
+        /* Progress breadcrumb */
+        + '#rc-exp-a .ex-progress { display:flex; align-items:center; gap:0.3rem; padding:0.5rem 1.2rem; flex-wrap:wrap; }'
+        + '#rc-exp-a .ex-phase { font-size:0.72rem; padding:0.2rem 0.5rem; border:1px solid #1e3a5f; border-radius:2px; color:#4a7a9b; background:#0d1e30; }'
+        + '#rc-exp-a .ex-phase-current { border-color:#7fdbff; color:#7fdbff; background:#0d2a40; box-shadow:0 0 6px rgba(127,219,255,0.15); }'
+        + '#rc-exp-a .ex-phase-done { border-color:#2ecc71; color:#2ecc71; background:#0d2a1a; }'
+        + '#rc-exp-a .ex-arrow { color:#1e3a5f; font-size:0.8rem; }'
+
+        /* Instructions */
+        + '#rc-exp-a .ex-instructions { padding:0.4rem 1.2rem 0.6rem; font-size:0.82rem; color:#6a8fa8; line-height:1.5; border-bottom:1px dashed #1e3a5f; font-style:italic; white-space:pre-line; }'
+
+        /* Two-column layout */
+        + '#rc-exp-a .ex-columns { display:flex; gap:0; min-height:0; }'
+        + '#rc-exp-a .ex-col { flex:1; padding:0.6rem 0.8rem; }'
+        + '#rc-exp-a .ex-col-fields { border-right:1px dashed #1e3a5f; }'
+        + '#rc-exp-a .ex-col-head { font-size:0.68rem; text-transform:uppercase; letter-spacing:0.1em; color:#3a6a8f; margin-bottom:0.5rem; padding-bottom:0.25rem; border-bottom:1px solid #1e3a5f; }'
+
+        /* Fields table */
+        + '#rc-exp-a .ex-ftable { width:100%; border-collapse:collapse; font-size:0.78rem; }'
+        + '#rc-exp-a .ex-ftable th { text-align:left; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.08em; color:#3a6a8f; padding:0.3rem 0.4rem; border-bottom:1px solid #1e3a5f; font-weight:500; }'
+        + '#rc-exp-a .ex-ftable td { padding:0.35rem 0.4rem; border-bottom:1px solid #0f2236; vertical-align:top; }'
+        + '#rc-exp-a .ex-fname { color:#7fdbff; white-space:nowrap; font-weight:600; width:120px; }'
+        + '#rc-exp-a .ex-fval { color:#b0c4d8; word-break:break-word; }'
+        + '#rc-exp-a .ex-unset { color:#2a4a6b; }'
+        + '#rc-exp-a .ex-finstr { font-size:0.7rem; color:#4a6a80; font-style:italic; margin-top:0.15rem; }'
+        + '#rc-exp-a .ex-fopts { color:#4a6a80; font-size:0.72rem; }'
+        + '#rc-exp-a .ex-fstatus { width:40px; text-align:center; }'
+        + '#rc-exp-a .ex-empty { color:#2a4a6b; font-style:italic; font-size:0.8rem; }'
+
+        /* Feedback row highlights */
+        + '#rc-exp-a .ex-row-outcome { background:rgba(127,219,255,0.06); }'
+        + '#rc-exp-a .ex-row-new { background:rgba(46,204,113,0.06); }'
+        + '#rc-exp-a .ex-row-modified { background:rgba(230,168,23,0.06); }'
+
+        /* Tags */
+        + '#rc-exp-a .ex-tag { font-size:0.6rem; font-weight:700; letter-spacing:0.06em; padding:0.1rem 0.3rem; border-radius:2px; }'
+        + '#rc-exp-a .ex-tag-outcome { color:#7fdbff; background:rgba(127,219,255,0.12); }'
+        + '#rc-exp-a .ex-tag-new { color:#2ecc71; background:rgba(46,204,113,0.12); }'
+        + '#rc-exp-a .ex-tag-modified { color:#e6a817; background:rgba(230,168,23,0.12); }'
+
+        /* Affordance grid */
+        + '#rc-exp-a .ex-aff-grid { display:grid; grid-template-columns:1fr; gap:0.4rem; }'
+        + '#rc-exp-a .ex-aff { border:1px solid #1e3a5f; border-radius:3px; padding:0.4rem 0.5rem; background:#0d1e30; }'
+        + '#rc-exp-a .ex-aff-head { display:flex; align-items:center; gap:0.4rem; }'
+        + '#rc-exp-a .ex-aff-idx { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:2px; font-size:0.65rem; font-weight:700; background:#1e3a5f; color:#7fdbff; flex-shrink:0; }'
+        + '#rc-exp-a .ex-aff-lbl { font-size:0.8rem; color:#b0c4d8; }'
+        + '#rc-exp-a .ex-aff-meta { font-size:0.68rem; margin-top:0.2rem; }'
+        + '#rc-exp-a .ex-aff-verb { color:#3a6a8f; font-weight:600; }'
+        + '#rc-exp-a .ex-aff-url { color:#4a7a9b; }'
+        + '#rc-exp-a .ex-aff-body { font-size:0.68rem; color:#3a5a70; margin-top:0.1rem; word-break:break-all; }'
+        + '#rc-exp-a .ex-aff-opts { font-size:0.68rem; color:#3a5a70; margin-top:0.1rem; }'
+
+        /* Affordance variants */
+        + '#rc-exp-a .ex-aff-primary { border-color:#7fdbff; background:#0d2a40; box-shadow:0 0 8px rgba(127,219,255,0.08); }'
+        + '#rc-exp-a .ex-aff-primary .ex-aff-lbl { color:#7fdbff; font-weight:700; }'
+        + '#rc-exp-a .ex-aff-primary .ex-aff-idx { background:#7fdbff; color:#0b1622; }'
+        + '#rc-exp-a .ex-aff-nav { border-color:#1e3a5f; background:#0b1622; border-style:dashed; }'
+        + '#rc-exp-a .ex-aff-nav .ex-aff-lbl { color:#4a6a80; }'
+        + '#rc-exp-a .ex-aff-selected { border-color:#2ecc71; background:#0d2a1a; }'
+        + '#rc-exp-a .ex-aff-selected .ex-aff-lbl { color:#2ecc71; }'
+        + '#rc-exp-a .ex-aff-selected .ex-aff-idx { background:#2ecc71; color:#0b1622; }'
+        + '#rc-exp-a .ex-aff-fb-new { border-left:3px solid #2ecc71; }'
+        + '#rc-exp-a .ex-aff-fb-modified { border-left:3px solid #e6a817; }'
+
+        /* Value types (reused from shared wfRenderValue) */
+        + '#rc-exp-a .wf-null, #rc-exp-a .wf-empty-arr, #rc-exp-a .wf-empty-obj { color:#2a4a6b; font-style:italic; font-size:0.75rem; }'
+        + '#rc-exp-a .wf-bool, #rc-exp-a .wf-num { color:#7fdbff; }'
+        + '#rc-exp-a .wf-str { color:#b0c4d8; }'
+        + '#rc-exp-a .wf-tbl { width:100%; border-collapse:collapse; }'
+        + '#rc-exp-a .wf-tbl td { padding:0.2rem 0.3rem; font-size:0.75rem; border-bottom:1px solid #0f2236; }'
+        + '#rc-exp-a .wf-key { color:#4a7a9b; font-weight:500; width:100px; }'
+        + '#rc-exp-a .wf-val { color:#b0c4d8; }'
+        + '#rc-exp-a .wf-arr { display:flex; flex-direction:column; gap:0.1rem; }'
+        + '#rc-exp-a .wf-arr-item { padding-left:0.4rem; border-left:2px solid #1e3a5f; }'
+        + '#rc-exp-a .wf-table th { background:#0d1e30; border-color:#1e3a5f; color:#7fdbff; }'
+        + '#rc-exp-a .wf-table td { border-color:#1e3a5f; }'
+        + '#rc-exp-a .wf-table-rownum { color:#3a6a8f; background:#0b1622; }'
+        + '#rc-exp-a .wf-table-coltype { color:#3a6a8f; }'
+        + '#rc-exp-a .wf-table-empty { color:#2a4a6b; }'
+        + '#rc-exp-a .wf-table-summary { color:#3a6a8f; }'
+        + '#rc-exp-a .wf-table-prop { color:#3a6a8f; }'
+        ;
+
     registerRenderer({
-        id: 'exp-e', label: 'Schematic', format: 'schematic',
-        style: 'light', style_label: 'Light',
+        id: 'exp-a',
+        label: 'Experimental - A',
+        format: 'exp-a',
         init: function(c) {
-            c.style.cssText = 'overflow:auto;padding:0;background:#fafbfc;';
+            c.style.cssText = 'overflow-y:auto;padding:0;';
+            var style = document.createElement('style');
+            style.textContent = EXP_CSS;
+            document.head.appendChild(style);
             container = c;
         },
-        update: function(state, msg, feedback) {
-            if (!state || !state.state) return;
-            var s = state.state;
-            var defn = s.definition;
-            if (!defn || !defn.nodes || !defn.nodes.length) return;
-
-            try {
-                var spine = Schematic.definitionToSpine(defn);
-                var execState = {
-                    current: s.node || s.lifecycle_current || null,
-                    completed: s.completed_nodes || s.lifecycle_completed || []
-                };
-                var graphDiv = document.createElement('div');
-                container.innerHTML = '';
-                container.appendChild(graphDiv);
-                Schematic.renderHybrid(spine, graphDiv, execState, {
-                    nodeRenderer: _pillNodeRenderer
-                });
-            } catch (e) {
-                container.innerHTML = '<pre style="color:red;padding:1rem;">Schematic error: ' + e.message + '\n' + e.stack + '</pre>';
-            }
-        },
+        update: function(state, msg, feedback) { expARenderPage(container, state, msg, feedback); },
         activate: function() {},
         deactivate: function() {}
     });
 })();
 
+/* ======================================================================
+   RENDERER: EXPERIMENTAL B — card grid layout
+   ====================================================================== */
+(function() {
+    var container;
 
+    function expBRenderPage(c, state, msg, feedback) {
+        if (!c || !state) return;
+
+        var fieldCategory = {};
+        var affCategory = {};
+        if (feedback) {
+            var out = feedback.outcome || {};
+            var eff = feedback.effects || {};
+            for (var k in out) fieldCategory[k] = 'outcome';
+            for (var k in (eff.new_fields || {})) fieldCategory[k] = 'new';
+            for (var k in (eff.modified_fields || {})) fieldCategory[k] = 'modified';
+            (eff.new_affordances || []).forEach(function(a){ affCategory[a.label] = 'new'; });
+            (eff.modified_affordances || []).forEach(function(a){ affCategory[a.label] = 'modified'; });
+        }
+
+        var s = state.state || {};
+        var html = '';
+
+        /* ── Header with filled progress bar ── */
+        var lifecycle = s.lifecycle || [];
+        var current = s.lifecycle_current || '';
+        var completed = s.lifecycle_completed || [];
+        var progressCount = completed.length + (current && completed.indexOf(current) === -1 ? 1 : 0);
+        var pct = lifecycle.length ? Math.round((progressCount / lifecycle.length) * 100) : 0;
+
+        html += '<div class="gb-header">';
+        html += '<div class="gb-title">' + wfEsc(s.workflow || 'Workflow') + '</div>';
+        html += '<div class="gb-node">' + wfEsc(s.node_title || s.node) + '</div>';
+        html += '</div>';
+
+        if (lifecycle.length) {
+            html += '<div class="gb-bar-wrap">';
+            html += '<div class="gb-bar-track">';
+            html += '<div class="gb-bar-fill" style="width:' + Math.max(pct, 4) + '%"></div>';
+            html += '</div>';
+            html += '<div class="gb-bar-labels">';
+            for (var i = 0; i < lifecycle.length; i++) {
+                var isCurrent = lifecycle[i] === current;
+                var isDone = completed.indexOf(lifecycle[i]) !== -1;
+                html += '<span class="gb-bar-lbl' + (isCurrent ? ' gb-bar-lbl-cur' : '') + (isDone ? ' gb-bar-lbl-done' : '') + '">' + wfEsc(lifecycle[i]) + '</span>';
+            }
+            html += '</div>';
+            html += '</div>';
+        }
+
+        if (state.instructions) {
+            html += '<div class="gb-instr">' + wfEsc(state.instructions) + '</div>';
+        }
+
+        /* ── Table (if present) ── */
+        if (s.execution_table) {
+            html += wfRenderExecTable(s.execution_table);
+        } else if (s.table) {
+            html += wfRenderTable(s.table);
+        }
+
+        /* ── Field cards in a grid ── */
+        if (s.fields) {
+            html += '<div class="gb-section-label">state.fields</div>';
+            var fkeys = Object.keys(s.fields);
+            if (fkeys.length) {
+                html += '<div class="gb-grid">';
+                for (var i = 0; i < fkeys.length; i++) {
+                    var k = fkeys[i];
+                    var f = s.fields[k];
+                    var cat = fieldCategory[k] || null;
+                    var cls = 'gb-fcard' + (cat ? ' gb-fc-' + cat : '');
+                    html += '<div class="' + cls + '">';
+                    var tagMap = {outcome:'SET', 'new':'NEW', modified:'CHG'};
+                    html += '<div class="gb-fc-head">';
+                    html += '<span class="gb-fc-name">' + wfEsc(k) + '</span>';
+                    if (cat) html += '<span class="gb-tag gb-tag-' + cat + '">' + tagMap[cat] + '</span>';
+                    html += '</div>';
+                    if (f && typeof f === 'object' && 'value' in f) {
+                        if (f.instruction) html += '<div class="gb-fc-instr">' + wfEsc(f.instruction) + '</div>';
+                        if (f.value == null) html += '<div class="gb-fc-val gb-fc-empty">not set</div>';
+                        else html += '<div class="gb-fc-val">' + wfEsc(f.value) + '</div>';
+                        if (f.options) html += '<div class="gb-fc-opts">' + wfEsc(f.options.join(' | ')) + '</div>';
+                    } else {
+                        html += '<div class="gb-fc-val">' + wfRenderValue(f) + '</div>';
+                    }
+                    html += '</div>';
+                }
+                html += '</div>';
+            } else {
+                html += '<div class="gb-empty">(empty)</div>';
+            }
+        }
+
+        /* ── Extra state (generic) ── */
+        html += wfRenderStateProps(state);
+
+        /* ── Affordances as pill toolbar ── */
+        if (state.affordances && state.affordances.length) {
+            html += '<div class="gb-section-label">affordances</div>';
+            html += '<div class="gb-toolbar">';
+            for (var i = 0; i < state.affordances.length; i++) {
+                var a = state.affordances[i];
+                var cls = 'gb-pill';
+                if (/Proceed|Submit/.test(a.label)) cls += ' gb-pill-primary';
+                else if (/Go back/.test(a.label)) cls += ' gb-pill-nav';
+                else if (/\[Selected\]/.test(a.label)) cls += ' gb-pill-selected';
+                var ac = affCategory[a.label];
+                if (ac) cls += ' gb-pill-fb-' + ac;
+                html += '<div class="' + cls + '">';
+                html += '<span class="gb-pill-id">' + a.id + '</span>';
+                html += '<span class="gb-pill-label">' + wfEsc(a.label);
+                if (ac === 'new') html += ' <span class="gb-tag gb-tag-new">NEW</span>';
+                else if (ac === 'modified') html += ' <span class="gb-tag gb-tag-modified">CHG</span>';
+                html += '</span>';
+                html += '<div class="gb-pill-detail">';
+                html += '<span class="gb-pill-method">' + wfEsc(a.method) + '</span> ';
+                html += wfEsc(a.url) + ' ' + wfEsc(JSON.stringify(a.body));
+                html += '</div>';
+                var pStr = wfRenderParams(a);
+                if (pStr) html += '<div class="gb-pill-opts">' + wfEsc(pStr) + '</div>';
+                html += '</div>';
+            }
+            html += '</div>';
+        }
+
+        c.innerHTML = html;
+    }
+
+    var EXP_B_CSS = ''
+        + '#rc-exp-b { background:#1a1226; color:#d4c8e8; font-family:"Segoe UI",Roboto,sans-serif; overflow-y:auto; padding:0; }'
+        + '#rc-exp-b .gb-header { padding:1rem 1.2rem 0.3rem; }'
+        + '#rc-exp-b .gb-title { font-size:0.78rem; text-transform:uppercase; letter-spacing:0.12em; color:#8b6cc1; }'
+        + '#rc-exp-b .gb-node { font-size:1.3rem; font-weight:700; color:#e8ddf5; margin-top:0.15rem; }'
+
+        + '#rc-exp-b .gb-bar-wrap { padding:0.5rem 1.2rem; }'
+        + '#rc-exp-b .gb-bar-track { height:6px; background:#2a1e3e; border-radius:3px; overflow:hidden; }'
+        + '#rc-exp-b .gb-bar-fill { height:100%; background:linear-gradient(90deg,#8b6cc1,#c084fc); border-radius:3px; transition:width 0.3s; }'
+        + '#rc-exp-b .gb-bar-labels { display:flex; justify-content:space-between; margin-top:0.3rem; }'
+        + '#rc-exp-b .gb-bar-lbl { font-size:0.62rem; color:#5a4a70; }'
+        + '#rc-exp-b .gb-bar-lbl-cur { color:#c084fc; font-weight:700; }'
+        + '#rc-exp-b .gb-bar-lbl-done { color:#8b6cc1; }'
+
+        + '#rc-exp-b .gb-instr { padding:0.3rem 1.2rem 0.6rem; font-size:0.82rem; color:#9a8ab0; line-height:1.5; white-space:pre-line; }'
+
+        + '#rc-exp-b .gb-section-label { padding:0.3rem 1.2rem; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.1em; color:#5a4a70; }'
+
+        + '#rc-exp-b .gb-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; padding:0.3rem 1.2rem 0.8rem; }'
+        + '#rc-exp-b .gb-fcard { background:#221a33; border:1px solid #2e2444; border-radius:8px; padding:0.6rem 0.7rem; display:flex; flex-direction:column; gap:0.2rem; }'
+        + '#rc-exp-b .gb-fc-head { display:flex; align-items:center; justify-content:space-between; }'
+        + '#rc-exp-b .gb-fc-name { font-size:0.78rem; font-weight:600; color:#c084fc; }'
+        + '#rc-exp-b .gb-fc-instr { font-size:0.7rem; color:#6a5a80; font-style:italic; }'
+        + '#rc-exp-b .gb-fc-val { font-size:0.85rem; color:#d4c8e8; }'
+        + '#rc-exp-b .gb-fc-empty { color:#4a3a60; font-style:italic; }'
+        + '#rc-exp-b .gb-fc-opts { font-size:0.68rem; color:#6a5a80; font-family:Consolas,monospace; }'
+
+        + '#rc-exp-b .gb-fc-outcome { border-left:3px solid #8b6cc1; background:#251d38; }'
+        + '#rc-exp-b .gb-fc-new { border-left:3px solid #4caf50; background:#1a2a1a; }'
+        + '#rc-exp-b .gb-fc-modified { border-left:3px solid #e6a817; background:#2a2210; }'
+
+        + '#rc-exp-b .gb-tag { font-size:0.55rem; font-weight:700; letter-spacing:0.06em; padding:0.1rem 0.3rem; border-radius:3px; }'
+        + '#rc-exp-b .gb-tag-outcome { color:#c084fc; background:rgba(192,132,252,0.15); }'
+        + '#rc-exp-b .gb-tag-new { color:#4caf50; background:rgba(76,175,80,0.15); }'
+        + '#rc-exp-b .gb-tag-modified { color:#e6a817; background:rgba(230,168,23,0.15); }'
+
+        + '#rc-exp-b .gb-toolbar { display:flex; flex-direction:column; gap:0.35rem; padding:0.3rem 1.2rem 1rem; }'
+        + '#rc-exp-b .gb-pill { display:flex; flex-wrap:wrap; align-items:center; gap:0.4rem; padding:0.5rem 0.7rem; background:#221a33; border:1px solid #2e2444; border-radius:20px; }'
+        + '#rc-exp-b .gb-pill-id { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; font-size:0.65rem; font-weight:700; background:#2e2444; color:#8b6cc1; flex-shrink:0; }'
+        + '#rc-exp-b .gb-pill-label { font-size:0.82rem; color:#d4c8e8; flex:1; }'
+        + '#rc-exp-b .gb-pill-detail { width:100%; font-size:0.65rem; color:#5a4a70; font-family:Consolas,monospace; padding-left:1.8rem; word-break:break-all; }'
+        + '#rc-exp-b .gb-pill-method { font-weight:600; color:#6a5a80; }'
+        + '#rc-exp-b .gb-pill-opts { width:100%; font-size:0.65rem; color:#5a4a70; font-family:Consolas,monospace; padding-left:1.8rem; }'
+
+        + '#rc-exp-b .gb-pill-primary { border-color:#8b6cc1; background:#251d38; }'
+        + '#rc-exp-b .gb-pill-primary .gb-pill-label { color:#c084fc; font-weight:700; }'
+        + '#rc-exp-b .gb-pill-primary .gb-pill-id { background:#8b6cc1; color:#fff; }'
+        + '#rc-exp-b .gb-pill-nav { border-style:dashed; border-color:#2e2444; }'
+        + '#rc-exp-b .gb-pill-nav .gb-pill-label { color:#6a5a80; }'
+        + '#rc-exp-b .gb-pill-selected { border-color:#4caf50; background:#1a2a1a; }'
+        + '#rc-exp-b .gb-pill-selected .gb-pill-label { color:#4caf50; }'
+        + '#rc-exp-b .gb-pill-selected .gb-pill-id { background:#4caf50; color:#fff; }'
+        + '#rc-exp-b .gb-pill-fb-new { border-left:3px solid #4caf50; }'
+        + '#rc-exp-b .gb-pill-fb-modified { border-left:3px solid #e6a817; }'
+
+        + '#rc-exp-b .gb-empty { padding:0.5rem 1.2rem; color:#4a3a60; font-style:italic; font-size:0.8rem; }'
+
+        + '#rc-exp-b .wf-null, #rc-exp-b .wf-empty-arr, #rc-exp-b .wf-empty-obj { color:#4a3a60; font-style:italic; font-size:0.8rem; }'
+        + '#rc-exp-b .wf-bool, #rc-exp-b .wf-num { color:#c084fc; }'
+        + '#rc-exp-b .wf-str { color:#d4c8e8; }'
+        + '#rc-exp-b .wf-tbl { width:100%; border-collapse:collapse; }'
+        + '#rc-exp-b .wf-tbl td { padding:0.2rem 0.3rem; font-size:0.78rem; border-bottom:1px solid #2e2444; }'
+        + '#rc-exp-b .wf-key { color:#8b6cc1; font-weight:500; }'
+        + '#rc-exp-b .wf-val { color:#d4c8e8; }'
+        + '#rc-exp-b .wf-arr { display:flex; flex-direction:column; gap:0.1rem; }'
+        + '#rc-exp-b .wf-arr-item { padding-left:0.4rem; border-left:2px solid #2e2444; }'
+        + '#rc-exp-b .wf-table th { background:#221a33; border-color:#2e2444; color:#c084fc; }'
+        + '#rc-exp-b .wf-table td { border-color:#2e2444; }'
+        + '#rc-exp-b .wf-table-rownum { color:#5a4a70; background:#1a1226; }'
+        + '#rc-exp-b .wf-table-coltype { color:#6a5a80; }'
+        + '#rc-exp-b .wf-table-empty { color:#4a3a60; }'
+        + '#rc-exp-b .wf-table-summary { color:#6a5a80; }'
+        + '#rc-exp-b .wf-table-prop { color:#6a5a80; }'
+        ;
+
+    registerRenderer({
+        id: 'exp-b',
+        label: 'Experimental - B',
+        format: 'exp-b',
+        init: function(c) {
+            c.style.cssText = 'overflow-y:auto;padding:0;';
+            var style = document.createElement('style');
+            style.textContent = EXP_B_CSS;
+            document.head.appendChild(style);
+            container = c;
+        },
+        update: function(state, msg, feedback) { expBRenderPage(container, state, msg, feedback); },
+        activate: function() {},
+        deactivate: function() {}
+    });
+})();
+
+/* ======================================================================
+   RENDERER: EXPERIMENTAL C — tree outline
+   ====================================================================== */
+(function() {
+    var container;
+
+    function treeVal(v, indent) {
+        var pfx = indent;
+        if (v == null) return pfx + '(null)\n';
+        if (typeof v === 'boolean' || typeof v === 'number') return pfx + String(v) + '\n';
+        if (typeof v === 'string') return pfx + '"' + v.replace(/"/g, '\\"') + '"\n';
+        if (Array.isArray(v)) {
+            if (!v.length) return pfx + '(empty list)\n';
+            var out = '';
+            for (var i = 0; i < v.length; i++) {
+                var isLast = i === v.length - 1;
+                var branch = isLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
+                var childPfx = indent + (isLast ? '   ' : '\u2502  ');
+                if (typeof v[i] === 'object' && v[i] !== null) {
+                    out += indent + branch + '[' + i + ']\n';
+                    out += treeObj(v[i], childPfx);
+                } else {
+                    out += indent + branch + treeVal(v[i], '').trim() + '\n';
+                }
+            }
+            return out;
+        }
+        if (typeof v === 'object') return '\n' + treeObj(v, indent);
+        return pfx + String(v) + '\n';
+    }
+
+    function treeObj(obj, indent) {
+        var keys = Object.keys(obj);
+        if (!keys.length) return indent + '(empty)\n';
+        var out = '';
+        for (var i = 0; i < keys.length; i++) {
+            var k = keys[i];
+            var isLast = i === keys.length - 1;
+            var branch = isLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
+            var childPfx = indent + (isLast ? '   ' : '\u2502  ');
+            var val = obj[k];
+            if (val && typeof val === 'object' && !Array.isArray(val)) {
+                out += indent + branch + k + '\n';
+                out += treeObj(val, childPfx);
+            } else if (Array.isArray(val)) {
+                out += indent + branch + k + '\n';
+                out += treeVal(val, childPfx);
+            } else {
+                out += indent + branch + k + ': ' + treeVal(val, '').trim() + '\n';
+            }
+        }
+        return out;
+    }
+
+    function expCRenderPage(c, state, msg, feedback) {
+        if (!c || !state) return;
+
+        var fieldCategory = {};
+        var affCategory = {};
+        if (feedback) {
+            var out = feedback.outcome || {};
+            var eff = feedback.effects || {};
+            for (var k in out) fieldCategory[k] = 'outcome';
+            for (var k in (eff.new_fields || {})) fieldCategory[k] = 'new';
+            for (var k in (eff.modified_fields || {})) fieldCategory[k] = 'modified';
+            (eff.new_affordances || []).forEach(function(a){ affCategory[a.label] = 'new'; });
+            (eff.modified_affordances || []).forEach(function(a){ affCategory[a.label] = 'modified'; });
+        }
+
+        var s = state.state || {};
+        var lines = [];
+
+        /* Root */
+        lines.push('<span class="tc-root">' + wfEsc(s.workflow || 'Workflow') + '</span>');
+
+        /* Lifecycle */
+        var lifecycle = s.lifecycle || [];
+        var current = s.lifecycle_current || '';
+        var completed = s.lifecycle_completed || [];
+        if (lifecycle.length) {
+            lines.push('\u251c\u2500 <span class="tc-key">lifecycle</span>');
+            for (var i = 0; i < lifecycle.length; i++) {
+                var label = lifecycle[i];
+                var isLast = i === lifecycle.length - 1;
+                var branch = isLast ? '   \u2514\u2500 ' : '   \u251c\u2500 ';
+                var cls = 'tc-phase';
+                if (label === current) cls = 'tc-phase-cur';
+                else if (completed.indexOf(label) !== -1) cls = 'tc-phase-done';
+                lines.push(branch + '<span class="' + cls + '">' + wfEsc(label) + '</span>');
+            }
+        }
+
+        /* Node (node_title rendered here; node raw ID and completed_nodes rendered by lifecycle above) */
+        lines.push('\u251c\u2500 <span class="tc-key">node</span>: <span class="tc-node">' + wfEsc(s.node_title || s.node) + '</span>');
+
+        /* Instructions */
+        if (state.instructions) {
+            lines.push('\u251c\u2500 <span class="tc-key">instructions</span>: <span class="tc-str">' + wfEsc(state.instructions) + '</span>');
+        }
+
+        /* Fields */
+        if (s.fields) {
+            var fkeys = Object.keys(s.fields);
+            var hasMore = s.table || (state.affordances && state.affordances.length);
+            var fieldBranch = hasMore ? '\u251c\u2500 ' : '\u2514\u2500 ';
+            var fieldCont = hasMore ? '\u2502  ' : '   ';
+            lines.push(fieldBranch + '<span class="tc-key">state.fields</span>');
+            if (fkeys.length) {
+                for (var i = 0; i < fkeys.length; i++) {
+                    var k = fkeys[i];
+                    var f = s.fields[k];
+                    var isLast = i === fkeys.length - 1;
+                    var fb = isLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
+                    var fc = isLast ? '   ' : '\u2502  ';
+                    var cat = fieldCategory[k] || null;
+                    var tagStr = '';
+                    var tagMap = {outcome:'SET', 'new':'NEW', modified:'CHG'};
+                    if (cat) tagStr = ' <span class="tc-tag tc-tag-' + cat + '">[' + tagMap[cat] + ']</span>';
+                    lines.push(fieldCont + fb + '<span class="tc-fname' + (cat ? ' tc-f-' + cat : '') + '">' + wfEsc(k) + '</span>' + tagStr);
+                    if (f && typeof f === 'object' && 'value' in f) {
+                        var subPfx = fieldCont + fc;
+                        var subParts = [];
+                        if (f.value == null) subParts.push('value: <span class="tc-null">(not set)</span>');
+                        else subParts.push('value: <span class="tc-str">' + wfEsc(f.value) + '</span>');
+                        if (f.instruction) subParts.push('instruction: <span class="tc-instr">' + wfEsc(f.instruction) + '</span>');
+                        if (f.options) subParts.push('options: <span class="tc-opts">' + wfEsc(f.options.join(', ')) + '</span>');
+                        for (var j = 0; j < subParts.length; j++) {
+                            var sIsLast = j === subParts.length - 1;
+                            lines.push(subPfx + (sIsLast ? '\u2514\u2500 ' : '\u251c\u2500 ') + subParts[j]);
+                        }
+                    } else {
+                        lines.push(fieldCont + fc + '\u2514\u2500 ' + treeVal(f, '').trim());
+                    }
+                }
+            } else {
+                lines.push(fieldCont + '\u2514\u2500 <span class="tc-null">(empty)</span>');
+            }
+        }
+
+        /* Table — prefer execution_table during execution, fall back to construction table */
+        var showExec = !!s.execution_table;
+        var tblData = showExec ? s.execution_table : s.table;
+        if (tblData) {
+            var hasAffs = state.affordances && state.affordances.length;
+            var tblBranch = hasAffs ? '\u251c\u2500 ' : '\u2514\u2500 ';
+            var tblCont = hasAffs ? '\u2502  ' : '   ';
+            var tblKey = showExec ? 'state.execution_table' : 'state.table';
+            lines.push(tblBranch + '<span class="tc-key">' + tblKey + '</span>');
+
+            if (showExec) {
+                /* Execution table: rows are objects with cells, acceptance, gating */
+                var etCols = tblData.columns || [];
+                var etRows = tblData.rows || [];
+                lines.push(tblCont + '\u251c\u2500 <span class="tc-key">columns</span>');
+                for (var ci = 0; ci < etCols.length; ci++) {
+                    var cLast = ci === etCols.length - 1;
+                    var colExtra = '';
+                    if (etCols[ci].choices) colExtra += ' choices=' + JSON.stringify(etCols[ci].choices);
+                    if (etCols[ci].rule) colExtra += ' rule=' + wfRuleToExpr(etCols[ci].rule, etCols);
+                    lines.push(tblCont + '\u2502  ' + (cLast ? '\u2514\u2500 ' : '\u251c\u2500 ') + '<span class="tc-fname">' + wfEsc(etCols[ci].name) + '</span> <span class="tc-opts">(' + wfEsc(etCols[ci].type) + ')</span>' + (colExtra ? ' <span class="tc-opts">' + wfEsc(colExtra) + '</span>' : ''));
+                }
+                if (!etCols.length) lines.push(tblCont + '\u2502  \u2514\u2500 <span class="tc-null">(none)</span>');
+                lines.push(tblCont + '\u2514\u2500 <span class="tc-key">rows</span> (' + etRows.length + ')');
+                for (var ri = 0; ri < etRows.length; ri++) {
+                    var rLast = ri === etRows.length - 1;
+                    var rb = rLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
+                    var rc = rLast ? '   ' : '\u2502  ';
+                    var r = etRows[ri];
+                    var acc = r.acceptance || {};
+                    var gTag = r.gated ? ' <span class="tc-null">[gated:true]</span>' : '';
+                    var aTag = acc.passed ? ' <span class="tc-f-new">[acceptance.passed:true]</span>' : ' <span class="tc-null">[acceptance.passed:false]</span>';
+                    lines.push(tblCont + '   ' + rb + '<span class="tc-fname">' + wfEsc(r.row_id || 'row ' + r.row) + '</span>' + gTag + aTag);
+                    if (r.gated_by && r.gated_by.length) {
+                        lines.push(tblCont + '   ' + rc + '\u251c\u2500 <span class="tc-key">gated_by</span>: <span class="tc-str">' + wfEsc(JSON.stringify(r.gated_by)) + '</span>');
+                    }
+                    if (acc.reason) {
+                        lines.push(tblCont + '   ' + rc + '\u251c\u2500 <span class="tc-key">acceptance.reason</span>: <span class="tc-str">' + wfEsc(acc.reason) + '</span>');
+                    }
+                    var cells = r.cells || [];
+                    for (var ci2 = 0; ci2 < cells.length; ci2++) {
+                        var cLast2 = ci2 === cells.length - 1;
+                        var cell = cells[ci2];
+                        var dv = cell.display_value || '';
+                        var statusTag = '<span class="tc-opts">[' + (cell.status || '?') + ']</span>';
+                        var cellLine = wfEsc(cell.column_name) + ' <span class="tc-opts">(' + wfEsc(cell.column_type) + ')</span> ' + statusTag + ': ' + (dv ? '<span class="tc-str">' + wfEsc(dv) + '</span>' : '<span class="tc-null">\u2014</span>');
+                        if (cell.value && cell.value !== cell.display_value) cellLine += ' <span class="tc-opts">value=' + wfEsc(cell.value) + '</span>';
+                        if (cell.available_actions && cell.available_actions.length) cellLine += ' <span class="tc-opts">actions=' + wfEsc(JSON.stringify(cell.available_actions)) + '</span>';
+                        if (cell.locked_reason) cellLine += ' <span class="tc-opts">locked_reason=' + wfEsc(cell.locked_reason) + '</span>';
+                        lines.push(tblCont + '   ' + rc + (cLast2 ? '\u2514\u2500 ' : '\u251c\u2500 ') + cellLine);
+                    }
+                }
+                if (!etRows.length) lines.push(tblCont + '   \u2514\u2500 <span class="tc-null">(none)</span>');
+            } else {
+                /* Construction table: rows are flat arrays */
+                var tbl = tblData;
+                var cols = tbl.columns || [];
+                var rows = tbl.rows || [];
+                if (tbl.summary) {
+                    lines.push(tblCont + '\u251c\u2500 summary: <span class="tc-str">' + wfEsc(tbl.summary) + '</span>');
+                }
+                lines.push(tblCont + '\u251c\u2500 <span class="tc-key">columns</span>');
+                for (var ci = 0; ci < cols.length; ci++) {
+                    var cLast = ci === cols.length - 1;
+                    var cb = cLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
+                    var cExtra = '';
+                    if (cols[ci].choices) cExtra += ' choices=' + JSON.stringify(cols[ci].choices);
+                    if (cols[ci].rule) cExtra += ' rule=' + wfRuleToExpr(cols[ci].rule, cols);
+                    lines.push(tblCont + '\u2502  ' + cb + '<span class="tc-fname">' + wfEsc(cols[ci].name) + '</span> <span class="tc-opts">(' + wfEsc(cols[ci].type) + ')</span>' + (cExtra ? ' <span class="tc-opts">' + wfEsc(cExtra) + '</span>' : ''));
+                }
+                if (!cols.length) lines.push(tblCont + '\u2502  \u2514\u2500 <span class="tc-null">(none)</span>');
+                var hasProps = tbl.properties && Object.keys(tbl.properties).length;
+                var rowBranch = hasProps ? '\u251c\u2500 ' : '\u2514\u2500 ';
+                lines.push(tblCont + rowBranch + '<span class="tc-key">rows</span> (' + rows.length + ')');
+                for (var ri = 0; ri < rows.length; ri++) {
+                    var rLast = ri === rows.length - 1;
+                    var rb = rLast ? '\u2514\u2500 ' : '\u251c\u2500 ';
+                    var rc = rLast ? '   ' : '\u2502  ';
+                    var rowPfx = tblCont + (hasProps ? '\u2502  ' : '   ');
+                    lines.push(rowPfx + rb + '<span class="tc-fname">row ' + ri + '</span>');
+                    for (var ci2 = 0; ci2 < rows[ri].length; ci2++) {
+                        var cLast2 = ci2 === rows[ri].length - 1;
+                        var cn = cols[ci2] ? cols[ci2].name : 'col-' + ci2;
+                        var cv = rows[ri][ci2];
+                        lines.push(rowPfx + rc + (cLast2 ? '\u2514\u2500 ' : '\u251c\u2500 ') + wfEsc(cn) + ': ' + (cv ? '<span class="tc-str">' + wfEsc(cv) + '</span>' : '<span class="tc-null">\u2014</span>'));
+                    }
+                }
+                if (!rows.length) lines.push(tblCont + (hasProps ? '\u2502  ' : '   ') + '\u2514\u2500 <span class="tc-null">(none)</span>');
+                if (hasProps) {
+                    lines.push(tblCont + '\u2514\u2500 <span class="tc-key">properties</span>');
+                    var pk = Object.keys(tbl.properties);
+                    for (var pi = 0; pi < pk.length; pi++) {
+                        var pLast = pi === pk.length - 1;
+                        lines.push(tblCont + '   ' + (pLast ? '\u2514\u2500 ' : '\u251c\u2500 ') + wfEsc(pk[pi]) + ': <span class="tc-str">' + wfEsc(String(tbl.properties[pk[pi]])) + '</span>');
+                    }
+                }
+            }
+        }
+
+        /* Extra state keys (generic rendering for unknown keys) */
+        var extraProps = wfRenderStateProps(state);
+        if (extraProps) {
+            lines.push('\u251c\u2500 <span class="tc-key">(extra state)</span>');
+            lines.push('   ' + extraProps.replace(/<[^>]+>/g, '').substring(0, 200));
+        }
+
+        /* Affordances */
+        if (state.affordances && state.affordances.length) {
+            lines.push('\u2514\u2500 <span class="tc-key">affordances</span>');
+            for (var i = 0; i < state.affordances.length; i++) {
+                var a = state.affordances[i];
+                var isLast = i === state.affordances.length - 1;
+                var ab = isLast ? '   \u2514\u2500 ' : '   \u251c\u2500 ';
+                var ac2 = isLast ? '      ' : '   \u2502  ';
+                var acCat = affCategory[a.label] || null;
+                var acTag = '';
+                if (acCat === 'new') acTag = ' <span class="tc-tag tc-tag-new">[NEW]</span>';
+                else if (acCat === 'modified') acTag = ' <span class="tc-tag tc-tag-modified">[CHG]</span>';
+                var affCls = 'tc-aff';
+                if (/Proceed|Submit/.test(a.label)) affCls += ' tc-aff-primary';
+                else if (/Go back/.test(a.label)) affCls += ' tc-aff-nav';
+                else if (/\[Selected\]/.test(a.label)) affCls += ' tc-aff-selected';
+                lines.push(ab + '<span class="tc-aff-id">[' + a.id + ']</span> <span class="' + affCls + '">' + wfEsc(a.label) + '</span>' + acTag);
+                lines.push(ac2 + '\u251c\u2500 <span class="tc-aff-m">' + wfEsc(a.method) + '</span> <span class="tc-aff-url">' + wfEsc(a.url) + '</span>');
+                var pStr = wfRenderParams(a);
+                var bodyLine = ac2 + (pStr ? '\u251c\u2500 ' : '\u2514\u2500 ') + 'body: <span class="tc-aff-body">' + wfEsc(JSON.stringify(a.body)) + '</span>';
+                lines.push(bodyLine);
+                if (pStr) {
+                    lines.push(ac2 + '\u2514\u2500 <span class="tc-opts">' + wfEsc(pStr) + '</span>');
+                }
+            }
+        }
+
+        c.querySelector('.tc-content').innerHTML = lines.join('\n');
+    }
+
+    var EXP_C_CSS = ''
+        + '#rc-exp-c { background:#0a100a; color:#88b888; font-family:Consolas,"Courier New",monospace; overflow-y:auto; padding:0.8rem 1rem; }'
+        + '#rc-exp-c .tc-content { white-space:pre; line-height:1.6; font-size:0.82rem; }'
+        + '#rc-exp-c .tc-root { font-size:1rem; font-weight:700; color:#50fa7b; }'
+        + '#rc-exp-c .tc-key { color:#6abf6a; font-weight:600; }'
+        + '#rc-exp-c .tc-node { color:#f1fa8c; font-weight:600; }'
+        + '#rc-exp-c .tc-phase { color:#4a6a4a; }'
+        + '#rc-exp-c .tc-phase-cur { color:#50fa7b; font-weight:700; text-decoration:underline; }'
+        + '#rc-exp-c .tc-phase-done { color:#6abf6a; }'
+        + '#rc-exp-c .tc-str { color:#c8e8c8; }'
+        + '#rc-exp-c .tc-null { color:#4a6a4a; font-style:italic; }'
+        + '#rc-exp-c .tc-instr { color:#6a8a6a; font-style:italic; }'
+        + '#rc-exp-c .tc-opts { color:#6a8a6a; }'
+        + '#rc-exp-c .tc-fname { color:#8be88b; font-weight:600; }'
+        + '#rc-exp-c .tc-f-outcome { color:#6abf6a; }'
+        + '#rc-exp-c .tc-f-new { color:#50fa7b; }'
+        + '#rc-exp-c .tc-f-modified { color:#f1fa8c; }'
+        + '#rc-exp-c .tc-tag { font-size:0.7em; font-weight:700; }'
+        + '#rc-exp-c .tc-tag-outcome { color:#6abf6a; }'
+        + '#rc-exp-c .tc-tag-new { color:#50fa7b; }'
+        + '#rc-exp-c .tc-tag-modified { color:#f1fa8c; }'
+        + '#rc-exp-c .tc-aff-id { color:#50fa7b; font-weight:700; }'
+        + '#rc-exp-c .tc-aff { color:#88b888; }'
+        + '#rc-exp-c .tc-aff-primary { color:#50fa7b; font-weight:700; }'
+        + '#rc-exp-c .tc-aff-nav { color:#4a6a4a; }'
+        + '#rc-exp-c .tc-aff-selected { color:#8be88b; text-decoration:underline; }'
+        + '#rc-exp-c .tc-aff-m { color:#6abf6a; font-weight:600; }'
+        + '#rc-exp-c .tc-aff-url { color:#88b888; }'
+        + '#rc-exp-c .tc-aff-body { color:#6a8a6a; }'
+        ;
+
+    registerRenderer({
+        id: 'exp-c',
+        label: 'Experimental - C',
+        format: 'exp-c',
+        init: function(c) {
+            c.style.cssText = 'overflow-y:auto;padding:0;';
+            var style = document.createElement('style');
+            style.textContent = EXP_C_CSS;
+            document.head.appendChild(style);
+            var pre = document.createElement('pre');
+            pre.className = 'tc-content';
+            c.appendChild(pre);
+            container = c;
+        },
+        update: function(state, msg, feedback) { expCRenderPage(container, state, msg, feedback); },
+        activate: function() {},
+        deactivate: function() {}
+    });
+})();
+
+/* ======================================================================
 /* ======================================================================
    SSE CONNECTION
    ====================================================================== */

@@ -482,7 +482,7 @@ def _compute_feedback(before: dict, after: dict, acted_label: str = None) -> dic
 # -- Workflow registry --
 # Each entry maps a workflow_id to its handler module and display metadata.
 
-_ALL_RENDERERS = ["raw", "light", "dark", "light-verbose", "dark-verbose", "exp-a", "exp-b", "exp-c", "exp-d", "exp-d-verbose", "exp-d-dark", "exp-d-dark-verbose", "exp-e"]
+_ALL_RENDERERS = ["raw", "light", "light-verbose", "dark", "dark-verbose", "exp-a", "exp-b", "exp-c"]
 _CUSTOM_WORKFLOWS_DIR = DATA_DIR / "custom_workflows"
 _CUSTOM_WORKFLOWS_DIR.mkdir(exist_ok=True)
 
