@@ -1263,7 +1263,7 @@ function setSpineHeights(spineArr, heightMap) {
 
 var _cssInjected = false;
 var _CSS = ''
-  + '.sch-node-wrap { z-index:2; position:relative; }'
+  + '.sch-node-wrap { z-index:2; position:relative; display:flex; }'
   + '.sch-node-wrap::after { content:""; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(128,0,255,0.25); z-index:999; pointer-events:none; }'
   + '.sch-cond-wrap { z-index:2; position:relative; }'
   + '.sch-cond-wrap::after { content:""; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(128,0,255,0.25); z-index:999; pointer-events:none; }'
@@ -1336,7 +1336,9 @@ function renderHybrid(spine, container, execState, opts) {
     }
   })(spine);
 
-  // Phase 1: Measure — render each node into a hidden container
+  // Phase 1: Measure — render each node into a hidden container.
+  // Use display:flex on the wrapper to match the render context and
+  // eliminate inline formatting artifacts (strut, baseline gaps).
   var measurer = document.createElement('div');
   measurer.style.cssText = 'position:absolute;left:-9999px;top:-9999px;visibility:hidden;'
     + (nodeW ? 'width:' + nodeW + 'px;' : '');
@@ -1350,7 +1352,9 @@ function renderHybrid(spine, container, execState, opts) {
     var status = _nodeStatus({ id: nid }, execState);
     var html = nodeRenderer({ id: nid, kind: info.kind, type: info.type, title: info.title }, status);
     var mDiv = document.createElement('div');
-    if (!nodeW) mDiv.style.display = 'inline-block';  // shrink-wrap for natural width
+    // display:inline-flex shrink-wraps both dimensions and eliminates
+    // the inline strut that causes height discrepancies vs positioned divs
+    mDiv.style.display = 'inline-flex';
     mDiv.innerHTML = html;
     measurer.appendChild(mDiv);
     heightMap[nid] = mDiv.offsetHeight;
