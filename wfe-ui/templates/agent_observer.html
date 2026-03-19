@@ -3418,8 +3418,8 @@ function connect() {
 /* ── Boot ── */
 /* Build hierarchical mode toggle from registered renderers */
 buildModeToggle();
-/* Default to the format of the last declared renderer */
-var bootId = allowedRenderers[allowedRenderers.length - 1] || 'raw';
+/* Default to the first renderer after raw */
+var bootId = (allowedRenderers.length > 1 ? allowedRenderers[1] : allowedRenderers[0]) || 'raw';
 var bootRenderer = renderers[bootId];
 if (bootRenderer && bootRenderer.format) {
     selectFormat(bootRenderer.format);
