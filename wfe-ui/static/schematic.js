@@ -306,7 +306,7 @@ function flattenSpine(spine, depth, rejoinRef) {
     if (sr) { line.branchLabel = sr.label; line.branchType = sr.type; if (sr.type === 'rejoin') line.isContinuation = true; }
     for (var si = 0; si < pathSegs.length; si++) {
       line.elements.push({ kind: 'wire' });
-      line.elements.push({ kind: 'step', title: pathSegs[si].title, id: pathSegs[si].id });
+      line.elements.push({ kind: 'step', title: pathSegs[si].title, id: pathSegs[si].id, height: pathSegs[si].height });
     }
     line.elements.push({ kind: 'rejoin-arrow' });
     line.elements.push({ kind: 'ref', label: endRef, type: 'rejoin' });
@@ -375,12 +375,12 @@ function flattenSpine(spine, depth, rejoinRef) {
     var seg = spine[i];
     if (seg.type === 'step') {
       wire();
-      cur.elements.push({ kind: 'step', title: seg.title, id: seg.id });
+      cur.elements.push({ kind: 'step', title: seg.title, id: seg.id, height: seg.height });
     }
     else if (seg.type === 'gate') {
       wire();
       var gid = 'g' + _refCounter;
-      cur.elements.push({ kind: 'branch-point', title: seg.title, type: 'gate', groupId: gid, id: seg.id });
+      cur.elements.push({ kind: 'branch-point', title: seg.title, type: 'gate', groupId: gid, id: seg.id, height: seg.height });
       var rejoinLabel = nextRef();
       var routeRefs = seg.routes.map(function() { return nextRef(); });
       lines.push(cur);
@@ -399,7 +399,7 @@ function flattenSpine(spine, depth, rejoinRef) {
     else if (seg.type === 'split') {
       wire();
       var gid2 = 'g' + _refCounter;
-      cur.elements.push({ kind: 'branch-point', title: seg.title, type: 'split', groupId: gid2, id: seg.id });
+      cur.elements.push({ kind: 'branch-point', title: seg.title, type: 'split', groupId: gid2, id: seg.id, height: seg.height });
       var mergeLabel = nextRef();
       var branchRefs = seg.branches.map(function() { return nextRef(); });
       lines.push(cur);
@@ -416,7 +416,7 @@ function flattenSpine(spine, depth, rejoinRef) {
       tagGroupByRefs(lines, gs2, branchRefs, 'split', gid2, mergeLabel);
       cur = { depth: depth, elements: [{ kind: 'ref', label: mergeLabel, type: 'rejoin' }],
               branchLabel: mergeLabel, branchType: 'rejoin', isContinuation: true };
-      if (seg.merge) { cur.elements.push({ kind: 'step', title: seg.merge.title, id: seg.merge.id }); }
+      if (seg.merge) { cur.elements.push({ kind: 'step', title: seg.merge.title, id: seg.merge.id, height: seg.merge.height }); }
     }
   }
 
@@ -435,8 +435,30 @@ function flattenSpine(spine, depth, rejoinRef) {
 // TREE-BASED ORDERING AND Y-ASSIGNMENT
 // ═══════════════════════════════════════════════════════════════════
 
-function treeOrderLines(lines) {
-  var rowStep = C.lineH + C.lineGap;
+// Pre-compute element heights so treeOrderLines has accurate per-row sizing.
+function _precomputeHeights(lines, opts) {
+  var explicitH = opts && opts.nodeH;  // only override when explicitly provided
+  for (var li = 0; li < lines.length; li++) {
+    for (var ei = 0; ei < lines[li].elements.length; ei++) {
+      var elem = lines[li].elements[ei];
+      if (elem.kind === 'step' && !elem.height) {
+        if (explicitH) {
+          elem.height = explicitH;
+        } else {
+          // Auto-compute from multi-line title
+          var titleLines = elem.title.split('\n');
+          if (titleLines.length > 1) {
+            elem.height = Math.max(C.stepH, titleLines.length * 15 + 10);
+          }
+        }
+      }
+    }
+  }
+}
+
+function treeOrderLines(lines, opts) {
+  var defaultH = (opts && opts.nodeH) || C.lineH;
+  var gap = (opts && opts.lineGap !== undefined) ? opts.lineGap : C.lineGap;
 
   var groupMembers = {};
   var groupRejoinLabel = {};
@@ -456,6 +478,21 @@ function treeOrderLines(lines) {
     }
   }
 
+  // Compute per-line row height from the tallest element on each line.
+  // Elements can declare height via seg.height in the spine data; otherwise
+  // use defaultH. For lines with multiple elements, take the max.
+  for (var li = 0; li < lines.length; li++) {
+    var maxH = defaultH;
+    for (var ei = 0; ei < lines[li].elements.length; ei++) {
+      var elem = lines[li].elements[ei];
+      if (elem.kind === 'step' || elem.kind === 'branch-point') {
+        var eh = elem.height || defaultH;
+        if (eh > maxH) maxH = eh;
+      }
+    }
+    lines[li]._rowH = maxH;
+  }
+
   var visited = {};
   var result = [];
 
@@ -467,13 +504,13 @@ function treeOrderLines(lines) {
     result.push(line);
 
     var bp = line.elements.find(function(e) { return e.kind === 'branch-point'; });
-    if (!bp) return startY + rowStep;
+    if (!bp) return startY + line._rowH + gap;
 
     var gid = bp.groupId;
     var members = groupMembers[gid] || [];
 
     var rejoinLabel = groupRejoinLabel[gid];
-    var contSubtreeBottom = startY + rowStep;
+    var contSubtreeBottom = startY + line._rowH + gap;
 
     if (rejoinLabel && continuationFor[rejoinLabel] !== undefined) {
       var contIdx = continuationFor[rejoinLabel];
@@ -487,16 +524,30 @@ function treeOrderLines(lines) {
 
       if (!hasBP) {
         contLine._assignedY = startY;
+        // Shared row: both lines must use the same rowH (the max)
+        var sharedLeafH = Math.max(line._rowH, contLine._rowH);
+        line._rowH = sharedLeafH;
+        contLine._rowH = sharedLeafH;
         visited[contIdx] = true;
         result.push(contLine);
       } else {
         contSubtreeBottom = assignY(contIdx, startY);
+        // Shared row: take max of both lines' rowH
+        var sharedH = Math.max(line._rowH, lines[contIdx]._rowH);
+        line._rowH = sharedH;
+        lines[contIdx]._rowH = sharedH;
       }
     }
 
-    var branchY = startY + rowStep;
+    // Branches start after the row height of the parent line
+    var branchY = startY + line._rowH + gap;
     for (var mi = 0; mi < members.length; mi++) {
       branchY = assignY(members[mi], branchY);
+    }
+
+    // Update contSubtreeBottom if it was based on old rowH
+    if (contSubtreeBottom === startY + defaultH + gap) {
+      contSubtreeBottom = startY + line._rowH + gap;
     }
 
     return Math.max(branchY, contSubtreeBottom);
@@ -516,7 +567,10 @@ function treeOrderLines(lines) {
 // CANVAS LAYOUT ENGINE
 // ═══════════════════════════════════════════════════════════════════
 
-function layout(lines) {
+function layout(lines, opts) {
+  var nodeW = (opts && opts.nodeW) || 0;   // 0 = text-measured (default)
+  var nodeH = (opts && opts.nodeH) || C.stepH;
+
   var positioned = [];
   var totalW = 0;
 
@@ -535,10 +589,17 @@ function layout(lines) {
 
       switch (elem.kind) {
         case 'step': {
-          var textW = tw(elem.title, C.font);
+          var titleLines = elem.title.split('\n');
+          var textW = 0;
+          for (var tli = 0; tli < titleLines.length; tli++) {
+            var lw = tw(titleLines[tli], C.font);
+            if (lw > textW) textW = lw;
+          }
           var dotSpace = C.dotR * 2 + 5;
-          var w = C.stepPadX + dotSpace + textW + C.stepPadX;
-          item = { kind: 'step', x: x, y: y, w: w, h: C.stepH, title: elem.title, id: elem.id, textW: textW, dotSpace: dotSpace };
+          var w = nodeW || (C.stepPadX + dotSpace + textW + C.stepPadX);
+          var naturalH = titleLines.length > 1 ? Math.max(C.stepH, titleLines.length * 15 + 10) : C.stepH;
+          var h = elem.height || (nodeW ? nodeH : naturalH);
+          item = { kind: 'step', x: x, y: y, w: w, h: h, title: elem.title, id: elem.id, textW: textW, dotSpace: dotSpace };
           x += w;
           break;
         }
@@ -553,14 +614,16 @@ function layout(lines) {
         }
         case 'branch-point': {
           var textW2 = tw(elem.title, C.fontBold);
-          var h = C.stepH;
+          var bpH = nodeW ? nodeH : C.stepH;
           var w2;
-          if (elem.type === 'gate') {
-            w2 = textW2 + C.stepPadX * 2 + h * 0.5;
+          if (nodeW) {
+            w2 = nodeW;
+          } else if (elem.type === 'gate') {
+            w2 = textW2 + C.stepPadX * 2 + bpH * 0.5;
           } else {
             w2 = textW2 + C.stepPadX * 2 + 16;
           }
-          item = { kind: 'branch-point', x: x, y: y, w: w2, h: h, title: elem.title,
+          item = { kind: 'branch-point', x: x, y: y, w: w2, h: bpH, title: elem.title,
                    type: elem.type, groupId: elem.groupId, id: elem.id, textW: textW2 };
           x += w2;
           break;
@@ -589,7 +652,7 @@ function layout(lines) {
     positioned.push({ y: y, items: items, contentEndX: contentEndX, rejoinStartIdx: rejoinStartIdx, depth: line.depth,
                        rejoinLabel: line.rejoinLabel, groups: line.groups,
                        isContinuation: line.isContinuation, branchLabel: line.branchLabel,
-                       _assignedY: line._assignedY,
+                       _assignedY: line._assignedY, _rowH: line._rowH || C.lineH,
                        totalContentW: x });
     totalW = Math.max(totalW, x + C.padX);
   }
@@ -861,14 +924,14 @@ function layout(lines) {
       if (itm3.kind === 'branch-point' && itm3.groupId) {
         var gid2 = itm3.groupId;
         var bpCx = itm3.x + itm3.w / 2;
-        var bpCy = positioned[pi10].y + C.lineH / 2;
+        var bpCy = positioned[pi10].y + positioned[pi10]._rowH / 2;
         var barX = bpCx + (groupDisplace[gid2] ? groupDisplace[gid2] / 2 : 0);
         var lastCy = bpCy;
         for (var pi11 = 0; pi11 < positioned.length; pi11++) {
           if (positioned[pi11].groups) {
             for (var gi5 = 0; gi5 < positioned[pi11].groups.length; gi5++) {
               if (positioned[pi11].groups[gi5].gid === gid2) {
-                lastCy = positioned[pi11].y + C.lineH / 2;
+                lastCy = positioned[pi11].y + positioned[pi11]._rowH / 2;
                 break;
               }
             }
@@ -890,7 +953,7 @@ function layout(lines) {
     for (var pli3 = 0; pli3 < plines2.length; pli3++) {
       var pl5 = plines2[pli3];
       var cx = pl5._convergenceXByLabel && pl5._convergenceXByLabel[rlabel2];
-      if (cx !== undefined) points.push({ cx: cx, cy: pl5.y + C.lineH / 2 });
+      if (cx !== undefined) points.push({ cx: cx, cy: pl5.y + pl5._rowH / 2 });
       if (pl5.groups && pl5.groups.length > 0 && type === 'gate') type = pl5.groups[0].type;
     }
 
@@ -899,7 +962,7 @@ function layout(lines) {
       var cl3 = clLines2[cli3];
       if (plines2.indexOf(cl3) >= 0) continue;
       var cx2 = cl3._convergenceXByLabel && cl3._convergenceXByLabel[rlabel2];
-      if (cx2 !== undefined) points.push({ cx: cx2, cy: cl3.y + C.lineH / 2 });
+      if (cx2 !== undefined) points.push({ cx: cx2, cy: cl3.y + cl3._rowH / 2 });
     }
 
     if (points.length < 2) continue;
@@ -926,7 +989,11 @@ function layout(lines) {
 
   var maxY = 0;
   for (var pi12 = 0; pi12 < positioned.length; pi12++) { if (positioned[pi12].y > maxY) maxY = positioned[pi12].y; }
-  var totalH = positioned.length > 0 ? maxY + C.lineH + C.padY : C.padY * 2;
+  var maxRowH = C.lineH;
+  for (var pi13 = 0; pi13 < positioned.length; pi13++) {
+    if (positioned[pi13].y === maxY && positioned[pi13]._rowH > maxRowH) maxRowH = positioned[pi13]._rowH;
+  }
+  var totalH = positioned.length > 0 ? maxY + maxRowH + C.padY : C.padY * 2;
   return { width: totalW, height: totalH, lines: positioned, vbars: vbars };
 }
 
@@ -963,7 +1030,37 @@ function drawSchematic(canvas, layoutData, execState) {
   var ctx = canvas.getContext('2d');
   ctx.scale(dpr, dpr);
 
-  // Vertical bars (draw first, behind everything)
+  // Topology lines (drawn first, behind nodes)
+
+  // Horizontal wires: one continuous line per layout row
+  for (var li3 = 0; li3 < layoutData.lines.length; li3++) {
+    var line3 = layoutData.lines[li3];
+    var cy3 = line3.y + (line3._rowH || C.lineH) / 2;
+    var spanLeft = Infinity, spanRight = -Infinity;
+    for (var si = 0; si < line3.items.length; si++) {
+      var sit = line3.items[si];
+      if (sit.kind === 'step' || sit.kind === 'branch-point') {
+        spanLeft = Math.min(spanLeft, sit.x + sit.w / 2);
+        spanRight = Math.max(spanRight, sit.x + sit.w / 2);
+      } else if (sit.kind === 'rejoin-arrow') {
+        spanRight = Math.max(spanRight, sit.x + sit.w);
+      } else if (sit.kind === 'cond') {
+        spanLeft = Math.min(spanLeft, sit.x + sit.w / 2);
+        spanRight = Math.max(spanRight, sit.x + sit.w / 2);
+      }
+    }
+    if (spanLeft < spanRight) {
+      ctx.beginPath();
+      ctx.moveTo(spanLeft, cy3);
+      ctx.lineTo(spanRight, cy3);
+      ctx.strokeStyle = C.grayWire;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+      ctx.stroke();
+    }
+  }
+
+  // Vertical bars
   for (var vi = 0; vi < layoutData.vbars.length; vi++) {
     var vb = layoutData.vbars[vi];
     ctx.beginPath();
@@ -977,11 +1074,13 @@ function drawSchematic(canvas, layoutData, execState) {
     ctx.setLineDash([]);
   }
 
-  // Elements
+  // Elements (drawn on top of topology lines)
   for (var li2 = 0; li2 < layoutData.lines.length; li2++) {
     var line2 = layoutData.lines[li2];
-    var cy = line2.y + C.lineH / 2;
+    var cy = line2.y + (line2._rowH || C.lineH) / 2;
     var lastItemRight = null;
+
+
 
     for (var ii9 = 0; ii9 < line2.items.length; ii9++) {
       var item3 = line2.items[ii9];
@@ -1001,18 +1100,22 @@ function drawSchematic(canvas, layoutData, execState) {
           ctx.font = C.font;
           ctx.fillStyle = textColor;
           ctx.textBaseline = 'middle';
-          ctx.fillText(item3.title, item3.x + C.stepPadX + C.dotR * 2 + 5, cy);
+          // Multi-line text support
+          var titleLines = item3.title.split('\n');
+          if (titleLines.length === 1) {
+            ctx.fillText(item3.title, item3.x + C.stepPadX + C.dotR * 2 + 5, cy);
+          } else {
+            var textLH = 15;
+            var textStartY = cy - (titleLines.length - 1) * textLH / 2;
+            for (var tli = 0; tli < titleLines.length; tli++) {
+              ctx.fillText(titleLines[tli], item3.x + C.stepPadX + C.dotR * 2 + 5, textStartY + tli * textLH);
+            }
+          }
           break;
         }
 
         case 'wire':
-          ctx.beginPath();
-          ctx.moveTo(item3.x, cy);
-          ctx.lineTo(item3.x + item3.w, cy);
-          ctx.strokeStyle = C.grayWire;
-          ctx.lineWidth = 2;
-          ctx.setLineDash([]);
-          ctx.stroke();
+          // Covered by the continuous horizontal line drawn above
           break;
 
         case 'ref':
@@ -1076,18 +1179,12 @@ function drawSchematic(canvas, layoutData, execState) {
         }
 
         case 'rejoin-arrow': {
-          var wireStart = lastItemRight !== null ? lastItemRight : (item3.x - 2);
+          // Wire covered by continuous horizontal line; just draw arrowhead
+          var ax = item3.x + item3.w;
           ctx.beginPath();
-          ctx.moveTo(wireStart, cy);
-          ctx.lineTo(item3.x + item3.w - 6, cy);
-          ctx.strokeStyle = C.grayWire;
-          ctx.lineWidth = 2;
-          ctx.setLineDash([]);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.moveTo(item3.x + item3.w - 6, cy - 4);
-          ctx.lineTo(item3.x + item3.w, cy);
-          ctx.lineTo(item3.x + item3.w - 6, cy + 4);
+          ctx.moveTo(ax - 6, cy - 4);
+          ctx.lineTo(ax, cy);
+          ctx.lineTo(ax - 6, cy + 4);
           ctx.closePath();
           ctx.fillStyle = C.grayLight;
           ctx.fill();
@@ -1099,16 +1196,18 @@ function drawSchematic(canvas, layoutData, execState) {
       }
     }
   }
+
 }
 
 // ── Convenience entry point ────────────────────────────────────────
 
-function renderWorkflow(spine, canvas, execState) {
+function renderWorkflow(spine, canvas, execState, layoutOpts) {
   resetRefs();
   var rawLines = flattenSpine(spine, 0, null);
-  var lines = treeOrderLines(rawLines);
-  var layoutData = layout(lines);
-  drawSchematic(canvas, layoutData, execState || null);
+  _precomputeHeights(rawLines, layoutOpts);
+  var lines = treeOrderLines(rawLines, layoutOpts);
+  var layoutData = layout(lines, layoutOpts);
+  if (canvas) drawSchematic(canvas, layoutData, execState || null);
   return layoutData;
 }
 

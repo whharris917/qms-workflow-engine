@@ -30,6 +30,24 @@
 
 const WORKFLOWS = [
   {
+    name: 'Variable Row Heights',
+    desc: 'Tests per-node height: the Review node is double-height (72px). Row spacing should adapt so adjacent rows don\'t overlap.',
+    spine: [
+      { type:'step', id:'intake', title:'Intake' },
+      { type:'step', id:'review', title:'Review', height: 72 },
+      { type:'gate', id:'decision', title:'Decision', routes: [
+        { label:'Approve', condition:'decision = Approve', path: [
+          { type:'step', id:'implement', title:'Implement' },
+        ]},
+        { label:'Reject', condition:'decision = Reject', path: [
+          { type:'step', id:'revise', title:'Revise', height: 72 },
+          { type:'step', id:'resubmit', title:'Re-Submit' },
+        ]},
+      ]},
+      { type:'step', id:'close', title:'Close' },
+    ],
+  },
+  {
     name: 'Simple Sequential',
     desc: 'No branching — a single line.',
     spine: [
@@ -54,7 +72,7 @@ const WORKFLOWS = [
           { type:'step', id:'impl', title:'Implement' },
         ]},
         { label:'High', condition:'severity = High', path: [
-          { type:'step', id:'deep', title:'Deep Analysis' },
+          { type:'step', id:'deep', title:'Deep\nDeep\nDeep\nDeep\nAnalysis' },
           { type:'step', id:'exec_rev', title:'Exec Review' },
           { type:'step', id:'remed', title:'Remediation' },
         ]},
@@ -399,50 +417,49 @@ const WORKFLOWS = [
   },
   {
     name: 'Stress Test: Pharmaceutical Clinical Trial Pipeline',
-    desc: 'Maximum complexity: entire 5-BP pipeline nested inside a parallel fork alongside regulatory and financial tracks. Tests deep nesting with sequential BPs inside a branch of a top-level fork.',
+    desc: 'Maximum complexity with variable-height nodes: multi-line titles and explicit heights throughout. Tests per-row height adaptation at every nesting level.',
     spine: [
-      { type:'step', id:'board_approve', title:'Board Approval' },
+      { type:'step', id:'board_approve', title:'Board\nApproval', height: 50 },
       { type:'split', id:'program_fork', title:'Program Tracks', branches: [
         { label:'Clinical', path: [
-      { type:'step', id:'proposal', title:'Proposal' },
-      // ── Clinical track BP #1: gate (5 routes, nested structures in 3) ──
+      { type:'step', id:'proposal', title:'Research\nProposal\nDraft', height: 65 },
       { type:'gate', id:'trial_phase', title:'Trial Phase', routes: [
         { label:'Pre-clinical', condition:'phase = Pre-clinical', path: [
-          { type:'step', id:'lab_study', title:'Lab Study' },
+          { type:'step', id:'lab_study', title:'Lab Study\n(In Vitro &\nIn Vivo)' },
         ]},
         { label:'Phase I', condition:'phase = Phase I', path: [
-          { type:'step', id:'dose_finding', title:'Dose Finding' },
-          { type:'step', id:'safety_profile', title:'Safety Profile' },
+          { type:'step', id:'dose_finding', title:'Dose\nFinding' },
+          { type:'step', id:'safety_profile', title:'Safety Profile\nAssessment\nReport', height: 65 },
         ]},
         { label:'Phase II', condition:'phase = Phase II', path: [
           { type:'split', id:'efficacy_fork', title:'Efficacy Tracks', branches: [
             { label:'Primary Endpoint', path: [
               { type:'step', id:'primary_enroll', title:'Enroll' },
-              { type:'step', id:'primary_treat', title:'Treat' },
-              { type:'step', id:'primary_measure', title:'Measure' },
+              { type:'step', id:'primary_treat', title:'Treat\nPatients' },
+              { type:'step', id:'primary_measure', title:'Measure\nPrimary\nEndpoint', height: 65 },
             ]},
             { label:'Biomarker', path: [
-              { type:'step', id:'bio_collect', title:'Collect Samples' },
+              { type:'step', id:'bio_collect', title:'Collect\nSamples' },
               { type:'step', id:'bio_analyze', title:'Analyze' },
             ]},
           ], merge: { id:'efficacy_merge', title:'Correlate' }},
-          { type:'step', id:'phase2_report', title:'Interim Report' },
+          { type:'step', id:'phase2_report', title:'Interim\nReport' },
         ]},
         { label:'Phase III', condition:'phase = Phase III', path: [
           { type:'split', id:'p3_fork', title:'Multi-Site Trial', branches: [
             { label:'Site A', path: [
               { type:'step', id:'a_recruit', title:'Recruit' },
-              { type:'step', id:'a_run', title:'Run Protocol' },
+              { type:'step', id:'a_run', title:'Run\nProtocol' },
               { type:'gate', id:'a_interim', title:'Interim Analysis', routes: [
                 { label:'Continue', condition:'result = Favorable', path: [
-                  { type:'step', id:'a_continue', title:'Continue Enrollment' },
+                  { type:'step', id:'a_continue', title:'Continue\nEnrollment' },
                 ]},
                 { label:'Modify', condition:'result = Concerning', path: [
-                  { type:'step', id:'a_amend', title:'Amend Protocol' },
-                  { type:'step', id:'a_resubmit', title:'IRB Re-Submit' },
+                  { type:'step', id:'a_amend', title:'Amend\nProtocol' },
+                  { type:'step', id:'a_resubmit', title:'IRB\nRe-Submit' },
                 ]},
                 { label:'Stop', condition:'result = Futile', path: [
-                  { type:'step', id:'a_stop', title:'Early Termination' },
+                  { type:'step', id:'a_stop', title:'Early\nTermination\nReport', height: 65 },
                 ]},
               ]},
               { type:'step', id:'a_close', title:'Close Site' },
@@ -457,74 +474,74 @@ const WORKFLOWS = [
               { type:'step', id:'c_run', title:'Run Protocol' },
               { type:'split', id:'c_sub_fork', title:'Sub-Study', branches: [
                 { label:'Genomic', path: [
-                  { type:'step', id:'c_genomic', title:'Sequence' },
-                  { type:'step', id:'c_annotate', title:'Annotate' },
+                  { type:'step', id:'c_genomic', title:'Whole Genome\nSequencing' },
+                  { type:'step', id:'c_annotate', title:'Variant\nAnnotation\n& Classification', height: 65 },
                 ]},
                 { label:'Pharmacokinetic', path: [
-                  { type:'step', id:'c_pk_sample', title:'Sample' },
-                  { type:'step', id:'c_pk_model', title:'Model' },
+                  { type:'step', id:'c_pk_sample', title:'PK\nSampling' },
+                  { type:'step', id:'c_pk_model', title:'Population\nPK Model' },
                   { type:'step', id:'c_pk_validate', title:'Validate' },
                 ]},
-              ], merge: { id:'c_sub_merge', title:'Integrate Sub-Study' }},
+              ], merge: { id:'c_sub_merge', title:'Integrate\nSub-Study' }},
               { type:'step', id:'c_close', title:'Close Site' },
             ]},
           ], merge: { id:'p3_merge', title:'Pool Data' }},
-          { type:'step', id:'p3_stats', title:'Statistical Analysis' },
+          { type:'step', id:'p3_stats', title:'Statistical\nAnalysis' },
         ]},
         { label:'Phase IV', condition:'phase = Phase IV', path: [
-          { type:'step', id:'post_market', title:'Post-Market Surveillance' },
-          { type:'step', id:'adverse_events', title:'Adverse Event Tracking' },
-          { type:'step', id:'periodic_report', title:'Periodic Safety Report' },
+          { type:'step', id:'post_market', title:'Post-Market\nSurveillance' },
+          { type:'step', id:'adverse_events', title:'Adverse Event\nTracking &\nReporting', height: 65 },
+          { type:'step', id:'periodic_report', title:'Periodic\nSafety\nReport' },
         ]},
       ]},
-      { type:'step', id:'data_lock', title:'Data Lock' },
+      { type:'step', id:'data_lock', title:'Data Lock\n& Unblinding', height: 50 },
       { type:'split', id:'submission_fork', title:'Submission Prep', branches: [
         { label:'Regulatory', path: [
-          { type:'step', id:'compile_csr', title:'Compile CSR' },
+          { type:'step', id:'compile_csr', title:'Compile\nCSR' },
           { type:'gate', id:'reg_pathway', title:'Reg Pathway', routes: [
             { label:'Standard', condition:'pathway = Standard', path: [
-              { type:'step', id:'nda_draft', title:'Draft NDA' },
-              { type:'step', id:'nda_review', title:'Internal Review' },
-              { type:'step', id:'nda_submit', title:'Submit to FDA' },
+              { type:'step', id:'nda_draft', title:'Draft NDA\nModule 1-5' },
+              { type:'step', id:'nda_review', title:'Internal\nReview' },
+              { type:'step', id:'nda_submit', title:'Submit\nto FDA' },
             ]},
             { label:'Accelerated', condition:'pathway = Accelerated', path: [
-              { type:'step', id:'bt_request', title:'Breakthrough Request' },
-              { type:'step', id:'bt_meeting', title:'Pre-BLA Meeting' },
-              { type:'step', id:'bt_submit', title:'Rolling Submission' },
+              { type:'step', id:'bt_request', title:'Breakthrough\nTherapy\nRequest', height: 65 },
+              { type:'step', id:'bt_meeting', title:'Pre-BLA\nMeeting' },
+              { type:'step', id:'bt_submit', title:'Rolling\nSubmission' },
             ]},
             { label:'Conditional', condition:'pathway = Conditional', path: [
-              { type:'step', id:'cond_evidence', title:'Compile Evidence' },
-              { type:'step', id:'cond_submit', title:'Conditional Filing' },
+              { type:'step', id:'cond_evidence', title:'Compile\nEvidence' },
+              { type:'step', id:'cond_submit', title:'Conditional\nFiling' },
             ]},
           ]},
-          { type:'step', id:'reg_track', title:'Track Review' },
+          { type:'step', id:'reg_track', title:'Track\nReview' },
         ]},
         { label:'Manufacturing', path: [
-          { type:'step', id:'scale_up', title:'Scale Up' },
-          { type:'step', id:'validation_batch', title:'Validation Batches' },
-          { type:'step', id:'stability', title:'Stability Testing' },
+          { type:'step', id:'scale_up', title:'Scale Up\nProcess' },
+          { type:'step', id:'validation_batch', title:'Validation\nBatches\n(3 Lots)', height: 65 },
+          { type:'step', id:'stability', title:'Stability\nTesting' },
         ]},
         { label:'Commercial', path: [
-          { type:'step', id:'market_analysis', title:'Market Analysis' },
+          { type:'step', id:'market_analysis', title:'Market\nAnalysis' },
           { type:'split', id:'launch_prep', title:'Launch Prep', branches: [
             { label:'Medical Affairs', path: [
-              { type:'step', id:'kol_engage', title:'KOL Engagement' },
-              { type:'step', id:'med_materials', title:'Medical Materials' },
+              { type:'step', id:'kol_engage', title:'KOL\nEngagement\nStrategy', height: 65 },
+              { type:'step', id:'med_materials', title:'Medical\nMaterials' },
             ]},
             { label:'Sales', path: [
-              { type:'step', id:'train_field', title:'Train Field Force' },
-              { type:'step', id:'territory_plan', title:'Territory Planning' },
+              { type:'step', id:'train_field', title:'Train\nField Force' },
+              { type:'step', id:'territory_plan', title:'Territory\nPlanning' },
             ]},
-          ], merge: { id:'launch_merge', title:'Launch Readiness' }},
+          ], merge: { id:'launch_merge', title:'Launch\nReadiness' }},
         ]},
-      ], merge: { id:'sub_merge', title:'Dossier Complete' }},
+      ], merge: { id:'sub_merge', title:'Dossier\nComplete' }},
       { type:'gate', id:'agency_decision', title:'Agency Decision', routes: [
         { label:'Approved', condition:'decision = Approved', path: [
-          { type:'step', id:'label_negotiate', title:'Label Negotiation' },
+          { type:'step', id:'label_negotiate', title:'Label\nNegotiation' },
         ]},
         { label:'CRL', condition:'decision = CRL', path: [
-          { type:'step', id:'crl_analyze', title:'Analyze CRL' },
-          { type:'step', id:'crl_respond', title:'Prepare Response' },
+          { type:'step', id:'crl_analyze', title:'Analyze\nComplete\nResponse\nLetter', height: 80 },
+          { type:'step', id:'crl_respond', title:'Prepare\nResponse' },
           { type:'step', id:'crl_resubmit', title:'Re-Submit' },
         ]},
         { label:'Rejected', condition:'decision = Rejected', path: [
@@ -533,80 +550,80 @@ const WORKFLOWS = [
       ]},
       { type:'split', id:'launch_fork', title:'Launch', branches: [
         { label:'Supply Chain', path: [
-          { type:'step', id:'produce', title:'Production Run' },
-          { type:'step', id:'distribute', title:'Distribution' },
+          { type:'step', id:'produce', title:'Production\nRun' },
+          { type:'step', id:'distribute', title:'Distribution\nPlanning &\nExecution', height: 65 },
         ]},
         { label:'Market Access', path: [
-          { type:'step', id:'pricing', title:'Pricing' },
-          { type:'step', id:'payer_negotiate', title:'Payer Negotiation' },
+          { type:'step', id:'pricing', title:'Pricing\nStrategy' },
+          { type:'step', id:'payer_negotiate', title:'Payer\nNegotiation' },
           { type:'gate', id:'reimburse', title:'Reimbursement', routes: [
             { label:'Formulary', condition:'type = Formulary', path: [
-              { type:'step', id:'formulary_app', title:'Application' },
-              { type:'step', id:'formulary_review', title:'Committee Review' },
+              { type:'step', id:'formulary_app', title:'Formulary\nApplication' },
+              { type:'step', id:'formulary_review', title:'P&T\nCommittee\nReview', height: 65 },
             ]},
             { label:'Exception', condition:'type = Exception', path: [
-              { type:'step', id:'exception_process', title:'Exception Process' },
+              { type:'step', id:'exception_process', title:'Exception\nProcess' },
             ]},
           ]},
-          { type:'step', id:'access_confirm', title:'Confirm Access' },
+          { type:'step', id:'access_confirm', title:'Confirm\nAccess' },
         ]},
-      ], merge: { id:'launch_merge2', title:'Market Entry' }},
+      ], merge: { id:'launch_merge2', title:'Market\nEntry' }},
       { type:'gate', id:'lifecycle', title:'Lifecycle', routes: [
         { label:'Grow', condition:'strategy = Grow', path: [
-          { type:'step', id:'line_ext', title:'Line Extension' },
-          { type:'step', id:'new_indication', title:'New Indication' },
+          { type:'step', id:'line_ext', title:'Line\nExtension' },
+          { type:'step', id:'new_indication', title:'New\nIndication\nStudy', height: 65 },
         ]},
         { label:'Maintain', condition:'strategy = Maintain', path: [
-          { type:'step', id:'pharmacovigilance', title:'Pharmacovigilance' },
+          { type:'step', id:'pharmacovigilance', title:'Ongoing\nPharmacovigilance\nProgram', height: 65 },
         ]},
         { label:'Sunset', condition:'strategy = Sunset', path: [
-          { type:'step', id:'generic_prep', title:'Generic Entry Prep' },
-          { type:'step', id:'wind_down', title:'Wind Down' },
-          { type:'step', id:'divest', title:'Divest' },
+          { type:'step', id:'generic_prep', title:'Generic\nEntry Prep' },
+          { type:'step', id:'wind_down', title:'Wind\nDown' },
+          { type:'step', id:'divest', title:'Divest\nAssets' },
         ]},
       ]},
-      { type:'step', id:'close_program', title:'Close Program' },
+      { type:'step', id:'close_program', title:'Close\nProgram' },
         ]},
         { label:'Regulatory Affairs', path: [
-          { type:'step', id:'ra_landscape', title:'Regulatory Landscape' },
+          { type:'step', id:'ra_landscape', title:'Regulatory\nLandscape\nAssessment', height: 65 },
           { type:'gate', id:'ra_strategy', title:'Filing Strategy', routes: [
             { label:'Centralized', condition:'strategy = Centralized', path: [
-              { type:'step', id:'ra_ema', title:'EMA Submission' },
-              { type:'step', id:'ra_chmp', title:'CHMP Review' },
+              { type:'step', id:'ra_ema', title:'EMA\nSubmission' },
+              { type:'step', id:'ra_chmp', title:'CHMP\nReview' },
             ]},
             { label:'Decentralized', condition:'strategy = Decentralized', path: [
-              { type:'step', id:'ra_rms', title:'RMS Filing' },
-              { type:'step', id:'ra_cms', title:'CMS Recognition' },
-              { type:'step', id:'ra_national', title:'National Approvals' },
+              { type:'step', id:'ra_rms', title:'RMS\nFiling' },
+              { type:'step', id:'ra_cms', title:'CMS\nRecognition' },
+              { type:'step', id:'ra_national', title:'National\nApprovals' },
             ]},
             { label:'Mutual Recognition', condition:'strategy = MRP', path: [
-              { type:'step', id:'ra_ref_state', title:'Reference State' },
-              { type:'step', id:'ra_extend', title:'Extend to CMS' },
+              { type:'step', id:'ra_ref_state', title:'Reference\nState' },
+              { type:'step', id:'ra_extend', title:'Extend\nto CMS' },
             ]},
           ]},
-          { type:'step', id:'ra_variations', title:'Manage Variations' },
+          { type:'step', id:'ra_variations', title:'Manage\nVariations' },
         ]},
         { label:'Finance', path: [
-          { type:'step', id:'fin_model', title:'Financial Model' },
+          { type:'step', id:'fin_model', title:'Financial\nModel' },
           { type:'split', id:'fin_fork', title:'Parallel Analysis', branches: [
             { label:'Revenue', path: [
-              { type:'step', id:'fin_forecast', title:'Revenue Forecast' },
-              { type:'step', id:'fin_scenarios', title:'Scenario Analysis' },
+              { type:'step', id:'fin_forecast', title:'Revenue\nForecast' },
+              { type:'step', id:'fin_scenarios', title:'Scenario\nAnalysis' },
             ]},
             { label:'Cost', path: [
-              { type:'step', id:'fin_cogs', title:'COGS Projection' },
-              { type:'step', id:'fin_opex', title:'OpEx Budget' },
+              { type:'step', id:'fin_cogs', title:'COGS\nProjection' },
+              { type:'step', id:'fin_opex', title:'OpEx\nBudget' },
             ]},
             { label:'Pricing', path: [
-              { type:'step', id:'fin_hta', title:'HTA Dossier' },
-              { type:'step', id:'fin_icer', title:'ICER Analysis' },
-              { type:'step', id:'fin_price_set', title:'Set Price' },
+              { type:'step', id:'fin_hta', title:'HTA\nDossier' },
+              { type:'step', id:'fin_icer', title:'ICER\nAnalysis' },
+              { type:'step', id:'fin_price_set', title:'Set\nPrice' },
             ]},
-          ], merge: { id:'fin_merge', title:'Business Case' }},
-          { type:'step', id:'fin_board', title:'Board Presentation' },
+          ], merge: { id:'fin_merge', title:'Business\nCase' }},
+          { type:'step', id:'fin_board', title:'Board\nPresentation' },
         ]},
-      ], merge: { id:'program_merge', title:'Program Review' }},
-      { type:'step', id:'final_decision', title:'Final Investment Decision' },
+      ], merge: { id:'program_merge', title:'Program\nReview' }},
+      { type:'step', id:'final_decision', title:'Final Investment\nDecision' },
     ],
   },
   {

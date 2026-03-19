@@ -3347,7 +3347,137 @@ function _fcComputeSlots(nodes, items) {
     return {slots: slots, totalW: totalW, totalH: totalH};
 }
 
-/* ── Main definition renderer ── */
+/* ── Schematic-positioned detailed flowchart ── */
+function _expDSchematicFlowchart(defn, stateObj) {
+    if (!defn || !defn.nodes || !defn.nodes.length) return '';
+    var nodes = defn.nodes;
+    var current = stateObj.lifecycle_current || stateObj.node || '';
+    var completed = stateObj.lifecycle_completed || stateObj.completed_nodes || [];
+
+    // Index nodes by ID
+    var nodeById = {};
+    var nodeIdx = {};
+    for (var i = 0; i < nodes.length; i++) {
+        nodeById[nodes[i].id] = nodes[i];
+        nodeIdx[nodes[i].id] = i;
+    }
+
+    var spine;
+    try {
+        spine = Schematic.definitionToSpine(defn);
+    } catch (e) {
+        return '<div class="fc-wrap"><pre style="color:red;padding:1rem;">Schematic error: ' + e.message + '</pre></div>';
+    }
+
+    var graphId = 'sch-fc-' + Math.random().toString(36).substr(2, 6);
+
+    // Phase 1: Measure card heights by rendering into a hidden container.
+    var measurer = document.createElement('div');
+    measurer.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:' + _FC.nodeW + 'px;visibility:hidden;';
+    document.body.appendChild(measurer);
+
+    var cardHeights = {}; // nodeId → measured pixel height
+    for (var mi = 0; mi < nodes.length; mi++) {
+        var mnd = nodes[mi];
+        var mDiv = document.createElement('div');
+        mDiv.innerHTML = _fcNodeCard(mnd, mi);
+        measurer.appendChild(mDiv);
+        cardHeights[mnd.id] = mDiv.offsetHeight;
+        measurer.removeChild(mDiv);
+    }
+    document.body.removeChild(measurer);
+
+    // Phase 2: Set measured heights on spine elements so the layout engine
+    // computes correct per-row spacing natively.
+    function setSpineHeights(spineArr) {
+        for (var si = 0; si < spineArr.length; si++) {
+            var seg = spineArr[si];
+            if (seg.id && cardHeights[seg.id]) {
+                seg.height = cardHeights[seg.id];
+            }
+            if (seg.type === 'gate' && seg.routes) {
+                for (var ri = 0; ri < seg.routes.length; ri++) {
+                    setSpineHeights(seg.routes[ri].path);
+                }
+            }
+            if (seg.type === 'split' && seg.branches) {
+                for (var bi = 0; bi < seg.branches.length; bi++) {
+                    setSpineHeights(seg.branches[bi].path);
+                }
+                if (seg.merge && seg.merge.id && cardHeights[seg.merge.id]) {
+                    seg.merge.height = cardHeights[seg.merge.id];
+                }
+            }
+        }
+    }
+    setSpineHeights(spine);
+
+    // Phase 3: Run the layout with actual card heights — correct from the start.
+    var execState = { current: current, completed: completed };
+    var layoutData = Schematic.renderWorkflow(spine, null, execState, {
+        nodeW: _FC.nodeW, lineGap: 16
+    });
+
+    // Phase 4: Build HTML. Cards and topology canvas positioned absolutely.
+    var cardsHtml = '';
+    for (var li = 0; li < layoutData.lines.length; li++) {
+        var ln = layoutData.lines[li];
+        var rowH = ln._rowH || Schematic.C.lineH;
+        for (var ii = 0; ii < ln.items.length; ii++) {
+            var itm = ln.items[ii];
+            if ((itm.kind === 'step' || itm.kind === 'branch-point') && itm.id && nodeById[itm.id]) {
+                var nd = nodeById[itm.id];
+                var idx = nodeIdx[itm.id];
+                var isCur = itm.id === current;
+                var isDone = completed.indexOf(itm.id) >= 0;
+                var stateClass = isCur ? ' fc-card-current' : isDone ? ' fc-card-done' : '';
+                // Vertically center card in its row
+                var ch = cardHeights[itm.id] || rowH;
+                var cardTop = ln.y + (rowH - ch) / 2;
+                cardsHtml += '<div class="fc-card-wrap' + stateClass
+                    + '" style="position:absolute;left:' + itm.x + 'px;top:' + cardTop + 'px;width:' + itm.w + 'px;z-index:1;">'
+                    + _fcNodeCard(nd, idx) + '</div>';
+            }
+            if (itm.kind === 'cond') {
+                var condCy = ln.y + rowH / 2;
+                cardsHtml += '<div class="fc-sch-cond" style="position:absolute;left:' + itm.x + 'px;top:' + (condCy - itm.h / 2)
+                    + 'px;width:' + itm.w + 'px;height:' + itm.h + 'px;z-index:1;'
+                    + 'display:flex;align-items:center;justify-content:center;'
+                    + 'background:#f3f4f6;border:1px solid #e5e7eb;border-radius:' + (itm.h / 2) + 'px;'
+                    + 'font-size:11px;font-weight:500;color:#374151;white-space:nowrap;overflow:hidden;'
+                    + 'font-family:-apple-system,BlinkMacSystemFont,sans-serif;">'
+                    + wfEsc(itm.text) + '</div>';
+            }
+        }
+    }
+
+    // Topology canvas (drawn by the same engine as workshop)
+    var topoCanvas = document.createElement('canvas');
+    topoCanvas.style.cssText = 'position:absolute;left:0;top:0;z-index:0;pointer-events:none;';
+    Schematic.drawSchematic(topoCanvas, layoutData, execState);
+
+    // Schedule canvas insertion after DOM render
+    setTimeout(function() {
+        var graph = document.getElementById(graphId);
+        if (graph) {
+            graph.insertBefore(topoCanvas, graph.firstChild);
+        }
+    }, 0);
+
+    // Header
+    var hdr = '<div class="fc-hdr">';
+    hdr += '<div class="fc-hdr-title">' + wfEsc(defn.workflow_title || '') + '</div>';
+    if (defn.workflow_id) hdr += '<code class="fc-hdr-id">' + wfEsc(defn.workflow_id) + '</code>';
+    if (defn.workflow_description) hdr += '<div class="fc-hdr-desc">' + wfEsc(defn.workflow_description) + '</div>';
+    hdr += '</div>';
+
+    return '<div class="fc-wrap">' + hdr
+        + '<div class="fc-graph" id="' + graphId + '" style="position:relative;width:' + layoutData.width + 'px;min-height:' + layoutData.height + 'px;">'
+        + cardsHtml
+        + '</div></div>';
+}
+
+/* ── Main definition renderer (legacy ELK-based) ── */
 function expDRenderDefinition(defn) {
     if (!defn) return '';
     var nodes = defn.nodes || [];
@@ -3398,7 +3528,7 @@ function expDRenderStateProps(state) {
     var html = '';
     for (var i = 0; i < extra.length; i++) {
         var k = extra[i], v = s[k];
-        if (k === 'definition' && _isDefinition(v)) { html += expDRenderDefinition(v); continue; }
+        if (k === 'definition' && _isDefinition(v)) { html += _expDSchematicFlowchart(v, s); continue; }
         html += '<div class="wf-card"><div class="wf-card-head">state.' + wfEsc(k) + '</div>';
         if (Array.isArray(v) && v.length && typeof v[0] === 'string') {
             html += '<ul class="wf-extra-list">'; for (var j = 0; j < v.length; j++) html += '<li>' + wfEsc(v[j]) + '</li>'; html += '</ul>';
@@ -3582,6 +3712,8 @@ var EXP_D_FC_CSS = ''
     + '.fc-edge-layer { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:0; }'
     + '.fc-edge-svg { display:block; }'
     + '.fc-card-wrap { z-index:1; }'
+    + '.fc-card-current .fc-card { border-color:#2a6bcf !important; box-shadow:0 0 0 2px rgba(42,107,207,0.2); }'
+    + '.fc-card-done .fc-card { border-color:#4caf50 !important; opacity:0.85; }'
     /* Card */
     + '.fc-card { border:1px solid; border-radius:8px; overflow:hidden; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
     + '.fc-card-head { display:flex; align-items:center; gap:0.4rem; padding:0.45rem 0.65rem; flex-wrap:wrap; }'
