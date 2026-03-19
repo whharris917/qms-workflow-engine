@@ -391,44 +391,59 @@ function flattenSpine(spine, depth, rejoinRef) {
     }
     else if (seg.type === 'gate') {
       wire();
-      var gid = 'g' + _refCounter;
-      cur.elements.push({ kind: 'branch-point', title: seg.title, type: 'gate', groupId: gid, id: seg.id, height: seg.height });
-      var rejoinLabel = nextRef();
-      var routeRefs = seg.routes.map(function() { return nextRef(); });
-      lines.push(cur);
-      var gs = lines.length;
-      for (var ri = 0; ri < seg.routes.length; ri++) {
-        var route = seg.routes[ri];
-        var start = [{ kind: 'ref', label: routeRefs[ri], type: 'gate' }];
-        if (route.condition) start.push({ kind: 'cond', text: route.condition, type: 'gate' });
-        var cont = emitPath(route.path, start, depth + 1, rejoinLabel);
-        lines.push.apply(lines, cont);
+      if (seg.routes.length === 0) {
+        // Collapsed gate: stay on current line with dashed connector.
+        // No groupId — collapsed nodes don't branch, so treeOrderLines should skip them.
+        cur.elements.push({ kind: 'branch-point', title: seg.title, type: 'gate', id: seg.id, height: seg.height });
+        cur.elements.push({ kind: 'collapse-wire' });
+      } else {
+        var gid = 'g' + _refCounter;
+        cur.elements.push({ kind: 'branch-point', title: seg.title, type: 'gate', groupId: gid, id: seg.id, height: seg.height });
+        var rejoinLabel = nextRef();
+        var routeRefs = seg.routes.map(function() { return nextRef(); });
+        lines.push(cur);
+        var gs = lines.length;
+        for (var ri = 0; ri < seg.routes.length; ri++) {
+          var route = seg.routes[ri];
+          var start = [{ kind: 'ref', label: routeRefs[ri], type: 'gate' }];
+          if (route.condition) start.push({ kind: 'cond', text: route.condition, type: 'gate' });
+          var cont = emitPath(route.path, start, depth + 1, rejoinLabel);
+          lines.push.apply(lines, cont);
+        }
+        tagGroupByRefs(lines, gs, routeRefs, 'gate', gid, rejoinLabel);
+        cur = { depth: depth, elements: [{ kind: 'ref', label: rejoinLabel, type: 'rejoin' }],
+                branchLabel: rejoinLabel, branchType: 'rejoin', isContinuation: true };
       }
-      tagGroupByRefs(lines, gs, routeRefs, 'gate', gid, rejoinLabel);
-      cur = { depth: depth, elements: [{ kind: 'ref', label: rejoinLabel, type: 'rejoin' }],
-              branchLabel: rejoinLabel, branchType: 'rejoin', isContinuation: true };
     }
     else if (seg.type === 'split') {
       wire();
-      var gid2 = 'g' + _refCounter;
-      cur.elements.push({ kind: 'branch-point', title: seg.title, type: 'split', groupId: gid2, id: seg.id, height: seg.height });
-      var mergeLabel = nextRef();
-      var branchRefs = seg.branches.map(function() { return nextRef(); });
-      lines.push(cur);
-      var gs2 = lines.length;
-      for (var bi = 0; bi < seg.branches.length; bi++) {
-        var branch = seg.branches[bi];
-        var start2 = [
-          { kind: 'ref', label: branchRefs[bi], type: 'split' },
-          { kind: 'cond', text: branch.label, type: 'split' },
-        ];
-        var cont2 = emitPath(branch.path, start2, depth + 1, mergeLabel);
-        lines.push.apply(lines, cont2);
+      if (seg.branches.length === 0) {
+        // Collapsed split: stay on current line with dashed connector to merge node.
+        // No groupId — collapsed nodes don't branch, so treeOrderLines should skip them.
+        cur.elements.push({ kind: 'branch-point', title: seg.title, type: 'split', id: seg.id, height: seg.height });
+        cur.elements.push({ kind: 'collapse-wire' });
+        if (seg.merge) { cur.elements.push({ kind: 'step', title: seg.merge.title, id: seg.merge.id, height: seg.merge.height }); }
+      } else {
+        var gid2 = 'g' + _refCounter;
+        cur.elements.push({ kind: 'branch-point', title: seg.title, type: 'split', groupId: gid2, id: seg.id, height: seg.height });
+        var mergeLabel = nextRef();
+        var branchRefs = seg.branches.map(function() { return nextRef(); });
+        lines.push(cur);
+        var gs2 = lines.length;
+        for (var bi = 0; bi < seg.branches.length; bi++) {
+          var branch = seg.branches[bi];
+          var start2 = [
+            { kind: 'ref', label: branchRefs[bi], type: 'split' },
+            { kind: 'cond', text: branch.label, type: 'split' },
+          ];
+          var cont2 = emitPath(branch.path, start2, depth + 1, mergeLabel);
+          lines.push.apply(lines, cont2);
+        }
+        tagGroupByRefs(lines, gs2, branchRefs, 'split', gid2, mergeLabel);
+        cur = { depth: depth, elements: [{ kind: 'ref', label: mergeLabel, type: 'rejoin' }],
+                branchLabel: mergeLabel, branchType: 'rejoin', isContinuation: true };
+        if (seg.merge) { cur.elements.push({ kind: 'step', title: seg.merge.title, id: seg.merge.id, height: seg.merge.height }); }
       }
-      tagGroupByRefs(lines, gs2, branchRefs, 'split', gid2, mergeLabel);
-      cur = { depth: depth, elements: [{ kind: 'ref', label: mergeLabel, type: 'rejoin' }],
-              branchLabel: mergeLabel, branchType: 'rejoin', isContinuation: true };
-      if (seg.merge) { cur.elements.push({ kind: 'step', title: seg.merge.title, id: seg.merge.id, height: seg.merge.height }); }
     }
   }
 
@@ -494,7 +509,7 @@ function treeOrderLines(lines, opts) {
     line._assignedY = startY;
     result.push(line);
 
-    var bp = line.elements.find(function(e) { return e.kind === 'branch-point'; });
+    var bp = line.elements.find(function(e) { return e.kind === 'branch-point' && e.groupId; });
     if (!bp) return startY + line._rowH + gap;
 
     var gid = bp.groupId;
@@ -506,7 +521,7 @@ function treeOrderLines(lines, opts) {
     if (rejoinLabel && continuationFor[rejoinLabel] !== undefined) {
       var contIdx = continuationFor[rejoinLabel];
       var contLine = lines[contIdx];
-      var hasBP = contLine.elements.find(function(e) { return e.kind === 'branch-point'; });
+      var hasBP = contLine.elements.find(function(e) { return e.kind === 'branch-point' && e.groupId; });
 
       while (contLine.elements.length > 0 &&
              (contLine.elements[0].kind === 'ref' || contLine.elements[0].kind === 'wire')) {
@@ -601,6 +616,12 @@ function layout(lines, opts) {
         case 'wire': {
           item = { kind: 'wire', x: x, y: y, w: C.wireW };
           x += C.wireW;
+          break;
+        }
+        case 'collapse-wire': {
+          var cw = C.wireW * 3;
+          item = { kind: 'collapse-wire', x: x, y: y, w: cw };
+          x += cw;
           break;
         }
         case 'ref': {
@@ -1031,11 +1052,12 @@ function drawSchematic(canvas, layoutData, execState, opts) {
 
   // Topology lines (drawn first, behind nodes)
 
-  // Horizontal wires: one continuous line per layout row
+  // Horizontal wires: one line per layout row, dashed through collapse-wire segments
   for (var li3 = 0; li3 < layoutData.lines.length; li3++) {
     var line3 = layoutData.lines[li3];
     var cy3 = line3.y + wireOff(line3._rowH || C.lineH);
     var spanLeft = Infinity, spanRight = -Infinity;
+    var dashRanges = [];
     for (var si = 0; si < line3.items.length; si++) {
       var sit = line3.items[si];
       if (sit.kind === 'step' || sit.kind === 'branch-point') {
@@ -1046,16 +1068,31 @@ function drawSchematic(canvas, layoutData, execState, opts) {
       } else if (sit.kind === 'cond') {
         spanLeft = Math.min(spanLeft, sit.x + sit.w / 2);
         spanRight = Math.max(spanRight, sit.x + sit.w / 2);
+      } else if (sit.kind === 'collapse-wire') {
+        dashRanges.push({ x1: sit.x, x2: sit.x + sit.w });
       }
     }
-    if (spanLeft < spanRight) {
-      ctx.beginPath();
-      ctx.moveTo(spanLeft, cy3);
-      ctx.lineTo(spanRight, cy3);
-      ctx.strokeStyle = C.grayWire;
-      ctx.lineWidth = 2;
+    if (spanLeft >= spanRight) continue;
+    ctx.strokeStyle = C.grayWire;
+    ctx.lineWidth = 2;
+    if (dashRanges.length === 0) {
+      ctx.beginPath(); ctx.setLineDash([]);
+      ctx.moveTo(spanLeft, cy3); ctx.lineTo(spanRight, cy3); ctx.stroke();
+    } else {
+      // Draw in segments: solid normally, dashed through collapse-wire ranges
+      var segs = [], cx = spanLeft;
+      for (var di = 0; di < dashRanges.length; di++) {
+        var dr = dashRanges[di];
+        if (dr.x1 > cx) segs.push({ x1: cx, x2: dr.x1, dash: false });
+        segs.push({ x1: dr.x1, x2: dr.x2, dash: true });
+        cx = dr.x2;
+      }
+      if (cx < spanRight) segs.push({ x1: cx, x2: spanRight, dash: false });
+      for (var si2 = 0; si2 < segs.length; si2++) {
+        ctx.beginPath(); ctx.setLineDash(segs[si2].dash ? [6, 4] : []);
+        ctx.moveTo(segs[si2].x1, cy3); ctx.lineTo(segs[si2].x2, cy3); ctx.stroke();
+      }
       ctx.setLineDash([]);
-      ctx.stroke();
     }
   }
 
@@ -1420,7 +1457,8 @@ function renderHybrid(spine, container, execState, opts) {
         var ch = heightMap[itm.id] || rowH;
         var nodeTop = handlePx !== null ? ln.y : ln.y + handleY * (rowH - ch);
         nodesHtml += '<div class="sch-node-wrap sch-node-' + itemStatus
-            + '" style="position:absolute;left:' + itm.x + 'px;top:' + nodeTop + 'px;width:' + itm.w + 'px;z-index:1;">'
+            + '" data-node-id="' + itm.id + '" data-node-kind="' + itm.kind + '"'
+            + ' style="position:absolute;left:' + itm.x + 'px;top:' + nodeTop + 'px;width:' + itm.w + 'px;z-index:1;">'
             + nodeHtml + '</div>';
       }
 
