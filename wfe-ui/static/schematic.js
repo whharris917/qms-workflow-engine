@@ -1413,7 +1413,7 @@ function renderHybrid(spine, container, execState, opts) {
         var ch = heightMap[itm.id] || rowH;
         var nodeTop = ln.y + (rowH - ch) / 2;
         nodesHtml += '<div class="sch-node-wrap sch-node-' + itemStatus
-            + '" style="position:absolute;left:' + itm.x + 'px;top:' + nodeTop + 'px;width:' + itm.w + 'px;z-index:1;">'
+            + '" style="position:absolute;left:' + itm.x + 'px;top:' + nodeTop + 'px;width:' + itm.w + 'px;height:' + ch + 'px;z-index:1;overflow:hidden;">'
             + nodeHtml + '</div>';
       }
 
