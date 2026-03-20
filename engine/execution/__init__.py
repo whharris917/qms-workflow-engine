@@ -1,7 +1,7 @@
 """WFE Execution Engine — business logic for plan execution.
 
 Pure Python, no Flask dependency. Can be used by:
-- Flask routes (wfe-ui/api.py)
+- Flask routes (app/api.py)
 - AI agents via Python API
 - MCP tools (future)
 """

@@ -11,7 +11,8 @@ import json
 
 from .schema import WorkflowDef
 from .evaluator import evaluate, check_visibility
-from .renderer import render_page, _load_engine
+from .renderer import render_page
+from .affordances import _load_engine
 
 
 def dispatch(defn: WorkflowDef, data: dict, workflow_id: str, body: dict) -> dict:
