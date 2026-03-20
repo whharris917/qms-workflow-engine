@@ -95,6 +95,37 @@ def _cond_label(when: dict | None) -> str:
     return "?"
 
 
+def _gate_labels(gate: dict) -> list[str]:
+    """Walk a gate expression tree and return human-readable labels for each leaf."""
+    if not gate:
+        return []
+    op = gate.get("op")
+    if op in ("AND", "OR"):
+        labels = []
+        for c in gate.get("conditions", []):
+            labels.extend(_gate_labels(c))
+        return labels
+    if op == "NOT":
+        inner = _gate_labels(gate.get("condition", {}))
+        return [f"NOT {l}" for l in inner]
+    # Leaf condition
+    ctype = gate.get("type", "")
+    key = gate.get("key", "")
+    if ctype == "field_truthy":
+        return [key]
+    if ctype == "field_equals":
+        return [f"{key} = {gate.get('value', '?')!r}"]
+    if ctype == "field_not_null":
+        return [f"{key} is set"]
+    if ctype == "set_membership":
+        return [f"{key} in {gate.get('set_ref', '?')}"]
+    if ctype == "table_has_columns":
+        return ["table has columns"]
+    if ctype == "table_has_rows":
+        return ["table has rows"]
+    return [ctype or "?"]
+
+
 def _serialize_definition(defn: WorkflowDef) -> dict:
     """Serialize a WorkflowDef for the observer UI (Exp-D flowchart)."""
     node_id_list = defn.node_ids  # ordered list for resolving implicit targets
@@ -117,11 +148,10 @@ def _serialize_definition(defn: WorkflowDef) -> dict:
         if nd.proceed:
             p = {"label": nd.proceed.label}
             if nd.proceed.gate:
-                p["requires"] = [
-                    c.get("key", "")
-                    for c in nd.proceed.gate.get("conditions", [])
-                    if c.get("type") == "field_truthy"
-                ] if nd.proceed.gate.get("op") == "AND" else []
+                p["requires"] = _gate_labels(nd.proceed.gate)
+                gate_op = nd.proceed.gate.get("op")
+                if gate_op and gate_op != "AND":
+                    p["gate_op"] = gate_op
             # Resolve target: explicit if set, otherwise next sequential node
             target = nd.proceed.target
             if not target and idx + 1 < len(node_id_list):

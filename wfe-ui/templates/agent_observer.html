@@ -1772,7 +1772,8 @@ function _fcNodeCard(nd, idx) {
         h += '<span class="fc-gate-lock">&#128274;</span>';
         h += '<span class="fc-gate-lbl">' + wfEsc(nd.proceed.label || 'Proceed') + '</span>';
         if (reqs.length) {
-            h += '<span class="fc-gate-reqs">&#128273; ' + wfEsc(reqs.join(', ')) + '</span>';
+            var sep = (nd.proceed.gate_op === 'OR') ? ' or ' : ', ';
+            h += '<span class="fc-gate-reqs">&#128273; ' + wfEsc(reqs.join(sep)) + '</span>';
         }
         h += '</div>';
     }
