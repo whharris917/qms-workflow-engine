@@ -99,7 +99,32 @@ def _evaluate_leaf(expr: dict, data: dict) -> tuple[bool, str]:
         passed = len(rows) > 0
         return passed, f"table has rows: {passed}"
 
+    if cond_type == "provider_state":
+        return _evaluate_provider(expr, data)
+
     return False, f"unknown condition type: {cond_type}"
+
+
+def _evaluate_provider(expr: dict, data: dict) -> tuple[bool, str]:
+    """Evaluate a condition against cached external provider state.
+
+    Fail-closed: returns False when the provider is unavailable.
+    """
+    from .providers import registry
+
+    provider_id = expr.get("provider", "")
+    provider = registry.get(provider_id)
+    if not provider:
+        return False, f"unknown provider: {provider_id}"
+
+    cached = data.get(f"_provider_cache_{provider_id}")
+    if cached is None:
+        return False, f"provider '{provider_id}' state unavailable"
+
+    condition = expr.get("condition", {})
+    bindings = data.get(f"_provider_bindings_{provider_id}", {})
+
+    return provider.evaluate(bindings, cached, condition)
 
 
 def check_visibility(visible_when: dict | None, data: dict) -> bool:

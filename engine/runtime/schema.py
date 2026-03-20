@@ -202,6 +202,53 @@ class ForkDef:
 
 
 @dataclass
+class ProviderExposeDef:
+    """A single state key exposed from a provider on a specific node."""
+    key: str
+    label: str
+    instruction: str | None = None
+
+    @classmethod
+    def from_dict(cls, d: dict) -> ProviderExposeDef:
+        return cls(
+            key=d.get("key", ""),
+            label=d.get("label", d.get("key", "")),
+            instruction=d.get("instruction"),
+        )
+
+
+@dataclass
+class ProviderNodeDef:
+    """Per-node display configuration for a workflow-level provider."""
+    provider_id: str
+    expose: list[ProviderExposeDef] = field(default_factory=list)
+    affordances: bool = False
+
+    @classmethod
+    def from_dict(cls, pid: str, d: dict) -> ProviderNodeDef:
+        expose = [ProviderExposeDef.from_dict(e) for e in d.get("expose", [])]
+        return cls(
+            provider_id=pid,
+            expose=expose,
+            affordances=d.get("affordances", False),
+        )
+
+
+@dataclass
+class ProviderDef:
+    """Workflow-level provider declaration."""
+    provider_id: str
+    bindings: dict[str, str] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, pid: str, d: dict) -> ProviderDef:
+        return cls(
+            provider_id=pid,
+            bindings=d.get("bindings", {}),
+        )
+
+
+@dataclass
 class NodeDef:
     """A discrete step in a workflow."""
     id: str
@@ -218,6 +265,7 @@ class NodeDef:
     actions: list[ActionDef] = field(default_factory=list)
     router: list[RouteDef] | None = None  # mutually exclusive with proceed/fork
     fork: ForkDef | None = None            # mutually exclusive with proceed/router
+    provider_nodes: dict[str, ProviderNodeDef] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, nid: str, d: dict) -> NodeDef:
@@ -248,6 +296,10 @@ class NodeDef:
         if d.get("fork"):
             fork = ForkDef.from_dict(d["fork"])
 
+        provider_nodes = {}
+        for pid, pdef in (d.get("provider_nodes") or {}).items():
+            provider_nodes[pid] = ProviderNodeDef.from_dict(pid, pdef)
+
         return cls(
             id=nid,
             title=d.get("title", nid),
@@ -263,6 +315,7 @@ class NodeDef:
             actions=actions,
             router=router,
             fork=fork,
+            provider_nodes=provider_nodes,
         )
 
 
@@ -275,6 +328,7 @@ class WorkflowDef:
     option_sets: dict[str, list] = field(default_factory=dict)
     column_types: dict[str, dict] = field(default_factory=dict)
     nodes: dict[str, NodeDef] = field(default_factory=dict)
+    providers: dict[str, ProviderDef] = field(default_factory=dict)
 
     @property
     def node_ids(self) -> list[str]:
@@ -307,6 +361,10 @@ class WorkflowDef:
         for nid, ndef in (d.get("nodes") or {}).items():
             nodes[nid] = NodeDef.from_dict(nid, ndef)
 
+        providers = {}
+        for pid, pdef in (d.get("providers") or {}).items():
+            providers[pid] = ProviderDef.from_dict(pid, pdef)
+
         return cls(
             workflow_id=d.get("workflow_id", d.get("workflow_title", "unknown")),
             workflow_title=d.get("workflow_title", "Untitled"),
@@ -314,4 +372,5 @@ class WorkflowDef:
             option_sets=d.get("option_sets", {}),
             column_types=d.get("column_types", {}),
             nodes=nodes,
+            providers=providers,
         )

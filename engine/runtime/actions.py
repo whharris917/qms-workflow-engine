@@ -58,6 +58,9 @@ def dispatch(defn: WorkflowDef, data: dict, workflow_id: str, body: dict) -> dic
     if action == "complete":
         return _complete_execution(defn, data, workflow_id)
 
+    if action == "provider_action":
+        return _provider_action(defn, data, workflow_id, body)
+
     return {"error": f"Unknown action: {action}"}
 
 
@@ -729,4 +732,37 @@ def _complete_execution(defn, data, workflow_id):
     idx = node_ids.index(node_id)
     if idx < len(node_ids) - 1:
         data["node"] = node_ids[idx + 1]
+    return render_page(defn, data, workflow_id)
+
+
+def _provider_action(defn, data, workflow_id, body):
+    """Route an action to an external state provider."""
+    from .providers import registry, resolve_bindings, ProviderUnavailableError
+
+    provider_id = body.get("provider", "")
+    provider = registry.get(provider_id)
+    if not provider:
+        return {"error": f"Unknown provider: {provider_id}"}
+
+    # Resolve bindings from workflow-level provider config
+    pdef = defn.providers.get(provider_id)
+    if not pdef:
+        return {"error": f"Provider '{provider_id}' not declared in this workflow."}
+
+    bindings = resolve_bindings(pdef.bindings, data)
+    action_name = body.get("provider_action", "")
+    params = {k: v for k, v in body.items()
+              if k not in ("action", "provider", "provider_action")}
+
+    try:
+        result = provider.execute(bindings, action_name, params)
+    except ProviderUnavailableError as e:
+        return {"error": f"Provider '{provider_id}' unavailable: {e.detail}"}
+
+    if not result.get("ok", False):
+        return {"error": result.get("error", "Provider action failed.")}
+
+    # Invalidate cached state so next render re-queries
+    data.pop(f"_provider_cache_{provider_id}", None)
+
     return render_page(defn, data, workflow_id)

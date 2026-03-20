@@ -384,10 +384,15 @@ def _wf_load_state(workflow_id: str) -> dict:
 
 
 def _wf_save_state(workflow_id: str, data: dict):
-    """Persist workflow state to disk."""
+    """Persist workflow state to disk.
+
+    Strips transient provider cache/binding keys before writing.
+    """
     p = _wf_state_path(workflow_id)
+    clean = {k: v for k, v in data.items()
+             if not k.startswith("_provider_")}
     with open(p, "w") as f:
-        json.dump(data, f, indent=2)
+        json.dump(clean, f, indent=2)
 
 
 def _wf_notify(workflow_id: str, event: dict):
@@ -467,8 +472,16 @@ _CUSTOM_WORKFLOWS_DIR = DATA_DIR / "custom_workflows"
 _CUSTOM_WORKFLOWS_DIR.mkdir(exist_ok=True)
 
 
+def _register_providers():
+    """Register external state providers."""
+    from engine.runtime.providers import registry
+    from engine.runtime.test_provider import CounterProvider
+    registry.register(CounterProvider())
+
+
 def _discover_workflows():
     """Build the workflow registry from YAML definitions + builder handler."""
+    _register_providers()
     workflows = {}
 
     # Built-in YAML workflows — loaded via the unified runtime

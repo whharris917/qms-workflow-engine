@@ -84,6 +84,11 @@ def get_node_affordances(
     if node.table is not None or node.execution:
         sources.append(TableSource(node))
 
+    # External providers
+    for pid, pnode_def in node.provider_nodes.items():
+        if pnode_def.affordances:
+            sources.append(ProviderSource(pid))
+
     # Collect
     raw: list[dict] = []
     for source in sources:
@@ -645,3 +650,29 @@ class ExecutionSource:
             })
 
         return affs
+
+
+# ---------------------------------------------------------------------------
+# Source: Provider (external state)
+# ---------------------------------------------------------------------------
+
+class ProviderSource:
+    """Adapts an ExternalStateProvider into an AffordanceSource."""
+
+    def __init__(self, provider_id: str):
+        self.provider_id = provider_id
+
+    def get_affordances(self, ctx: AffordanceContext) -> list[dict]:
+        from .providers import registry, resolve_bindings
+
+        provider = registry.get(self.provider_id)
+        if not provider:
+            return []
+        pdef = ctx.defn.providers.get(self.provider_id)
+        if not pdef:
+            return []
+        cached = ctx.data.get(f"_provider_cache_{self.provider_id}")
+        if cached is None:
+            return []  # provider unavailable
+        bindings = resolve_bindings(pdef.bindings, ctx.data)
+        return provider.get_affordances(bindings, cached, ctx.api_base)

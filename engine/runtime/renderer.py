@@ -10,6 +10,7 @@ from __future__ import annotations
 from .schema import WorkflowDef, FieldDef, NodeDef
 from .evaluator import check_visibility
 from .affordances import get_node_affordances, _load_engine, _resolve_options
+from .providers import registry as provider_registry, resolve_bindings, ProviderUnavailableError
 
 from ..utils import trunc, field as make_field
 
@@ -114,6 +115,12 @@ def _gate_labels(gate: dict) -> list[str]:
         return ["table has columns"]
     if ctype == "table_has_rows":
         return ["table has rows"]
+    if ctype == "provider_state":
+        pid = gate.get("provider", "?")
+        inner = gate.get("condition", {})
+        inner_type = inner.get("type", "?")
+        inner_val = inner.get("value", "")
+        return [f"{pid}: {inner_type} = {inner_val!r}"]
     return [ctype or "?"]
 
 
@@ -187,12 +194,34 @@ def _serialize_definition(defn: WorkflowDef) -> dict:
     }
 
 
+def _query_providers(defn: WorkflowDef, data: dict):
+    """Query all workflow-level providers and cache results in data.
+
+    Populates _provider_cache_{pid} and _provider_bindings_{pid} as
+    transient keys. These are stripped before persistence by app.py.
+    """
+    for pid, pdef in defn.providers.items():
+        provider = provider_registry.get(pid)
+        if not provider:
+            continue
+        bindings = resolve_bindings(pdef.bindings, data)
+        data[f"_provider_bindings_{pid}"] = bindings
+        try:
+            data[f"_provider_cache_{pid}"] = provider.query(bindings)
+        except ProviderUnavailableError:
+            data[f"_provider_cache_{pid}"] = None
+
+
 def render_page(defn: WorkflowDef, data: dict, workflow_id: str) -> dict:
     """Render the current workflow state as the page dict."""
     node_id = data.get("node", defn.node_ids[0] if defn.node_ids else "")
     node = defn.nodes.get(node_id)
     if not node:
         return {"error": f"Unknown node: {node_id}"}
+
+    # Query external providers (before rendering — keeps render pure)
+    if defn.providers:
+        _query_providers(defn, data)
 
     # Derive lifecycle banner — topology-aware
     lifecycle = _build_lifecycle(defn)
@@ -234,8 +263,30 @@ def render_page(defn: WorkflowDef, data: dict, workflow_id: str) -> dict:
 
     # Fields
     fields_display = _build_fields(defn, node, data)
+
+    # Provider exposed fields — projected as read-only into fields_display
+    provider_states = {}
+    for pid, pnode_def in node.provider_nodes.items():
+        cached = data.get(f"_provider_cache_{pid}")
+        if cached is None:
+            # Provider unavailable — show diagnostic field
+            if pid in defn.providers:
+                fields_display[f"{pid} (unavailable)"] = make_field(
+                    "Cannot reach provider", "This provider is currently unavailable."
+                )
+            continue
+        provider_states[pid] = cached
+        for expose_def in pnode_def.expose:
+            value = cached.get(expose_def.key)
+            entry = make_field(value, expose_def.instruction)
+            entry["readonly"] = True
+            entry["provider"] = pid
+            fields_display[expose_def.label] = entry
+
     if fields_display:
         state["fields"] = fields_display
+    if provider_states:
+        state["providers"] = provider_states
 
     # Lists
     for list_def in node.lists.values():

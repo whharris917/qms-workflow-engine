@@ -126,6 +126,20 @@ class WorkflowRuntime:
 
     def resolve_resource(self, resource: str, body: dict):
         """Translate a resource URL segment to (internal_body, acted_label)."""
+        # Provider-routed actions: ext.{provider_id}.{action}
+        if resource.startswith("ext."):
+            parts = resource.split(".", 2)
+            if len(parts) == 3:
+                _, provider_id, action = parts
+                internal_body = {
+                    "action": "provider_action",
+                    "provider": provider_id,
+                    "provider_action": action,
+                    **body,
+                }
+                return internal_body, f"{provider_id}: {action}"
+            return None
+
         if resource in self.defn.all_field_keys:
             acted_label = None
             for fdef in self.defn.all_fields.values():
