@@ -6,8 +6,6 @@
   .ws-section > h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
   .ws-section > .desc { font-size: 0.85rem; color: #888; margin-bottom: 1rem; }
   /* Schematic node CSS injected by schematic.js on first use */
-  .sch-node-wrap[data-node-kind="branch-point"] { cursor: pointer; }
-  .sch-bp-collapsed { border-style: dashed !important; opacity: 0.7; }
 </style>
 
 <h1>Spine Model — Workflow Banner Workshop</h1>
@@ -688,44 +686,6 @@ const WORKFLOWS = [
 // BUILD PAGE
 // ═══════════════════════════════════════════════════════════════════
 
-// ── Deep-clone a spine, emptying paths for collapsed branch-points ──
-
-function pruneSpine(spine, collapsed) {
-  var out = [];
-  for (var i = 0; i < spine.length; i++) {
-    var seg = spine[i];
-    if (seg.type === 'gate') {
-      var isCollapsed = collapsed.has(seg.id);
-      var routes = [];
-      if (!isCollapsed) {
-        for (var ri = 0; ri < seg.routes.length; ri++) {
-          var r = seg.routes[ri];
-          routes.push({ label: r.label, condition: r.condition, path: pruneSpine(r.path, collapsed) });
-        }
-      }
-      out.push({ type: 'gate', id: seg.id, title: seg.title, routes: routes, height: seg.height });
-    } else if (seg.type === 'split') {
-      var isCollapsed2 = collapsed.has(seg.id);
-      var branches = [];
-      if (!isCollapsed2) {
-        for (var bi = 0; bi < seg.branches.length; bi++) {
-          var b = seg.branches[bi];
-          branches.push({ label: b.label, path: pruneSpine(b.path, collapsed) });
-        }
-      }
-      out.push({
-        type: 'split', id: seg.id, title: seg.title, branches: branches,
-        merge: seg.merge, height: seg.height
-      });
-    } else {
-      out.push({ type: seg.type, id: seg.id, title: seg.title, height: seg.height });
-    }
-  }
-  return out;
-}
-
-// ── Node renderer ───────────────────────────────────────────────────
-
 function workshopNodeRenderer(item, status) {
   if (item.kind === 'branch-point') {
     var collapsedCls = item._collapsed ? ' sch-bp-collapsed' : '';
@@ -746,8 +706,6 @@ function workshopNodeRenderer(item, status) {
     + '</div>';
 }
 
-// ── Build page ──────────────────────────────────────────────────────
-
 function buildWorkshop() {
   const root = document.getElementById('workshop');
 
@@ -767,34 +725,17 @@ function buildWorkshop() {
     const graphDiv = document.createElement('div');
     section.appendChild(graphDiv);
 
-    const collapsed = new Set();
-
-    function render() {
-      try {
-        var spine = pruneSpine(wf.spine, collapsed);
-        Schematic.renderHybrid(spine, graphDiv, null, {
-          nodeRenderer: function(item, status) {
-            if (item.kind === 'branch-point') item._collapsed = collapsed.has(item.id);
-            return workshopNodeRenderer(item, status);
-          }
-        });
-      } catch (e) {
-        graphDiv.innerHTML = '<pre style="color:red;font-size:0.8rem;padding:1rem;background:#fff0f0;border-radius:8px;">'
-          + 'Error: ' + e.message + '\n' + e.stack + '</pre>';
-      }
+    try {
+      Schematic.renderHybrid(wf.spine, graphDiv, null, {
+        nodeRenderer: workshopNodeRenderer
+      });
+    } catch (e) {
+      const err = document.createElement('pre');
+      err.style.cssText = 'color:red; font-size:0.8rem; padding:1rem; background:#fff0f0; border-radius:8px;';
+      err.textContent = `Error: ${e.message}\n${e.stack}`;
+      graphDiv.appendChild(err);
     }
 
-    graphDiv.addEventListener('click', function(ev) {
-      var wrap = ev.target.closest('[data-node-kind="branch-point"]');
-      if (!wrap) return;
-      var nodeId = wrap.getAttribute('data-node-id');
-      if (!nodeId) return;
-      if (collapsed.has(nodeId)) collapsed.delete(nodeId);
-      else collapsed.add(nodeId);
-      render();
-    });
-
-    render();
     root.appendChild(section);
   }
 }

@@ -1292,12 +1292,16 @@ function setSpineHeights(spineArr, heightMap) {
 //   handlePx     — vertical handle as fixed pixels from node top (overrides handleY when set)
 //                  nodes top-align and hang below the wire; use for card layouts where
 //                  the wire should pass through a fixed-height header
+//   collapsible   — branch-points are clickable to collapse/expand descendants (default true)
+//   focusNode     — node ID to focus on; auto-collapses all branch-points not on the path to it
 //   onLayout(layoutData)  — optional callback after layout, before DOM population
 
 var _cssInjected = false;
 var _CSS = ''
   + '.sch-node-wrap { z-index:2; position:relative; display:flex; flex-direction:column; }'
   + '.sch-cond-wrap { z-index:2; position:relative; }'
+  + '.sch-collapsible [data-node-kind="branch-point"] { cursor:pointer; }'
+  + '.sch-bp-collapsed { border-style:dashed !important; opacity:0.7; }'
   + '.sch-cond { display:inline-flex; align-items:center; justify-content:center; padding:0 8px; border-radius:10px; height:20px; border:1.5px solid #e5e7eb; background:#f3f4f6; font:500 11px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:#374151; white-space:nowrap; }'
   + '.sch-pill { display:inline-flex; align-items:center; gap:5px; padding:4px 13px; border-radius:15px; min-height:30px; background:#fff; border:1.5px solid #e5e7eb; font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:#374151; box-sizing:border-box; }'
   + '.sch-pill-dot { width:7px; height:7px; border-radius:50%; background:#6b7280; flex-shrink:0; }'
@@ -1340,6 +1344,12 @@ function renderHybrid(spine, container, execState, opts) {
   var lineGap = opts.lineGap !== undefined ? opts.lineGap : C.lineGap;
   var handleY = opts.handleY !== undefined ? opts.handleY : 0.5;
   var handlePx = opts.handlePx !== undefined ? opts.handlePx : null;
+
+  // Auto-collapse: show only the path to focusNode
+  var originalSpine = spine;
+  if (opts.focusNode) {
+    spine = _autoCollapse(spine, opts.focusNode);
+  }
 
   // Collect all node IDs from the spine for measurement
   var nodeIds = [];
@@ -1486,12 +1496,141 @@ function renderHybrid(spine, container, execState, opts) {
   container.innerHTML = nodesHtml;
   container.insertBefore(topoCanvas, container.firstChild);
 
+  // Phase 6: Collapsible interactivity (one-time setup, default on)
+  if (opts.collapsible !== false) {
+    _setupCollapsible(originalSpine, container, execState, opts);
+  }
+
   return layoutData;
 }
 
 // Minimal HTML escaping for default renderers
 function _escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Auto-collapse: focus on a specific node ──────────────────────
+// Walk the spine tree to find all branch-point IDs that are ancestors
+// of targetId (i.e., targetId is reachable through their branches).
+// Returns true if targetId is found, populating ancestors Set.
+
+function _spineContains(spine, targetId, ancestors) {
+  for (var i = 0; i < spine.length; i++) {
+    var seg = spine[i];
+    if (seg.id === targetId) return true;
+    if (seg.type === 'gate') {
+      for (var ri = 0; ri < seg.routes.length; ri++) {
+        if (_spineContains(seg.routes[ri].path, targetId, ancestors)) {
+          ancestors.add(seg.id);
+          return true;
+        }
+      }
+    }
+    if (seg.type === 'split') {
+      for (var bi = 0; bi < seg.branches.length; bi++) {
+        if (_spineContains(seg.branches[bi].path, targetId, ancestors)) {
+          ancestors.add(seg.id);
+          return true;
+        }
+      }
+      if (seg.merge && seg.merge.id === targetId) return true;
+    }
+  }
+  return false;
+}
+
+// Collect all branch-point IDs in a spine.
+function _allBranchPointIds(spine, out) {
+  for (var i = 0; i < spine.length; i++) {
+    var seg = spine[i];
+    if (seg.type === 'gate') {
+      out.add(seg.id);
+      for (var ri = 0; ri < seg.routes.length; ri++) _allBranchPointIds(seg.routes[ri].path, out);
+    }
+    if (seg.type === 'split') {
+      out.add(seg.id);
+      for (var bi = 0; bi < seg.branches.length; bi++) _allBranchPointIds(seg.branches[bi].path, out);
+    }
+  }
+}
+
+// Auto-collapse: collapse every branch-point that is NOT an ancestor
+// of focusId. Returns pruned spine ready for rendering.
+function _autoCollapse(spine, focusId) {
+  var ancestors = new Set();
+  _spineContains(spine, focusId, ancestors);
+  var allBPs = new Set();
+  _allBranchPointIds(spine, allBPs);
+  var collapsed = new Set();
+  allBPs.forEach(function(id) { if (!ancestors.has(id)) collapsed.add(id); });
+  return _pruneSpine(spine, collapsed);
+}
+
+// ── Collapsible branch-points ─────────────────────────────────────
+// Deep-clone a spine, removing routes/branches for collapsed node IDs.
+// Collapsed gates/splits get empty arrays so flattenSpine keeps them
+// inline with a collapse-wire connector.
+
+function _pruneSpine(spine, collapsed) {
+  var out = [];
+  for (var i = 0; i < spine.length; i++) {
+    var seg = spine[i];
+    if (seg.type === 'gate') {
+      var isC = collapsed.has(seg.id);
+      var routes = [];
+      if (!isC) {
+        for (var ri = 0; ri < seg.routes.length; ri++) {
+          var r = seg.routes[ri];
+          routes.push({ label: r.label, condition: r.condition, path: _pruneSpine(r.path, collapsed) });
+        }
+      }
+      out.push({ type: 'gate', id: seg.id, title: seg.title, routes: routes, height: seg.height });
+    } else if (seg.type === 'split') {
+      var isC2 = collapsed.has(seg.id);
+      var branches = [];
+      if (!isC2) {
+        for (var bi = 0; bi < seg.branches.length; bi++) {
+          var b = seg.branches[bi];
+          branches.push({ label: b.label, path: _pruneSpine(b.path, collapsed) });
+        }
+      }
+      out.push({ type: 'split', id: seg.id, title: seg.title, branches: branches,
+                 merge: seg.merge, height: seg.height });
+    } else {
+      out.push({ type: seg.type, id: seg.id, title: seg.title, height: seg.height });
+    }
+  }
+  return out;
+}
+
+// Attach one-time delegated click handler for collapse/expand.
+// Stores original spine and collapsed state on the container.
+function _setupCollapsible(originalSpine, container, execState, opts) {
+  if (container._schCollapsible) return;
+  container._schCollapsible = true;
+  container.classList.add('sch-collapsible');
+
+  var collapsed = new Set();
+  var origRenderer = opts.nodeRenderer;
+
+  container.addEventListener('click', function(ev) {
+    var wrap = ev.target.closest('[data-node-kind="branch-point"]');
+    if (!wrap) return;
+    var nodeId = wrap.getAttribute('data-node-id');
+    if (!nodeId) return;
+    if (collapsed.has(nodeId)) collapsed.delete(nodeId);
+    else collapsed.add(nodeId);
+
+    var pruned = _pruneSpine(originalSpine, collapsed);
+    var reOpts = {};
+    for (var k in opts) reOpts[k] = opts[k];
+    reOpts.collapsible = false; // handler already attached, skip re-setup
+    reOpts.nodeRenderer = function(item, status) {
+      if (item.kind === 'branch-point') item._collapsed = collapsed.has(item.id);
+      return origRenderer(item, status);
+    };
+    renderHybrid(pruned, container, execState, reOpts);
+  });
 }
 
 // ── Gate SVG shape ────────────────────────────────────────────────
