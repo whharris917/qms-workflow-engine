@@ -44,3 +44,10 @@ htmlcov/
 
 # Runtime state
 .wfe/
+
+# Data — only track YAML definitions
+data/*
+!data/*.yaml
+!data/custom_workflows/
+data/custom_workflows/*
+!data/custom_workflows/*.yaml

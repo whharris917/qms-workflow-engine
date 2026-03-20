@@ -14,14 +14,14 @@ from pathlib import Path
 
 import yaml
 
-from runtime.evaluator import evaluate
-from runtime.renderer import render_page as _unused  # type: ignore — we render our own way
+from .runtime.evaluator import evaluate
+from .runtime.renderer import render_page as _unused  # type: ignore — we render our own way
 
 # ---------------------------------------------------------------------------
 # Load YAML definition for the builder's own nodes
 # ---------------------------------------------------------------------------
 
-_YAML_PATH = Path(__file__).parent / "data" / "agent_create_workflow.yaml"
+_YAML_PATH = Path(__file__).resolve().parent.parent / "data" / "agent_create_workflow.yaml"
 with open(_YAML_PATH) as _f:
     _DEF = yaml.safe_load(_f)
 
@@ -33,7 +33,7 @@ _NODE_INFO = {
 
 WORKFLOW_TITLE = "Create Workflow"
 
-_CUSTOM_DIR = Path(__file__).parent / "data" / "custom_workflows"
+_CUSTOM_DIR = Path(__file__).resolve().parent.parent / "data" / "custom_workflows"
 _CUSTOM_DIR.mkdir(exist_ok=True)
 
 _VALID_FIELD_TYPES = ["text", "boolean", "select", "computed"]

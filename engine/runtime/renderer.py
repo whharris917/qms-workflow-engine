@@ -11,16 +11,9 @@ import json
 from .schema import WorkflowDef, FieldDef, NodeDef
 from .evaluator import evaluate, check_visibility
 
-# Re-use existing helpers
-import sys
-import os
-_parent = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _parent not in sys.path:
-    sys.path.insert(0, _parent)
-from utils import trunc, field as make_field
-
-from engine import PlanEngine
-from engine.types import ColumnDef, PlanDefinition, ExecutionState, is_choice_list
+from ..utils import trunc, field as make_field
+from ..execution import PlanEngine
+from ..execution.types import ColumnDef, PlanDefinition, ExecutionState, is_choice_list
 
 
 def _build_lifecycle(defn: WorkflowDef) -> list:

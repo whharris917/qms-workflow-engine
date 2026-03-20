@@ -9,17 +9,17 @@ import yaml
 import markdown
 from flask import Flask, render_template, abort, request, redirect, url_for, jsonify, Response
 
-import builder_handler
-from runtime import WorkflowRuntime
+from engine import builder as builder_handler
+from engine.runtime import WorkflowRuntime
 
 
 app = Flask(__name__)
 
-DATA_DIR = Path(__file__).resolve().parent / "data"
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
 # Register the execution API blueprint
-from api import api as api_blueprint  # noqa: E402
+from app.api import api as api_blueprint  # noqa: E402
 app.register_blueprint(api_blueprint)
 
 QUALITY_MANUAL_DIR = Path(__file__).resolve().parent.parent.parent / "Quality-Manual"
@@ -145,29 +145,9 @@ def inbox():
     return render_template("inbox.html", active_page="inbox")
 
 
-WORKFLOWS_DIR = Path(__file__).resolve().parent.parent / "workflows"
-
-
-def _list_workflows():
-    """List all workflow YAML files with name and state."""
-    workflows = []
-    if WORKFLOWS_DIR.exists():
-        import yaml
-        for p in sorted(WORKFLOWS_DIR.glob("*.yaml")):
-            try:
-                data = yaml.safe_load(p.read_text(encoding="utf-8"))
-                workflows.append({
-                    "name": data.get("name", p.stem),
-                    "state": data.get("state", "unknown"),
-                })
-            except Exception:
-                workflows.append({"name": p.stem, "state": "error"})
-    return workflows
-
-
 @app.route("/initiate")
 def initiate():
-    return render_template("initiate.html", active_page="home", workflows=_list_workflows())
+    return render_template("initiate.html", active_page="home", workflows=[])
 
 
 # --- Template Editor ---
@@ -777,5 +757,3 @@ def workshop():
     return render_template("workshop.html", active_page="workshop")
 
 
-if __name__ == "__main__":
-    app.run(debug=True, port=5000, threaded=True)
