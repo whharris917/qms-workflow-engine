@@ -212,7 +212,8 @@ def _query_providers(defn: WorkflowDef, data: dict):
             data[f"_provider_cache_{pid}"] = None
 
 
-def render_page(defn: WorkflowDef, data: dict, workflow_id: str) -> dict:
+def render_page(defn: WorkflowDef, data: dict, workflow_id: str,
+                 instance_id: str | None = None) -> dict:
     """Render the current workflow state as the page dict."""
     node_id = data.get("node", defn.node_ids[0] if defn.node_ids else "")
     node = defn.nodes.get(node_id)
@@ -317,7 +318,7 @@ def render_page(defn: WorkflowDef, data: dict, workflow_id: str) -> dict:
         }
 
     # Affordances (delegated to AffordanceSource protocol)
-    affordances = get_node_affordances(defn, node, data, workflow_id)
+    affordances = get_node_affordances(defn, node, data, workflow_id, instance_id)
 
     return {
         "state": state,

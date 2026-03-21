@@ -2,6 +2,7 @@
 
 import json
 import time as _time
+import uuid
 from pathlib import Path
 from queue import Queue, Empty
 
@@ -358,54 +359,112 @@ def sandbox():
 
 # ── Agent Portal ──
 
-# -- Workflow registry: per-workflow state, observers --
+# -- Workflow registry: per-instance state, observers --
 
 _WORKFLOW_STATE_DIR = DATA_DIR / "workflows"
 _WORKFLOW_STATE_DIR.mkdir(exist_ok=True)
 
-# In-memory state per workflow (not persisted)
+
+def _cache_key(workflow_id: str, instance_id: str) -> str:
+    """Composite key for in-memory caches."""
+    return f"{workflow_id}/{instance_id}"
+
+
+# In-memory state per workflow instance (not persisted)
 _workflow_observers: dict[str, list[Queue]] = {}
 _workflow_current_path: dict[str, str | None] = {}
 _workflow_last_feedback: dict[str, dict] = {}
 
 
-def _wf_state_path(workflow_id: str) -> Path:
-    """Return the on-disk JSON state file for a workflow."""
-    return _WORKFLOW_STATE_DIR / f"{workflow_id}.state.json"
+def _wf_new_instance_id() -> str:
+    """Generate a new instance ID (8-char hex from UUID4)."""
+    return uuid.uuid4().hex[:8]
 
 
-def _wf_load_state(workflow_id: str) -> dict:
-    """Load workflow state from disk, or return empty dict if none."""
-    p = _wf_state_path(workflow_id)
+def _wf_instance_dir(workflow_id: str) -> Path:
+    """Return (and create) the directory for a workflow type's instances."""
+    d = _WORKFLOW_STATE_DIR / workflow_id
+    d.mkdir(exist_ok=True)
+    return d
+
+
+def _wf_state_path(workflow_id: str, instance_id: str) -> Path:
+    """Return the on-disk JSON state file for a workflow instance."""
+    return _wf_instance_dir(workflow_id) / f"{instance_id}.state.json"
+
+
+def _wf_load_state(workflow_id: str, instance_id: str) -> dict:
+    """Load workflow instance state from disk, or return empty dict."""
+    p = _wf_state_path(workflow_id, instance_id)
     if p.exists():
         with open(p) as f:
             return json.load(f)
     return {}
 
 
-def _wf_save_state(workflow_id: str, data: dict):
-    """Persist workflow state to disk.
+def _wf_save_state(workflow_id: str, instance_id: str, data: dict):
+    """Persist workflow instance state to disk.
 
     Strips transient provider cache/binding keys before writing.
     """
-    p = _wf_state_path(workflow_id)
+    p = _wf_state_path(workflow_id, instance_id)
     clean = {k: v for k, v in data.items()
              if not k.startswith("_provider_")}
     with open(p, "w") as f:
         json.dump(clean, f, indent=2)
 
 
-def _wf_notify(workflow_id: str, event: dict):
-    """Push event to all SSE observers for a workflow."""
+def _wf_list_instances(workflow_id: str) -> list[dict]:
+    """List all instances of a workflow type with summary info."""
+    d = _WORKFLOW_STATE_DIR / workflow_id
+    if not d.is_dir():
+        return []
+    instances = []
+    for f in sorted(d.glob("*.state.json")):
+        inst_id = f.stem.replace(".state", "")
+        try:
+            state = json.loads(f.read_text())
+            node = state.get("node", "?")
+        except Exception:
+            node = "?"
+        instances.append({
+            "id": inst_id,
+            "node": node,
+            "mtime": f.stat().st_mtime,
+        })
+    # Sort newest first
+    instances.sort(key=lambda x: x["mtime"], reverse=True)
+    return instances
+
+
+def _wf_notify(workflow_id: str, instance_id: str, event: dict):
+    """Push event to all SSE observers for a workflow instance."""
+    ck = _cache_key(workflow_id, instance_id)
     event.setdefault("timestamp", _time.time())
     dead = []
-    for q in _workflow_observers.get(workflow_id, []):
+    for q in _workflow_observers.get(ck, []):
         try:
             q.put_nowait(event)
         except Exception:
             dead.append(q)
     for q in dead:
-        _workflow_observers[workflow_id].remove(q)
+        _workflow_observers[ck].remove(q)
+
+
+_portal_observers: list[Queue] = []
+
+
+def _wf_notify_portal(event: dict):
+    """Push event to all SSE observers of the portal page."""
+    event.setdefault("timestamp", _time.time())
+    dead = []
+    for q in _portal_observers:
+        try:
+            q.put_nowait(event)
+        except Exception:
+            dead.append(q)
+    for q in dead:
+        _portal_observers.remove(q)
 
 
 def _compute_feedback(before: dict, after: dict, acted_label: str = None) -> dict:
@@ -537,99 +596,215 @@ def _discover_workflows():
 _WORKFLOWS = _discover_workflows()
 
 
+def _migrate_legacy_state_files():
+    """Migrate old flat state files to instance directories.
+
+    Old format: data/workflows/{workflow_id}.state.json
+    New format: data/workflows/{workflow_id}/{instance_id}.state.json
+    """
+    for f in list(_WORKFLOW_STATE_DIR.glob("*.state.json")):
+        wf_id = f.name.replace(".state.json", "")
+        if wf_id in _WORKFLOWS:
+            dest_dir = _WORKFLOW_STATE_DIR / wf_id
+            dest_dir.mkdir(exist_ok=True)
+            inst_id = _wf_new_instance_id()
+            f.rename(dest_dir / f"{inst_id}.state.json")
+
+
+_migrate_legacy_state_files()
+
+
 def _get_handler(workflow_id):
     """Return the handler module for a workflow, or None."""
     wf = _WORKFLOWS.get(workflow_id)
     return wf["handler"] if wf else None
 
 
-def _render_agent_node(workflow_id: str):
-    """Render the current state of a workflow as a JSON-serializable dict."""
+def _render_agent_node(workflow_id: str, instance_id: str):
+    """Render the current state of a workflow instance."""
     handler = _get_handler(workflow_id)
     if handler is None:
         return {"error": f"Unknown workflow: {workflow_id}"}
-    data = _wf_load_state(workflow_id)
+    data = _wf_load_state(workflow_id, instance_id)
     if not data or "node" not in data:
         data = handler.default_data()
-        _wf_save_state(workflow_id, data)
-    return handler.render_node(data, workflow_id)
+        _wf_save_state(workflow_id, instance_id, data)
+    return handler.render_node(data, workflow_id, instance_id)
 
 
 _last_action_times: dict[str, float] = {}
 _ACTION_COOLDOWN: float = 1.0  # seconds between actions
 
 
-def _process_agent_action(workflow_id: str, body):
-    """Process a POST action for a workflow."""
-    # Rate limit per workflow
+def _process_agent_action(workflow_id: str, instance_id: str, body):
+    """Process a POST action for a workflow instance."""
+    ck = _cache_key(workflow_id, instance_id)
+    # Rate limit per instance
     now = _time.time()
-    elapsed = now - _last_action_times.get(workflow_id, 0.0)
+    elapsed = now - _last_action_times.get(ck, 0.0)
     if elapsed < _ACTION_COOLDOWN:
         return {
             "error": f"Too fast. Wait {_ACTION_COOLDOWN - elapsed:.1f}s before your next action.",
             "retry_after": round(_ACTION_COOLDOWN - elapsed, 1),
         }
-    _last_action_times[workflow_id] = now
+    _last_action_times[ck] = now
 
     handler = _get_handler(workflow_id)
     if handler is None:
         return {"error": f"Unknown workflow: {workflow_id}"}
 
-    data = _wf_load_state(workflow_id)
+    data = _wf_load_state(workflow_id, instance_id)
     if not data or "node" not in data:
         data = handler.default_data()
-    result = handler.process_action(data, workflow_id, body)
+    result = handler.process_action(data, workflow_id, body, instance_id)
     if "error" not in result:
-        _wf_save_state(workflow_id, data)
+        _wf_save_state(workflow_id, instance_id, data)
     return result
+
+
+def _render_portal() -> dict:
+    """Build the portal's canonical {state, instructions, affordances} dict."""
+    workflows = []
+    affordances = []
+    n = 1
+    for wf_id, wf_info in _WORKFLOWS.items():
+        instances = _wf_list_instances(wf_id)
+        wf_entry = {
+            "id": wf_id,
+            "title": wf_info["title"],
+            "description": wf_info["description"],
+            "instances": [],
+        }
+        for inst in instances:
+            wf_entry["instances"].append({
+                "id": inst["id"],
+                "node": inst["node"],
+                "url": f"/agent/{wf_id}/{inst['id']}",
+            })
+            affordances.append({
+                "id": n,
+                "label": f"Open {wf_info['title']} ({inst['id']}: {inst['node']})",
+                "method": "GET",
+                "url": f"/agent/{wf_id}/{inst['id']}",
+            })
+            n += 1
+        affordances.append({
+            "id": n,
+            "label": f"New {wf_info['title']} instance",
+            "method": "POST",
+            "url": f"/agent/{wf_id}/new",
+            "body": {},
+        })
+        n += 1
+        workflows.append(wf_entry)
+
+    return {
+        "state": {
+            "page": "agent_portal",
+            "page_title": "Agent Portal",
+            "workflows": workflows,
+        },
+        "instructions": "Available workflows. Create new instances or open existing ones.",
+        "affordances": affordances,
+    }
 
 
 @app.route("/agent")
 def agent_portal():
-    # Build workflow list with state summaries
-    workflows = []
-    for wf_id, wf_info in _WORKFLOWS.items():
-        state = _wf_load_state(wf_id)
-        has_state = bool(state)
-        workflows.append({
-            "id": wf_id,
-            "title": wf_info["title"],
-            "description": wf_info["description"],
-            "has_state": has_state,
-        })
-    return render_template("agent.html", active_page="agent", workflows=workflows)
+    # JSON for agents, HTML for browsers
+    if request.accept_mimetypes.best == "application/json":
+        return jsonify(_render_portal())
+
+    # Build template data from the canonical representation
+    portal = _render_portal()
+    workflows = portal["state"]["workflows"]
+    return render_template("agent.html", active_page="agent", workflows=workflows,
+                           agent_view_stream="/agent/stream")
 
 
-@app.route("/agent/<workflow_id>/observe")
-def agent_observe(workflow_id):
+@app.route("/agent/stream")
+def agent_portal_stream():
+    """SSE stream for the portal page — instance create/delete events."""
+    def generate():
+        q = Queue()
+        _portal_observers.append(q)
+        try:
+            init = {
+                "type": "init",
+                "page": _render_portal(),
+            }
+            yield f"data: {json.dumps(init)}\n\n"
+            while True:
+                try:
+                    event = q.get(timeout=15)
+                    # On any change, send the full refreshed portal state
+                    event["page"] = _render_portal()
+                    yield f"data: {json.dumps(event)}\n\n"
+                except Empty:
+                    yield ": keepalive\n\n"
+        except GeneratorExit:
+            pass
+        finally:
+            if q in _portal_observers:
+                _portal_observers.remove(q)
+    return Response(
+        generate(),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.route("/agent/<workflow_id>/new", methods=["POST"])
+def agent_new_instance(workflow_id):
+    """Create a new workflow instance."""
+    if workflow_id not in _WORKFLOWS:
+        return jsonify({"error": "Unknown workflow"}), 404
+    inst_id = _wf_new_instance_id()
+    handler = _get_handler(workflow_id)
+    data = handler.default_data()
+    _wf_save_state(workflow_id, inst_id, data)
+    # Notify portal observers
+    _wf_notify_portal({"type": "instance_created", "workflow_id": workflow_id, "instance_id": inst_id})
+    # JSON for agents, redirect for browsers
+    if request.accept_mimetypes.best == "application/json":
+        page = handler.render_node(data, workflow_id, inst_id)
+        page["instance_id"] = inst_id
+        return jsonify(page), 201
+    return redirect(f"/agent/{workflow_id}/{inst_id}/observe")
+
+
+@app.route("/agent/<workflow_id>/<instance_id>/observe")
+def agent_observe(workflow_id, instance_id):
     if workflow_id not in _WORKFLOWS:
         abort(404)
     wf_info = _WORKFLOWS[workflow_id]
     return render_template(
         "agent_observer.html",
         workflow_id=workflow_id,
+        instance_id=instance_id,
         workflow_title=wf_info["title"],
-        stream_url=f"/agent/{workflow_id}/stream",
+        stream_url=f"/agent/{workflow_id}/{instance_id}/stream",
         renderers=json.dumps(wf_info["renderers"]),
     )
 
 
-@app.route("/agent/<workflow_id>/stream")
-def agent_stream(workflow_id):
+@app.route("/agent/<workflow_id>/<instance_id>/stream")
+def agent_stream(workflow_id, instance_id):
     if workflow_id not in _WORKFLOWS:
         return jsonify({"error": "Unknown workflow"}), 404
+    ck = _cache_key(workflow_id, instance_id)
 
     def generate():
         q = Queue()
-        observers = _workflow_observers.setdefault(workflow_id, [])
+        observers = _workflow_observers.setdefault(ck, [])
         observers.append(q)
         try:
-            page = _render_agent_node(workflow_id)
+            page = _render_agent_node(workflow_id, instance_id)
             init = {
                 "type": "init",
-                "current_path": _workflow_current_path.get(workflow_id),
+                "current_path": _workflow_current_path.get(ck),
                 "page": page,
-                "last_feedback": _workflow_last_feedback.get(workflow_id),
+                "last_feedback": _workflow_last_feedback.get(ck),
             }
             yield f"data: {json.dumps(init)}\n\n"
             while True:
@@ -641,8 +816,8 @@ def agent_stream(workflow_id):
         except GeneratorExit:
             pass
         finally:
-            if q in _workflow_observers.get(workflow_id, []):
-                _workflow_observers[workflow_id].remove(q)
+            if q in _workflow_observers.get(ck, []):
+                _workflow_observers[ck].remove(q)
     return Response(
         generate(),
         mimetype="text/event-stream",
@@ -650,40 +825,44 @@ def agent_stream(workflow_id):
     )
 
 
-@app.route("/agent/<workflow_id>/reset", methods=["POST"])
-def agent_reset(workflow_id):
+@app.route("/agent/<workflow_id>/<instance_id>/reset", methods=["POST"])
+def agent_reset(workflow_id, instance_id):
     if workflow_id not in _WORKFLOWS:
         return jsonify({"error": "Unknown workflow"}), 404
-    p = _wf_state_path(workflow_id)
+    p = _wf_state_path(workflow_id, instance_id)
     if p.exists():
         p.unlink()
-    _workflow_current_path.pop(workflow_id, None)
-    _workflow_last_feedback.pop(workflow_id, None)
-    return jsonify({"message": f"Workflow '{workflow_id}' reset."})
+    ck = _cache_key(workflow_id, instance_id)
+    _workflow_current_path.pop(ck, None)
+    _workflow_last_feedback.pop(ck, None)
+    _wf_notify_portal({"type": "instance_deleted", "workflow_id": workflow_id, "instance_id": instance_id})
+    return jsonify({"message": f"Instance '{instance_id}' of '{workflow_id}' deleted."})
 
 
-@app.route("/agent/<workflow_id>", methods=["GET"])
-def agent_workflow_get(workflow_id):
+@app.route("/agent/<workflow_id>/<instance_id>", methods=["GET"])
+def agent_workflow_get(workflow_id, instance_id):
     if workflow_id not in _WORKFLOWS:
         return jsonify({"error": f"Unknown workflow: {workflow_id}"}), 404
-    page = _render_agent_node(workflow_id)
+    ck = _cache_key(workflow_id, instance_id)
+    page = _render_agent_node(workflow_id, instance_id)
     node = (page.get("state") or {}).get("node") or (page.get("state") or {}).get("position") or workflow_id
-    _workflow_current_path[workflow_id] = node
-    _wf_notify(workflow_id, {"type": "navigate", "path": node, "content": json.dumps(page)})
+    _workflow_current_path[ck] = node
+    _wf_notify(workflow_id, instance_id, {"type": "navigate", "path": node, "content": json.dumps(page)})
     if page is None:
         return jsonify({"error": f"Unknown workflow: {workflow_id}"}), 404
     return jsonify(page)
 
 
-def _execute_and_feedback(workflow_id, internal_body, acted_label=None):
+def _execute_and_feedback(workflow_id, instance_id, internal_body, acted_label=None):
     """Execute an agent action, compute feedback, notify observers.
 
     Returns (feedback_dict, http_status_code).
     """
+    ck = _cache_key(workflow_id, instance_id)
     attempted = acted_label or internal_body.get("action", "?")
-    before_full = _render_agent_node(workflow_id)
-    _wf_notify(workflow_id, {"type": "action", "path": workflow_id, "body": internal_body})
-    result = _process_agent_action(workflow_id, internal_body)
+    before_full = _render_agent_node(workflow_id, instance_id)
+    _wf_notify(workflow_id, instance_id, {"type": "action", "path": workflow_id, "body": internal_body})
+    result = _process_agent_action(workflow_id, instance_id, internal_body)
 
     if "error" in result:
         feedback = {
@@ -696,8 +875,8 @@ def _execute_and_feedback(workflow_id, internal_body, acted_label=None):
                 "modified_affordances": [],
             },
         }
-        _workflow_last_feedback[workflow_id] = feedback
-        _wf_notify(workflow_id, {"type": "result", "path": workflow_id, "result": before_full, "feedback": feedback})
+        _workflow_last_feedback[ck] = feedback
+        _wf_notify(workflow_id, instance_id, {"type": "result", "path": workflow_id, "result": before_full, "feedback": feedback})
         return feedback, 422
 
     after_full = result
@@ -705,15 +884,15 @@ def _execute_and_feedback(workflow_id, internal_body, acted_label=None):
     feedback["attempted_action"] = attempted
 
     node = (after_full.get("state") or {}).get("node") or (after_full.get("state") or {}).get("position") or workflow_id
-    _workflow_current_path[workflow_id] = node
-    _workflow_last_feedback[workflow_id] = feedback
-    _wf_notify(workflow_id, {"type": "result", "path": workflow_id, "result": after_full, "feedback": feedback})
+    _workflow_current_path[ck] = node
+    _workflow_last_feedback[ck] = feedback
+    _wf_notify(workflow_id, instance_id, {"type": "result", "path": workflow_id, "result": after_full, "feedback": feedback})
 
     return feedback, 200
 
 
-@app.route("/agent/<workflow_id>/<resource>", methods=["POST"])
-def agent_resource_post(workflow_id, resource):
+@app.route("/agent/<workflow_id>/<instance_id>/<resource>", methods=["POST"])
+def agent_resource_post(workflow_id, instance_id, resource):
     """Resource-oriented endpoint — each affordance is a literal URL."""
     if workflow_id not in _WORKFLOWS:
         return jsonify({"error": f"Unknown workflow: {workflow_id}"}), 404
@@ -725,19 +904,21 @@ def agent_resource_post(workflow_id, resource):
         return jsonify({"error": f"Unknown resource: {resource}"}), 404
     internal_body, acted_label = resolved
 
-    feedback, status = _execute_and_feedback(workflow_id, internal_body,
+    feedback, status = _execute_and_feedback(workflow_id, instance_id,
+                                             internal_body,
                                              acted_label=acted_label)
     return jsonify(feedback), status
 
 
-@app.route("/agent/<workflow_id>", methods=["POST"])
-def agent_workflow_post(workflow_id):
+@app.route("/agent/<workflow_id>/<instance_id>", methods=["POST"])
+def agent_workflow_post(workflow_id, instance_id):
     """Legacy single-endpoint dispatch (backward compatibility)."""
     if workflow_id not in _WORKFLOWS:
         return jsonify({"error": f"Unknown workflow: {workflow_id}"}), 404
     body = request.get_json(silent=True) or {}
     acted_label = body.get("action", "?")
-    feedback, status = _execute_and_feedback(workflow_id, body, acted_label=acted_label)
+    feedback, status = _execute_and_feedback(workflow_id, instance_id, body,
+                                             acted_label=acted_label)
     return jsonify(feedback), status
 
 

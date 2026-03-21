@@ -119,9 +119,84 @@
         </nav>
     </aside>
     <div class="main">
-        <div class="content">
+        <div class="content" id="human-view">
             {% block content %}{% endblock %}
         </div>
+        <div class="content" id="agent-view" style="display:none;">
+            <div id="agent-view-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                <h1 style="font-size:1.75rem; font-weight:600;">Agent View</h1>
+                <span id="agent-stream-status" style="font-size:0.8rem; color:#999;">disconnected</span>
+            </div>
+            <pre id="agent-view-content" style="background:#1a1a2e; color:#e0e0e0; padding:1.25rem; border-radius:8px; font-size:0.82rem; line-height:1.5; overflow-x:auto; white-space:pre-wrap; max-height:calc(100vh - 10rem); overflow-y:auto;"></pre>
+        </div>
+        {% if agent_view_stream %}
+        <button id="agent-view-toggle" onclick="toggleAgentView()" title="Toggle Agent View"
+            style="position:fixed; top:1rem; right:1.25rem; z-index:100; background:#1a1a2e; color:#ccc; border:1px solid #444; border-radius:6px; padding:0.4rem 0.8rem; font-size:0.8rem; cursor:pointer; transition: background 0.15s, color 0.15s;">
+            Agent View
+        </button>
+        <script>
+        (function() {
+            var streamUrl = '{{ agent_view_stream }}';
+            var es = null;
+            var agentActive = false;
+            var lastState = null;
+
+            function renderAgentState(data) {
+                var el = document.getElementById('agent-view-content');
+                if (!el) return;
+                try {
+                    el.textContent = JSON.stringify(data, null, 2);
+                } catch(e) {
+                    el.textContent = String(data);
+                }
+            }
+
+            function connectStream() {
+                if (es) return;
+                es = new EventSource(streamUrl);
+                var status = document.getElementById('agent-stream-status');
+                es.onopen = function() { if (status) status.textContent = 'connected'; status.style.color = '#4a4'; };
+                es.onmessage = function(e) {
+                    try {
+                        var evt = JSON.parse(e.data);
+                        lastState = evt.page || evt;
+                        if (agentActive) renderAgentState(lastState);
+                    } catch(err) {}
+                };
+                es.onerror = function() { if (status) status.textContent = 'disconnected'; status.style.color = '#999'; };
+            }
+
+            function disconnectStream() {
+                if (es) { es.close(); es = null; }
+                var status = document.getElementById('agent-stream-status');
+                if (status) { status.textContent = 'disconnected'; status.style.color = '#999'; }
+            }
+
+            window.toggleAgentView = function() {
+                agentActive = !agentActive;
+                var human = document.getElementById('human-view');
+                var agent = document.getElementById('agent-view');
+                var btn = document.getElementById('agent-view-toggle');
+                if (agentActive) {
+                    human.style.display = 'none';
+                    agent.style.display = 'block';
+                    btn.style.background = '#4a9eff';
+                    btn.style.color = '#fff';
+                    btn.style.borderColor = '#4a9eff';
+                    connectStream();
+                    if (lastState) renderAgentState(lastState);
+                } else {
+                    human.style.display = 'block';
+                    agent.style.display = 'none';
+                    btn.style.background = '#1a1a2e';
+                    btn.style.color = '#ccc';
+                    btn.style.borderColor = '#444';
+                    disconnectStream();
+                }
+            };
+        })();
+        </script>
+        {% endif %}
     </div>
 </body>
 </html>

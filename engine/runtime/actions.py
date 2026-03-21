@@ -11,15 +11,27 @@ import json
 
 from .schema import WorkflowDef
 from .evaluator import evaluate, check_visibility
-from .renderer import render_page
+from .renderer import render_page as _render_page_impl
 from .affordances import _load_engine
 
+# Instance context — set at dispatch() entry so internal functions can call
+# render_page() without threading instance_id through every signature.
+_current_instance_id: str | None = None
 
-def dispatch(defn: WorkflowDef, data: dict, workflow_id: str, body: dict) -> dict:
+
+def render_page(defn, data, workflow_id):
+    """Wrapper that injects the current instance_id into render calls."""
+    return _render_page_impl(defn, data, workflow_id, _current_instance_id)
+
+
+def dispatch(defn: WorkflowDef, data: dict, workflow_id: str, body: dict,
+             instance_id: str | None = None) -> dict:
     """Process a POST action. Mutates *data* in place.
 
     Returns the rendered page dict on success, or {"error": msg} on failure.
     """
+    global _current_instance_id
+    _current_instance_id = instance_id
     action = body.get("action")
 
     if action == "restart":

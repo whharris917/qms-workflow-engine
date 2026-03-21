@@ -46,10 +46,15 @@ class AffordanceSource(Protocol):
 # ---------------------------------------------------------------------------
 
 def get_node_affordances(
-    defn: WorkflowDef, node: NodeDef, data: dict, workflow_id: str
+    defn: WorkflowDef, node: NodeDef, data: dict, workflow_id: str,
+    instance_id: str | None = None,
 ) -> list[dict]:
     """Collect affordances from all sources on a node, then number them."""
-    ctx = AffordanceContext(data=data, defn=defn, api_base=f"/agent/{workflow_id}")
+    if instance_id:
+        api_base = f"/agent/{workflow_id}/{instance_id}"
+    else:
+        api_base = f"/agent/{workflow_id}"
+    ctx = AffordanceContext(data=data, defn=defn, api_base=api_base)
     sources: list[Any] = []
 
     # Content: fields

@@ -18,6 +18,10 @@ from .runtime.evaluator import evaluate
 from .runtime.schema import WorkflowDef
 from .runtime.renderer import _build_lifecycle, _serialize_definition
 
+# Instance context — set at process_action() entry so internal render_node()
+# calls don't need instance_id threaded through every helper.
+_current_instance_id: str | None = None
+
 # ---------------------------------------------------------------------------
 # Load YAML definition for the builder's own nodes
 # ---------------------------------------------------------------------------
@@ -349,7 +353,8 @@ def _summary(data: dict) -> dict:
     return result
 
 
-def render_node(data: dict, workflow_id: str) -> dict:
+def render_node(data: dict, workflow_id: str,
+                instance_id: str | None = None) -> dict:
     data = _ensure(data)
     node = data["node"]
     info = _NODE_INFO[node]
@@ -359,7 +364,7 @@ def render_node(data: dict, workflow_id: str) -> dict:
     lifecycle_current = node
     lifecycle_completed = data.get("completed_nodes", [])
 
-    affordances = _build_affordances(data, workflow_id)
+    affordances = _build_affordances(data, workflow_id, instance_id)
 
     state = {
         "workflow": WORKFLOW_TITLE,
@@ -388,11 +393,12 @@ def render_node(data: dict, workflow_id: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def _build_affordances(data: dict, workflow_id: str) -> list[dict]:
+def _build_affordances(data: dict, workflow_id: str,
+                       instance_id: str | None = None) -> list[dict]:
     node = data["node"]
     affs = []
     n = 1
-    api = f"/agent/{workflow_id}"
+    api = f"/agent/{workflow_id}/{instance_id}" if instance_id else f"/agent/{workflow_id}"
 
     if node == "metadata":
         for key, label in [("workflow_id", "Workflow ID"), ("workflow_title", "Workflow Title"), ("workflow_description", "Workflow Description")]:
@@ -707,7 +713,12 @@ def _build_affordances(data: dict, workflow_id: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
-def process_action(data: dict, workflow_id: str, body: dict) -> dict:
+def process_action(data: dict, workflow_id: str, body: dict,
+                   instance_id: str | None = None) -> dict:
+    # Store instance_id so all internal render_node() calls can use it
+    global _current_instance_id
+    _current_instance_id = instance_id
+
     data = _ensure(data)
     action = body.get("action")
     node = data["node"]
@@ -716,7 +727,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         fresh = default_data()
         data.clear()
         data.update(fresh)
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     # -----------------------------------------------------------------------
     # Metadata
@@ -732,18 +743,18 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if v in reserved:
             return {"error": f"'{v}' is a reserved workflow ID."}
         data["workflow_id"] = v
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "set_workflow_title":
         v = body.get("value", "").strip()
         if not v:
             return {"error": "Workflow title is required."}
         data["workflow_title"] = v
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "set_workflow_description":
         data["workflow_description"] = body.get("value", "").strip() or None
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     # -----------------------------------------------------------------------
     # Option sets (workflow-level)
@@ -759,7 +770,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if name in data["option_sets"]:
             return {"error": f"Option set '{name}' already exists. Use edit to modify."}
         data["option_sets"][name] = options
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "edit_option_set":
         name = body.get("name", "").strip()
@@ -769,14 +780,14 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if not isinstance(options, list) or not options:
             return {"error": "Options must be a non-empty array."}
         data["option_sets"][name] = options
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "remove_option_set":
         name = body.get("name", "").strip()
         if name not in data.get("option_sets", {}):
             return {"error": f"Option set '{name}' does not exist."}
         del data["option_sets"][name]
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     # -----------------------------------------------------------------------
     # Column types (workflow-level)
@@ -796,7 +807,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if type_id in data["column_types"]:
             return {"error": f"Column type '{type_id}' already exists. Use edit to modify."}
         data["column_types"][type_id] = {"label": label, "category": category, "description": description}
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "edit_column_type":
         type_id = body.get("type_id", "").strip()
@@ -811,14 +822,14 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
             ct["category"] = body["category"]
         if body.get("description"):
             ct["description"] = body["description"].strip()
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "remove_column_type":
         type_id = body.get("type_id", "").strip()
         if type_id not in data.get("column_types", {}):
             return {"error": f"Column type '{type_id}' does not exist."}
         del data["column_types"][type_id]
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     # -----------------------------------------------------------------------
     # Node builder
@@ -840,14 +851,14 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
             "table": None, "navigation": [], "proceed": None, "actions": [],
         })
         data["focused_node"] = len(data["wf_nodes"]) - 1
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "select_node":
         idx = body.get("index")
         if not isinstance(idx, int) or idx < 0 or idx >= len(data["wf_nodes"]):
             return {"error": "Invalid node index."}
         data["focused_node"] = idx
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "edit_node":
         idx = body.get("index")
@@ -858,7 +869,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
             wn["title"] = body["title"].strip()
         if body.get("instruction"):
             wn["instruction"] = body["instruction"].strip()
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "remove_node":
         idx = body.get("index")
@@ -870,7 +881,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
                 data["focused_node"] = None
             elif data["focused_node"] > idx:
                 data["focused_node"] -= 1
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "reorder_node":
         idx = body.get("index")
@@ -890,7 +901,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
                 data["focused_node"] = idx + 1
             elif data["focused_node"] == idx + 1:
                 data["focused_node"] = idx
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     # -----------------------------------------------------------------------
     # Fields (scoped to focused node)
@@ -937,7 +948,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if body.get("annotate_from"):
             new_field["annotate_from"] = body["annotate_from"]
         data["wf_nodes"][focused]["fields"].append(new_field)
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "edit_field":
         focused = data.get("focused_node")
@@ -974,7 +985,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
             fld["instruction_when_false"] = body["instruction_when_false"] or None
         if "annotate_from" in body:
             fld["annotate_from"] = body["annotate_from"] or None
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "remove_field":
         focused = data.get("focused_node")
@@ -985,7 +996,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if not isinstance(fi, int) or fi < 0 or fi >= len(flds):
             return {"error": "Invalid field index."}
         flds.pop(fi)
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     # -----------------------------------------------------------------------
     # Lists (scoped to focused node)
@@ -1016,7 +1027,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
             "operations": ops,
             "focus": bool(body.get("focus", False)),
         }
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "edit_list":
         focused = data.get("focused_node")
@@ -1034,7 +1045,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
             ldef["operations"] = [o for o in body["operations"] if o in _VALID_LIST_OPS]
         if "focus" in body:
             ldef["focus"] = bool(body["focus"])
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "remove_list":
         focused = data.get("focused_node")
@@ -1046,7 +1057,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if lk not in lists:
             return {"error": f"List '{lk}' does not exist."}
         del lists[lk]
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "add_list_field":
         focused = data.get("focused_node")
@@ -1070,7 +1081,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if ftype == "select" and isinstance(body.get("options"), list):
             fdef["options"] = body["options"]
         schema[fkey] = fdef
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "remove_list_field":
         focused = data.get("focused_node")
@@ -1086,7 +1097,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if fkey not in schema:
             return {"error": f"Field '{fkey}' does not exist in list '{lk}'."}
         del schema[fkey]
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     # -----------------------------------------------------------------------
     # Table (scoped to focused node)
@@ -1112,14 +1123,14 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         else:
             tbl["operations"] = list(_VALID_TABLE_OPS)
         fn["table"] = tbl
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "remove_table":
         focused = data.get("focused_node")
         if focused is None or focused >= len(data["wf_nodes"]):
             return {"error": "No node is focused."}
         data["wf_nodes"][focused]["table"] = None
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     # -----------------------------------------------------------------------
     # Node config (scoped to focused node)
@@ -1149,7 +1160,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
                 return {"error": f"Target node '{target}' does not exist."}
             proceed["target"] = target
         data["wf_nodes"][focused]["proceed"] = proceed
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "add_navigation":
         focused = data.get("focused_node")
@@ -1169,7 +1180,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if isinstance(when, dict):
             entry["when"] = when
         data["wf_nodes"][focused].setdefault("navigation", []).append(entry)
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "remove_navigation":
         focused = data.get("focused_node")
@@ -1180,7 +1191,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if not isinstance(ni, int) or ni < 0 or ni >= len(navs):
             return {"error": "Invalid navigation index."}
         navs.pop(ni)
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "add_action":
         focused = data.get("focused_node")
@@ -1191,7 +1202,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if at not in ("submit", "restart") or not al:
             return {"error": "action_type (submit/restart) and label are required."}
         data["wf_nodes"][focused].setdefault("actions", []).append({"action": at, "label": al})
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "remove_action":
         focused = data.get("focused_node")
@@ -1202,7 +1213,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if not isinstance(ai, int) or ai < 0 or ai >= len(acts):
             return {"error": "Invalid action index."}
         acts.pop(ai)
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "set_show_all_fields":
         focused = data.get("focused_node")
@@ -1212,7 +1223,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if v is not True and v is not False:
             return {"error": "value must be true or false."}
         data["wf_nodes"][focused]["show_all_fields"] = v
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "set_pause":
         focused = data.get("focused_node")
@@ -1222,7 +1233,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if v is not True and v is not False:
             return {"error": "value must be true or false."}
         data["wf_nodes"][focused]["pause"] = v
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "set_execution":
         focused = data.get("focused_node")
@@ -1232,7 +1243,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if v is not True and v is not False:
             return {"error": "value must be true or false."}
         data["wf_nodes"][focused]["execution"] = v
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     # -----------------------------------------------------------------------
     # Set node mode (standard / router / fork)
@@ -1258,7 +1269,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         else:  # standard
             fn.pop("router", None)
             fn.pop("fork", None)
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     # -----------------------------------------------------------------------
     # Router: add / remove route
@@ -1279,7 +1290,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if when and isinstance(when, dict):
             route["when"] = when
         fn["router"].append(route)
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "remove_route":
         focused = data.get("focused_node")
@@ -1291,7 +1302,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if not isinstance(ri, int) or ri < 0 or ri >= len(routes):
             return {"error": "Invalid route index."}
         routes.pop(ri)
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     # -----------------------------------------------------------------------
     # Fork: merge, label, branch, gate
@@ -1309,7 +1320,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if not merge or not any(w["id"] == merge for w in data["wf_nodes"]):
             return {"error": f"Merge target '{merge}' does not exist."}
         fork["merge"] = merge
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "set_fork_label":
         focused = data.get("focused_node")
@@ -1320,7 +1331,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if not fork:
             return {"error": "Node is not in fork mode."}
         fork["label"] = body.get("label", "Continue").strip()
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "add_branch":
         focused = data.get("focused_node")
@@ -1345,7 +1356,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
             if nid not in node_ids:
                 return {"error": f"Branch node '{nid}' does not exist."}
         fork.setdefault("branches", {})[bid] = {"label": label, "nodes": nodes_list}
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "remove_branch":
         focused = data.get("focused_node")
@@ -1360,7 +1371,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if bid not in branches:
             return {"error": f"Branch '{bid}' does not exist."}
         del branches[bid]
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "set_fork_gate":
         focused = data.get("focused_node")
@@ -1381,7 +1392,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
             }
         else:
             return {"error": "Provide gate (expression dict) or requires (array of field keys)."}
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     # -----------------------------------------------------------------------
     # Builder navigation
@@ -1394,14 +1405,14 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if node not in data["completed_nodes"]:
             data["completed_nodes"].append(node)
         data["node"] = _NODES[idx + 1]
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "go_back":
         idx = _NODES.index(node)
         if idx <= 0:
             return {"error": "Already at the first node."}
         data["node"] = _NODES[idx - 1]
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     if action == "publish":
         if node != "preview":
@@ -1415,7 +1426,7 @@ def process_action(data: dict, workflow_id: str, body: dict) -> dict:
         if "preview" not in data["completed_nodes"]:
             data["completed_nodes"].append("preview")
         data["node"] = "published"
-        return render_node(data, workflow_id)
+        return render_node(data, workflow_id, _current_instance_id)
 
     return {"error": f"Unknown action: {action}"}
 

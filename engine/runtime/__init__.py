@@ -118,11 +118,13 @@ class WorkflowRuntime:
     def default_data(self) -> dict:
         return _build_default_data(self.defn)
 
-    def render_node(self, data: dict, workflow_id: str) -> dict:
-        return render_page(self.defn, data, workflow_id)
+    def render_node(self, data: dict, workflow_id: str,
+                    instance_id: str | None = None) -> dict:
+        return render_page(self.defn, data, workflow_id, instance_id)
 
-    def process_action(self, data: dict, workflow_id: str, body: dict) -> dict:
-        return dispatch(self.defn, data, workflow_id, body)
+    def process_action(self, data: dict, workflow_id: str, body: dict,
+                       instance_id: str | None = None) -> dict:
+        return dispatch(self.defn, data, workflow_id, body, instance_id)
 
     def resolve_resource(self, resource: str, body: dict):
         """Translate a resource URL segment to (internal_body, acted_label)."""
