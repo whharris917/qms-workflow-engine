@@ -15,7 +15,8 @@ from pathlib import Path
 import yaml
 
 from .runtime.evaluator import evaluate
-from .runtime.renderer import render_page as _unused  # type: ignore — we render our own way
+from .runtime.schema import WorkflowDef
+from .runtime.renderer import _build_lifecycle, _serialize_definition
 
 # ---------------------------------------------------------------------------
 # Load YAML definition for the builder's own nodes
@@ -24,6 +25,15 @@ from .runtime.renderer import render_page as _unused  # type: ignore — we rend
 _YAML_PATH = Path(__file__).resolve().parent.parent / "data" / "agent_create_workflow.yaml"
 with open(_YAML_PATH) as _f:
     _DEF = yaml.safe_load(_f)
+
+# Parse into WorkflowDef so we can reuse the runtime's rendering helpers.
+# Inject implicit proceed links between sequential nodes so the schematic
+# banner can chain them into a connected spine.
+_builder_raw = {**_DEF, "workflow_title": "Create Workflow"}
+_builder_node_ids = list(_builder_raw["nodes"].keys())
+for _i, _nid in enumerate(_builder_node_ids[:-1]):
+    _builder_raw["nodes"][_nid].setdefault("proceed", {"label": "Continue", "target": _builder_node_ids[_i + 1]})
+_BUILDER_DEFN = WorkflowDef.from_dict(_builder_raw)
 
 _NODES = list(_DEF["nodes"].keys())
 _NODE_INFO = {
@@ -344,14 +354,10 @@ def render_node(data: dict, workflow_id: str) -> dict:
     node = data["node"]
     info = _NODE_INFO[node]
 
-    # Derive lifecycle from builder's own node titles
-    lifecycle = [_NODE_INFO[nid]["title"] for nid in _NODES]
-    lifecycle_current = info["title"]
-    lifecycle_completed = []
-    for cn in data["completed_nodes"]:
-        cn_info = _NODE_INFO.get(cn)
-        if cn_info and cn_info["title"] not in lifecycle_completed:
-            lifecycle_completed.append(cn_info["title"])
+    # Use the runtime's topology-aware lifecycle (same format as all other workflows)
+    lifecycle = _build_lifecycle(_BUILDER_DEFN)
+    lifecycle_current = node
+    lifecycle_completed = data.get("completed_nodes", [])
 
     affordances = _build_affordances(data, workflow_id)
 
@@ -363,6 +369,7 @@ def render_node(data: dict, workflow_id: str) -> dict:
         "lifecycle_current": lifecycle_current,
         "lifecycle_completed": lifecycle_completed,
         "completed_nodes": data["completed_nodes"],
+        "banner_definition": _serialize_definition(_BUILDER_DEFN),
         "definition": _summary(data),
     }
 

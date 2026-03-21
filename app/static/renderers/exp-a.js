@@ -36,9 +36,11 @@
         if (lifecycle.length) {
             html += '<div class="ex-progress">';
             for (var i = 0; i < lifecycle.length; i++) {
-                var label = lifecycle[i];
-                var isCurrent = label === current;
-                var isDone = completed.indexOf(label) !== -1;
+                var item = lifecycle[i];
+                var label = (typeof item === 'string') ? item : (item.title || '');
+                var itemId = (typeof item === 'string') ? item : (item.id || '');
+                var isCurrent = itemId === current || label === current;
+                var isDone = completed.indexOf(itemId) !== -1 || completed.indexOf(label) !== -1;
                 if (i > 0) html += '<span class="ex-arrow">&rarr;</span>';
                 var cls = 'ex-phase';
                 if (isCurrent) cls += ' ex-phase-current';

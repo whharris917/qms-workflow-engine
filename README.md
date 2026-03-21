@@ -55,7 +55,7 @@ Three built-in workflows ship in `data/`:
 
 Agents don't need to know the workflow structure. Every valid action is presented as a self-describing affordance with a URL, HTTP method, body template, and parameter options for constrained choices. The agent just picks one and sends it.
 
-Affordances are **derived from state**, not declared. When a field becomes visible, its affordance appears. When a gate opens, the proceed affordance appears. When a fork activates, branch-switching affordances appear. When all acceptance criteria pass, the completion affordance appears.
+Affordances are **derived from state**, not declared. Each workflow primitive (fields, lists, tables, navigation, external providers) implements an `AffordanceSource` that answers "what is possible?" — the engine collects from all sources automatically. When a field becomes visible, its affordance appears. When a gate opens, the proceed affordance appears. When a fork activates, branch-switching affordances appear. When an external provider offers actions, they appear alongside native affordances.
 
 ### Observer UI
 
@@ -237,10 +237,12 @@ qms-workflow-engine/
 ├── engine/
 │   ├── runtime/                    # Unified workflow runtime
 │   │   ├── __init__.py             #   WorkflowRuntime class
-│   │   ├── schema.py               #   Dataclasses (WorkflowDef, NodeDef, FieldDef, ...)
-│   │   ├── evaluator.py            #   Expression evaluator (gates, visibility, conditions)
+│   │   ├── schema.py               #   Dataclasses (WorkflowDef, NodeDef, FieldDef, ProviderDef, ...)
+│   │   ├── evaluator.py            #   Expression evaluator (gates, visibility, provider_state)
 │   │   ├── actions.py              #   Action dispatcher (all state mutations)
-│   │   ├── renderer.py             #   Page rendering + affordance generation
+│   │   ├── renderer.py             #   Page rendering (state building, provider queries)
+│   │   ├── affordances.py          #   AffordanceSource protocol (recursive delegation)
+│   │   ├── providers.py            #   ExternalStateProvider protocol + ProviderRegistry
 │   │   └── compat.py               #   Legacy YAML normalization
 │   ├── execution/                  # Table execution engine
 │   │   ├── execution.py            #   PlanEngine (cell states, gating, locking, cascade)

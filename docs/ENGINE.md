@@ -14,15 +14,25 @@ YAML Definition
  ┌────┴────┐
  │ Runtime │   engine/runtime/__init__.py (WorkflowRuntime)
  └────┬────┘
-   ┌──┼──┬──────┐
-schema eval render actions
-   │    │    │      │
- Parse Gates Page  State
- YAML  Viz  Dict  Changes
-       Accept
+   ┌──┼──┬──────┬──────────┐
+schema eval render actions  │
+   │    │    │      │       │
+ Parse Gates Page  State  ┌─┴──────────┐
+ YAML  Viz  Dict  Changes │ affordances│  providers
+       Accept             │ (sources)  │  (external)
+                          └────────────┘
 ```
 
 The runtime (`engine/runtime/`) is the single engine that interprets all workflow definitions. It loads YAML, parses it into typed dataclasses, and implements the handler protocol that `app/app.py` consumes.
+
+| Module | File | Responsibility |
+|--------|------|----------------|
+| Schema | `schema.py` | Dataclasses parsed from YAML (WorkflowDef, NodeDef, FieldDef, ProviderDef, ...) |
+| Evaluator | `evaluator.py` | Unified expression evaluator (gates, visibility, acceptance, provider_state) |
+| Renderer | `renderer.py` | Builds page dict: state, instructions, provider queries |
+| Actions | `actions.py` | Action dispatcher — all state mutations including provider_action |
+| Affordances | `affordances.py` | AffordanceSource protocol — recursive delegation from content primitives |
+| Providers | `providers.py` | ExternalStateProvider protocol, ProviderRegistry, binding resolution |
 
 ### Handler Protocol
 
@@ -176,7 +186,10 @@ All conditions — gates, visibility, acceptance criteria, navigation guards, ro
 {type: table_has_columns}                     # table has >= 1 column
 {type: table_has_rows}                        # table has >= 1 row
 {type: set_membership, key: X, set_ref: Y}   # data[X] in option_sets[Y]
+{type: provider_state, provider: P, ...}     # defers to provider.evaluate()
 ```
+
+The `provider_state` leaf delegates evaluation to the named external provider's `evaluate()` method. The provider receives its bindings, cached state, and the condition dict — it decides the semantics. Evaluation is fail-closed: if the provider is unavailable, the condition fails.
 
 ### Acceptance Criteria Leaves
 
@@ -221,6 +234,7 @@ Composites nest arbitrarily:
 | Fork gate | `fork.gate` | Fork affordance suppressed |
 | Side effect trigger | `side_effects[].when` | Side effect does not fire |
 | Acceptance criteria | Column `rule` | Row does not pass acceptance |
+| Provider state | `provider_state` leaf | Delegated to provider's evaluate() |
 
 The evaluator returns `(passed: bool, reason: str)` for debugging — the reason explains why a condition failed.
 
@@ -371,18 +385,35 @@ Side effects fire immediately after the field is set, before the page is re-rend
 
 ## Affordance Generation
 
-Affordances are **derived from content + state**, not declared. The runtime (`engine/runtime/renderer.py`) generates them in this order:
+Affordances are **derived from content + state**, not declared. Generation is recursive: each workflow primitive implements the `AffordanceSource` protocol and answers "what is possible?" for itself. The node-level collector (`get_node_affordances()` in `engine/runtime/affordances.py`) aggregates from all sources and assigns sequential IDs.
 
-1. **Field affordances** — for each visible, non-computed field: `"Set {label} (current: {value})"`
-2. **List affordances** — for each list: add, select, edit, remove, reorder (based on declared operations and current list state)
-3. **Navigation affordances** — for each navigation entry whose `when` condition passes
-4. **Proceed affordance** — if the proceed gate evaluates to true
-5. **Fork affordance** — if a fork exists and its gate passes
-6. **Branch switch affordance** — if inside a fork, for switching between branches
-7. **Node action affordances** — submit, restart (unconditional if declared)
-8. **Table structural affordances** — add_column, set_cell, etc. (based on declared operations)
-9. **Execution affordances** — cell operations from `PlanEngine.get_plan_state().next_actions`
-10. **Execution complete affordance** — when all acceptance criteria pass
+### The AffordanceSource Protocol
+
+```python
+class AffordanceSource(Protocol):
+    def get_affordances(self, ctx: AffordanceContext) -> list[dict]: ...
+```
+
+`AffordanceContext` carries the workflow definition, current node, state dict, workflow ID, and API base URL. Each source examines the context and returns zero or more affordance dicts.
+
+### Sources
+
+| Source | Generates |
+|--------|-----------|
+| `FieldSource` | One affordance per visible, non-computed field: `"Set {label} (current: {value})"` |
+| `ListSource` | add, select, edit, remove, reorder (based on declared operations and current list state) |
+| `NavigationSource` | One per navigation entry whose `when` guard passes |
+| `ProceedSource` | Proceed affordance (if gate evaluates to true) |
+| `ForkSource` | Fork activation (if fork exists and gate passes) |
+| `BranchSwitchSource` | Branch switching (when inside an active fork) |
+| `ActionSource` | Terminal actions: submit, restart (unconditional if declared) |
+| `TableStructuralSource` | Table construction: add_column, set_cell, etc. (based on declared operations) |
+| `ExecutionSource` | Cell operations from `PlanEngine.get_plan_state().next_actions` + completion |
+| `ProviderSource` | Adapts external provider's `get_affordances()` into the source protocol |
+
+Adding a new primitive means implementing a new `AffordanceSource` — the collector never changes.
+
+### Affordance Shape
 
 Each affordance is a self-describing object:
 
@@ -491,6 +522,13 @@ column_types:
     category: auto-executed
     description: "Pass/fail evaluation."
 
+# ── External State Providers (optional) ──────────
+providers:
+  my_provider:
+    bindings:
+      doc_id: $title                    # $field_ref resolved from state at query time
+      mode: literal_value               # plain strings pass through as literals
+
 # ── Nodes ─────────────────────────────────────────
 nodes:
 
@@ -546,6 +584,14 @@ nodes:
 
     # Execution engine (requires table)
     execution: false
+
+    # External state providers (per-node config)
+    provider_nodes:
+      my_provider:                      # references workflow-level providers key
+        expose:
+          - key: counter               # state key to expose as read-only field
+            label: Counter Value
+        affordances: true               # include provider's affordances on this node
 
     # Navigation
     navigation:
@@ -653,6 +699,14 @@ Validation: select fields reject values not in current options. Dynamic options 
 | `cell_action` | `{action, operation, row, column, ...}` | Cell mutation (fill, sign, mark_na, initiate_issue, amend, re-sign) |
 | `complete` | `{action: complete}` | Exit execution, proceed to next node |
 
+### Provider Actions
+
+| Action | Body | Effect |
+|--------|------|--------|
+| `provider_action` | `{action: provider_action, provider: id, provider_action: name, ...params}` | Routes to external provider's `execute()`, invalidates provider cache, re-renders |
+
+The `provider_action` dispatch path resolves bindings, calls `provider.execute()`, clears the provider cache so the next render fetches fresh state, and returns the re-rendered page.
+
 ### Internal Algorithms
 
 **`_enter_node()`** — called whenever the current node changes. Handles:
@@ -662,6 +716,102 @@ Validation: select fields reject values not in current options. Dynamic options 
 **`_activate_fork()`** — initializes parallel branch state, sets first branch as active.
 
 **`_branch_proceed()`** — advances within a branch. When branch ends, auto-switches to next incomplete branch. When all branches complete, proceeds to merge node.
+
+---
+
+## External State Providers
+
+External state providers allow workflows to read from and write to systems outside the workflow engine — QMS document state, GitHub issues, deployment status, or any other external source.
+
+### The Provider Protocol
+
+Providers implement `ExternalStateProvider` (`engine/runtime/providers.py`):
+
+```python
+class ExternalStateProvider(Protocol):
+    provider_id: str
+    def query(self, bindings: dict) -> dict[str, Any]: ...
+    def get_affordances(self, bindings: dict, state: dict, api_base: str) -> list[dict]: ...
+    def execute(self, bindings: dict, action: str, params: dict) -> dict: ...
+    def evaluate(self, bindings: dict, state: dict, condition: dict) -> tuple[bool, str]: ...
+```
+
+| Method | Purpose |
+|--------|---------|
+| `query()` | Fetch current state (called before each render) |
+| `get_affordances()` | Return available actions as affordance dicts |
+| `execute()` | Perform a mutation, return updated state |
+| `evaluate()` | Custom condition evaluation for `provider_state` expressions |
+
+### Registration
+
+Providers are registered at application startup via `ProviderRegistry`:
+
+```python
+from engine.runtime.providers import registry
+registry.register(my_provider)  # my_provider.provider_id must be unique
+```
+
+No YAML changes are needed to add a new provider — registration is Python-only.
+
+### YAML Declaration
+
+Workflows reference registered providers declaratively:
+
+```yaml
+providers:
+  counter:                              # must match a registered provider_id
+    bindings:
+      doc_id: $title                    # $field_ref → resolved from state dict
+      mode: production                  # plain string → passed as literal
+```
+
+Bindings map provider parameters to workflow state. The `$` prefix signals a field reference resolved at query time; plain strings pass through as literals.
+
+### Node-Level Configuration
+
+Each node controls what it exposes from a provider:
+
+```yaml
+provider_nodes:
+  counter:
+    expose:
+      - key: count                     # state key from provider.query()
+        label: Current Count           # displayed as read-only field
+    affordances: true                  # include provider's affordances on this node
+```
+
+Exposed keys appear as read-only fields in the page state under `state.providers.{provider_id}`. When `affordances: true`, the provider's `get_affordances()` output is included via `ProviderSource`.
+
+### URL Scheme
+
+Provider affordances use dot-separated resource URLs routed through the engine's `resolve_resource()`:
+
+```
+ext.{provider_id}.{action}   →   provider_action dispatch
+```
+
+Example: `ext.counter.increment` resolves to `{action: provider_action, provider: counter, provider_action: increment}`.
+
+### Caching and Persistence
+
+Provider state is cached per-render in transient keys (`_provider_cache_*`, `_provider_bindings_*`). These are stripped before state persistence — provider state is always queried fresh, never stored.
+
+### Condition Evaluation
+
+The `provider_state` expression leaf delegates to the provider:
+
+```yaml
+proceed:
+  gate:
+    type: provider_state
+    provider: counter
+    operator: gt
+    key: count
+    value: 3
+```
+
+The provider's `evaluate()` receives its bindings, cached state, and the condition dict. It returns `(passed, reason)`. Evaluation is fail-closed: if the provider is unavailable, the condition fails.
 
 ---
 
@@ -825,6 +975,7 @@ Events are JSON-encoded. The renderer's `update()` method receives the parsed pa
 - Execution engine (cell operations, gating, acceptance criteria)
 - `show_all_fields` review/summary nodes
 - Option sets, column type catalogs
+- External state provider bindings, expose, affordances, and `provider_state` conditions
 
 ### What Requires Python
 
@@ -832,6 +983,8 @@ Events are JSON-encoded. The renderer's `update()` method receives the parsed pa
 - New table column types
 - New cell operations for the execution engine
 - New expression evaluator leaf conditions
+- New external state providers (implement `ExternalStateProvider` protocol + register at startup)
+- New affordance sources (implement `AffordanceSource` protocol)
 - The workflow builder itself (structural editing of nested definitions)
 - Custom renderers
 

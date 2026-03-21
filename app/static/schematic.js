@@ -1205,9 +1205,23 @@ function drawSchematic(canvas, layoutData, execState, opts) {
         }
 
         case 'cond': {
-          drawPill(ctx, item3.x, cy - item3.h / 2, item3.w, item3.h, item3.h / 2, C.condBg, C.grayBorder, 1.5);
+          // Determine if this branch has been reached (any node on this line is current/completed)
+          var condReached = false;
+          if (execState) {
+            for (var csi = 0; csi < line2.items.length; csi++) {
+              var csit = line2.items[csi];
+              if ((csit.kind === 'step' || csit.kind === 'branch-point') && csit.id) {
+                if (csit.id === execState.current) { condReached = true; break; }
+                if (execState.completed && execState.completed.indexOf(csit.id) >= 0) { condReached = true; break; }
+              }
+            }
+          }
+          var condFill = condReached ? C.completedFill : C.condBg;
+          var condBorder = condReached ? C.completedBorder : C.grayBorder;
+          var condTextC = condReached ? C.completedText : C.condText;
+          drawPill(ctx, item3.x, cy - item3.h / 2, item3.w, item3.h, item3.h / 2, condFill, condBorder, 1.5);
           ctx.font = C.fontSmall;
-          ctx.fillStyle = C.condText;
+          ctx.fillStyle = condTextC;
           ctx.textBaseline = 'middle';
           ctx.fillText(item3.text, item3.x + C.condPadX, cy);
           break;
@@ -1303,6 +1317,7 @@ var _CSS = ''
   + '.sch-collapsible [data-node-kind="branch-point"] { cursor:pointer; }'
   + '.sch-bp-collapsed { border-style:dashed !important; opacity:0.7; }'
   + '.sch-cond { display:inline-flex; align-items:center; justify-content:center; padding:0 8px; border-radius:10px; height:20px; border:1.5px solid #e5e7eb; background:#f3f4f6; font:500 11px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:#374151; white-space:nowrap; }'
+  + '.sch-cond-active { border-color:#4caf50; background:#e8f5e9; color:#2e7d32; }'
   + '.sch-pill { display:inline-flex; align-items:center; gap:5px; padding:4px 13px; border-radius:15px; min-height:30px; background:#fff; border:1.5px solid #e5e7eb; font:13px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:#374151; box-sizing:border-box; }'
   + '.sch-pill-dot { width:7px; height:7px; border-radius:50%; background:#6b7280; flex-shrink:0; }'
   + '.sch-pill-title { white-space:pre-line; line-height:1.3; }'
@@ -1451,6 +1466,59 @@ function renderHybrid(spine, container, execState, opts) {
   var nodesHtml = '';
   var condRenderer = opts.condRenderer || null;
 
+  // Build a map from line index → all node IDs on that line (for branch status)
+  var _lineNodeIds = {};
+  for (var _li = 0; _li < layoutData.lines.length; _li++) {
+    var _ids = [];
+    for (var _ii = 0; _ii < layoutData.lines[_li].items.length; _ii++) {
+      var _it = layoutData.lines[_li].items[_ii];
+      if ((_it.kind === 'step' || _it.kind === 'branch-point') && _it.id) _ids.push(_it.id);
+    }
+    _lineNodeIds[_li] = _ids;
+  }
+  // Build group membership: gid → [line indices]
+  var _groupLines = {};
+  for (var _li2 = 0; _li2 < layoutData.lines.length; _li2++) {
+    var _ln = layoutData.lines[_li2];
+    if (_ln.groups) {
+      for (var _gi = 0; _gi < _ln.groups.length; _gi++) {
+        var _g = _ln.groups[_gi];
+        if (!_groupLines[_g.gid]) _groupLines[_g.gid] = [];
+        _groupLines[_g.gid].push(_li2);
+      }
+    }
+  }
+  // Check if any node directly on a line is current or completed
+  function _lineHasReached(lineIdx) {
+    if (!execState) return false;
+    var ids = _lineNodeIds[lineIdx] || [];
+    for (var ci = 0; ci < ids.length; ci++) {
+      if (ids[ci] === execState.current) return true;
+      if (execState.completed && execState.completed.indexOf(ids[ci]) >= 0) return true;
+    }
+    return false;
+  }
+  // Determine condition label status.
+  // Gate (router): green if THIS route was taken (any node on this line reached).
+  // Split (fork): green if ANY sibling branch was reached (fork is active).
+  function _condIsActive(lineIdx, condType) {
+    if (!execState) return false;
+    if (condType === 'gate') {
+      return _lineHasReached(lineIdx);
+    }
+    // split: check all sibling lines in the same group
+    var ln3 = layoutData.lines[lineIdx];
+    if (ln3 && ln3.groups) {
+      for (var gi3 = 0; gi3 < ln3.groups.length; gi3++) {
+        var siblings = _groupLines[ln3.groups[gi3].gid] || [];
+        for (var si = 0; si < siblings.length; si++) {
+          if (_lineHasReached(siblings[si])) return true;
+        }
+      }
+    }
+    return false;
+  }
+
   for (var li = 0; li < layoutData.lines.length; li++) {
     var ln = layoutData.lines[li];
     var rowH = ln._rowH || C.lineH;
@@ -1474,8 +1542,10 @@ function renderHybrid(spine, container, execState, opts) {
 
       if (itm.kind === 'cond') {
         var condCy = handlePx !== null ? ln.y + Math.min(handlePx, rowH) : ln.y + rowH * handleY;
+        var condActive = _condIsActive(li, itm.type);
+        var condCls = 'sch-cond' + (condActive ? ' sch-cond-active' : '');
         if (condRenderer) {
-          var condStatus = 'pending';
+          var condStatus = condActive ? 'active' : 'pending';
           nodesHtml += '<div class="sch-cond-wrap" style="position:absolute;left:' + itm.x + 'px;top:' + (condCy - itm.h / 2)
               + 'px;width:' + itm.w + 'px;height:' + itm.h + 'px;z-index:1;">'
               + condRenderer({ text: itm.text, type: itm.type, w: itm.w, h: itm.h }, condStatus)
@@ -1483,7 +1553,7 @@ function renderHybrid(spine, container, execState, opts) {
         } else {
           // Default condition label
           nodesHtml += '<div class="sch-cond-wrap" style="position:absolute;left:' + itm.x + 'px;top:' + (condCy - itm.h / 2)
-              + 'px;z-index:1;"><div class="sch-cond">' + _escHtml(itm.text) + '</div></div>';
+              + 'px;z-index:1;"><div class="' + condCls + '">' + _escHtml(itm.text) + '</div></div>';
         }
       }
     }
@@ -1555,15 +1625,57 @@ function _allBranchPointIds(spine, out) {
 }
 
 // Auto-collapse: collapse every branch-point that is NOT an ancestor
-// of focusId. Returns pruned spine ready for rendering.
+// of focusId, the first node, or the last node. This ensures the focus
+// node is visible while the first and last nodes always remain visible
+// to provide context (start/end of the workflow).
 function _autoCollapse(spine, focusId) {
-  var ancestors = new Set();
-  _spineContains(spine, focusId, ancestors);
+  var keep = new Set();
+  // Protect branch-points on the path to focusId
+  _spineContains(spine, focusId, keep);
+  // Protect branch-points on the path to the first node
+  var firstId = _spineFirstId(spine);
+  if (firstId) _spineContains(spine, firstId, keep);
+  // Protect branch-points on the path to the last node
+  var lastId = _spineLastId(spine);
+  if (lastId) _spineContains(spine, lastId, keep);
+
   var allBPs = new Set();
   _allBranchPointIds(spine, allBPs);
   var collapsed = new Set();
-  allBPs.forEach(function(id) { if (!ancestors.has(id)) collapsed.add(id); });
+  allBPs.forEach(function(id) { if (!keep.has(id)) collapsed.add(id); });
   return _pruneSpine(spine, collapsed);
+}
+
+// Return the ID of the first node in a spine (depth-first).
+function _spineFirstId(spine) {
+  for (var i = 0; i < spine.length; i++) {
+    var seg = spine[i];
+    if (seg.id) return seg.id;
+    if (seg.type === 'gate' && seg.routes.length) {
+      var inner = _spineFirstId(seg.routes[0].path);
+      if (inner) return inner;
+    }
+    if (seg.type === 'split' && seg.branches.length) {
+      var inner2 = _spineFirstId(seg.branches[0].path);
+      if (inner2) return inner2;
+    }
+  }
+  return null;
+}
+
+// Return the ID of the last node in a spine (depth-first, last element).
+function _spineLastId(spine) {
+  for (var i = spine.length - 1; i >= 0; i--) {
+    var seg = spine[i];
+    if (seg.type === 'split' && seg.merge && seg.merge.id) return seg.merge.id;
+    if (seg.type === 'gate' && seg.routes.length) {
+      var lastRoute = seg.routes[seg.routes.length - 1];
+      var inner = _spineLastId(lastRoute.path);
+      if (inner) return inner;
+    }
+    if (seg.id) return seg.id;
+  }
+  return null;
 }
 
 // ── Collapsible branch-points ─────────────────────────────────────

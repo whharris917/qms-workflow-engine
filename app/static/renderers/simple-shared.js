@@ -272,7 +272,7 @@ function wfRenderStateProps(state) {
        Known keys (rendered elsewhere): workflow, node, node_title, completed_nodes,
        lifecycle, lifecycle_current, lifecycle_completed, fields, table, execution_table. */
     var s = state.state || {};
-    var known = ['workflow','node','node_title','completed_nodes','lifecycle','lifecycle_current','lifecycle_completed','fields','table','execution_table','fork_state'];
+    var known = ['workflow','node','node_title','completed_nodes','lifecycle','lifecycle_current','lifecycle_completed','fields','table','execution_table','fork_state','banner_definition'];
     var extra = Object.keys(s).filter(function(k) { return known.indexOf(k) === -1; });
     if (!extra.length) return '';
     var html = '';
@@ -305,7 +305,7 @@ function wfRenderStateProps(state) {
 
 function wfRenderBanner(state) {
     var s = state.state || {};
-    var defn = s.definition;
+    var defn = s.banner_definition || s.definition;
     var current = s.lifecycle_current || '';
     var completed = s.lifecycle_completed || [];
 
@@ -317,13 +317,17 @@ function wfRenderBanner(state) {
     /* Legacy flat banner */
     var lifecycle = s.lifecycle || [];
     if (!lifecycle.length) return '';
-    var labels = (typeof lifecycle[0] === 'string') ? lifecycle : lifecycle.map(function(x) { return x.title || ''; });
-    var currentIdx = labels.indexOf(current);
+    var items = lifecycle.map(function(x) {
+        if (typeof x === 'string') return { id: x, title: x };
+        return { id: x.id || x.title || '', title: x.title || '' };
+    });
+    var currentIdx = -1;
+    for (var ci = 0; ci < items.length; ci++) { if (items[ci].id === current) { currentIdx = ci; break; } }
     var html = '<div class="wf-banner">';
-    for (var i = 0; i < labels.length; i++) {
-        var label = labels[i];
-        var isCurrent = label === current;
-        var isDone = completed.indexOf(label) !== -1;
+    for (var i = 0; i < items.length; i++) {
+        var label = items[i].title;
+        var isCurrent = items[i].id === current;
+        var isDone = completed.indexOf(items[i].id) !== -1;
         var isPast = i < currentIdx;
         if (i > 0) html += '<div class="wf-conn' + ((isDone || isPast || isCurrent) ? ' wf-conn-active' : '') + '"></div>';
         html += '<div class="wf-step' + (isCurrent ? ' wf-step-active' : '') + (isDone ? ' wf-step-done' : '') + '">';
@@ -1231,7 +1235,7 @@ function expDRenderDefinition(defn) {
 /* ── State props (definition-aware) ── */
 function expDRenderStateProps(state) {
     var s = state.state || {};
-    var known = ['workflow','node','node_title','completed_nodes','lifecycle','lifecycle_current','lifecycle_completed','fields','table','execution_table','fork_state'];
+    var known = ['workflow','node','node_title','completed_nodes','lifecycle','lifecycle_current','lifecycle_completed','fields','table','execution_table','fork_state','banner_definition'];
     var extra = Object.keys(s).filter(function(k) { return known.indexOf(k) === -1; });
     if (!extra.length) return '';
     var html = '';

@@ -41,9 +41,12 @@
             html += '</div>';
             html += '<div class="gb-bar-labels">';
             for (var i = 0; i < lifecycle.length; i++) {
-                var isCurrent = lifecycle[i] === current;
-                var isDone = completed.indexOf(lifecycle[i]) !== -1;
-                html += '<span class="gb-bar-lbl' + (isCurrent ? ' gb-bar-lbl-cur' : '') + (isDone ? ' gb-bar-lbl-done' : '') + '">' + wfEsc(lifecycle[i]) + '</span>';
+                var item = lifecycle[i];
+                var label = (typeof item === 'string') ? item : (item.title || '');
+                var itemId = (typeof item === 'string') ? item : (item.id || '');
+                var isCurrent = itemId === current || label === current;
+                var isDone = completed.indexOf(itemId) !== -1 || completed.indexOf(label) !== -1;
+                html += '<span class="gb-bar-lbl' + (isCurrent ? ' gb-bar-lbl-cur' : '') + (isDone ? ' gb-bar-lbl-done' : '') + '">' + wfEsc(label) + '</span>';
             }
             html += '</div>';
             html += '</div>';

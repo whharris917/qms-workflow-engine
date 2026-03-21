@@ -80,12 +80,14 @@
         if (lifecycle.length) {
             lines.push('\u251c\u2500 <span class="tc-key">lifecycle</span>');
             for (var i = 0; i < lifecycle.length; i++) {
-                var label = lifecycle[i];
+                var item = lifecycle[i];
+                var label = (typeof item === 'string') ? item : (item.title || '');
+                var itemId = (typeof item === 'string') ? item : (item.id || '');
                 var isLast = i === lifecycle.length - 1;
                 var branch = isLast ? '   \u2514\u2500 ' : '   \u251c\u2500 ';
                 var cls = 'tc-phase';
-                if (label === current) cls = 'tc-phase-cur';
-                else if (completed.indexOf(label) !== -1) cls = 'tc-phase-done';
+                if (itemId === current || label === current) cls = 'tc-phase-cur';
+                else if (completed.indexOf(itemId) !== -1 || completed.indexOf(label) !== -1) cls = 'tc-phase-done';
                 lines.push(branch + '<span class="' + cls + '">' + wfEsc(label) + '</span>');
             }
         }
