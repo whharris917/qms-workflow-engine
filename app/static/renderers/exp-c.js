@@ -73,26 +73,24 @@
         /* Root */
         lines.push('<span class="tc-root">' + wfEsc(s.workflow || 'Workflow') + '</span>');
 
-        /* Lifecycle */
-        var lifecycle = s.lifecycle || [];
-        var current = s.lifecycle_current || '';
-        var completed = s.lifecycle_completed || [];
-        if (lifecycle.length) {
-            lines.push('\u251c\u2500 <span class="tc-key">lifecycle</span>');
-            for (var i = 0; i < lifecycle.length; i++) {
-                var item = lifecycle[i];
-                var label = (typeof item === 'string') ? item : (item.title || '');
-                var itemId = (typeof item === 'string') ? item : (item.id || '');
-                var isLast = i === lifecycle.length - 1;
+        /* Progress */
+        var defnNodes = (s.definition || s.banner_definition || {}).nodes || [];
+        var current = s.node || '';
+        var completed = s.completed_nodes || [];
+        if (defnNodes.length) {
+            lines.push('\u251c\u2500 <span class="tc-key">progress</span>');
+            for (var i = 0; i < defnNodes.length; i++) {
+                var item = defnNodes[i];
+                var isLast = i === defnNodes.length - 1;
                 var branch = isLast ? '   \u2514\u2500 ' : '   \u251c\u2500 ';
                 var cls = 'tc-phase';
-                if (itemId === current || label === current) cls = 'tc-phase-cur';
-                else if (completed.indexOf(itemId) !== -1 || completed.indexOf(label) !== -1) cls = 'tc-phase-done';
-                lines.push(branch + '<span class="' + cls + '">' + wfEsc(label) + '</span>');
+                if (item.id === current) cls = 'tc-phase-cur';
+                else if (completed.indexOf(item.id) !== -1) cls = 'tc-phase-done';
+                lines.push(branch + '<span class="' + cls + '">' + wfEsc(item.title) + '</span>');
             }
         }
 
-        /* Node (node_title rendered here; node raw ID and completed_nodes rendered by lifecycle above) */
+        /* Node */
         lines.push('\u251c\u2500 <span class="tc-key">node</span>: <span class="tc-node">' + wfEsc(s.node_title || s.node) + '</span>');
 
         /* Instructions */

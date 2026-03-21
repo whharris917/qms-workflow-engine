@@ -23,30 +23,28 @@
         var html = '';
 
         /* ── Header with filled progress bar ── */
-        var lifecycle = s.lifecycle || [];
-        var current = s.lifecycle_current || '';
-        var completed = s.lifecycle_completed || [];
+        var defnNodes = (s.definition || s.banner_definition || {}).nodes || [];
+        var current = s.node || '';
+        var completed = s.completed_nodes || [];
         var progressCount = completed.length + (current && completed.indexOf(current) === -1 ? 1 : 0);
-        var pct = lifecycle.length ? Math.round((progressCount / lifecycle.length) * 100) : 0;
+        var pct = defnNodes.length ? Math.round((progressCount / defnNodes.length) * 100) : 0;
 
         html += '<div class="gb-header">';
         html += '<div class="gb-title">' + wfEsc(s.workflow || 'Workflow') + '</div>';
         html += '<div class="gb-node">' + wfEsc(s.node_title || s.node) + '</div>';
         html += '</div>';
 
-        if (lifecycle.length) {
+        if (defnNodes.length) {
             html += '<div class="gb-bar-wrap">';
             html += '<div class="gb-bar-track">';
             html += '<div class="gb-bar-fill" style="width:' + Math.max(pct, 4) + '%"></div>';
             html += '</div>';
             html += '<div class="gb-bar-labels">';
-            for (var i = 0; i < lifecycle.length; i++) {
-                var item = lifecycle[i];
-                var label = (typeof item === 'string') ? item : (item.title || '');
-                var itemId = (typeof item === 'string') ? item : (item.id || '');
-                var isCurrent = itemId === current || label === current;
-                var isDone = completed.indexOf(itemId) !== -1 || completed.indexOf(label) !== -1;
-                html += '<span class="gb-bar-lbl' + (isCurrent ? ' gb-bar-lbl-cur' : '') + (isDone ? ' gb-bar-lbl-done' : '') + '">' + wfEsc(label) + '</span>';
+            for (var i = 0; i < defnNodes.length; i++) {
+                var item = defnNodes[i];
+                var isCurrent = item.id === current;
+                var isDone = completed.indexOf(item.id) !== -1;
+                html += '<span class="gb-bar-lbl' + (isCurrent ? ' gb-bar-lbl-cur' : '') + (isDone ? ' gb-bar-lbl-done' : '') + '">' + wfEsc(item.title) + '</span>';
             }
             html += '</div>';
             html += '</div>';

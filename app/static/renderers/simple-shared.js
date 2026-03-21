@@ -264,15 +264,24 @@ function wfRenderDefinition(defn) {
 }
 
 function _isDefinition(v) {
-    return v && typeof v === 'object' && !Array.isArray(v) && ('nodes' in v) && ('workflow_title' in v || 'workflow_id' in v);
+    /* Match only detailed definitions (with fields/instructions on nodes),
+       not topology-only definitions used for the schematic banner. */
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
+    if (!v.nodes || !v.nodes.length) return false;
+    // Check if any node has detail beyond id/title/proceed/router/fork
+    for (var i = 0; i < v.nodes.length; i++) {
+        var n = v.nodes[i];
+        if (n.fields || n.instruction || n.actions || n.navigation) return true;
+    }
+    return false;
 }
 
 function wfRenderStateProps(state) {
     /* Render any state keys not handled by dedicated building blocks.
        Known keys (rendered elsewhere): workflow, node, node_title, completed_nodes,
-       lifecycle, lifecycle_current, lifecycle_completed, fields, table, execution_table. */
+       definition, fields, table, execution_table. */
     var s = state.state || {};
-    var known = ['workflow','node','node_title','completed_nodes','lifecycle','lifecycle_current','lifecycle_completed','fields','table','execution_table','fork_state','banner_definition'];
+    var known = ['workflow','node','node_title','completed_nodes','definition','fields','table','execution_table','fork_state','banner_definition'];
     var extra = Object.keys(s).filter(function(k) { return known.indexOf(k) === -1; });
     if (!extra.length) return '';
     var html = '';
@@ -306,36 +315,14 @@ function wfRenderStateProps(state) {
 function wfRenderBanner(state) {
     var s = state.state || {};
     var defn = s.banner_definition || s.definition;
-    var current = s.lifecycle_current || '';
-    var completed = s.lifecycle_completed || [];
+    var current = s.node || '';
+    var completed = s.completed_nodes || [];
 
-    /* If we have a topology-aware definition, render schematic banner */
     if (defn && defn.nodes && defn.nodes.length) {
         return _wfSchematicBanner(defn, current, completed);
     }
 
-    /* Legacy flat banner */
-    var lifecycle = s.lifecycle || [];
-    if (!lifecycle.length) return '';
-    var items = lifecycle.map(function(x) {
-        if (typeof x === 'string') return { id: x, title: x };
-        return { id: x.id || x.title || '', title: x.title || '' };
-    });
-    var currentIdx = -1;
-    for (var ci = 0; ci < items.length; ci++) { if (items[ci].id === current) { currentIdx = ci; break; } }
-    var html = '<div class="wf-banner">';
-    for (var i = 0; i < items.length; i++) {
-        var label = items[i].title;
-        var isCurrent = items[i].id === current;
-        var isDone = completed.indexOf(items[i].id) !== -1;
-        var isPast = i < currentIdx;
-        if (i > 0) html += '<div class="wf-conn' + ((isDone || isPast || isCurrent) ? ' wf-conn-active' : '') + '"></div>';
-        html += '<div class="wf-step' + (isCurrent ? ' wf-step-active' : '') + (isDone ? ' wf-step-done' : '') + '">';
-        html += '<span class="wf-dot">' + (isDone ? '&#10003;' : (i + 1)) + '</span>';
-        html += '<span class="wf-step-label">' + wfEsc(label) + '</span>';
-        html += '</div>';
-    }
-    return html + '</div>';
+    return '';
 }
 
 /* ── Pill node renderer — compact banner-style nodes ── */
@@ -1179,8 +1166,8 @@ var _fcDefnIdx = null;
 function _expDSchematicFlowchart(defn, stateObj) {
     if (!defn || !defn.nodes || !defn.nodes.length) return '';
     var nodes = defn.nodes;
-    var current = stateObj.lifecycle_current || stateObj.node || '';
-    var completed = stateObj.lifecycle_completed || stateObj.completed_nodes || [];
+    var current = stateObj.node || '';
+    var completed = stateObj.completed_nodes || [];
     _fcDefnNodes = {}; _fcDefnIdx = {};
     for (var i = 0; i < nodes.length; i++) { _fcDefnNodes[nodes[i].id] = nodes[i]; _fcDefnIdx[nodes[i].id] = i; }
     var spine;
@@ -1235,7 +1222,7 @@ function expDRenderDefinition(defn) {
 /* ── State props (definition-aware) ── */
 function expDRenderStateProps(state) {
     var s = state.state || {};
-    var known = ['workflow','node','node_title','completed_nodes','lifecycle','lifecycle_current','lifecycle_completed','fields','table','execution_table','fork_state','banner_definition'];
+    var known = ['workflow','node','node_title','completed_nodes','definition','fields','table','execution_table','fork_state','banner_definition'];
     var extra = Object.keys(s).filter(function(k) { return known.indexOf(k) === -1; });
     if (!extra.length) return '';
     var html = '';
@@ -1269,6 +1256,7 @@ function _expDPage(container, state, msg, feedback, verbose) {
     html += '<div class="wf-section"><div class="wf-section-head">' + wfEsc(s.node_title || s.node) + '</div></div>';
     if (state.instructions) html += '<div class="wf-desc">' + wfEsc(state.instructions) + '</div>';
     html += expDRenderStateProps(state);
+    if (s.definition && _isDefinition(s.definition)) { html += _expDSchematicFlowchart(s.definition, s); }
     if (s.fields) { html += '<div class="wf-card"><div class="wf-card-head">Fields</div>' + wfRenderFields(s.fields, fieldCategory) + '</div>'; }
     if (s.execution_table) { html += verbose ? wfRenderExecTable(s.execution_table) : wfRenderExecTableDefault(s.execution_table); }
     else if (s.table) { html += wfRenderTable(s.table); }

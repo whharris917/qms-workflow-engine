@@ -16,7 +16,7 @@ import yaml
 
 from .runtime.evaluator import evaluate
 from .runtime.schema import WorkflowDef
-from .runtime.renderer import _build_lifecycle, _serialize_definition
+from .runtime.renderer import _serialize_definition
 
 # Instance context — set at process_action() entry so internal render_node()
 # calls don't need instance_id threaded through every helper.
@@ -359,20 +359,12 @@ def render_node(data: dict, workflow_id: str,
     node = data["node"]
     info = _NODE_INFO[node]
 
-    # Use the runtime's topology-aware lifecycle (same format as all other workflows)
-    lifecycle = _build_lifecycle(_BUILDER_DEFN)
-    lifecycle_current = node
-    lifecycle_completed = data.get("completed_nodes", [])
-
     affordances = _build_affordances(data, workflow_id, instance_id)
 
     state = {
         "workflow": WORKFLOW_TITLE,
         "node": node,
         "node_title": info["title"],
-        "lifecycle": lifecycle,
-        "lifecycle_current": lifecycle_current,
-        "lifecycle_completed": lifecycle_completed,
         "completed_nodes": data["completed_nodes"],
         "banner_definition": _serialize_definition(_BUILDER_DEFN),
         "definition": _summary(data),

@@ -30,22 +30,20 @@
         html += '</div>';
 
         /* ── Progress breadcrumb ── */
-        var lifecycle = s.lifecycle || [];
-        var current = s.lifecycle_current || '';
-        var completed = s.lifecycle_completed || [];
-        if (lifecycle.length) {
+        var defnNodes = (s.definition || s.banner_definition || {}).nodes || [];
+        var current = s.node || '';
+        var completed = s.completed_nodes || [];
+        if (defnNodes.length) {
             html += '<div class="ex-progress">';
-            for (var i = 0; i < lifecycle.length; i++) {
-                var item = lifecycle[i];
-                var label = (typeof item === 'string') ? item : (item.title || '');
-                var itemId = (typeof item === 'string') ? item : (item.id || '');
-                var isCurrent = itemId === current || label === current;
-                var isDone = completed.indexOf(itemId) !== -1 || completed.indexOf(label) !== -1;
+            for (var i = 0; i < defnNodes.length; i++) {
+                var item = defnNodes[i];
+                var isCurrent = item.id === current;
+                var isDone = completed.indexOf(item.id) !== -1;
                 if (i > 0) html += '<span class="ex-arrow">&rarr;</span>';
                 var cls = 'ex-phase';
                 if (isCurrent) cls += ' ex-phase-current';
                 else if (isDone) cls += ' ex-phase-done';
-                html += '<span class="' + cls + '">' + wfEsc(label) + '</span>';
+                html += '<span class="' + cls + '">' + wfEsc(item.title) + '</span>';
             }
             html += '</div>';
         }

@@ -15,63 +15,6 @@ from .providers import registry as provider_registry, resolve_bindings, Provider
 from ..utils import trunc, field as make_field
 
 
-def _build_lifecycle(defn: WorkflowDef) -> list:
-    """Build a topology-aware lifecycle structure for the banner.
-
-    Returns a list of items, each either:
-      {"type": "node", "id": "...", "title": "..."}
-      {"type": "router", "id": "...", "title": "...", "targets": [{"label": "...", "id": "..."}]}
-      {"type": "fork", "id": "...", "title": "...",
-       "branches": [{"label": "...", "nodes": [{"id": "...", "title": "..."}...]}...],
-       "merge": {"id": "...", "title": "..."}}
-    """
-    # Identify nodes claimed by forks
-    claimed = set()
-    merge_of = {}  # merge_id -> fork_id
-    for nid, nd in defn.nodes.items():
-        if nd.fork:
-            for bdef in nd.fork.branches.values():
-                for bnid in bdef.nodes:
-                    claimed.add(bnid)
-            if nd.fork.merge:
-                merge_of[nd.fork.merge] = nid
-
-    items = []
-    for nid, nd in defn.nodes.items():
-        if nid in claimed or nid in merge_of:
-            continue
-
-        if nd.router:
-            targets = []
-            for route in nd.router:
-                tnode = defn.nodes.get(route.target)
-                targets.append({
-                    "label": _cond_label(route.when),
-                    "id": route.target,
-                    "title": tnode.title if tnode else route.target,
-                })
-            items.append({"type": "router", "id": nid, "title": nd.title, "targets": targets})
-
-        elif nd.fork:
-            branches = []
-            for bid, bdef in nd.fork.branches.items():
-                bnodes = []
-                for bnid in bdef.nodes:
-                    bnode = defn.nodes.get(bnid)
-                    bnodes.append({"id": bnid, "title": bnode.title if bnode else bnid})
-                branches.append({"label": bdef.label, "nodes": bnodes})
-            merge_node = defn.nodes.get(nd.fork.merge)
-            items.append({
-                "type": "fork", "id": nid, "title": nd.title,
-                "branches": branches,
-                "merge": {"id": nd.fork.merge, "title": merge_node.title if merge_node else nd.fork.merge},
-            })
-
-        else:
-            items.append({"type": "node", "id": nid, "title": nd.title})
-
-    return items
-
 
 def _cond_label(when: dict | None) -> str:
     """Short label for a router condition."""
@@ -122,6 +65,45 @@ def _gate_labels(gate: dict) -> list[str]:
         inner_val = inner.get("value", "")
         return [f"{pid}: {inner_type} = {inner_val!r}"]
     return [ctype or "?"]
+
+
+def _serialize_definition_topology(defn: WorkflowDef) -> dict:
+    """Serialize topology for the schematic banner.
+
+    Includes only what definitionToSpine() needs: node id/title,
+    proceed targets, router routes, and fork branches. Omits fields,
+    instructions, navigation, actions, and proceed gate details.
+    """
+    node_id_list = defn.node_ids
+    nodes = []
+    for idx, (nid, nd) in enumerate(defn.nodes.items()):
+        entry = {"id": nid, "title": nd.title}
+        if nd.proceed:
+            target = nd.proceed.target
+            if not target and idx + 1 < len(node_id_list):
+                target = node_id_list[idx + 1]
+            if target:
+                entry["proceed"] = {"target": target}
+        if nd.router:
+            entry["router"] = [
+                {"target": r.target, "when": r.when}
+                for r in nd.router
+            ]
+        if nd.fork:
+            branches = {}
+            for bid, bdef in nd.fork.branches.items():
+                branches[bid] = {"label": bdef.label, "nodes": bdef.nodes}
+            entry["fork"] = {
+                "label": nd.fork.label,
+                "merge": nd.fork.merge,
+                "branches": branches,
+            }
+        nodes.append(entry)
+    return {
+        "workflow_id": defn.workflow_id,
+        "workflow_title": defn.workflow_title,
+        "nodes": nodes,
+    }
 
 
 def _serialize_definition(defn: WorkflowDef) -> dict:
@@ -224,19 +206,12 @@ def render_page(defn: WorkflowDef, data: dict, workflow_id: str,
     if defn.providers:
         _query_providers(defn, data)
 
-    # Derive lifecycle banner — topology-aware
-    lifecycle = _build_lifecycle(defn)
-    lifecycle_current = node_id
-    lifecycle_completed = data.get("completed_nodes", [])
-
     state = {
         "workflow": defn.workflow_title,
         "node": node_id,
         "node_title": node.title,
-        "lifecycle": lifecycle,
-        "lifecycle_current": lifecycle_current,
-        "lifecycle_completed": lifecycle_completed,
         "completed_nodes": data.get("completed_nodes", []),
+        "definition": _serialize_definition_topology(defn),
     }
 
     # Fork state — expose branch tracking for UI
@@ -258,9 +233,6 @@ def render_page(defn: WorkflowDef, data: dict, workflow_id: str,
             "active_branch": fork_state.get("active_branch"),
             "branches": branch_display,
         }
-
-    # Workflow definition for visual renderers (Exp-D flowchart)
-    state["definition"] = _serialize_definition(defn)
 
     # Fields
     fields_display = _build_fields(defn, node, data)
