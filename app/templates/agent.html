@@ -29,8 +29,8 @@
     #portal-raw-view pre { background: #1a1a2e; color: #e0e0e0; padding: 1.25rem; border-radius: 8px; font-size: 0.82rem; line-height: 1.5; overflow-x: auto; white-space: pre-wrap; max-height: calc(100vh - 10rem); overflow-y: auto; margin: 0; }
 </style>
 
-<div id="portal-human-view" style="border: 2px solid #7c3aed; border-radius: 6px; padding: 1rem; min-height: 4rem;"></div>
-<div id="portal-raw-view" style="border: 2px solid #7c3aed; border-radius: 6px; padding: 1rem;">
+<div id="portal-human-view" style="border: 2px solid #7c3aed; border-radius: 6px; padding: 1rem; min-height: 4rem; margin-top: 2.5rem;"></div>
+<div id="portal-raw-view" style="border: 2px solid #7c3aed; border-radius: 6px; padding: 1rem; margin-top: 2.5rem;">
     <pre id="portal-raw-content"></pre>
 </div>
 
@@ -63,11 +63,12 @@
     document.addEventListener('DOMContentLoaded', function() {
         var btn = document.getElementById('agent-view-toggle');
         if (btn) {
-            btn.textContent = 'Raw';
+            btn.textContent = 'Human';
             btn.onclick = function() {
                 isRaw = !isRaw;
                 humanView.style.display = isRaw ? 'none' : 'block';
                 rawView.style.display = isRaw ? 'block' : 'none';
+                btn.textContent = isRaw ? 'Agent' : 'Human';
                 btn.style.background = isRaw ? '#4a9eff' : '#1a1a2e';
                 btn.style.color = isRaw ? '#fff' : '#ccc';
                 btn.style.borderColor = isRaw ? '#4a9eff' : '#444';

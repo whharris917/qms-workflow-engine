@@ -132,7 +132,7 @@
         {% if agent_view_stream or show_raw_toggle %}
         <button id="agent-view-toggle" {% if agent_view_stream %}onclick="toggleAgentView()"{% endif %} title="Toggle view"
             style="position:fixed; top:1rem; right:1.25rem; z-index:100; background:#1a1a2e; color:#ccc; border:1px solid #444; border-radius:6px; padding:0.4rem 0.8rem; font-size:0.8rem; cursor:pointer; transition: background 0.15s, color 0.15s;">
-            {% if show_raw_toggle %}Raw{% else %}Agent View{% endif %}
+            {% if show_raw_toggle %}Human{% else %}Agent View{% endif %}
         </button>
         {% if agent_view_stream %}
         <script>

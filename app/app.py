@@ -526,7 +526,7 @@ def _compute_feedback(before: dict, after: dict, acted_label: str = None) -> dic
 # -- Workflow registry --
 # Each entry maps a workflow_id to its handler module and display metadata.
 
-_ALL_RENDERERS = ["raw", "light", "light-verbose", "dark", "dark-verbose", "exp-a", "exp-b", "exp-c"]
+_ALL_RENDERERS = ["raw", "light"]
 _CUSTOM_WORKFLOWS_DIR = DATA_DIR / "custom_workflows"
 _CUSTOM_WORKFLOWS_DIR.mkdir(exist_ok=True)
 
@@ -787,6 +787,7 @@ def agent_observe(workflow_id, instance_id):
     wf_info = _WORKFLOWS[workflow_id]
     return render_template(
         "agent_observer.html",
+        active_page="agent",
         workflow_id=workflow_id,
         instance_id=instance_id,
         workflow_title=wf_info["title"],
@@ -868,6 +869,7 @@ def agent_workflow_get(workflow_id, instance_id):
     wf_info = _WORKFLOWS[workflow_id]
     return render_template(
         "agent_observer.html",
+        active_page="agent",
         workflow_id=workflow_id,
         instance_id=instance_id,
         workflow_title=wf_info["title"],
