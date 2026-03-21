@@ -110,7 +110,7 @@ def get_node_affordances(
 # Utilities (shared by sources, imported from renderer)
 # ---------------------------------------------------------------------------
 
-def _resolve_options(defn: WorkflowDef, fdef: FieldDef, data: dict) -> list[str]:
+def _resolve_options(defn: WorkflowDef, fdef: FieldDef, data: dict, annotate: bool = True) -> list[str]:
     """Resolve options for a select field, including dynamic options."""
     if fdef.dynamic_options:
         source_key = fdef.dynamic_options.get("source_key", "")
@@ -125,7 +125,7 @@ def _resolve_options(defn: WorkflowDef, fdef: FieldDef, data: dict) -> list[str]
 
     if fdef.options_from:
         raw_options = defn.option_sets.get(fdef.options_from, [])
-        if fdef.annotate_from and fdef.annotation:
+        if annotate and fdef.annotate_from and fdef.annotation:
             annotate_set = set(defn.option_sets.get(fdef.annotate_from, []))
             return [
                 f"{opt} {fdef.annotation}" if opt in annotate_set else opt
@@ -193,7 +193,7 @@ class FieldSource:
         if ftype == "boolean":
             a["parameters"] = {"value": {"options": [True, False]}}
         elif ftype == "select":
-            options = _resolve_options(ctx.defn, fdef, ctx.data)
+            options = _resolve_options(ctx.defn, fdef, ctx.data, annotate=False)
             if options:
                 a["parameters"] = {"value": {"options": options}}
         return [a]

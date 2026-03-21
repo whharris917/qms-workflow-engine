@@ -632,23 +632,8 @@ def _render_agent_node(workflow_id: str, instance_id: str):
     return handler.render_node(data, workflow_id, instance_id)
 
 
-_last_action_times: dict[str, float] = {}
-_ACTION_COOLDOWN: float = 1.0  # seconds between actions
-
-
 def _process_agent_action(workflow_id: str, instance_id: str, body):
     """Process a POST action for a workflow instance."""
-    ck = _cache_key(workflow_id, instance_id)
-    # Rate limit per instance
-    now = _time.time()
-    elapsed = now - _last_action_times.get(ck, 0.0)
-    if elapsed < _ACTION_COOLDOWN:
-        return {
-            "error": f"Too fast. Wait {_ACTION_COOLDOWN - elapsed:.1f}s before your next action.",
-            "retry_after": round(_ACTION_COOLDOWN - elapsed, 1),
-        }
-    _last_action_times[ck] = now
-
     handler = _get_handler(workflow_id)
     if handler is None:
         return {"error": f"Unknown workflow: {workflow_id}"}
