@@ -1,81 +1,79 @@
 {% extends "base.html" %}
-{% block title %}Agent Portal{% endblock %}
+{% block title %}{{ payload.state.page_title }}{% endblock %}
 {% block content %}
-<h1>Agent Portal</h1>
-<p>Available workflows. Create new instances or observe existing ones.</p>
 
 <style>
-    .wf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 1.25rem; margin-top: 1.5rem; }
-    .wf-card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 1.25rem; }
-    .wf-card h2 { font-size: 1.1rem; margin: 0 0 0.4rem 0; }
-    .wf-card p { font-size: 0.9rem; color: #555; margin-bottom: 1rem; }
-    .btn-new { display: inline-block; background: #218838; color: #fff; padding: 0.25rem 0.6rem; font-size: 0.78rem; font-weight: 500; border-radius: 4px; border: none; cursor: pointer; text-decoration: none; white-space: nowrap; transition: background 0.15s; }
-    .btn-new:hover { background: #196c2e; }
-    .new-instance-wrap { display: flex; justify-content: flex-end; margin-top: 0.5rem; }
-    .inst-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    .inst-table th { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 2px solid #eee; color: #999; font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em; }
-    .inst-table td { padding: 0.35rem 0.5rem; border-bottom: 1px solid #f5f5f5; }
-    .inst-table tr:last-child td { border-bottom: none; }
-    .inst-id { font-family: monospace; font-size: 0.8rem; color: #888; }
-    .inst-node { color: #333; }
-    .inst-actions { display: flex; gap: 0.35rem; justify-content: flex-end; }
-    .btn-observe { display: inline-block; background: #f0f4fa; color: #2a6bcf; font-size: 0.78rem; font-weight: 500; padding: 0.25rem 0.6rem; border-radius: 4px; border: 1px solid #d0ddf0; cursor: pointer; text-decoration: none; transition: background 0.15s; }
-    .btn-observe:hover { background: #dce6f5; }
-    .btn-delete { display: inline-block; background: #faf0f0; color: #b33; font-size: 0.78rem; font-weight: 500; padding: 0.25rem 0.6rem; border-radius: 4px; border: 1px solid #f0d0d0; cursor: pointer; transition: background 0.15s; }
-    .btn-delete:hover { background: #f5dcdc; }
-    .wf-meta { font-size: 0.75rem; color: #aaa; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #f0f0f0; }
-    .wf-meta code { background: #f5f5f5; padding: 0.1em 0.35em; border-radius: 3px; font-size: 0.85em; }
-    .wf-empty { font-size: 0.85rem; color: #bbb; padding: 0.5rem 0; text-align: center; }
+    /* Portal card grid */
+    .portal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 1.25rem; margin-top: 1.5rem; }
+    .portal-card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 1.25rem; }
+    .portal-card h2 { font-size: 1.1rem; margin: 0 0 0.4rem 0; }
+    .portal-card p { font-size: 0.9rem; color: #555; margin-bottom: 1rem; }
+    .portal-btn-new { display: inline-block; background: #218838; color: #fff; padding: 0.25rem 0.6rem; font-size: 0.78rem; font-weight: 500; border-radius: 4px; border: none; cursor: pointer; text-decoration: none; white-space: nowrap; transition: background 0.15s; }
+    .portal-btn-new:hover { background: #196c2e; }
+    .portal-new-wrap { display: flex; justify-content: flex-end; margin-top: 0.5rem; }
+    .portal-inst-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .portal-inst-table th { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 2px solid #eee; color: #999; font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    .portal-inst-table td { padding: 0.35rem 0.5rem; border-bottom: 1px solid #f5f5f5; }
+    .portal-inst-table tr:last-child td { border-bottom: none; }
+    .portal-inst-id { font-family: monospace; font-size: 0.8rem; color: #888; }
+    .portal-inst-node { color: #333; }
+    .portal-inst-actions { display: flex; gap: 0.35rem; justify-content: flex-end; }
+    .portal-btn-observe { display: inline-block; background: #f0f4fa; color: #2a6bcf; font-size: 0.78rem; font-weight: 500; padding: 0.25rem 0.6rem; border-radius: 4px; border: 1px solid #d0ddf0; cursor: pointer; text-decoration: none; transition: background 0.15s; }
+    .portal-btn-observe:hover { background: #dce6f5; }
+    .portal-btn-delete { display: inline-block; background: #faf0f0; color: #b33; font-size: 0.78rem; font-weight: 500; padding: 0.25rem 0.6rem; border-radius: 4px; border: 1px solid #f0d0d0; cursor: pointer; transition: background 0.15s; }
+    .portal-btn-delete:hover { background: #f5dcdc; }
+    .portal-meta { font-size: 0.75rem; color: #aaa; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #f0f0f0; }
+
+    /* Raw view */
+    #portal-raw-view { display: none; }
+    #portal-raw-view pre { background: #1a1a2e; color: #e0e0e0; padding: 1.25rem; border-radius: 8px; font-size: 0.82rem; line-height: 1.5; overflow-x: auto; white-space: pre-wrap; max-height: calc(100vh - 10rem); overflow-y: auto; margin: 0; }
 </style>
 
-<div class="wf-grid">
-    {% for wf in workflows %}
-    <div class="wf-card">
-        <h2>{{ wf.title }}</h2>
-        <p>{{ wf.description }}</p>
-        <table class="inst-table">
-            {% if wf.instances %}
-            <thead>
-                <tr><th>Instance</th><th>Node</th><th></th></tr>
-            </thead>
-            <tbody>
-                {% for inst in wf.instances %}
-                <tr>
-                    <td class="inst-id">{{ inst.id }}</td>
-                    <td class="inst-node">{{ inst.node }}</td>
-                    <td class="inst-actions">
-                        <a class="btn-observe" href="/agent/{{ wf.id }}/{{ inst.id }}/observe">Observe</a>
-                        <button class="btn-delete" onclick="deleteInstance('{{ wf.id }}', '{{ inst.id }}')">Delete</button>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-            {% endif %}
-        </table>
-        <div class="new-instance-wrap">
-            <form action="/agent/{{ wf.id }}/new" method="POST" style="margin:0;">
-                <button class="btn-new" type="submit">+ New Instance</button>
-            </form>
-        </div>
-        <div class="wf-meta">API: <code>GET /agent/{{ wf.id }}/{id}</code> &nbsp; <code>POST /agent/{{ wf.id }}/{id}</code></div>
-    </div>
-    {% endfor %}
+<div id="portal-human-view" style="border: 2px solid #7c3aed; border-radius: 6px; padding: 1rem; min-height: 4rem;"></div>
+<div id="portal-raw-view" style="border: 2px solid #7c3aed; border-radius: 6px; padding: 1rem;">
+    <pre id="portal-raw-content"></pre>
 </div>
 
+<script src="{{ url_for('static', filename='renderers/portal.js') }}"></script>
 <script>
-document.querySelectorAll('.wf-card').forEach(function(card) {
-    var actions = card.querySelector('.inst-actions');
-    var btn = card.querySelector('.new-instance-wrap .btn-new');
-    if (actions && btn) {
-        btn.style.width = actions.offsetWidth + 'px';
-    }
-});
+(function() {
+    var payload = {{ payload_json|safe }};
+    var streamUrl = '{{ stream_url }}';
+    var humanView = document.getElementById('portal-human-view');
+    var rawView = document.getElementById('portal-raw-view');
+    var rawContent = document.getElementById('portal-raw-content');
+    var isRaw = false;
 
-function deleteInstance(wfId, instId) {
-    if (!confirm('Delete instance ' + instId + '?')) return;
-    fetch('/agent/' + wfId + '/' + instId + '/reset', { method: 'POST' })
-        .then(function(r) { return r.json(); })
-        .then(function() { location.reload(); });
-}
+    // Initial render
+    _portalRenderer.render(humanView, payload);
+    rawContent.textContent = JSON.stringify(payload, null, 2);
+
+    // SSE — live updates
+    var es = new EventSource(streamUrl);
+    es.onmessage = function(e) {
+        try {
+            var evt = JSON.parse(e.data);
+            var page = evt.page || evt;
+            payload = page;
+            _portalRenderer.render(humanView, payload);
+            rawContent.textContent = JSON.stringify(payload, null, 2);
+        } catch(err) {}
+    };
+    // Toggle button — bind after DOM is fully parsed (button is outside block content)
+    document.addEventListener('DOMContentLoaded', function() {
+        var btn = document.getElementById('agent-view-toggle');
+        if (btn) {
+            btn.textContent = 'Raw';
+            btn.onclick = function() {
+                isRaw = !isRaw;
+                humanView.style.display = isRaw ? 'none' : 'block';
+                rawView.style.display = isRaw ? 'block' : 'none';
+                btn.style.background = isRaw ? '#4a9eff' : '#1a1a2e';
+                btn.style.color = isRaw ? '#fff' : '#ccc';
+                btn.style.borderColor = isRaw ? '#4a9eff' : '#444';
+            };
+        }
+    });
+})();
 </script>
 {% endblock %}

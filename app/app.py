@@ -688,6 +688,14 @@ def _render_portal() -> dict:
                 "url": f"/agent/{wf_id}/{inst['id']}",
             })
             n += 1
+            affordances.append({
+                "id": n,
+                "label": f"Delete {wf_info['title']} ({inst['id']})",
+                "method": "POST",
+                "url": f"/agent/{wf_id}/{inst['id']}/delete",
+                "body": {},
+            })
+            n += 1
         affordances.append({
             "id": n,
             "label": f"New {wf_info['title']} instance",
@@ -700,7 +708,7 @@ def _render_portal() -> dict:
 
     return {
         "state": {
-            "page": "agent_portal",
+            "page": "agent",
             "page_title": "Agent Portal",
             "workflows": workflows,
         },
@@ -711,15 +719,16 @@ def _render_portal() -> dict:
 
 @app.route("/agent")
 def agent_portal():
+    portal = _render_portal()
     # JSON for agents, HTML for browsers
     if request.accept_mimetypes.best == "application/json":
-        return jsonify(_render_portal())
+        return jsonify(portal)
 
-    # Build template data from the canonical representation
-    portal = _render_portal()
-    workflows = portal["state"]["workflows"]
-    return render_template("agent.html", active_page="agent", workflows=workflows,
-                           agent_view_stream="/agent/stream")
+    return render_template("agent.html", active_page="agent",
+                           payload=portal,
+                           payload_json=json.dumps(portal),
+                           stream_url="/agent/stream",
+                           show_raw_toggle=True)
 
 
 @app.route("/agent/stream")
@@ -765,12 +774,10 @@ def agent_new_instance(workflow_id):
     _wf_save_state(workflow_id, inst_id, data)
     # Notify portal observers
     _wf_notify_portal({"type": "instance_created", "workflow_id": workflow_id, "instance_id": inst_id})
-    # JSON for agents, redirect for browsers
+    # Return confirmation — stay on portal
     if request.accept_mimetypes.best == "application/json":
-        page = handler.render_node(data, workflow_id, inst_id)
-        page["instance_id"] = inst_id
-        return jsonify(page), 201
-    return redirect(f"/agent/{workflow_id}/{inst_id}/observe")
+        return jsonify({"instance_id": inst_id, "workflow_id": workflow_id}), 201
+    return redirect("/agent")
 
 
 @app.route("/agent/<workflow_id>/<instance_id>/observe")
@@ -825,8 +832,8 @@ def agent_stream(workflow_id, instance_id):
     )
 
 
-@app.route("/agent/<workflow_id>/<instance_id>/reset", methods=["POST"])
-def agent_reset(workflow_id, instance_id):
+@app.route("/agent/<workflow_id>/<instance_id>/delete", methods=["POST"])
+def agent_delete(workflow_id, instance_id):
     if workflow_id not in _WORKFLOWS:
         return jsonify({"error": "Unknown workflow"}), 404
     p = _wf_state_path(workflow_id, instance_id)
@@ -842,15 +849,31 @@ def agent_reset(workflow_id, instance_id):
 @app.route("/agent/<workflow_id>/<instance_id>", methods=["GET"])
 def agent_workflow_get(workflow_id, instance_id):
     if workflow_id not in _WORKFLOWS:
-        return jsonify({"error": f"Unknown workflow: {workflow_id}"}), 404
+        if request.accept_mimetypes.best == "application/json":
+            return jsonify({"error": f"Unknown workflow: {workflow_id}"}), 404
+        abort(404)
     ck = _cache_key(workflow_id, instance_id)
     page = _render_agent_node(workflow_id, instance_id)
+    if page is None:
+        if request.accept_mimetypes.best == "application/json":
+            return jsonify({"error": f"Unknown workflow: {workflow_id}"}), 404
+        abort(404)
     node = (page.get("state") or {}).get("node") or (page.get("state") or {}).get("position") or workflow_id
     _workflow_current_path[ck] = node
     _wf_notify(workflow_id, instance_id, {"type": "navigate", "path": node, "content": json.dumps(page)})
-    if page is None:
-        return jsonify({"error": f"Unknown workflow: {workflow_id}"}), 404
-    return jsonify(page)
+
+    # JSON for agents, HTML observer for browsers
+    if request.accept_mimetypes.best == "application/json":
+        return jsonify(page)
+    wf_info = _WORKFLOWS[workflow_id]
+    return render_template(
+        "agent_observer.html",
+        workflow_id=workflow_id,
+        instance_id=instance_id,
+        workflow_title=wf_info["title"],
+        stream_url=f"/agent/{workflow_id}/{instance_id}/stream",
+        renderers=json.dumps(wf_info["renderers"]),
+    )
 
 
 def _execute_and_feedback(workflow_id, instance_id, internal_body, acted_label=None):
