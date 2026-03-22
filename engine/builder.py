@@ -17,6 +17,7 @@ import yaml
 from .runtime.evaluator import evaluate
 from .runtime.schema import WorkflowDef
 from .runtime.renderer import _serialize_definition
+from .utils import field as make_field
 
 # Instance context — set at process_action() entry so internal render_node()
 # calls don't need instance_id threaded through every helper.
@@ -381,7 +382,29 @@ def render_node(data: dict, workflow_id: str,
         "definition": _summary(data),
     }
 
-    if node == "preview":
+    if node == "metadata":
+        state["fields"] = {
+            "Workflow ID": make_field(data.get("workflow_id"), "A machine-readable slug used in URLs. Lowercase, hyphens only."),
+            "Workflow Title": make_field(data.get("workflow_title"), "The human-readable name shown in the portal."),
+            "Workflow Description": make_field(data.get("workflow_description"), "A one-line summary shown in the workflow listing."),
+        }
+    elif node == "node_builder":
+        focused = data.get("focused_node")
+        wf_nodes = data.get("wf_nodes", [])
+        if focused is not None and focused < len(wf_nodes):
+            fn = wf_nodes[focused]
+            mode = "router" if fn.get("router") is not None else ("fork" if fn.get("fork") else "standard")
+            fields = {
+                "Show All Fields": make_field(fn.get("show_all_fields", False), "Display all fields from all nodes (useful for review nodes)"),
+                "Pause": make_field(fn.get("pause", True), "True=stop here (default), False=may auto-advance if gate passes"),
+                "Execution": make_field(fn.get("execution", False), "True=execution node with table engine"),
+                "Node Mode": make_field(mode, "standard=fields+proceed, router=auto-routing, fork=parallel branches"),
+            }
+            for k in ("Show All Fields", "Pause", "Execution"):
+                fields[k]["options"] = [True, False]
+            fields["Node Mode"]["options"] = list(_VALID_NODE_MODES)
+            state["fields"] = fields
+    elif node == "preview":
         state["validation_errors"] = _validate(data)
 
     return {
@@ -620,26 +643,26 @@ def _build_affordances(data: dict, workflow_id: str,
                               "body": {"action_index": "<action_index>"}, "parameters": {"action_index": {"options": ai, "labels": al}}})
                 n += 1
 
-            # Node flags
-            affs.append({"id": n, "label": f"Set show_all_fields for '{fn['id']}' (current: {fn.get('show_all_fields', False)})",
+            # Node flags — labels match state.fields keys for inline rendering
+            affs.append({"id": n, "label": f"Set Show All Fields (current: {json.dumps(fn.get('show_all_fields', False))})",
                           "method": "POST", "url": f"{api}/set_show_all_fields", "body": {"value": "<value>"}, "parameters": {"value": {"options": [True, False]}}})
             n += 1
 
-            affs.append({"id": n, "label": f"Set pause for '{fn['id']}' (current: {fn.get('pause', True)})",
+            affs.append({"id": n, "label": f"Set Pause (current: {json.dumps(fn.get('pause', True))})",
                           "method": "POST", "url": f"{api}/set_pause", "body": {"value": "<value>"},
-                          "parameters": {"value": {"options": [True, False], "description": "True=stop here (default), False=may auto-advance if gate passes"}}})
+                          "parameters": {"value": {"options": [True, False]}}})
             n += 1
 
-            affs.append({"id": n, "label": f"Set execution for '{fn['id']}' (current: {fn.get('execution', False)})",
+            affs.append({"id": n, "label": f"Set Execution (current: {json.dumps(fn.get('execution', False))})",
                           "method": "POST", "url": f"{api}/set_execution", "body": {"value": "<value>"},
-                          "parameters": {"value": {"options": [True, False], "description": "True=execution node with table engine"}}})
+                          "parameters": {"value": {"options": [True, False]}}})
             n += 1
 
             # Node mode selector
             current_mode = "router" if fn.get("router") is not None else ("fork" if fn.get("fork") else "standard")
-            affs.append({"id": n, "label": f"Set node mode for '{fn['id']}' (current: {current_mode})",
-                          "method": "POST", "url": f"{api}/set_node_mode", "body": {"mode": "<mode>"},
-                          "parameters": {"mode": {"options": _VALID_NODE_MODES, "description": "standard=fields+proceed, router=auto-routing, fork=parallel branches"}}})
+            affs.append({"id": n, "label": f"Set Node Mode (current: {json.dumps(current_mode)})",
+                          "method": "POST", "url": f"{api}/set_node_mode", "body": {"value": "<value>"},
+                          "parameters": {"value": {"options": list(_VALID_NODE_MODES)}}})
             n += 1
 
             # Router affordances
@@ -1256,7 +1279,8 @@ def process_action(data: dict, workflow_id: str, body: dict,
         focused = data.get("focused_node")
         if focused is None or focused >= len(data["wf_nodes"]):
             return {"error": "No node is focused."}
-        mode = body.get("mode", "").strip()
+        mode = (body.get("value") or body.get("mode", ""))
+        mode = mode.strip() if isinstance(mode, str) else ""
         if mode not in _VALID_NODE_MODES:
             return {"error": f"Invalid mode. Choose: {', '.join(_VALID_NODE_MODES)}"}
         fn = data["wf_nodes"][focused]
