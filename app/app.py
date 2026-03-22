@@ -467,6 +467,28 @@ def _wf_notify_portal(event: dict):
         _portal_observers.remove(q)
 
 
+def _all_affordances(page: dict) -> list[dict]:
+    """Collect all affordances: top-level + inline (fields, table, columns, properties)."""
+    affs = list(page.get("affordances", []))
+    st = page.get("state") or {}
+    # Field affordances
+    for field in (st.get("fields") or {}).values():
+        fa = field.get("affordance") if isinstance(field, dict) else None
+        if fa is not None:
+            affs.append(fa)
+    # Table affordances
+    table = st.get("table")
+    if isinstance(table, dict):
+        affs.extend(table.get("affordances", []))
+        for col in table.get("columns", []):
+            if isinstance(col, dict):
+                affs.extend(col.get("affordances", []))
+        props = table.get("properties")
+        if isinstance(props, dict):
+            affs.extend(props.get("affordances", []))
+    return affs
+
+
 def _compute_feedback(before: dict, after: dict, acted_label: str = None) -> dict:
     """Compute the Feedback — structured response to an agent action.
 
@@ -502,10 +524,10 @@ def _compute_feedback(before: dict, after: dict, acted_label: str = None) -> dic
         """Stable identity for an affordance — its URL."""
         return a.get("url", "")
 
-    before_aff = {_aff_key(a): a for a in before.get("affordances", [])}
+    before_aff = {_aff_key(a): a for a in _all_affordances(before)}
     new_affordances = []
     modified_affordances = []
-    for a in after.get("affordances", []):
+    for a in _all_affordances(after):
         key = _aff_key(a)
         if key not in before_aff:
             new_affordances.append(a)

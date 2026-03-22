@@ -48,9 +48,8 @@ window._WFE_ALLOWED_RENDERERS = {{ renderers|safe }};
 window._WFE_STREAM_URL = '{{ stream_url }}';
 </script>
 <script src="/static/renderers/registry.js"></script>
-<script src="/static/renderers/raw.js"></script>
-<script src="/static/renderers/simple-shared.js"></script>
-<script src="/static/renderers/simple.js"></script>
+<script src="/static/renderers/agent-renderer.js"></script>
+<script src="/static/renderers/human-renderer.js"></script>
 <script>
 /* ── SSE ── */
 function connect() {

@@ -185,10 +185,10 @@ class FieldSource:
             display = json.dumps(current)
 
         a: dict[str, Any] = {
-            "label": f"Set {fdef.label} (current: {display})",
             "method": "POST",
             "url": f"{ctx.api_base}/{fdef.key}",
             "body": {"value": "<value>"},
+            "_field_label": fdef.label,  # transient tag for partitioning
         }
         if ftype == "boolean":
             a["parameters"] = {"value": {"options": [True, False]}}
@@ -436,7 +436,12 @@ class TableSource:
 
 
 class TableStructuralSource:
-    """Affordances for table construction operations."""
+    """Affordances for table construction, anchored to objects.
+
+    Each affordance is tagged with transient keys for partitioning:
+      _table_anchor: "table" | "column" | "properties"
+      _col_index: <int>  (only when _table_anchor == "column")
+    """
 
     def __init__(self, node: NodeDef):
         self.node = node
@@ -453,16 +458,17 @@ class TableStructuralSource:
         table_data = data.get("table", {})
         cols = table_data.get("columns", [])
         rows = table_data.get("rows", [])
-        col_indices = list(range(len(cols)))
-        col_labels = [c["name"] for c in cols]
+        row_indices = list(range(len(rows)))
         affs: list[dict] = []
+
+        # -- Table-level affordances --
 
         if "add_column" in ops:
             a: dict[str, Any] = {
-                "label": "Add column",
                 "method": "POST", "url": f"{api}/add_column",
                 "body": {"name": "<name>", "type": "<type>"},
                 "parameters": {"name": {}, "type": {"options": list(defn.column_types.keys())}},
+                "_table_anchor": "table",
             }
             if defn.column_types:
                 type_info = [
@@ -476,118 +482,106 @@ class TableStructuralSource:
 
         if "add_row" in ops and cols:
             affs.append({
-                "label": "Add row",
                 "method": "POST", "url": f"{api}/add_row",
                 "body": {},
+                "_table_anchor": "table",
             })
 
-        if cols:
+        if "remove_row" in ops and rows:
+            affs.append({
+                "method": "POST", "url": f"{api}/remove_row",
+                "body": {"row": "<row>"},
+                "parameters": {"row": {"options": row_indices}},
+                "_table_anchor": "table",
+            })
+
+        # -- Per-column affordances --
+
+        exec_col_info = None  # lazily built for acceptance rules
+        for ci, col in enumerate(cols):
+            ctype = col.get("type", "")
+
             if "rename_column" in ops:
                 affs.append({
-                    "label": "Rename column",
                     "method": "POST", "url": f"{api}/rename_column",
-                    "body": {"col": "<col>", "name": "<name>"},
-                    "parameters": {"col": {"options": col_indices, "labels": col_labels}, "name": {}},
+                    "body": {"col": ci, "name": "<name>"},
+                    "parameters": {"name": {}},
+                    "_table_anchor": "column", "_col_index": ci,
                 })
 
             if "set_column_type" in ops:
                 affs.append({
-                    "label": "Set column type",
                     "method": "POST", "url": f"{api}/set_column_type",
-                    "body": {"col": "<col>", "type": "<type>"},
-                    "parameters": {"col": {"options": col_indices, "labels": col_labels},
-                                   "type": {"options": list(defn.column_types.keys())}},
+                    "body": {"col": ci, "type": "<type>"},
+                    "parameters": {"type": {"options": list(defn.column_types.keys())}},
+                    "_table_anchor": "column", "_col_index": ci,
                 })
 
             if "remove_column" in ops:
                 affs.append({
-                    "label": "Remove column",
                     "method": "POST", "url": f"{api}/remove_column",
-                    "body": {"col": "<col>"},
-                    "parameters": {"col": {"options": col_indices, "labels": col_labels}},
+                    "body": {"col": ci},
+                    "_table_anchor": "column", "_col_index": ci,
                 })
 
-            # Choice-list column management
-            if "set_choices" in ops:
-                choice_cols = [(i, c) for i, c in enumerate(cols) if c["type"] == "ex-choice-list"]
-                if choice_cols:
-                    affs.append({
-                        "label": "Set choices for column",
-                        "method": "POST", "url": f"{api}/set_choices",
-                        "body": {"col": "<col>", "choices": "<choices>"},
-                        "parameters": {
-                            "col": {"options": [i for i, _ in choice_cols], "labels": [c["name"] for _, c in choice_cols]},
-                            "choices": {"description": "Array of valid option strings"},
-                        },
-                    })
+            if "set_cell" in ops and rows:
+                affs.append({
+                    "method": "POST", "url": f"{api}/set_cell",
+                    "body": {"col": ci, "row": "<row>", "value": "<value>"},
+                    "parameters": {"row": {"options": row_indices}, "value": {}},
+                    "_table_anchor": "column", "_col_index": ci,
+                })
 
-            # Acceptance criteria rule management
-            if "set_rule" in ops:
-                ae_cols = [(i, c) for i, c in enumerate(cols) if c["type"] == "ae-acceptance-criteria"]
-                if ae_cols:
+            # Type-specific: choice-list
+            if "set_choices" in ops and ctype == "ex-choice-list":
+                affs.append({
+                    "method": "POST", "url": f"{api}/set_choices",
+                    "body": {"col": ci, "choices": "<choices>"},
+                    "parameters": {"choices": {"description": "Array of valid option strings"}},
+                    "_table_anchor": "column", "_col_index": ci,
+                })
+
+            # Type-specific: acceptance criteria
+            if "set_rule" in ops and ctype == "ae-acceptance-criteria":
+                if exec_col_info is None:
                     exec_col_info = [
                         {"index": i, "name": c["name"], "type": c["type"]}
                         for i, c in enumerate(cols)
                         if c["type"] in ("ex-free-text", "ex-choice-list", "ex-cross-reference", "ex-signature")
                     ]
-                    affs.append({
-                        "label": "Set acceptance rule for column",
-                        "method": "POST", "url": f"{api}/set_rule",
-                        "body": {"col": "<col>", "rule": "<rule>"},
-                        "parameters": {
-                            "col": {"options": [i for i, _ in ae_cols], "labels": [c["name"] for _, c in ae_cols]},
-                            "rule": {
-                                "description": 'Boolean expression tree. Structure: {"op": "AND"|"OR", "conditions": [...]}.',
-                                "executable_columns": exec_col_info,
-                            },
+                affs.append({
+                    "method": "POST", "url": f"{api}/set_rule",
+                    "body": {"col": ci, "rule": "<rule>"},
+                    "parameters": {
+                        "rule": {
+                            "description": 'Boolean expression tree. Structure: {"op": "AND"|"OR", "conditions": [...]}.',
+                            "executable_columns": exec_col_info,
                         },
-                    })
+                    },
+                    "_table_anchor": "column", "_col_index": ci,
+                })
 
-            # Prerequisite management
-            if "set_prerequisites" in ops and rows:
-                prereq_cols = [(i, c) for i, c in enumerate(cols) if c["type"] == "ne-prerequisite"]
-                if prereq_cols:
-                    row_ids = [f"Row-{i+1}" for i in range(len(rows))]
-                    affs.append({
-                        "label": "Set prerequisites for cell",
-                        "method": "POST", "url": f"{api}/set_prerequisites",
-                        "body": {"row": "<row>", "col": "<col>", "prerequisites": "<prerequisites>"},
-                        "parameters": {
-                            "row": {"options": list(range(len(rows))), "labels": row_ids},
-                            "col": {"options": [i for i, _ in prereq_cols], "labels": [c["name"] for _, c in prereq_cols]},
-                            "prerequisites": {"description": "Array of row indices that must pass acceptance before this row"},
-                        },
-                    })
+            # Type-specific: prerequisite
+            if "set_prerequisites" in ops and ctype == "ne-prerequisite" and rows:
+                row_ids = [f"Row-{i+1}" for i in range(len(rows))]
+                affs.append({
+                    "method": "POST", "url": f"{api}/set_prerequisites",
+                    "body": {"col": ci, "row": "<row>", "prerequisites": "<prerequisites>"},
+                    "parameters": {
+                        "row": {"options": row_indices, "labels": row_ids},
+                        "prerequisites": {"description": "Array of row indices that must pass acceptance before this row"},
+                    },
+                    "_table_anchor": "column", "_col_index": ci,
+                })
 
-        # Cell editing
-        if "set_cell" in ops and cols and rows:
-            affs.append({
-                "label": "Set cell",
-                "method": "POST", "url": f"{api}/set_cell",
-                "body": {"row": "<row>", "col": "<col>", "value": "<value>"},
-                "parameters": {
-                    "row": {"options": list(range(len(rows)))},
-                    "col": {"options": col_indices, "labels": col_labels},
-                    "value": {},
-                },
-            })
+        # -- Properties affordances --
 
-        if "remove_row" in ops and rows:
-            affs.append({
-                "label": "Remove row",
-                "method": "POST", "url": f"{api}/remove_row",
-                "body": {"row": "<row>"},
-                "parameters": {"row": {"options": list(range(len(rows)))}},
-            })
-
-        # Table properties
         if "set_property" in ops:
-            seq = table_data.get("properties", data.get("properties", {})).get("sequential_execution", False)
             affs.append({
-                "label": f"Set sequential execution (current: {json.dumps(seq)})",
                 "method": "POST", "url": f"{api}/set_property",
                 "body": {"key": "sequential_execution", "value": "<value>"},
                 "parameters": {"value": {"options": [True, False]}},
+                "_table_anchor": "properties",
             })
 
         return affs

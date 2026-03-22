@@ -1,9 +1,9 @@
 /* ======================================================================
-   RENDERER: RAW — formatted JSON
+   RENDERER: AGENT — formatted JSON
    ====================================================================== */
 registerRenderer({
     id: 'raw',
-    label: 'Raw',
+    label: 'Agent',
     format: 'raw',
     _pre: null,
     init: function(c) {

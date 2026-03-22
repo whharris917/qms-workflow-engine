@@ -87,12 +87,13 @@ function wfRuleToExpr(rule, columns) {
 function wfRenderFields(fields, fieldCategory, fieldAffordances) {
     var keys = Object.keys(fields);
     if (!keys.length) return '<span class="wf-empty-obj">(empty)</span>';
+    /* Legacy fallback: if affordances are passed separately, build lookup.
+       New format: each field has f.affordance inline. */
     var affByLabel = {};
     if (fieldAffordances) {
         for (var ai = 0; ai < fieldAffordances.length; ai++) {
             var aff = fieldAffordances[ai];
-            /* Match "Set {FieldLabel} (current: ...)" to field label */
-            var m = aff.label.match(/^Set (.+?) \(current:/);
+            var m = aff.label.match(/^Set (.+?)( \(current:|$)/);
             if (m) affByLabel[m[1]] = aff;
         }
     }
@@ -102,7 +103,8 @@ function wfRenderFields(fields, fieldCategory, fieldAffordances) {
         var f = fields[k];
         var cat = fieldCategory[k] || null;
         var catCls = cat ? ' wf-fb-' + cat : '';
-        var aff = affByLabel[k] || null;
+        /* Prefer inline affordance; fall back to legacy regex match */
+        var aff = (f && f.affordance) || affByLabel[k] || null;
         var tooltip = aff ? aff.method + ' ' + aff.url + (aff.body !== undefined ? ' ' + JSON.stringify(aff.body) : '') : '';
         html += '<div class="wf-field' + catCls + '">';
         var tagMap = {outcome:'SET', 'new':'NEW', modified:'CHANGED'};
@@ -429,28 +431,81 @@ function _wfSchematicBanner(defn, current, completed) {
     return '<div class="wf-banner wf-banner-flow" id="' + containerId + '" style="min-height:52px;"></div>';
 }
 
+/* ── Generic affordance renderer ──
+   Renders an array of affordances as interactive controls.
+   Works with or without labels — derives action name from URL if no label. */
+function wfRenderAffordances(affs) {
+    if (!affs || !affs.length) return '';
+    var html = '<div class="wf-affs">';
+    for (var i = 0; i < affs.length; i++) {
+        var a = affs[i];
+        var action = a.label || a.url.split('/').pop().replace(/_/g, ' ');
+        var params = a.parameters || {};
+        var paramKeys = Object.keys(params);
+        var tooltip = a.method + ' ' + a.url + ' ' + JSON.stringify(a.body);
+
+        if (paramKeys.length) {
+            /* Parametric: render as inline form */
+            html += '<div class="wf-aff-inline" data-aff-url="' + wfEsc(a.url) + '" data-aff-body="' + wfEsc(JSON.stringify(a.body)) + '">';
+            html += '<span class="wf-aff-action">' + wfEsc(action) + '</span>';
+            for (var pi = 0; pi < paramKeys.length; pi++) {
+                var pk = paramKeys[pi];
+                var p = params[pk];
+                /* Skip params that are pre-filled in the body (e.g., col) */
+                if (a.body[pk] !== undefined && a.body[pk] !== '<' + pk + '>') continue;
+                if (p.options) {
+                    html += ' <select class="wf-param-input wf-aff-compact" data-param="' + wfEsc(pk) + '">';
+                    for (var oi = 0; oi < p.options.length; oi++) {
+                        var optVal = p.options[oi];
+                        var optLabel = p.labels ? p.labels[oi] : (optVal === true ? 'Yes' : optVal === false ? 'No' : String(optVal));
+                        html += '<option value="' + wfEsc(JSON.stringify(optVal)) + '">' + wfEsc(optLabel) + '</option>';
+                    }
+                    html += '</select>';
+                } else {
+                    html += ' <input class="wf-param-input wf-aff-compact" type="text" data-param="' + wfEsc(pk) + '"'
+                        + ' placeholder="' + wfEsc(p.description || pk) + '">';
+                }
+            }
+            html += ' <button class="wf-aff-go" data-aff-url="' + wfEsc(a.url) + '" title="' + wfEsc(tooltip) + '">' + wfEsc(action) + '</button>';
+            html += '</div>';
+        } else {
+            /* Simple: render as button */
+            html += '<button class="wf-aff-btn" data-aff-url="' + wfEsc(a.url) + '" data-aff-body="' + wfEsc(JSON.stringify(a.body)) + '" title="' + wfEsc(tooltip) + '">' + wfEsc(action) + '</button>';
+        }
+    }
+    html += '</div>';
+    return html;
+}
+
 function wfRenderTable(table) {
     if (!table) return '';
     var cols = table.columns || [];
     var rows = table.rows || [];
     var props = table.properties || {};
+    var tableAffs = table.affordances || [];
 
     var html = '<div class="wf-card">';
-    html += '<div class="wf-card-head">state.table</div>';
+    html += '<div class="wf-card-head">Table</div>';
 
     if (table.summary) {
         html += '<div class="wf-table-summary">' + wfEsc(table.summary) + '</div>';
     }
+
+    /* Table-level affordances */
+    html += wfRenderAffordances(tableAffs);
 
     if (cols.length) {
         html += '<div class="wf-table-wrap"><table class="wf-table"><thead><tr>';
         html += '<th class="wf-table-rownum">#</th>';
         for (var ci = 0; ci < cols.length; ci++) {
             var c = cols[ci];
+            var colAffs = c.affordances || [];
             html += '<th><div class="wf-table-colname">' + wfEsc(c.name) + '</div>';
             html += '<div class="wf-table-coltype">' + wfEsc(c.type) + '</div>';
             if (c.choices) html += '<div class="wf-table-colmeta">choices: ' + wfEsc(JSON.stringify(c.choices)) + '</div>';
             if (c.rule) html += '<div class="wf-table-colmeta">rule: ' + wfEsc(wfRuleToExpr(c.rule, cols)) + '</div>';
+            /* Column affordances */
+            html += wfRenderAffordances(colAffs);
             html += '</th>';
         }
         html += '</tr></thead><tbody>';
@@ -471,13 +526,16 @@ function wfRenderTable(table) {
         html += '<div class="wf-table-empty">(no columns defined)</div>';
     }
 
-    /* Properties */
+    /* Properties with affordances */
+    var propAffs = props.affordances || [];
     var propKeys = Object.keys(props);
     if (propKeys.length) {
         html += '<div class="wf-table-props">';
         for (var i = 0; i < propKeys.length; i++) {
+            if (propKeys[i] === 'affordances') continue;
             html += '<span class="wf-table-prop">' + wfEsc(propKeys[i]) + ': ' + wfEsc(String(props[propKeys[i]])) + '</span>';
         }
+        html += wfRenderAffordances(propAffs);
         html += '</div>';
     }
 
@@ -574,7 +632,8 @@ function wfRenderParamAff(aff) {
     if (!paramKeys.length) return '';
     var tooltip = aff.method + ' ' + aff.url + ' ' + JSON.stringify(aff.body);
     var html = '<div class="wf-param-form" data-aff-url="' + wfEsc(aff.url) + '" data-aff-body="' + wfEsc(JSON.stringify(aff.body)) + '">';
-    html += '<div class="wf-param-head">' + wfEsc(aff.label) + '</div>';
+    var action = aff.label || aff.url.split('/').pop().replace(/_/g, ' ');
+    html += '<div class="wf-param-head">' + wfEsc(action) + '</div>';
     for (var pi = 0; pi < paramKeys.length; pi++) {
         var pk = paramKeys[pi];
         var p = params[pk];
@@ -722,169 +781,11 @@ function wfRenderExecTableFaithful(et, affordances) {
     return html;
 }
 
-function wfRenderPage(container, state, msg, feedback) {
-    if (!container || !state) return;
-
-    var fieldCategory = {};
-    var affCategory = {};
-    if (feedback) {
-        var out = feedback.outcome || {};
-        var eff = feedback.effects || {};
-        for (var k in out) fieldCategory[k] = 'outcome';
-        for (var k in (eff.new_fields || {})) fieldCategory[k] = 'new';
-        for (var k in (eff.modified_fields || {})) fieldCategory[k] = 'modified';
-        (eff.new_affordances || []).forEach(function(a){ affCategory[a.label] = 'new'; });
-        (eff.modified_affordances || []).forEach(function(a){ affCategory[a.label] = 'modified'; });
-    }
-
-    var html = '';
-    var s = state.state || {};
-
-    html += '<div class="wf-header">';
-    html += '<h1 class="wf-title">' + wfEsc(s.workflow || 'Workflow') + '</h1>';
-    html += '</div>';
-
-    html += wfRenderBanner(state);
-
-    html += '<div class="wf-section">';
-    html += '<div class="wf-section-head">' + wfEsc(s.node_title || s.node) + '</div>';
-    html += '</div>';
-
-    if (state.instructions) {
-        html += '<div class="wf-desc">' + wfEsc(state.instructions) + '</div>';
-    }
-
-    html += wfRenderStateProps(state);
-
-    if (s.fields) {
-        html += '<div class="wf-card">';
-        html += '<div class="wf-card-head">Fields</div>';
-        html += wfRenderFields(s.fields, fieldCategory);
-        html += '</div>';
-    }
-
-    if (s.execution_table) {
-        html += wfRenderExecTable(s.execution_table);
-    } else if (s.table) {
-        html += wfRenderTable(s.table);
-    }
-
-    if (state.affordances && state.affordances.length) {
-        html += '<div class="wf-card">';
-        html += '<div class="wf-card-head">affordances</div>';
-        for (var i = 0; i < state.affordances.length; i++) {
-            var a = state.affordances[i];
-            var cls = 'wf-aff';
-            if (/Proceed|Submit/.test(a.label)) cls += ' wf-aff-primary';
-            else if (/Go back/.test(a.label)) cls += ' wf-aff-nav';
-            else if (/\[Selected\]/.test(a.label)) cls += ' wf-aff-selected';
-            if (affCategory[a.label]) cls += ' wf-aff-' + affCategory[a.label];
-            html += '<div class="' + cls + '">';
-            html += '<div class="wf-aff-top">';
-            html += '<span class="wf-aff-id">' + a.id + '</span>';
-            var ac = affCategory[a.label];
-            var affTag = ac === 'new' ? '<span class="wf-tag-new">NEW</span>' : ac === 'modified' ? '<span class="wf-tag-modified">CHANGED</span>' : '';
-            html += '<span class="wf-aff-label">' + wfEsc(a.label) + affTag + '</span>';
-            html += '<span class="wf-aff-method">' + wfEsc(a.method) + '</span>';
-            html += '</div>';
-            html += '<div class="wf-aff-detail">' + wfEsc(a.url) + ' &nbsp; ' + wfEsc(JSON.stringify(a.body)) + '</div>';
-            var pStr = wfRenderParams(a);
-            if (pStr) {
-                html += '<div class="wf-aff-options">' + wfEsc(pStr) + '</div>';
-            }
-            html += '</div>';
-        }
-        html += '</div>';
-    }
-
-    container.innerHTML = html;
-}
-
-/* Default-verbosity page renderer: uses clean exec table, no state.* card headers */
-function wfRenderPageDefault(container, state, msg, feedback) {
-    if (!container || !state) return;
-
-    var fieldCategory = {};
-    var affCategory = {};
-    if (feedback) {
-        var out = feedback.outcome || {};
-        var eff = feedback.effects || {};
-        for (var k in out) fieldCategory[k] = 'outcome';
-        for (var k in (eff.new_fields || {})) fieldCategory[k] = 'new';
-        for (var k in (eff.modified_fields || {})) fieldCategory[k] = 'modified';
-        (eff.new_affordances || []).forEach(function(a){ affCategory[a.label] = 'new'; });
-        (eff.modified_affordances || []).forEach(function(a){ affCategory[a.label] = 'modified'; });
-    }
-
-    var html = '';
-    var s = state.state || {};
-
-    html += '<div class="wf-header">';
-    html += '<h1 class="wf-title">' + wfEsc(s.workflow || 'Workflow') + '</h1>';
-    html += '</div>';
-
-    html += wfRenderBanner(state);
-
-    html += '<div class="wf-section">';
-    html += '<div class="wf-section-head">' + wfEsc(s.node_title || s.node) + '</div>';
-    html += '</div>';
-
-    if (state.instructions) {
-        html += '<div class="wf-desc">' + wfEsc(state.instructions) + '</div>';
-    }
-
-    html += wfRenderStateProps(state);
-
-    if (s.fields) {
-        html += '<div class="wf-card">';
-        html += '<div class="wf-card-head">Fields</div>';
-        html += wfRenderFields(s.fields, fieldCategory);
-        html += '</div>';
-    }
-
-    if (s.execution_table) {
-        html += wfRenderExecTableFaithful(s.execution_table, state.affordances || []);
-    } else if (s.table) {
-        html += wfRenderTable(s.table);
-    }
-
-    if (state.affordances && state.affordances.length) {
-        html += '<div class="wf-card">';
-        html += '<div class="wf-card-head">Affordances</div>';
-        for (var i = 0; i < state.affordances.length; i++) {
-            var a = state.affordances[i];
-            var cls = 'wf-aff';
-            if (/Proceed|Submit|Complete/.test(a.label)) cls += ' wf-aff-primary';
-            else if (/Go back/.test(a.label)) cls += ' wf-aff-nav';
-            else if (/\[Selected\]/.test(a.label)) cls += ' wf-aff-selected';
-            if (affCategory[a.label]) cls += ' wf-aff-' + affCategory[a.label];
-            html += '<div class="' + cls + '">';
-            html += '<div class="wf-aff-top">';
-            html += '<span class="wf-aff-id">' + a.id + '</span>';
-            var ac = affCategory[a.label];
-            var affTag = ac === 'new' ? '<span class="wf-tag-new">NEW</span>' : ac === 'modified' ? '<span class="wf-tag-modified">CHANGED</span>' : '';
-            html += '<span class="wf-aff-label">' + wfEsc(a.label) + affTag + '</span>';
-            html += '<span class="wf-aff-method">' + wfEsc(a.method) + '</span>';
-            html += '</div>';
-            html += '<div class="wf-aff-detail">' + wfEsc(a.url) + ' &nbsp; ' + wfEsc(JSON.stringify(a.body)) + '</div>';
-            var pStr = wfRenderParams(a);
-            if (pStr) {
-                html += '<div class="wf-aff-options">' + wfEsc(pStr) + '</div>';
-            }
-            html += '</div>';
-        }
-        html += '</div>';
-    }
-
-    container.innerHTML = html;
-}
-
-
 /* ======================================================================
-   RENDERER: SIMPLE — Shared flowchart functions
+   RENDERER: HUMAN — Flowchart + interactive affordances
    ====================================================================== */
 
-/* ── Exp-D: Flowchart renderer (Path B) ──
+/* ── Flowchart renderer ──
    HTML cards with absolute positioning + SVG edge layer behind.
    Layout computed from data -> positions assigned, not measured.
 */
@@ -1320,7 +1221,7 @@ var _fcDefnNodes = null;
 var _fcDefnIdx = null;
 
 /* ── Schematic-positioned detailed flowchart ── */
-function _expDSchematicFlowchart(defn, stateObj) {
+function _schematicFlowchart(defn, stateObj) {
     if (!defn || !defn.nodes || !defn.nodes.length) return '';
     var nodes = defn.nodes;
     var current = stateObj.node || '';
@@ -1355,7 +1256,7 @@ function _expDSchematicFlowchart(defn, stateObj) {
 }
 
 /* ── Main definition renderer (schematic card flowchart) ── */
-function expDRenderDefinition(defn) {
+function humanRenderDefinition(defn) {
     if (!defn) return '';
     var nodes = defn.nodes || [];
     var h = '<div class="fc-hdr">';
@@ -1377,7 +1278,7 @@ function expDRenderDefinition(defn) {
 }
 
 /* ── State props (definition-aware) ── */
-function expDRenderStateProps(state) {
+function humanRenderStateProps(state) {
     var s = state.state || {};
     var known = ['workflow','node','node_title','completed_nodes','definition','fields','table','execution_table','fork_state','banner_definition'];
     var extra = Object.keys(s).filter(function(k) { return known.indexOf(k) === -1; });
@@ -1385,7 +1286,7 @@ function expDRenderStateProps(state) {
     var html = '';
     for (var i = 0; i < extra.length; i++) {
         var k = extra[i], v = s[k];
-        if (k === 'definition' && _isDefinition(v)) { html += _expDSchematicFlowchart(v, s); continue; }
+        if (k === 'definition' && _isDefinition(v)) { html += _schematicFlowchart(v, s); continue; }
         html += '<div class="wf-card"><div class="wf-card-head">state.' + wfEsc(k) + '</div>';
         if (Array.isArray(v) && v.length && typeof v[0] === 'string') { html += '<ul class="wf-extra-list">'; for (var j = 0; j < v.length; j++) html += '<li>' + wfEsc(v[j]) + '</li>'; html += '</ul>'; }
         else if (v && typeof v === 'object') { html += wfRenderValue(v); }
@@ -1503,7 +1404,7 @@ function _wfBindAffordances(container) {
 }
 
 /* ── Page renderer (shared default + verbose) ── */
-function _expDPage(container, state, msg, feedback, verbose) {
+function _humanPage(container, state, msg, feedback, verbose) {
     if (!container || !state) return;
     var fieldCategory = {}, affCategory = {};
     if (feedback) {
@@ -1522,27 +1423,13 @@ function _expDPage(container, state, msg, feedback, verbose) {
         html += '<div class="wf-error">' + wfEsc(feedback.outcome.error) + '</div>';
     }
     if (state.instructions) html += '<div class="wf-desc">' + wfEsc(state.instructions) + '</div>';
-    html += expDRenderStateProps(state);
-    if (s.definition && _isDefinition(s.definition)) { html += _expDSchematicFlowchart(s.definition, s); }
-    /* ── Faithful affordance classification ──
-       Match field affordances by label pattern against displayed field names,
-       NOT by body shape. This prevents silent drops of parametric affordances
-       (like "Set cell") that have body.value but don't correspond to a field. */
-    var fieldAffordances = [], actionAffordances = [];
-    if (state.affordances) {
-        var fieldLabelSet = {};
-        if (s.fields) { var fk = Object.keys(s.fields); for (var fi = 0; fi < fk.length; fi++) fieldLabelSet[fk[fi]] = true; }
-        for (var ai = 0; ai < state.affordances.length; ai++) {
-            var a = state.affordances[ai];
-            var m = a.label.match(/^Set (.+?) \(current:/);
-            if (m && fieldLabelSet[m[1]]) {
-                fieldAffordances.push(a);
-            } else {
-                actionAffordances.push(a);
-            }
-        }
-    }
-    if (s.fields) { html += '<div class="wf-card"><div class="wf-card-head">Fields</div>' + wfRenderFields(s.fields, fieldCategory, fieldAffordances) + '</div>'; }
+    html += humanRenderStateProps(state);
+    if (s.definition && _isDefinition(s.definition)) { html += _schematicFlowchart(s.definition, s); }
+    /* ── Affordance classification ──
+       Field affordances are now inline in field objects (f.affordance).
+       state.affordances contains only non-field affordances (actions). */
+    var actionAffordances = state.affordances || [];
+    if (s.fields) { html += '<div class="wf-card"><div class="wf-card-head">Fields</div>' + wfRenderFields(s.fields, fieldCategory) + '</div>'; }
     /* ── Execution table: faithful projection with inline cell controls ── */
     if (s.execution_table) {
         html += verbose ? wfRenderExecTable(s.execution_table) : wfRenderExecTableFaithful(s.execution_table, actionAffordances);
@@ -1575,10 +1462,11 @@ function _expDPage(container, state, msg, feedback, verbose) {
         html += '<div class="wf-action-bar">';
         for (var i = 0; i < simpleAffordances.length; i++) {
             var a = simpleAffordances[i], cls = 'wf-aff-action-btn';
-            if (/Proceed|Submit|Complete/.test(a.label)) cls += ' wf-aff-action-primary';
-            else if (/Go back/.test(a.label)) cls += ' wf-aff-action-nav';
+            var aLabel = a.label || a.url.split('/').pop().replace(/_/g, ' ');
+            if (/Proceed|Submit|Complete/i.test(aLabel)) cls += ' wf-aff-action-primary';
+            else if (/go.back/i.test(aLabel)) cls += ' wf-aff-action-nav';
             var tooltip = a.method + ' ' + a.url + (a.body !== undefined ? ' ' + JSON.stringify(a.body) : '');
-            html += '<button class="' + cls + '" data-aff-url="' + wfEsc(a.url) + '" data-aff-body="' + wfEsc(JSON.stringify(a.body || {})) + '" title="' + wfEsc(tooltip) + '">' + wfEsc(a.label) + '</button>';
+            html += '<button class="' + cls + '" data-aff-url="' + wfEsc(a.url) + '" data-aff-body="' + wfEsc(JSON.stringify(a.body || {})) + '" title="' + wfEsc(tooltip) + '">' + wfEsc(aLabel) + '</button>';
         }
         html += '</div></div>';
     }
@@ -1636,3 +1524,283 @@ function _fcFixLayout(container) {
     var edgeLayer = graph.querySelector('.fc-edge-layer');
     if (edgeLayer) edgeLayer.innerHTML = _fcBuildEdgeSvg(slots, edges, totalW, totalH);
 }
+/* ======================================================================
+   RENDERER: SIMPLE — CSS constants and variant registrations
+   ====================================================================== */
+
+/* Shared structural CSS (layout, sizing, typography — no colors) */
+var WF_STRUCTURAL_CSS = ''
+    + '.wf-header { display:flex; align-items:baseline; justify-content:space-between; padding:1.25rem 1.5rem 0.25rem; }'
+    + '.wf-title { font-size:1.4rem; font-weight:600; margin:0; }'
+    + '.wf-banner { display:flex; align-items:center; margin:0.75rem 1.5rem; padding:0.75rem 1rem; border-radius:8px; border:1px solid; overflow-x:auto; }'
+    + '.wf-step { display:flex; flex-direction:column; align-items:center; gap:0.2rem; flex-shrink:0; }'
+    + '.wf-dot { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; font-size:0.7rem; font-weight:600; }'
+    + '.wf-step-label { font-size:0.68rem; font-weight:500; text-align:center; white-space:nowrap; }'
+    + '.wf-conn { flex:1; height:2px; margin:0 0.25rem; min-width:12px; align-self:center; margin-bottom:1rem; }'
+    + '.wf-parallel { display:flex; flex-direction:column; gap:0.2rem; align-self:center; padding:0.3rem 0.5rem; border:1px dashed; border-radius:6px; }'
+    + '.wf-branch { display:flex; align-items:center; gap:0.25rem; font-size:0.6rem; }'
+    + '.wf-branch-label { font-weight:700; font-size:0.58rem; min-width:4em; }'
+    + '.wf-branch-node { font-size:0.58rem; padding:0.1rem 0.3rem; border-radius:3px; border:1px solid; white-space:nowrap; }'
+    + '.wf-branch-sep { font-size:0.5rem; opacity:0.5; }'
+    + '.wf-step-targets { display:flex; flex-direction:column; gap:0.1rem; margin-top:0.15rem; }'
+    + '.wf-target { font-size:0.55rem; padding:0.05rem 0.25rem; border-radius:2px; border:1px dashed; text-align:center; }'
+    + '.wf-banner-flow { overflow:hidden !important; padding:0.25rem !important; display:block !important; }'
+    + '.mb-svg { display:block; }'
+    + '.wf-section { padding:0.5rem 1.5rem 0; }'
+    + '.wf-section-head { font-size:1.1rem; font-weight:600; }'
+    + '.wf-desc { padding:0.25rem 1.5rem 0.75rem; font-size:0.9rem; line-height:1.5; white-space:pre-line; }'
+    + '.wf-error { margin:0.5rem 1.5rem; padding:0.6rem 0.8rem; background:#fef2f2; border:1px solid #fca5a5; border-radius:6px; color:#991b1b; font-size:0.85rem; font-weight:500; }'
+    + '.wf-card { margin:0.5rem 1.5rem; padding:0.75rem; border:1px solid; border-radius:8px; }'
+    + '.wf-card-head { font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem; }'
+    + '.wf-tbl { width:100%; border-collapse:collapse; }'
+    + '.wf-tbl td { padding:0.35rem 0.5rem; font-size:0.85rem; vertical-align:top; }'
+    + '.wf-key { width:160px; white-space:nowrap; font-weight:500; font-size:0.8rem; }'
+    + '.wf-val { word-break:break-word; }'
+    + '.wf-null, .wf-empty-arr, .wf-empty-obj { font-style:italic; font-size:0.8rem; }'
+    + '.wf-extra-list { margin:0.3rem 0; padding-left:1.2rem; list-style:disc; }'
+    + '.wf-extra-list li { margin:0.15rem 0; font-size:0.85rem; }'
+    + '.wf-arr { display:flex; flex-direction:column; gap:0.15rem; }'
+    + '.wf-arr-item { padding-left:0.5rem; border-left:2px solid; }'
+    + '.wf-fields { display:flex; flex-direction:column; gap:0.15rem; }'
+    + '.wf-field { padding:0.5rem 0.6rem; }'
+    + '.wf-field:last-child { border-bottom:none; }'
+    + '.wf-field-label { font-size:0.8rem; font-weight:600; margin-bottom:0.15rem; }'
+    + '.wf-field-instruction { font-size:0.75rem; font-style:italic; margin-bottom:0.2rem; line-height:1.3; }'
+    + '.wf-field-value { font-size:0.85rem; }'
+    + '.wf-field-empty { font-style:italic; font-size:0.8rem; }'
+    + '.wf-field-options { font-size:0.72rem; font-family:Consolas,Monaco,monospace; margin-top:0.15rem; }'
+    + '.wf-aff { margin-bottom:0.4rem; padding:0.5rem 0.6rem; border:1px solid; border-radius:6px; }'
+    + '.wf-aff-top { display:flex; align-items:center; gap:0.5rem; }'
+    + '.wf-aff-id { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; font-size:0.7rem; font-weight:600; flex-shrink:0; }'
+    + '.wf-aff-label { flex:1; font-size:0.85rem; }'
+    + '.wf-aff-method { font-size:0.65rem; font-weight:600; padding:0.15rem 0.4rem; border-radius:3px; }'
+    + '.wf-aff-controls { display:flex; gap:0.35rem; margin-top:0.35rem; flex-wrap:wrap; align-items:center; }'
+    + '.wf-aff-opt-btn { font-size:0.78rem; padding:0.3rem 0.7rem; border-radius:4px; border:1px solid #ccc; background:#f8f9fb; color:#333; cursor:pointer; transition:background 0.15s; }'
+    + '.wf-aff-opt-btn:hover { background:#e8ecf1; }'
+    + '.wf-aff-opt-active { background:#2a6bcf !important; color:#fff !important; border-color:#2a6bcf !important; }'
+    + '.wf-aff-input { flex:1; font-size:0.82rem; padding:0.3rem 0.5rem; border:1px solid #ccc; border-radius:4px; min-width:120px; font-family:inherit; }'
+    + '.wf-aff-input:focus { outline:none; border-color:#2a6bcf; }'
+    + '.wf-aff-select { flex:1; font-size:0.82rem; padding:0.3rem 0.5rem; border:1px solid #ccc; border-radius:4px; min-width:120px; font-family:inherit; background:#fff; }'
+    + '.wf-aff-select:focus { outline:none; border-color:#2a6bcf; }'
+    + '.wf-aff-submit { font-size:0.78rem; padding:0.3rem 0.7rem; border-radius:4px; border:1px solid #2a6bcf; background:#2a6bcf; color:#fff; cursor:pointer; transition:background 0.15s; }'
+    + '.wf-aff-submit:hover { background:#1a5bbf; }'
+    + '.wf-aff-action-btn { font-size:0.82rem; padding:0.35rem 0.9rem; border-radius:4px; border:1px solid #218838; background:#218838; color:#fff; cursor:pointer; transition:background 0.15s; font-weight:500; }'
+    + '.wf-aff-action-btn:hover { background:#196c2e; }'
+    + '.wf-aff-primary .wf-aff-action-btn { background:#2a6bcf; border-color:#2a6bcf; }'
+    + '.wf-aff-primary .wf-aff-action-btn:hover { background:#1a5bbf; }'
+    + '.wf-action-bar { display:flex; gap:0.5rem; flex-wrap:wrap; padding:0.25rem 0; }'
+    + '.wf-aff-action-primary { background:#2a6bcf !important; border-color:#2a6bcf !important; }'
+    + '.wf-aff-action-primary:hover { background:#1a5bbf !important; }'
+    + '.wf-aff-action-nav { background:#6c757d !important; border-color:#6c757d !important; }'
+    + '.wf-aff-action-nav:hover { background:#5a6268 !important; }'
+    + '.wf-tag-outcome { font-size:0.6em; font-weight:700; vertical-align:super; margin-left:0.5em; letter-spacing:0.05em; }'
+    + '.wf-tag-new { font-size:0.6em; font-weight:700; vertical-align:super; margin-left:0.5em; letter-spacing:0.05em; }'
+    + '.wf-tag-modified { font-size:0.6em; font-weight:700; vertical-align:super; margin-left:0.5em; letter-spacing:0.05em; }'
+    + '.wf-table-summary { font-size:0.78rem; margin-bottom:0.5rem; font-style:italic; }'
+    + '.wf-table-wrap { overflow-x:auto; }'
+    + '.wf-table { width:100%; border-collapse:collapse; font-size:0.82rem; }'
+    + '.wf-table th, .wf-table td { padding:0.4rem 0.6rem; border:1px solid; text-align:left; vertical-align:top; }'
+    + '.wf-table-rownum { width:40px; text-align:center; font-size:0.75rem; font-weight:600; }'
+    + '.wf-table-colname { font-weight:600; font-size:0.82rem; }'
+    + '.wf-table-coltype { font-size:0.68rem; font-weight:400; }'
+    + '.wf-table-empty { font-style:italic; font-size:0.8rem; text-align:center; padding:0.75rem; }'
+    + '.wf-table-props { display:flex; gap:1rem; margin-top:0.5rem; font-size:0.72rem; }'
+    + '.wf-table-prop { font-family:Consolas,Monaco,monospace; }'
+    + '.wf-table-colmeta { font-size:0.68rem; word-break:break-all; max-width:200px; overflow:hidden; }'
+    /* Blueprint renderer — workflow definition visualization */
+    + '.bp-wrap { margin:0.5rem 1.5rem; }'
+    + '.bp-header { padding:0.75rem 0; border-bottom:2px solid; margin-bottom:0.75rem; }'
+    + '.bp-title { font-size:1.15rem; font-weight:700; }'
+    + '.bp-id { display:inline-block; font-size:0.7rem; font-family:Consolas,Monaco,monospace; padding:0.15rem 0.5rem; border:1px solid; border-radius:3px; margin-top:0.25rem; }'
+    + '.bp-desc { font-size:0.82rem; margin-top:0.3rem; line-height:1.4; }'
+    + '.bp-lifecycle { display:flex; align-items:center; margin:0.75rem 0; padding:0.6rem 0.75rem; border-radius:8px; border:1px solid; overflow-x:auto; }'
+    + '.bp-lc-step { display:flex; flex-direction:column; align-items:center; gap:0.15rem; flex-shrink:0; }'
+    + '.bp-lc-dot { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; font-size:0.65rem; font-weight:600; }'
+    + '.bp-lc-label { font-size:0.65rem; font-weight:500; white-space:nowrap; }'
+    + '.bp-lc-conn { flex:1; height:2px; margin:0 0.2rem; min-width:10px; align-self:center; margin-bottom:0.9rem; }'
+    + '.bp-empty { font-size:0.82rem; font-style:italic; padding:0.5rem 0; }'
+    + '.bp-nodes { display:flex; flex-direction:column; margin-top:0.5rem; }'
+    + '.bp-node-conn { display:flex; justify-content:center; padding:0.1rem 0; }'
+    + '.bp-arrow { font-size:0.7rem; line-height:1; }'
+    + '.bp-node { border:1px solid; border-radius:8px; overflow:hidden; }'
+    + '.bp-node-head { display:flex; align-items:center; gap:0.5rem; padding:0.5rem 0.75rem; flex-wrap:wrap; }'
+    + '.bp-node-title { font-size:0.95rem; font-weight:700; }'
+    + '.bp-node-id { font-size:0.65rem; font-family:Consolas,Monaco,monospace; padding:0.1rem 0.4rem; border:1px solid; border-radius:3px; }'
+
+    + '.bp-node-flag { font-size:0.6rem; padding:0.1rem 0.4rem; border:1px dashed; border-radius:3px; font-family:Consolas,Monaco,monospace; }'
+    + '.bp-node-section { padding:0.4rem 0.75rem; border-top:1px solid; }'
+    + '.bp-node-section-label { font-size:0.62rem; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.25rem; }'
+    + '.bp-node-instr { font-size:0.78rem; line-height:1.4; white-space:pre-line; }'
+    + '.bp-node-none { font-size:0.75rem; font-style:italic; }'
+    + '.bp-fields-table { width:100%; border-collapse:collapse; font-size:0.78rem; }'
+    + '.bp-fields-table th { text-align:left; font-size:0.62rem; text-transform:uppercase; letter-spacing:0.06em; padding:0.2rem 0.4rem; font-weight:500; }'
+    + '.bp-fields-table td { padding:0.25rem 0.4rem; vertical-align:top; }'
+    + '.bp-field-key { font-family:Consolas,Monaco,monospace; font-weight:600; font-size:0.75rem; }'
+    + '.bp-field-detail { font-size:0.72rem; max-width:250px; overflow:hidden; text-overflow:ellipsis; }'
+    + '.bp-type { display:inline-block; font-size:0.62rem; font-weight:600; padding:0.1rem 0.4rem; border-radius:10px; text-transform:uppercase; letter-spacing:0.03em; }'
+    + '.bp-gate { display:flex; align-items:center; gap:0.4rem; padding:0.3rem 0; flex-wrap:wrap; }'
+    + '.bp-gate-icon { font-size:0.7rem; }'
+    + '.bp-gate-label { font-size:0.82rem; font-weight:600; }'
+    + '.bp-gate-reqs { font-size:0.72rem; }'
+    + '.bp-gate-key { font-family:Consolas,Monaco,monospace; font-weight:600; padding:0.05rem 0.3rem; border:1px solid; border-radius:3px; font-size:0.7rem; }'
+    + '.bp-nav-item { display:flex; align-items:center; gap:0.4rem; padding:0.15rem 0; font-size:0.78rem; }'
+    + '.bp-nav-action { font-size:0.62rem; font-weight:600; padding:0.1rem 0.35rem; border:1px solid; border-radius:3px; font-family:Consolas,Monaco,monospace; }'
+    + '.bp-nav-label { }'
+    + '.bp-nav-target { font-family:Consolas,Monaco,monospace; font-size:0.72rem; }'
+    + '.bp-action-item { display:flex; align-items:center; gap:0.4rem; padding:0.15rem 0; font-size:0.78rem; }'
+    + '.bp-action-type { font-size:0.62rem; font-weight:600; padding:0.1rem 0.35rem; border-radius:3px; text-transform:uppercase; }'
+
+    + '.wf-exec-cell { font-size:0.8rem; }'
+    + '.wf-exec-pass { font-weight:600; }'
+    + '.wf-exec-pending { font-style:italic; }'
+    + '.wf-exec-gated { opacity:0.5; }'
+    + '.wf-exec-locked { opacity:0.5; }'
+    + '.wf-exec-reason { font-size:0.7rem; font-style:italic; margin-top:0.15rem; }'
+    + '.wf-row-gated { opacity:0.6; }'
+    /* Parametric affordance forms */
+    + '.wf-param-form { padding:0.5rem 0.6rem; border-bottom:1px solid #f0f0f0; }'
+    + '.wf-param-form:last-child { border-bottom:none; }'
+    + '.wf-param-head { font-size:0.82rem; font-weight:600; margin-bottom:0.35rem; }'
+    + '.wf-param-row { display:flex; align-items:center; gap:0.4rem; margin-bottom:0.25rem; }'
+    + '.wf-param-label { font-size:0.75rem; font-weight:500; min-width:60px; flex-shrink:0; }'
+    + '.wf-param-input { flex:1; font-size:0.8rem; padding:0.25rem 0.4rem; border:1px solid #ccc; border-radius:4px; font-family:inherit; min-width:0; }'
+    + 'select.wf-param-input { background:#fff; }'
+    + '.wf-param-submit { font-size:0.78rem; padding:0.3rem 0.7rem; border-radius:4px; border:1px solid #2a6bcf; background:#2a6bcf; color:#fff; cursor:pointer; margin-top:0.25rem; }'
+    + '.wf-param-submit:hover { background:#1a5bbf; }'
+    /* Inline execution cell controls */
+    + '.wf-exec-control { display:flex; gap:0.25rem; margin-top:0.25rem; align-items:center; }'
+    + '.wf-exec-input { width:100%; font-size:0.78rem; padding:0.2rem 0.35rem; border:1px solid #ccc; border-radius:3px; font-family:inherit; box-sizing:border-box; }'
+    + '.wf-exec-select { font-size:0.78rem; padding:0.2rem 0.35rem; border:1px solid #ccc; border-radius:3px; font-family:inherit; background:#fff; flex:1; min-width:0; }'
+    + '.wf-exec-submit { font-size:0.72rem; padding:0.2rem 0.5rem; border-radius:3px; border:1px solid #2a6bcf; background:#2a6bcf; color:#fff; cursor:pointer; white-space:nowrap; flex-shrink:0; }'
+    + '.wf-exec-submit:hover { background:#1a5bbf; }'
+    + '.wf-exec-btn { font-size:0.72rem; padding:0.2rem 0.5rem; border-radius:3px; border:1px solid #218838; background:#218838; color:#fff; cursor:pointer; white-space:nowrap; margin-top:0.2rem; }'
+    + '.wf-exec-btn:hover { background:#196c2e; }'
+    + '.wf-exec-btn-sec { background:#6c757d; border-color:#6c757d; }'
+    + '.wf-exec-btn-sec:hover { background:#5a6268; }'
+    + '.wf-exec-display { margin-bottom:0.15rem; }'
+    /* Schematic hybrid renderer — CSS injected by schematic.js on first use */
+    ;
+
+/* ── CSS ── */
+var FC_CSS = ''
+    /* Wrapper */
+    + '.fc-wrap { margin:0.5rem 1rem; }'
+    + '.fc-hdr { padding:0.4rem 0; border-bottom:2px solid; margin-bottom:0.5rem; }'
+    + '.fc-hdr-title { font-size:1.05rem; font-weight:700; }'
+    + '.fc-hdr-id { font-size:0.7rem; opacity:0.6; vertical-align:middle; }'
+    + '.fc-hdr-desc { font-size:0.78rem; margin-top:0.15rem; opacity:0.6; }'
+    + '.fc-empty { text-align:center; padding:2rem; opacity:0.6; font-style:italic; }'
+    /* Graph container */
+    + '.fc-graph { overflow:visible; }'
+    + '.fc-edge-layer { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:0; }'
+    + '.fc-edge-svg { display:block; }'
+    + '.fc-card-wrap { z-index:1; }'
+    + '.fc-card-current .fc-card { border-color:#2a6bcf !important; box-shadow:0 0 0 2px rgba(42,107,207,0.2); }'
+    + '.fc-card-done .fc-card { border-color:#4caf50 !important; background:#f6faf6; }'
+    + '.sch-node-current .fc-card { border-color:#2a6bcf !important; box-shadow:0 0 0 2px rgba(42,107,207,0.2); }'
+    + '.sch-node-completed .fc-card { border-color:#4caf50 !important; background:#f6faf6; }'
+    /* Card */
+    + '.fc-card { border:1px solid; border-radius:8px; overflow:hidden; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:#fff; }'
+    + '.fc-card-head { display:flex; align-items:center; gap:0.4rem; padding:0.45rem 0.65rem; flex-wrap:wrap; }'
+    + '.fc-num { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; font-size:0.7rem; font-weight:700; flex-shrink:0; }'
+    + '.fc-card-title { font-size:0.88rem; font-weight:700; }'
+    + '.fc-card-id { font-size:0.62rem; opacity:0.6; font-family:Consolas,Monaco,monospace; }'
+    + '.fc-eye { font-size:0.75rem; opacity:0.6; }'
+    /* Instruction */
+    + '.fc-instr { padding:0.2rem 0.65rem 0.35rem; font-size:0.72rem; line-height:1.35; opacity:0.6; white-space:pre-line; }'
+    /* Fields */
+    + '.fc-fields { padding:0.25rem 0.65rem; }'
+    + '.fc-field { display:flex; align-items:center; gap:0.35rem; padding:0.2rem 0; font-size:0.78rem; }'
+    + '.fc-field-dot { display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; font-size:0.6rem; font-weight:700; flex-shrink:0; border:1.5px solid; }'
+    + '.fc-field-name { font-weight:600; }'
+    + '.fc-field-key { font-size:0.62rem; margin-left:auto; }'
+    + '.fc-field-opts { margin-left:2.2rem; padding:0.1rem 0; }'
+    + '.fc-field-opt { font-size:0.62rem; font-family:Consolas,Monaco,monospace; padding:0.05rem 0; }'
+    /* Gate */
+    + '.fc-gate { display:flex; align-items:center; gap:0.3rem; padding:0.3rem 0.65rem; border-top:1px dashed; flex-wrap:wrap; font-size:0.78rem; }'
+    + '.fc-gate-lock { font-size:0.8rem; }'
+    + '.fc-gate-lbl { font-weight:600; }'
+    + '.fc-gate-reqs { font-size:0.68rem; font-family:Consolas,monospace; margin-left:auto; }'
+    /* Actions */
+    + '.fc-acts { display:flex; gap:0.3rem; padding:0.3rem 0.65rem; border-top:1px solid; flex-wrap:wrap; }'
+    + '.fc-act { font-size:0.72rem; font-weight:600; padding:0.15rem 0.5rem; border-radius:4px; }'
+    /* Badge (router/fork) */
+    + '.fc-badge { font-size:0.58rem; font-weight:700; padding:0.1rem 0.35rem; border-radius:3px; text-transform:uppercase; letter-spacing:0.04em; }'
+    /* Router routes */
+    + '.fc-routes { padding:0.25rem 0.65rem; }'
+    + '.fc-route { display:flex; align-items:center; gap:0.3rem; padding:0.12rem 0; font-size:0.72rem; }'
+    + '.fc-route-arrow { font-weight:700; }'
+    + '.fc-route-cond { font-style:italic; }'
+    + '.fc-route-target { font-size:0.62rem; margin-left:auto; }'
+    /* Fork info */
+    + '.fc-fork-info { padding:0.3rem 0.65rem; border-top:1px dashed; }'
+    + '.fc-fork-label { font-size:0.78rem; font-weight:600; }'
+    + '.fc-fork-merge { font-size:0.68rem; margin-left:0.8rem; }'
+    + '.fc-fork-branches { display:flex; gap:0.4rem; margin-top:0.2rem; flex-wrap:wrap; }'
+    + '.fc-fork-branch { font-size:0.65rem; padding:0.1rem 0.4rem; border-radius:3px; border:1px solid; }'
+    /* Edge SVG */
+    + '.fc-ef { fill:none; stroke-width:2; }'                             /* forward: solid */
+    + '.fc-eb { fill:none; stroke-width:1.5; stroke-dasharray:3 3; }'   /* back: dotted */
+    + '.fc-eg { fill:none; stroke-width:1.5; stroke-dasharray:3 3; }'   /* goto: dotted */
+    + '.fc-efk { fill:none; stroke-width:2; }'                           /* fork: solid */
+    + '.fc-emg { fill:none; stroke-width:2; }'                           /* merge: solid */
+    + '.fc-ert { fill:none; stroke-width:1.5; stroke-dasharray:6 4; }'  /* router: dashed */
+    + '.fc-el { font-size:11px; font-family:-apple-system,sans-serif; }'
+    ;
+
+/* ── Light tokens ── */
+var FC_LIGHT = ''
+    + '.fc-hdr { border-bottom-color:#2a6bcf; } .fc-hdr-title { color:#1a1a2e; }'
+    + '.fc-card { background:#fff; border-color:#dde1e6; box-shadow:0 1px 4px rgba(0,0,0,0.06); }'
+    + '.fc-card-head { background:linear-gradient(135deg,#e8ecf1,#dde2e8); }'
+    + '.fc-num { background:#2a6bcf; color:#fff; }'
+    + '.fc-card-title { color:#1a1a2e; }'
+    + '.fc-ft-text { background:#e3f2fd; border-color:#1565c0; color:#1565c0; }'
+    + '.fc-ft-bool { background:#fff3e0; border-color:#e65100; color:#e65100; }'
+    + '.fc-ft-sel { background:#f3e5f5; border-color:#7b1fa2; color:#7b1fa2; }'
+    + '.fc-gate { border-top-color:#c8e6c9; }'
+    + '.fc-gate-lbl { color:#2e7d32; }'
+    + '.fc-gate-reqs { color:#1565c0; }'
+    + '.fc-acts { border-top-color:#f0f0f0; }'
+    + '.fc-act-submit { background:#e8f5e9; color:#2e7d32; }'
+    + '.fc-act-restart { background:#fff3e0; color:#e65100; }'
+    + '.fc-badge-router { background:#fff3e0; color:#e65100; }'
+    + '.fc-badge-fork { background:#e8f5e9; color:#2e7d32; }'
+    + '.fc-card-router .fc-card-head { background:linear-gradient(135deg,#fff3e0,#ffe0b2); }'
+    + '.fc-card-fork .fc-card-head { background:linear-gradient(135deg,#e8f5e9,#c8e6c9); }'
+    + '.fc-route-arrow { color:#e65100; }'
+    + '.fc-route-cond { color:#795548; }'
+    + '.fc-route-target { color:#1565c0; }'
+    + '.fc-fork-info { border-top-color:#c8e6c9; }'
+    + '.fc-fork-label { color:#2e7d32; }'
+    + '.fc-fork-merge { color:#666; }'
+    + '.fc-fork-branch { background:#e8f5e9; border-color:#a5d6a7; color:#2e7d32; }'
+    + '.fc-ef { stroke:#4caf50; } .fc-mf { fill:#4caf50; }'
+    + '.fc-eb { stroke:#2a6bcf; } .fc-mb { fill:#2a6bcf; }'
+    + '.fc-eg { stroke:#7b1fa2; } .fc-mg { fill:#7b1fa2; }'
+    + '.fc-efk { stroke:#4caf50; } .fc-mk { fill:#4caf50; }'
+    + '.fc-emg { stroke:#4caf50; }'
+    + '.fc-ert { stroke:#e65100; } .fc-mr { fill:#e65100; }'
+    + '.fc-el-b { fill:#2a6bcf; } .fc-el-g { fill:#7b1fa2; }'
+    + '.fc-el-fk { fill:#4caf50; } .fc-el-rt { fill:#e65100; }'
+    ;
+
+function _scopeFC(sel, css) { return css.replace(/\.fc-/g, sel + ' .fc-'); }
+
+(function() {
+    var container;
+    registerRenderer({
+        id: 'light', label: 'Human',
+        init: function(c) {
+            c.style.cssText = 'overflow-y:auto;padding:0;';
+            var style = document.createElement('style');
+            style.textContent = WF_STRUCTURAL_CSS + FC_CSS
+                + _scopeFC('#rc-light', FC_LIGHT)
+                + '#rc-light { background:#f5f5f5; color:#333; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
+                + '#rc-light .wf-title { color:#1a1a2e; } #rc-light .wf-banner { background:#f8f9fb; border-color:#e8e8e8; } #rc-light .wf-dot { background:#dde1e6; color:#888; } #rc-light .wf-step-label { color:#888; } #rc-light .wf-step-active .wf-dot { background:#2a6bcf; color:#fff; } #rc-light .wf-step-active .wf-step-label { color:#1a1a2e; font-weight:600; } #rc-light .wf-step-done .wf-dot { background:#4caf50; color:#fff; } #rc-light .wf-step-done .wf-step-label { color:#555; } #rc-light .wf-conn { background:#dde1e6; } #rc-light .wf-conn-active { background:#4caf50; } #rc-light .wf-section-head { color:#1a1a2e; } #rc-light .wf-desc { color:#666; } #rc-light .wf-card { background:#fff; border-color:#e8e8e8; } #rc-light .wf-card-head { color:#7f8fa6; } #rc-light .wf-tbl td { border-bottom:1px solid #f0f0f0; } #rc-light .wf-key { color:#7f8fa6; } #rc-light .wf-val { color:#333; } #rc-light .wf-null, #rc-light .wf-empty-arr, #rc-light .wf-empty-obj { color:#bbb; } #rc-light .wf-bool, #rc-light .wf-num { color:#2a6bcf; } #rc-light .wf-str { color:#333; } #rc-light .wf-arr-item { border-left-color:#e8e8e8; } #rc-light .wf-field { border-bottom:1px solid #f0f0f0; } #rc-light .wf-field-label { color:#555; } #rc-light .wf-field-instruction { color:#999; } #rc-light .wf-field-value { color:#333; } #rc-light .wf-field-empty { color:#bbb; } #rc-light .wf-field-options { color:#7f8fa6; } #rc-light .wf-aff { background:#f8f9fb; border-color:#e8e8e8; } #rc-light .wf-aff-id { background:#dde1e6; color:#555; } #rc-light .wf-aff-label { color:#333; } #rc-light .wf-aff-method { color:#7f8fa6; background:#eef1f5; } #rc-light .wf-aff-detail { color:#999; } #rc-light .wf-aff-options { color:#7f8fa6; } #rc-light .wf-aff-primary { border-color:#2a6bcf; background:#f0f5ff; } #rc-light .wf-aff-primary .wf-aff-label { color:#2a6bcf; font-weight:600; } #rc-light .wf-aff-primary .wf-aff-id { background:#2a6bcf; color:#fff; } #rc-light .wf-aff-nav { border-color:#dde1e6; background:#fafafa; } #rc-light .wf-aff-nav .wf-aff-label { color:#888; } #rc-light .wf-aff-selected { border-color:#4caf50; background:#f0fff0; } #rc-light .wf-aff-selected .wf-aff-label { color:#2e7d32; } #rc-light .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; } #rc-light .wf-fb-outcome { border-left:3px solid #2a6bcf; background:#f0f5ff; } #rc-light .wf-fb-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-light .wf-fb-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-light .wf-aff-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-light .wf-aff-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-light .wf-tag-outcome { color:#2a6bcf; } #rc-light .wf-tag-new { color:#4caf50; } #rc-light .wf-tag-modified { color:#e6a817; } #rc-light .wf-table th { background:#f4f6f9; border-color:#e8e8e8; } #rc-light .wf-table td { border-color:#e8e8e8; } #rc-light .wf-table-rownum { color:#aaa; background:#fafbfc; } #rc-light .wf-table-coltype { color:#7f8fa6; } #rc-light .wf-table-empty { color:#bbb; } #rc-light .wf-table-summary { color:#7f8fa6; } #rc-light .wf-table-prop { color:#7f8fa6; } #rc-light .wf-exec-pass { color:#2e7d32; } #rc-light .wf-exec-pending { color:#b0b0b0; } #rc-light [data-completed="true"] { background:#e8f5e9; } #rc-light .wf-exec-reason { color:#999; } #rc-light .wf-parallel { border-color:#c8e6c9; background:#f8fdf8; } #rc-light .wf-branch-label { color:#2e7d32; } #rc-light .wf-branch-node { background:#fff; border-color:#dde1e6; color:#555; } #rc-light .wf-branch-done { background:#e8f5e9; border-color:#4caf50; color:#2e7d32; } #rc-light .wf-branch-active { background:#e3f2fd; border-color:#2a6bcf; color:#1a1a2e; font-weight:600; } #rc-light .wf-dot-router { background:#e65100; } #rc-light .wf-dot-fork { background:#2e7d32; } #rc-light .wf-target { border-color:#e65100; color:#795548; } #rc-light .wf-target-done { background:#fff3e0; color:#e65100; } #rc-light .wf-target-active { background:#fff3e0; border-color:#e65100; color:#e65100; font-weight:600; } #rc-light .mb-node { background:#fff; border-color:#dde1e6; color:#555; } #rc-light .mb-current { background:#e3f2fd; border-color:#2a6bcf; color:#1a1a2e; font-weight:700; } #rc-light .mb-done { background:#e8f5e9; border-color:#4caf50; color:#2e7d32; } #rc-light .mb-router { border-color:#e65100; } #rc-light .mb-router.mb-done { border-color:#4caf50; } #rc-light .mb-fork { border-color:#2e7d32; } #rc-light .mb-fork.mb-done { border-color:#4caf50; } #rc-light .wf-param-form { border-bottom-color:#f0f0f0; } #rc-light .wf-param-head { color:#333; } #rc-light .wf-param-label { color:#555; } #rc-light .wf-param-input { border-color:#ccc; color:#333; } #rc-light .wf-param-input:focus { outline:none; border-color:#2a6bcf; } #rc-light .wf-exec-input { border-color:#ccc; color:#333; } #rc-light .wf-exec-input:focus { outline:none; border-color:#2a6bcf; } #rc-light .wf-exec-select { border-color:#ccc; color:#333; } #rc-light .wf-exec-select:focus { outline:none; border-color:#2a6bcf; } #rc-light .wf-exec-display { color:#333; }'
+                ; document.head.appendChild(style); container = c;
+        },
+        update: function(state, msg, feedback) { _humanPage(container, state, msg, feedback, false); },
+        activate: function() {}, deactivate: function() {}
+    });
+})();

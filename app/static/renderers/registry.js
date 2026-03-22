@@ -1,7 +1,9 @@
 /* ======================================================================
-   RENDERER REGISTRY — two-mode rendering system (Agent / Human)
+   RENDERER REGISTRY — two-mode rendering system
+     'raw'   = Agent renderer (formatted JSON)
+     'light' = Human renderer (interactive UI with flowchart)
    Each renderer is an object with:
-     .id        — unique string key ('raw' or 'light')
+     .id        — unique string key
      .label     — display name
      .init(container)       — build DOM inside container, called once
      .update(state, msg)    — redraw with new agent state + last message

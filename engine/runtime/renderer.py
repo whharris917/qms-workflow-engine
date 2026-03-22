@@ -234,7 +234,7 @@ def render_page(defn: WorkflowDef, data: dict, workflow_id: str,
             "branches": branch_display,
         }
 
-    # Fields
+    # Fields (with inline affordances)
     fields_display = _build_fields(defn, node, data)
 
     # Provider exposed fields — projected as read-only into fields_display
@@ -244,16 +244,20 @@ def render_page(defn: WorkflowDef, data: dict, workflow_id: str,
         if cached is None:
             # Provider unavailable — show diagnostic field
             if pid in defn.providers:
-                fields_display[f"{pid} (unavailable)"] = make_field(
+                diag = make_field(
                     "Cannot reach provider", "This provider is currently unavailable."
                 )
+                diag["affordance"] = None
+                fields_display[f"{pid} (unavailable)"] = diag
             continue
         provider_states[pid] = cached
         for expose_def in pnode_def.expose:
             value = cached.get(expose_def.key)
             entry = make_field(value, expose_def.instruction)
+            entry["key"] = expose_def.key
             entry["readonly"] = True
             entry["provider"] = pid
+            entry["affordance"] = None
             fields_display[expose_def.label] = entry
 
     if fields_display:
@@ -290,12 +294,75 @@ def render_page(defn: WorkflowDef, data: dict, workflow_id: str,
         }
 
     # Affordances (delegated to AffordanceSource protocol)
-    affordances = get_node_affordances(defn, node, data, workflow_id, instance_id)
+    all_affordances = get_node_affordances(defn, node, data, workflow_id, instance_id)
+
+    # Partition affordances by anchor.
+    # FieldSource tags with _field_label, TableStructuralSource tags with
+    # _table_anchor / _col_index.  Everything else stays top-level.
+    remaining = []
+    field_affs_by_label: dict[str, dict] = {}
+    table_affs: list[dict] = []
+    col_affs: dict[int, list[dict]] = {}
+    props_affs: list[dict] = []
+    for aff in all_affordances:
+        fl = aff.pop("_field_label", None)
+        ta = aff.pop("_table_anchor", None)
+        ci = aff.pop("_col_index", None)
+        if fl is not None:
+            field_affs_by_label[fl] = aff
+        elif ta == "table":
+            table_affs.append(aff)
+        elif ta == "column" and ci is not None:
+            col_affs.setdefault(ci, []).append(aff)
+        elif ta == "properties":
+            props_affs.append(aff)
+        else:
+            remaining.append(aff)
+
+    # Assign global IDs across all anchored locations.
+    aff_id = 1
+
+    # 1. Field affordances
+    if "fields" in state:
+        for label, field_obj in state["fields"].items():
+            fa = field_affs_by_label.get(label)
+            if fa is not None:
+                fa["id"] = aff_id
+                aff_id += 1
+                field_obj["affordance"] = fa
+
+    # 2. Table affordances — enrich state.table with anchored affordances
+    if "table" in state:
+        for a in table_affs:
+            a["id"] = aff_id
+            aff_id += 1
+        state["table"]["affordances"] = table_affs
+
+        # Enrich columns with per-column affordances
+        for ci, col_obj in enumerate(state["table"].get("columns", [])):
+            ca = col_affs.get(ci, [])
+            for a in ca:
+                a["id"] = aff_id
+                aff_id += 1
+            col_obj["affordances"] = ca
+
+        # Enrich properties with affordances
+        if props_affs:
+            for a in props_affs:
+                a["id"] = aff_id
+                aff_id += 1
+            props = state["table"].get("properties", {})
+            props["affordances"] = props_affs
+
+    # 3. Remaining (flow control, navigation, actions, etc.)
+    for aff in remaining:
+        aff["id"] = aff_id
+        aff_id += 1
 
     return {
         "state": state,
         "instructions": node.instruction,
-        "affordances": affordances,
+        "affordances": remaining,
     }
 
 
@@ -328,12 +395,17 @@ def _build_fields(defn: WorkflowDef, node: NodeDef, data: dict) -> dict:
             instruction = fdef.instruction
 
         entry = make_field(value, instruction)
+        entry["key"] = key
 
         # Expose options for select fields
         if ftype == "select":
             options = _resolve_options(defn, fdef, data)
             if options:
                 entry["options"] = options
+
+        # Affordance is attached later by render_page() from the partitioned
+        # affordance list.  Initialize to None (computed/readonly default).
+        entry["affordance"] = None
 
         fields[label] = entry
 
