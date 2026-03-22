@@ -36,6 +36,9 @@ with open(_YAML_PATH) as _f:
 _builder_raw = {**_DEF, "workflow_title": "Create Workflow"}
 _builder_node_ids = list(_builder_raw["nodes"].keys())
 for _i, _nid in enumerate(_builder_node_ids[:-1]):
+    # Skip preview — its only forward path is the explicit /publish action
+    if _nid == "preview":
+        continue
     _builder_raw["nodes"][_nid].setdefault("proceed", {"label": "Continue", "target": _builder_node_ids[_i + 1]})
 _BUILDER_DEFN = WorkflowDef.from_dict(_builder_raw)
 
@@ -1399,6 +1402,8 @@ def process_action(data: dict, workflow_id: str, body: dict,
     # -----------------------------------------------------------------------
 
     if action == "proceed":
+        if node == "preview":
+            return {"error": "Use 'publish' to advance from Preview."}
         idx = _NODES.index(node)
         if idx >= len(_NODES) - 1:
             return {"error": "Already at the final node."}
