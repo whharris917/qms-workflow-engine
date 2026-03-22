@@ -90,6 +90,12 @@ def dispatch(defn: WorkflowDef, data: dict, workflow_id: str, body: dict,
     if action == "provider_action":
         return _provider_action(defn, data, workflow_id, body)
 
+    if action == "focus":
+        return _focus(defn, data, workflow_id, body)
+
+    if action == "unfocus":
+        return _unfocus(defn, data, workflow_id)
+
     return {"error": f"Unknown action: {action}"}
 
 
@@ -98,6 +104,48 @@ def _restart(defn: WorkflowDef, data: dict, workflow_id: str) -> dict:
     fresh = _build_default_data(defn)
     data.clear()
     data.update(fresh)
+    return render_page(defn, data, workflow_id)
+
+
+def _focus(defn: WorkflowDef, data: dict, workflow_id: str, body: dict) -> dict:
+    target = body.get("target")
+    if not target:
+        return {"error": "Missing focus target"}
+
+    # Validate target path
+    node = defn.nodes.get(data.get("node", ""))
+    has_fields = bool(node and node.fields)
+    table = data.get("table")
+    has_exec = "execution_state" in data
+
+    if target == "fields":
+        if not has_fields:
+            return {"error": "No fields to focus on"}
+    elif target == "table":
+        if not table:
+            return {"error": "No table to focus on"}
+    elif target.startswith("table.col."):
+        if not table:
+            return {"error": "No table to focus on"}
+        try:
+            ci = int(target.split(".")[-1])
+        except ValueError:
+            return {"error": f"Invalid column index in: {target}"}
+        cols = table.get("columns", [])
+        if ci < 0 or ci >= len(cols):
+            return {"error": f"Column index {ci} out of range (0-{len(cols)-1})"}
+    elif target == "exec":
+        if not has_exec:
+            return {"error": "No execution table to focus on"}
+    else:
+        return {"error": f"Unknown focus target: {target}"}
+
+    data["focus"] = target
+    return render_page(defn, data, workflow_id)
+
+
+def _unfocus(defn: WorkflowDef, data: dict, workflow_id: str) -> dict:
+    data["focus"] = None
     return render_page(defn, data, workflow_id)
 
 
