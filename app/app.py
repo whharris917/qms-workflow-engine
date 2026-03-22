@@ -409,7 +409,7 @@ def _wf_save_state(workflow_id: str, instance_id: str, data: dict):
     """
     p = _wf_state_path(workflow_id, instance_id)
     clean = {k: v for k, v in data.items()
-             if not k.startswith("_provider_")}
+             if not k.startswith("_provider_") and not k.startswith("__option_set_")}
     with open(p, "w") as f:
         json.dump(clean, f, indent=2)
 

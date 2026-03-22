@@ -128,13 +128,20 @@ function wfRenderFields(fields, fieldCategory, fieldAffordances) {
                         }
                     }
                     if (useDropdown) {
-                        html += '<div class="wf-aff-controls">';
+                        /* Dropdown: current value + select + Set on one line */
+                        var curDisplay = f.value === true ? 'Yes' : f.value === false ? 'No' : f.value != null ? String(f.value) : '';
+                        html += '<div class="wf-field-row">';
+                        if (curDisplay) {
+                            html += '<span class="wf-field-current">' + wfEsc(curDisplay) + '</span>';
+                        } else {
+                            html += '<span class="wf-field-current wf-field-empty">(not set)</span>';
+                        }
                         html += '<select class="wf-aff-select" data-aff-url="' + wfEsc(aff.url) + '">';
+                        html += '<option value="">— Select —</option>';
                         for (var oi = 0; oi < options.length; oi++) {
                             var oval = options[oi];
                             var olabel = oval === true ? 'Yes' : oval === false ? 'No' : String(oval);
-                            var isActive = JSON.stringify(oval) === JSON.stringify(f.value);
-                            html += '<option value="' + wfEsc(JSON.stringify(oval)) + '"' + (isActive ? ' selected' : '') + '>' + wfEsc(olabel) + '</option>';
+                            html += '<option value="' + wfEsc(JSON.stringify(oval)) + '">' + wfEsc(olabel) + '</option>';
                         }
                         html += '</select>';
                         html += '<button class="wf-aff-submit" data-aff-url="' + wfEsc(aff.url) + '">Set</button>';
@@ -1349,8 +1356,10 @@ function _wfBindAffordances(container) {
     /* Dropdown selects + Set button */
     container.querySelectorAll('.wf-aff-select').forEach(function(select) {
         var url = select.getAttribute('data-aff-url');
-        var btn = container.querySelector('.wf-aff-submit[data-aff-url="' + url + '"]');
+        var row = select.closest('.wf-field-row') || select.closest('.wf-aff-controls');
+        var btn = row ? row.querySelector('.wf-aff-submit') : container.querySelector('.wf-aff-submit[data-aff-url="' + url + '"]');
         function updateTooltip() {
+            if (!select.value) { if (btn) btn.title = ''; return; }
             var val = JSON.parse(select.value);
             var tip = 'POST ' + url + ' ' + JSON.stringify({value: val});
             if (btn) btn.title = tip;
@@ -1359,6 +1368,7 @@ function _wfBindAffordances(container) {
         select.addEventListener('change', updateTooltip);
         if (btn) {
             btn.addEventListener('click', function() {
+                if (!select.value) return;
                 var val = JSON.parse(select.value);
                 _wfExecAffordance(url, { value: val });
             });
