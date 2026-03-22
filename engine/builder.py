@@ -316,15 +316,23 @@ def _publish(data: dict) -> str | None:
 
 
 def _summary(data: dict) -> dict:
+    wf_nodes = data.get("wf_nodes", [])
+    node_ids = [w["id"] for w in wf_nodes]
     nodes = []
-    for wn in data.get("wf_nodes", []):
+    for idx, wn in enumerate(wf_nodes):
+        # Resolve implicit proceed target (next sequential node)
+        proceed = wn.get("proceed")
+        if proceed is not None:
+            proceed = dict(proceed)
+            if not proceed.get("target") and idx + 1 < len(node_ids):
+                proceed["target"] = node_ids[idx + 1]
         nd = {
             "id": wn["id"], "title": wn["title"],
             "instruction": wn.get("instruction", ""),
             "show_all_fields": wn.get("show_all_fields", False),
             "fields": wn.get("fields", []),
             "navigation": wn.get("navigation", []),
-            "proceed": wn.get("proceed"),
+            "proceed": proceed,
             "actions": wn.get("actions", []),
         }
         if wn.get("pause") is False:

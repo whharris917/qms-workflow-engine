@@ -1,0 +1,163 @@
+workflow_title: Equipment Calibration Record
+workflow_description: 'Track equipment calibration: scheduling, execution, pass/fail
+  routing, and out-of-tolerance investigation.'
+nodes:
+  intake:
+    title: Intake
+    instruction: Record the equipment details and calibration trigger.
+    fields:
+      equipment_id:
+        label: Equipment ID
+        type: text
+        key: equipment_id
+        instruction: Unique asset identifier
+      equipment_name:
+        label: Equipment Name
+        type: text
+        key: equipment_name
+      location:
+        label: Location
+        type: text
+        key: location
+      trigger:
+        label: Calibration Trigger
+        type: select
+        key: trigger
+      criticality:
+        label: Equipment Criticality
+        type: select
+        key: criticality
+      last_cal_date:
+        label: Last Calibration Date
+        type: text
+        key: last_cal_date
+    proceed:
+      label: Proceed to Scheduling
+  scheduling:
+    title: Scheduling & Preparation
+    instruction: Schedule the calibration. Ensure reference standards are valid.
+    fields:
+      ref_standard:
+        label: Reference Standard
+        type: text
+        key: ref_standard
+      std_cert_valid:
+        label: Standard Certificate Valid
+        type: boolean
+        key: std_cert_valid
+        instruction: Confirm reference standard is within calibration validity
+      technician:
+        label: Assigned Technician
+        type: text
+        key: technician
+      scheduled_date:
+        label: Scheduled Date
+        type: text
+        key: scheduled_date
+      procedure_ref:
+        label: Calibration Procedure Ref
+        type: text
+        key: procedure_ref
+    navigation:
+    - action: go_back
+      label: Back to Intake
+    proceed:
+      label: Proceed to Execution
+  execution:
+    title: Calibration Execution
+    instruction: Record as-found/as-left readings, environmental conditions, and pass/fail.
+    fields:
+      env_humidity:
+        label: Relative Humidity (%)
+        type: text
+        key: env_humidity
+      as_found:
+        label: As-Found Readings
+        type: text
+        key: as_found
+      adjustments:
+        label: Adjustments Made
+        type: boolean
+        key: adjustments
+      as_left:
+        label: As-Left Readings
+        type: text
+        key: as_left
+      cal_result:
+        label: Calibration Result
+        type: select
+        key: cal_result
+      tech_signature:
+        label: Technician Signature
+        type: text
+        key: tech_signature
+    navigation:
+    - action: go_back
+      label: Back to Scheduling
+    proceed:
+      label: Submit Results
+  router_result:
+    title: Result Router
+    instruction: Auto-routes based on calibration result.
+    router:
+    - target: complete
+    - target: complete
+    - target: oot_investigation
+  oot_investigation:
+    title: OOT Investigation
+    instruction: Equipment failed calibration. Investigate impact, root cause, and
+      corrective actions.
+    fields:
+      impact:
+        label: Impact Assessment
+        type: text
+        key: impact
+        instruction: Evaluate impact on products measured since last successful calibration
+      root_cause:
+        label: Root Cause
+        type: select
+        key: root_cause
+      affected_products:
+        label: Affected Products/Batches
+        type: text
+        key: affected_products
+      corrective_action:
+        label: Corrective Action
+        type: text
+        key: corrective_action
+      preventive_action:
+        label: Preventive Action
+        type: text
+        key: preventive_action
+      disposition:
+        label: Equipment Disposition
+        type: select
+        key: disposition
+      qa_review:
+        label: QA Review Required
+        type: boolean
+        key: qa_review
+    navigation:
+    - action: go_back
+      label: Back to Execution
+    proceed:
+      label: Proceed to Completion
+  complete:
+    title: Calibration Complete
+    instruction: Record is complete. Review summary and schedule next calibration.
+    show_all_fields: true
+    fields:
+      next_cal_due:
+        label: Next Calibration Due Date
+        type: text
+        key: next_cal_due
+      cert_ref:
+        label: Certificate Reference
+        type: text
+        key: cert_ref
+    navigation:
+    - action: go_back
+      label: Back to Execution
+    actions:
+    - action: restart
+      label: Start New Calibration Record

@@ -567,11 +567,54 @@ function wfRenderExecTable(et) {
     return html;
 }
 
-/* Default-verbosity exec table: display_value only, status via CSS, no metadata text */
-function wfRenderExecTableDefault(et) {
+/* ── Parametric affordance form ── */
+function wfRenderParamAff(aff) {
+    var params = aff.parameters || {};
+    var paramKeys = Object.keys(params);
+    if (!paramKeys.length) return '';
+    var tooltip = aff.method + ' ' + aff.url + ' ' + JSON.stringify(aff.body);
+    var html = '<div class="wf-param-form" data-aff-url="' + wfEsc(aff.url) + '" data-aff-body="' + wfEsc(JSON.stringify(aff.body)) + '">';
+    html += '<div class="wf-param-head">' + wfEsc(aff.label) + '</div>';
+    for (var pi = 0; pi < paramKeys.length; pi++) {
+        var pk = paramKeys[pi];
+        var p = params[pk];
+        html += '<div class="wf-param-row">';
+        html += '<label class="wf-param-label">' + wfEsc(pk) + '</label>';
+        if (p.options) {
+            html += '<select class="wf-param-input" data-param="' + wfEsc(pk) + '">';
+            for (var oi = 0; oi < p.options.length; oi++) {
+                var optVal = p.options[oi];
+                var optLabel = p.labels ? p.labels[oi] : (optVal === true ? 'Yes' : optVal === false ? 'No' : String(optVal));
+                html += '<option value="' + wfEsc(JSON.stringify(optVal)) + '">' + wfEsc(optLabel) + '</option>';
+            }
+            html += '</select>';
+        } else {
+            html += '<input class="wf-param-input" type="text" data-param="' + wfEsc(pk) + '"'
+                + (p.description ? ' placeholder="' + wfEsc(p.description) + '"' : '') + '>';
+        }
+        html += '</div>';
+    }
+    html += '<button class="wf-param-submit" title="' + wfEsc(tooltip) + '">Submit</button>';
+    html += '</div>';
+    return html;
+}
+
+/* ── Faithful execution table — inline cell affordance controls ── */
+function wfRenderExecTableFaithful(et, affordances) {
     if (!et) return '';
     var cols = et.columns || [];
     var rows = et.rows || [];
+
+    /* Index cell affordances by "row,col" */
+    var cellAffs = {};
+    for (var i = 0; i < affordances.length; i++) {
+        var a = affordances[i];
+        if (a.body && a.body.cell_action !== undefined && a.body.row !== undefined && a.body.col !== undefined) {
+            var key = a.body.row + ',' + a.body.col;
+            if (!cellAffs[key]) cellAffs[key] = [];
+            cellAffs[key].push(a);
+        }
+    }
 
     var html = '<div class="wf-card">';
     html += '<div class="wf-card-head">Execution Table</div>';
@@ -596,26 +639,80 @@ function wfRenderExecTableDefault(et) {
         var r = rows[ri];
         var rowCls = r.gated ? ' class="wf-row-gated"' : '';
         html += '<tr' + rowCls + '>';
-        html += '<td class="wf-table-rownum">' + wfEsc(r.row_id || String(r.row)) + '</td>';
 
+        /* Row header with acceptance status */
+        html += '<td class="wf-table-rownum">';
+        html += wfEsc(r.row_id || String(r.row));
+        var acc = r.acceptance || {};
+        if (acc.passed) {
+            html += '<div class="wf-exec-reason wf-exec-pass">&#10003; pass</div>';
+        } else if (acc.reason) {
+            html += '<div class="wf-exec-reason wf-exec-pending">' + wfEsc(acc.reason) + '</div>';
+        }
+        html += '</td>';
+
+        /* Cells */
         var cells = r.cells || [];
         for (var ci = 0; ci < cells.length; ci++) {
             var cell = cells[ci];
             var cellStatus = cell.status || 'empty';
-            var isCompleted = (cell.display_value && cell.available_actions.indexOf('fill') === -1
-                && cell.available_actions.indexOf('sign') === -1
-                && cell.available_actions.indexOf('mark_na') === -1
-                && cell.available_actions.indexOf('initiate_issue') === -1
-                && cellStatus !== 'empty' && cellStatus !== 'locked' && cellStatus !== 'gated' && cellStatus !== 'pending');
+            var affsForCell = cellAffs[ri + ',' + ci] || [];
+            var hasActions = affsForCell.length > 0;
+            var isComplete = cell.display_value && !hasActions && cellStatus !== 'empty' && cellStatus !== 'gated' && cellStatus !== 'locked';
             var cls = 'wf-exec-cell wf-exec-' + cellStatus;
-            html += '<td class="' + cls + '"' + (isCompleted ? ' data-completed="true"' : '') + '>';
+            html += '<td class="' + cls + '"' + (isComplete ? ' data-completed="true"' : '') + '>';
+
+            /* Display value */
             if (cellStatus === 'gated') {
-                html += '<span class="wf-table-empty">[BLOCKED]</span>';
+                html += '<span class="wf-table-empty">[GATED]</span>';
             } else if (cellStatus === 'locked') {
                 html += '<span class="wf-table-empty">[LOCKED]</span>';
-            } else {
-                html += (cell.display_value ? wfEsc(cell.display_value) : '<span class="wf-table-empty">&mdash;</span>');
+            } else if (cell.display_value) {
+                html += '<div class="wf-exec-display">' + wfEsc(cell.display_value) + '</div>';
             }
+
+            /* Inline affordance controls */
+            for (var ai = 0; ai < affsForCell.length; ai++) {
+                var a = affsForCell[ai];
+                var action = a.body.cell_action;
+                var tooltip = a.method + ' ' + a.url + ' ' + JSON.stringify(a.body);
+
+                if (action === 'fill' || action === 'amend') {
+                    var vp = a.parameters && a.parameters.value;
+                    html += '<div class="wf-exec-control">';
+                    if (vp && vp.options) {
+                        html += '<select class="wf-exec-select" data-aff-url="' + wfEsc(a.url) + '" data-aff-body="' + wfEsc(JSON.stringify(a.body)) + '">';
+                        for (var oi = 0; oi < vp.options.length; oi++) {
+                            html += '<option value="' + wfEsc(JSON.stringify(vp.options[oi])) + '">' + wfEsc(String(vp.options[oi])) + '</option>';
+                        }
+                        html += '</select>';
+                    } else {
+                        html += '<input class="wf-exec-input" type="text" data-aff-url="' + wfEsc(a.url) + '" data-aff-body="' + wfEsc(JSON.stringify(a.body)) + '"'
+                            + (action === 'amend' && cell.display_value ? ' value="' + wfEsc(cell.display_value) + '"' : '') + '>';
+                    }
+                    html += '<button class="wf-exec-submit" data-aff-url="' + wfEsc(a.url) + '" data-aff-body="' + wfEsc(JSON.stringify(a.body)) + '" title="' + wfEsc(tooltip) + '">' + wfEsc(action === 'fill' ? 'Fill' : 'Amend') + '</button>';
+                    html += '</div>';
+                } else if (action === 'sign' || action === 're-sign') {
+                    html += '<button class="wf-exec-btn" data-aff-url="' + wfEsc(a.url) + '" data-aff-body="' + wfEsc(JSON.stringify(a.body)) + '" title="' + wfEsc(tooltip) + '">' + wfEsc(action === 'sign' ? 'Sign' : 'Re-sign') + '</button>';
+                } else if (action === 'mark_na') {
+                    html += '<button class="wf-exec-btn wf-exec-btn-sec" data-aff-url="' + wfEsc(a.url) + '" data-aff-body="' + wfEsc(JSON.stringify(a.body)) + '" title="' + wfEsc(tooltip) + '">N/A</button>';
+                } else if (action === 'initiate_issue') {
+                    var ip = a.parameters && a.parameters.issue_type;
+                    html += '<div class="wf-exec-control">';
+                    if (ip && ip.options) {
+                        html += '<select class="wf-exec-select" data-aff-url="' + wfEsc(a.url) + '" data-aff-body="' + wfEsc(JSON.stringify(a.body)) + '" data-param="issue_type">';
+                        for (var oi = 0; oi < ip.options.length; oi++) {
+                            html += '<option value="' + wfEsc(JSON.stringify(ip.options[oi])) + '">' + wfEsc(String(ip.options[oi])) + '</option>';
+                        }
+                        html += '</select>';
+                    }
+                    html += '<button class="wf-exec-submit" data-aff-url="' + wfEsc(a.url) + '" data-aff-body="' + wfEsc(JSON.stringify(a.body)) + '" title="' + wfEsc(tooltip) + '">Issue</button>';
+                    html += '</div>';
+                } else {
+                    html += '<button class="wf-exec-btn" data-aff-url="' + wfEsc(a.url) + '" data-aff-body="' + wfEsc(JSON.stringify(a.body)) + '" title="' + wfEsc(tooltip) + '">' + wfEsc(a.label) + '</button>';
+                }
+            }
+
             html += '</td>';
         }
         html += '</tr>';
@@ -746,7 +843,7 @@ function wfRenderPageDefault(container, state, msg, feedback) {
     }
 
     if (s.execution_table) {
-        html += wfRenderExecTableDefault(s.execution_table);
+        html += wfRenderExecTableFaithful(s.execution_table, state.affordances || []);
     } else if (s.table) {
         html += wfRenderTable(s.table);
     }
@@ -1362,6 +1459,47 @@ function _wfBindAffordances(container) {
             _wfExecAffordance(url, body);
         });
     });
+    /* Parametric form submissions */
+    container.querySelectorAll('.wf-param-submit').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var form = btn.closest('.wf-param-form');
+            var url = form.getAttribute('data-aff-url');
+            var body = JSON.parse(JSON.stringify(JSON.parse(form.getAttribute('data-aff-body'))));
+            form.querySelectorAll('.wf-param-input').forEach(function(input) {
+                var param = input.getAttribute('data-param');
+                if (input.tagName === 'SELECT') {
+                    body[param] = JSON.parse(input.value);
+                } else {
+                    body[param] = input.value;
+                }
+            });
+            _wfExecAffordance(url, body);
+        });
+    });
+    /* Execution cell submit buttons (fill/amend with value input) */
+    container.querySelectorAll('.wf-exec-submit').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var url = btn.getAttribute('data-aff-url');
+            var body = JSON.parse(JSON.stringify(JSON.parse(btn.getAttribute('data-aff-body'))));
+            var control = btn.closest('.wf-exec-control');
+            if (control) {
+                var input = control.querySelector('.wf-exec-input, .wf-exec-select');
+                if (input) {
+                    var param = input.getAttribute('data-param') || 'value';
+                    body[param] = input.tagName === 'SELECT' ? JSON.parse(input.value) : input.value;
+                }
+            }
+            _wfExecAffordance(url, body);
+        });
+    });
+    /* Execution cell action buttons (sign, mark_na, etc.) */
+    container.querySelectorAll('.wf-exec-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var url = btn.getAttribute('data-aff-url');
+            var body = JSON.parse(btn.getAttribute('data-aff-body'));
+            _wfExecAffordance(url, body);
+        });
+    });
 }
 
 /* ── Page renderer (shared default + verbose) ── */
@@ -1386,12 +1524,18 @@ function _expDPage(container, state, msg, feedback, verbose) {
     if (state.instructions) html += '<div class="wf-desc">' + wfEsc(state.instructions) + '</div>';
     html += expDRenderStateProps(state);
     if (s.definition && _isDefinition(s.definition)) { html += _expDSchematicFlowchart(s.definition, s); }
-    /* Split affordances: field-level (has body.value) vs standalone actions */
+    /* ── Faithful affordance classification ──
+       Match field affordances by label pattern against displayed field names,
+       NOT by body shape. This prevents silent drops of parametric affordances
+       (like "Set cell") that have body.value but don't correspond to a field. */
     var fieldAffordances = [], actionAffordances = [];
     if (state.affordances) {
+        var fieldLabelSet = {};
+        if (s.fields) { var fk = Object.keys(s.fields); for (var fi = 0; fi < fk.length; fi++) fieldLabelSet[fk[fi]] = true; }
         for (var ai = 0; ai < state.affordances.length; ai++) {
             var a = state.affordances[ai];
-            if (a.body && a.body.value !== undefined) {
+            var m = a.label.match(/^Set (.+?) \(current:/);
+            if (m && fieldLabelSet[m[1]]) {
                 fieldAffordances.push(a);
             } else {
                 actionAffordances.push(a);
@@ -1399,14 +1543,38 @@ function _expDPage(container, state, msg, feedback, verbose) {
         }
     }
     if (s.fields) { html += '<div class="wf-card"><div class="wf-card-head">Fields</div>' + wfRenderFields(s.fields, fieldCategory, fieldAffordances) + '</div>'; }
-    if (s.execution_table) { html += verbose ? wfRenderExecTable(s.execution_table) : wfRenderExecTableDefault(s.execution_table); }
-    else if (s.table) { html += wfRenderTable(s.table); }
-    /* Standalone action affordances */
-    if (actionAffordances.length) {
+    /* ── Execution table: faithful projection with inline cell controls ── */
+    if (s.execution_table) {
+        html += verbose ? wfRenderExecTable(s.execution_table) : wfRenderExecTableFaithful(s.execution_table, actionAffordances);
+    } else if (s.table) {
+        html += wfRenderTable(s.table);
+    }
+    /* ── Action affordances: split parametric (forms) from simple (buttons) ──
+       Cell-action affordances are excluded here when execution_table is present
+       because they've already been rendered inline in the table cells. */
+    var paramAffordances = [], simpleAffordances = [];
+    for (var i = 0; i < actionAffordances.length; i++) {
+        var a = actionAffordances[i];
+        /* Skip cell_action affordances already rendered inline */
+        if (s.execution_table && a.body && a.body.cell_action !== undefined) continue;
+        if (a.parameters && Object.keys(a.parameters).length) {
+            paramAffordances.push(a);
+        } else {
+            simpleAffordances.push(a);
+        }
+    }
+    if (paramAffordances.length) {
+        html += '<div class="wf-card"><div class="wf-card-head">Operations</div>';
+        for (var i = 0; i < paramAffordances.length; i++) {
+            html += wfRenderParamAff(paramAffordances[i]);
+        }
+        html += '</div>';
+    }
+    if (simpleAffordances.length) {
         html += '<div class="wf-card"><div class="wf-card-head">Actions</div>';
         html += '<div class="wf-action-bar">';
-        for (var i = 0; i < actionAffordances.length; i++) {
-            var a = actionAffordances[i], cls = 'wf-aff-action-btn';
+        for (var i = 0; i < simpleAffordances.length; i++) {
+            var a = simpleAffordances[i], cls = 'wf-aff-action-btn';
             if (/Proceed|Submit|Complete/.test(a.label)) cls += ' wf-aff-action-primary';
             else if (/Go back/.test(a.label)) cls += ' wf-aff-action-nav';
             var tooltip = a.method + ' ' + a.url + (a.body !== undefined ? ' ' + JSON.stringify(a.body) : '');
