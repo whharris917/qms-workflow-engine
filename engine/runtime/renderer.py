@@ -8,7 +8,7 @@ AffordanceSource protocol in affordances.py.
 from __future__ import annotations
 
 from .schema import WorkflowDef, FieldDef, NodeDef
-from .evaluator import check_visibility
+from .evaluator import check_visibility, evaluate
 from .affordances import get_node_affordances, _load_engine, _resolve_options
 from .providers import registry as provider_registry, resolve_bindings, ProviderUnavailableError
 
@@ -341,19 +341,15 @@ def _build_fields(defn: WorkflowDef, node: NodeDef, data: dict) -> dict:
 
 
 def _evaluate_computed(defn: WorkflowDef, fdef: FieldDef, data: dict) -> bool:
-    """Evaluate a computed field. Returns the computed boolean value."""
+    """Evaluate a computed field using the unified expression evaluator."""
     compute = fdef.compute
     if not compute:
         return False
-
-    if compute.get("type") == "set_membership":
-        key = compute.get("key", "")
-        set_ref = compute.get("set_ref", "")
-        val = data.get(key)
-        member_set = set(defn.option_sets.get(set_ref, []))
-        return val in member_set
-
-    return False
+    # Inject option sets so set_membership leaves can resolve references
+    for name, values in defn.option_sets.items():
+        data[f"__option_set_{name}"] = set(values)
+    passed, _ = evaluate(compute, data)
+    return passed
 
 
 def _node_has_table(defn: WorkflowDef, node: NodeDef, data: dict) -> bool:

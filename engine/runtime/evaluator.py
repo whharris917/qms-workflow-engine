@@ -130,10 +130,16 @@ def _evaluate_provider(expr: dict, data: dict) -> tuple[bool, str]:
 def check_visibility(visible_when: dict | None, data: dict) -> bool:
     """Evaluate a field's visible_when condition.
 
-    Supports the legacy format: {key: value} or {key: "not_null"}.
+    Supports both the modern expression tree format ({type: ..., key: ...} or
+    {op: ..., conditions: [...]}) and the legacy format ({key: value}).
     """
     if not visible_when:
         return True
+    # Modern expression tree format — delegate to the unified evaluator
+    if "type" in visible_when or "op" in visible_when:
+        passed, _ = evaluate(visible_when, data)
+        return passed
+    # Legacy format: {field_key: expected_value}
     for key, expected in visible_when.items():
         val = data.get(key)
         if expected == "not_null":

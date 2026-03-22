@@ -15,6 +15,7 @@ from pathlib import Path
 import yaml
 
 from .runtime.evaluator import evaluate
+from .runtime.actions import validate_params
 from .runtime.schema import WorkflowDef
 from .runtime.renderer import _serialize_definition
 from .utils import field as make_field
@@ -53,6 +54,75 @@ WORKFLOW_TITLE = "Create Workflow"
 
 _CUSTOM_DIR = Path(__file__).resolve().parent.parent / "data" / "custom_workflows"
 _CUSTOM_DIR.mkdir(exist_ok=True)
+
+# ---------------------------------------------------------------------------
+# Parameter whitelists — reject unrecognized POST body keys early.
+# ---------------------------------------------------------------------------
+
+_FIELD_PARAMS = {
+    "key", "label", "type", "instruction", "options", "options_from",
+    "default", "visible_when", "side_effects", "dynamic_options",
+    "compute", "instruction_when_true", "instruction_when_false",
+    "annotate_from",
+}
+
+_BUILDER_EXPECTED_PARAMS: dict[str, set[str]] = {
+    # Metadata
+    "set_workflow_id": {"value"},
+    "set_workflow_title": {"value"},
+    "set_workflow_description": {"value"},
+    # Option sets
+    "add_option_set": {"name", "options"},
+    "edit_option_set": {"name", "options"},
+    "remove_option_set": {"name"},
+    # Column types
+    "add_column_type": {"type_id", "label", "category", "description"},
+    "edit_column_type": {"type_id", "label", "category", "description"},
+    "remove_column_type": {"type_id"},
+    # Nodes
+    "add_node": {"id", "title", "instruction"},
+    "select_node": {"index"},
+    "edit_node": {"index", "title", "instruction"},
+    "remove_node": {"index"},
+    "reorder_node": {"index", "direction"},
+    # Fields
+    "add_field": _FIELD_PARAMS,
+    "edit_field": _FIELD_PARAMS | {"field_index"},
+    "remove_field": {"field_index"},
+    # Lists
+    "add_list": {"key", "label", "operations", "focus"},
+    "edit_list": {"list_key", "label", "operations", "focus"},
+    "remove_list": {"list_key"},
+    "add_list_field": {"list_key", "field_key", "type", "required", "options"},
+    "remove_list_field": {"list_key", "field_key"},
+    # Table
+    "set_table": {"column_type_catalog", "properties", "operations"},
+    "remove_table": set(),
+    # Node config
+    "set_proceed": {"label", "requires", "gate", "target"},
+    "add_navigation": {"nav_action", "label", "node", "when"},
+    "remove_navigation": {"nav_index"},
+    "add_action": {"action_type", "label"},
+    "remove_action": {"action_index"},
+    "set_show_all_fields": {"value"},
+    "set_pause": {"value"},
+    "set_execution": {"value"},
+    "set_node_mode": {"value", "mode"},
+    # Router
+    "add_route": {"target", "when"},
+    "remove_route": {"route_index"},
+    # Fork
+    "set_fork_merge": {"merge"},
+    "set_fork_label": {"label"},
+    "add_branch": {"branch_id", "label", "nodes"},
+    "remove_branch": {"branch_id"},
+    "set_fork_gate": {"gate", "requires"},
+    # Navigation (builder-level)
+    "proceed": set(),
+    "go_back": set(),
+    "restart": set(),
+    "publish": set(),
+}
 
 _VALID_FIELD_TYPES = ["text", "boolean", "select", "computed"]
 
@@ -405,13 +475,30 @@ def render_node(data: dict, workflow_id: str,
             fields["Node Mode"]["options"] = list(_VALID_NODE_MODES)
             state["fields"] = fields
     elif node == "preview":
-        state["validation_errors"] = _validate(data)
+        errors = _validate(data)
+        state["validation"] = {
+            "status": "fail" if errors else "pass",
+            "errors": errors,
+            "checks": [
+                "At least one node exists",
+                "No duplicate field keys across workflow",
+                "All proceed gate field keys exist",
+                "All navigation/route/fork targets reference existing nodes",
+                "Every node has an exit (proceed, actions, router, or fork)",
+                "Router/fork structural integrity",
+            ],
+        }
 
-    return {
+    result = {
         "state": state,
         "instructions": info["instruction"],
         "affordances": affordances,
     }
+    # Include expression syntax once at response root (instead of repeating
+    # the full hint in every affordance parameter description)
+    if node == "node_builder":
+        result["expression_syntax"] = _EXPR_HINT
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -517,12 +604,12 @@ def _build_affordances(data: dict, workflow_id: str,
                               "options": {"description": "Array of options (select type)"},
                               "options_from": {"description": f"Reference to option_set. Available: {os_names}" if os_names else "Reference to option_set (define one first)"},
                               "dynamic_options": {"description": 'Cascading options: {"source_key":"field_key","mapping":{"val1":["opt1","opt2"]},"default":[]}'},
-                              "side_effects": {"description": 'Array of [{when: <expr>, set: {field_key: value}}]. ' + _EXPR_HINT},
-                              "compute": {"description": "Computed field evaluation spec. " + _EXPR_HINT},
+                              "side_effects": {"description": 'Array of [{when: <expr>, set: {key: val}}]. See expression_syntax.'},
+                              "compute": {"description": "Computed field evaluation spec. See expression_syntax."},
                               "instruction_when_true": {"description": "Instruction shown when compute is true (computed type)"},
                               "instruction_when_false": {"description": "Instruction shown when compute is false (computed type)"},
                               "annotate_from": {"description": f"Annotation source set. Available: {os_names}" if os_names else "Annotation source (define option_set first)"},
-                              "visible_when": {"description": "Show field conditionally. " + _EXPR_HINT},
+                              "visible_when": {"description": "Show field conditionally. See expression_syntax."},
                           }})
             n += 1
 
@@ -539,10 +626,10 @@ def _build_affordances(data: dict, workflow_id: str,
                                   "options_from": {"description": f"Reference to option_set. Available: {os_names}" if os_names else ""},
                                   "dynamic_options": {"description": 'Cascading: {"source_key":"field_key","mapping":{"val":["opts"]},"default":[]}'},
                                   "side_effects": {"description": 'Array of [{when: <expr>, set: {key: val}}]'},
-                                  "compute": {"description": _EXPR_HINT},
+                                  "compute": {"description": "See expression_syntax."},
                                   "instruction_when_true": {}, "instruction_when_false": {},
                                   "annotate_from": {},
-                                  "visible_when": {"description": _EXPR_HINT},
+                                  "visible_when": {"description": "See expression_syntax."},
                               }})
                 n += 1
                 affs.append({"id": n, "label": f"Remove field from '{fn['id']}'", "method": "POST", "url": f"{api}/remove_field",
@@ -609,7 +696,7 @@ def _build_affordances(data: dict, workflow_id: str,
                               "body": {"label": "<label>"},
                               "parameters": {
                                   "label": {},
-                                  "gate": {"description": "Optional gate expression. " + _EXPR_HINT},
+                                  "gate": {"description": "Optional gate expression. See expression_syntax."},
                                   "target": {"description": "Optional explicit next node", "options": other_ids} if other_ids else {"description": "Optional explicit next node"},
                                   "requires": {"description": f"Legacy shorthand: array of field keys -> AND gate. Available: {all_fk}"},
                               }})
@@ -621,7 +708,7 @@ def _build_affordances(data: dict, workflow_id: str,
                           "body": {"nav_action": "<nav_action>", "label": "<label>"},
                           "parameters": {"nav_action": {"options": ["go_back", "go_to"]}, "label": {},
                                          "node": {"options": other_ids},
-                                         "when": {"description": "Optional conditional guard. " + _EXPR_HINT}}})
+                                         "when": {"description": "Optional conditional guard. See expression_syntax."}}})
             n += 1
 
             if fn.get("navigation"):
@@ -672,7 +759,7 @@ def _build_affordances(data: dict, workflow_id: str,
                 affs.append({"id": n, "label": f"Add route to '{fn['id']}'", "method": "POST", "url": f"{api}/add_route",
                               "body": {"target": "<target>"},
                               "parameters": {"target": {"options": node_options},
-                                             "when": {"description": "Optional condition. " + _EXPR_HINT}}})
+                                             "when": {"description": "Optional condition. See expression_syntax."}}})
                 n += 1
                 if routes:
                     ri = list(range(len(routes)))
@@ -707,7 +794,7 @@ def _build_affordances(data: dict, workflow_id: str,
                               "method": "POST", "url": f"{api}/set_fork_gate",
                               "body": {},
                               "parameters": {
-                                  "gate": {"description": _EXPR_HINT},
+                                  "gate": {"description": "See expression_syntax."},
                                   "requires": {"description": f"Legacy shorthand: array of field keys -> AND gate. Available: {all_fk}"},
                               }})
                 n += 1
@@ -748,6 +835,13 @@ def process_action(data: dict, workflow_id: str, body: dict,
     data = _ensure(data)
     action = body.get("action")
     node = data["node"]
+
+    # Reject unrecognized parameters early
+    expected = _BUILDER_EXPECTED_PARAMS.get(action)
+    if expected is not None:
+        err = validate_params(body, expected)
+        if err:
+            return err
 
     if action == "restart":
         fresh = default_data()
@@ -1293,6 +1387,8 @@ def process_action(data: dict, workflow_id: str, body: dict,
             fn.pop("proceed", None)
             fn.pop("router", None)
             fn.setdefault("fork", {"label": "Continue", "merge": "", "branches": {}})
+            # Forks auto-activate by default (like routers); set pause=true to override
+            fn.setdefault("pause", False)
         else:  # standard
             fn.pop("router", None)
             fn.pop("fork", None)

@@ -647,6 +647,16 @@ def _process_agent_action(workflow_id: str, instance_id: str, body):
     return result
 
 
+def _wants_json() -> bool:
+    """True when the client prefers JSON or hasn't specified a preference.
+
+    /agent/ routes default to JSON (for agents). Browsers sending an explicit
+    text/html Accept header still get HTML.
+    """
+    best = request.accept_mimetypes.best
+    return best in ("application/json", None, "*/*", "")
+
+
 def _render_portal() -> dict:
     """Build the portal's canonical {state, instructions, affordances} dict."""
     workflows = []
@@ -706,7 +716,7 @@ def _render_portal() -> dict:
 def agent_portal():
     portal = _render_portal()
     # JSON for agents, HTML for browsers
-    if request.accept_mimetypes.best == "application/json":
+    if _wants_json():
         return jsonify(portal)
 
     return render_template("agent.html", active_page="agent",
@@ -760,7 +770,7 @@ def agent_new_instance(workflow_id):
     # Notify portal observers
     _wf_notify_portal({"type": "instance_created", "workflow_id": workflow_id, "instance_id": inst_id})
     # Return confirmation — stay on portal
-    if request.accept_mimetypes.best == "application/json":
+    if _wants_json():
         return jsonify({"instance_id": inst_id, "workflow_id": workflow_id}), 201
     return redirect("/agent")
 
@@ -835,13 +845,13 @@ def agent_delete(workflow_id, instance_id):
 @app.route("/agent/<workflow_id>/<instance_id>", methods=["GET"])
 def agent_workflow_get(workflow_id, instance_id):
     if workflow_id not in _WORKFLOWS:
-        if request.accept_mimetypes.best == "application/json":
+        if _wants_json():
             return jsonify({"error": f"Unknown workflow: {workflow_id}"}), 404
         abort(404)
     ck = _cache_key(workflow_id, instance_id)
     page = _render_agent_node(workflow_id, instance_id)
     if page is None:
-        if request.accept_mimetypes.best == "application/json":
+        if _wants_json():
             return jsonify({"error": f"Unknown workflow: {workflow_id}"}), 404
         abort(404)
     node = (page.get("state") or {}).get("node") or (page.get("state") or {}).get("position") or workflow_id
@@ -849,7 +859,7 @@ def agent_workflow_get(workflow_id, instance_id):
     _wf_notify(workflow_id, instance_id, {"type": "navigate", "path": node, "content": json.dumps(page)})
 
     # JSON for agents, HTML observer for browsers
-    if request.accept_mimetypes.best == "application/json":
+    if _wants_json():
         return jsonify(page)
     wf_info = _WORKFLOWS[workflow_id]
     return render_template(

@@ -1,0 +1,397 @@
+workflow_title: Document Review and Approval
+workflow_description: Route documents through multi-track review with severity-based
+  escalation, parallel technical and compliance review, and structured approval.
+nodes:
+  intake:
+    title: Document Intake
+    instruction: 'Enter the document metadata and classify its severity. Severity
+      determines the review path: Critical items go to executive escalation, Major
+      items get parallel technical and compliance review, Minor items follow a streamlined
+      quick review.'
+    fields:
+      document_title:
+        label: Document Title
+        type: text
+        key: document_title
+        instruction: The title of the document under review.
+      document_type:
+        label: Document Type
+        type: select
+        key: document_type
+        instruction: The category of document being submitted for review.
+        options:
+        - Policy
+        - SOP
+        - Work Instruction
+        - Form
+        - Specification
+      author:
+        label: Author
+        type: text
+        key: author
+        instruction: Name of the document author.
+      description:
+        label: Change Description
+        type: text
+        key: description
+        instruction: Summarize the changes being introduced in this document revision.
+      severity:
+        label: Severity
+        type: select
+        key: severity
+        instruction: 'Classification that determines the review path. Critical: executive
+          escalation. Major: parallel technical + compliance review. Minor: streamlined
+          quick review.'
+        options:
+        - Critical
+        - Major
+        - Minor
+      escalation_justification:
+        label: Escalation Justification
+        type: text
+        key: escalation_justification
+        instruction: Required for Critical severity. Explain why this document requires
+          executive-level review.
+        visible_when:
+          type: field_equals
+          key: severity
+          value: Critical
+    proceed:
+      label: Submit for Review
+      gate:
+        op: AND
+        conditions:
+        - type: field_truthy
+          key: document_title
+        - type: field_truthy
+          key: document_type
+        - type: field_truthy
+          key: author
+        - type: field_truthy
+          key: severity
+  severity_router:
+    title: Severity Router
+    instruction: Automatically routes to the appropriate review track based on the
+      severity classification.
+    router:
+    - target: escalation
+      when:
+        type: field_equals
+        key: severity
+        value: Critical
+    - target: parallel_review
+      when:
+        type: field_equals
+        key: severity
+        value: Major
+    - target: quick_review
+      when:
+        type: field_equals
+        key: severity
+        value: Minor
+  escalation:
+    title: Executive Escalation
+    instruction: This document has been classified as Critical. Complete the executive
+      review fields. An executive sponsor must acknowledge the risk and approve the
+      document before it can proceed to final approval.
+    fields:
+      executive_sponsor:
+        label: Executive Sponsor
+        type: text
+        key: executive_sponsor
+        instruction: Name of the executive who will sponsor this critical change.
+      risk_assessment:
+        label: Risk Assessment
+        type: select
+        key: risk_assessment
+        instruction: Executive assessment of the risk level for this critical change.
+        options:
+        - Acceptable with mitigations
+        - Acceptable without mitigations
+        - Unacceptable - requires redesign
+      mitigation_plan:
+        label: Mitigation Plan
+        type: text
+        key: mitigation_plan
+        instruction: Describe the mitigations that make this change acceptable.
+        visible_when:
+          type: field_equals
+          key: risk_assessment
+          value: Acceptable with mitigations
+      executive_approval:
+        label: Executive Approval
+        type: boolean
+        key: executive_approval
+        instruction: The executive sponsor confirms they have reviewed and approve
+          this critical change.
+    navigation:
+    - action: go_back
+      label: Back to Intake
+    proceed:
+      label: Proceed to Approval
+      gate:
+        op: AND
+        conditions:
+        - type: field_truthy
+          key: executive_sponsor
+        - type: field_truthy
+          key: risk_assessment
+        - type: field_truthy
+          key: executive_approval
+      target: approval
+  parallel_review:
+    title: Parallel Review Split
+    instruction: Major severity document. Technical and compliance reviews run in
+      parallel.
+    fork:
+      label: Continue
+      merge: review_merge
+      branches:
+        technical:
+          label: Technical Review
+          nodes:
+          - technical_review
+        compliance:
+          label: Compliance Review
+          nodes:
+          - compliance_review
+  technical_review:
+    title: Technical Review
+    instruction: Assess the technical accuracy, completeness, and impact of the document
+      changes. Evaluate against applicable standards and best practices.
+    fields:
+      tech_reviewer:
+        label: Technical Reviewer
+        type: text
+        key: tech_reviewer
+        instruction: Name of the technical reviewer performing this assessment.
+      tech_assessment:
+        label: Technical Assessment
+        type: select
+        key: tech_assessment
+        instruction: Overall technical judgment on the document.
+        options:
+        - Acceptable
+        - Acceptable with comments
+        - Revisions required
+        - Rejected
+      tech_comments:
+        label: Technical Comments
+        type: text
+        key: tech_comments
+        instruction: Detailed technical findings, concerns, or recommendations.
+      impact_analysis:
+        label: Impact Analysis
+        type: text
+        key: impact_analysis
+        instruction: 'Assessment of downstream impacts: affected systems, processes,
+          training, or documentation.'
+    proceed:
+      label: Submit Technical Review
+      gate:
+        op: AND
+        conditions:
+        - type: field_truthy
+          key: tech_reviewer
+        - type: field_truthy
+          key: tech_assessment
+  compliance_review:
+    title: Compliance Review
+    instruction: Evaluate the document for regulatory compliance, policy alignment,
+      and procedural conformance. Flag any gaps or non-conformances.
+    fields:
+      compliance_reviewer:
+        label: Compliance Reviewer
+        type: text
+        key: compliance_reviewer
+        instruction: Name of the compliance reviewer.
+      regulatory_alignment:
+        label: Regulatory Alignment
+        type: select
+        key: regulatory_alignment
+        instruction: Assessment of alignment with applicable regulations and standards.
+        options:
+        - Fully aligned
+        - Minor gaps identified
+        - Major non-conformance
+        - Not applicable
+      compliance_findings:
+        label: Compliance Findings
+        type: text
+        key: compliance_findings
+        instruction: Detailed compliance findings, gaps, or non-conformances identified.
+      policy_references:
+        label: Policy References
+        type: text
+        key: policy_references
+        instruction: Cite the specific policies, regulations, or standards that were
+          evaluated.
+    proceed:
+      label: Submit Compliance Review
+      gate:
+        op: AND
+        conditions:
+        - type: field_truthy
+          key: compliance_reviewer
+        - type: field_truthy
+          key: regulatory_alignment
+  review_merge:
+    title: Review Convergence
+    instruction: Both technical and compliance reviews must complete before proceeding.
+      Review findings are consolidated here.
+    show_all_fields: true
+    fields:
+      reviews_acceptable:
+        label: All Reviews Acceptable
+        type: computed
+        key: reviews_acceptable
+        compute:
+          op: AND
+          conditions:
+          - op: OR
+            conditions:
+            - type: field_equals
+              key: tech_assessment
+              value: Acceptable
+            - type: field_equals
+              key: tech_assessment
+              value: Acceptable with comments
+          - op: OR
+            conditions:
+            - type: field_equals
+              key: regulatory_alignment
+              value: Fully aligned
+            - type: field_equals
+              key: regulatory_alignment
+              value: Minor gaps identified
+            - type: field_equals
+              key: regulatory_alignment
+              value: Not applicable
+        instruction_when_true: Both reviews are acceptable. Proceed to final approval.
+        instruction_when_false: One or more reviews flagged issues. Revisions may
+          be required before approval.
+      consolidation_notes:
+        label: Consolidation Notes
+        type: text
+        key: consolidation_notes
+        instruction: Summarize findings from both reviews. Note any conflicts or items
+          requiring further discussion.
+    proceed:
+      label: Proceed to Approval
+      target: approval
+  quick_review:
+    title: Quick Review
+    instruction: Streamlined review path for Minor severity documents. A single reviewer
+      assesses and approves.
+    fields:
+      quick_reviewer:
+        label: Reviewer
+        type: text
+        key: quick_reviewer
+        instruction: Name of the reviewer performing the quick assessment.
+      quick_assessment:
+        label: Assessment
+        type: select
+        key: quick_assessment
+        instruction: Quick review outcome.
+        options:
+        - Approved
+        - Approved with comments
+        - Revisions required
+      quick_comments:
+        label: Review Comments
+        type: text
+        key: quick_comments
+        instruction: Any comments or observations from the quick review.
+    proceed:
+      label: Proceed to Approval
+      gate:
+        op: AND
+        conditions:
+        - type: field_truthy
+          key: quick_reviewer
+        - type: field_truthy
+          key: quick_assessment
+      target: approval
+  approval:
+    title: Final Approval
+    instruction: Review all collected information and make a final approval decision.
+      All fields from prior nodes are visible for reference.
+    show_all_fields: true
+    fields:
+      approver:
+        label: Approver
+        type: text
+        key: approver
+        instruction: Name of the individual making the final approval decision.
+      approval_decision:
+        label: Approval Decision
+        type: select
+        key: approval_decision
+        instruction: Final disposition of the document.
+        options:
+        - Approved
+        - Approved with conditions
+        - Rejected - return for revision
+        - Rejected - cancel document
+      approval_conditions:
+        label: Conditions of Approval
+        type: text
+        key: approval_conditions
+        instruction: If approved with conditions, describe the conditions that must
+          be met.
+        visible_when:
+          type: field_equals
+          key: approval_decision
+          value: Approved with conditions
+      rejection_reason:
+        label: Rejection Reason
+        type: text
+        key: rejection_reason
+        instruction: If rejected, explain the basis for rejection and what must change.
+        visible_when:
+          op: OR
+          conditions:
+          - type: field_equals
+            key: approval_decision
+            value: Rejected - return for revision
+          - type: field_equals
+            key: approval_decision
+            value: Rejected - cancel document
+    navigation:
+    - action: go_to
+      label: Return for Revision
+      node: intake
+      when:
+        type: field_equals
+        key: approval_decision
+        value: Rejected - return for revision
+    proceed:
+      label: Finalize Approval
+      gate:
+        op: AND
+        conditions:
+        - type: field_truthy
+          key: approver
+        - type: field_truthy
+          key: approval_decision
+      target: complete
+  complete:
+    title: Complete
+    instruction: The document review and approval process is complete. The document
+      is now approved and effective.
+    show_all_fields: true
+    fields:
+      effective_date:
+        label: Effective Date
+        type: text
+        key: effective_date
+        instruction: The date this document becomes effective.
+      document_version:
+        label: Approved Version
+        type: text
+        key: document_version
+        instruction: Version number assigned to the approved document.
+    actions:
+    - action: restart
+      label: Start New Review

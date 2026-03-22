@@ -19,6 +19,23 @@ from .affordances import _load_engine
 _current_instance_id: str | None = None
 
 
+def validate_params(body: dict, expected: set[str]) -> dict | None:
+    """Check for unrecognized parameters in a POST body.
+
+    Returns an error dict if unexpected keys are found, or None if valid.
+    The 'action' key is always allowed (injected by resolve_resource).
+    """
+    extra = set(body.keys()) - expected - {"action"}
+    if extra:
+        action = body.get("action", "?")
+        return {
+            "error": f"Unknown parameter(s) for '{action}': "
+                     f"{', '.join(sorted(extra))}. "
+                     f"Expected: {', '.join(sorted(expected))}"
+        }
+    return None
+
+
 def render_page(defn, data, workflow_id):
     """Wrapper that injects the current instance_id into render calls."""
     return _render_page_impl(defn, data, workflow_id, _current_instance_id)
@@ -196,6 +213,15 @@ def _enter_node(defn: WorkflowDef, data: dict, workflow_id: str, _depth: int = 0
     # Router: evaluate routes and auto-advance
     if dest_node.router:
         return _route(defn, data, workflow_id, dest_node, _depth)
+
+    # Fork auto-activation: if pause is False, auto-activate like routers
+    if dest_node.fork and not dest_node.pause:
+        fork_gate = dest_node.fork.gate
+        if fork_gate:
+            passed, _ = evaluate(fork_gate, data)
+            if not passed:
+                return render_page(defn, data, workflow_id)
+        return _activate_fork(defn, data, workflow_id, dest_node)
 
     # Auto-advance (pause=False) with proceed gate
     if not dest_node.pause and dest_node.proceed:
