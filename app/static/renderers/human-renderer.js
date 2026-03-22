@@ -519,12 +519,8 @@ function wfRenderTable(table) {
         for (var ci = 0; ci < cols.length; ci++) {
             var c = cols[ci];
             var colAffs = c.affordances || [];
-            html += '<th><div class="wf-table-colname">' + wfEsc(c.name) + '</div>';
-            html += '<div class="wf-table-coltype">' + wfEsc(c.type) + '</div>';
-            if (c.choices) html += '<div class="wf-table-colmeta">choices: ' + wfEsc(JSON.stringify(c.choices)) + '</div>';
-            if (c.rule) html += '<div class="wf-table-colmeta">rule: ' + wfEsc(wfRuleToExpr(c.rule, cols)) + '</div>';
-            /* Column affordances */
-            html += wfRenderAffordances(colAffs);
+            html += '<th>';
+            html += _wfRenderColAffordances(c, colAffs, cols);
             html += '</th>';
         }
         html += '</tr></thead><tbody>';
@@ -545,20 +541,110 @@ function wfRenderTable(table) {
         html += '<div class="wf-table-empty">(no columns defined)</div>';
     }
 
-    /* Properties with affordances */
+    /* Properties: current value + affordance on one line */
     var propAffs = props.affordances || [];
-    var propKeys = Object.keys(props);
-    if (propKeys.length) {
+    var propKeys = Object.keys(props).filter(function(k) { return k !== 'affordances'; });
+    if (propKeys.length || propAffs.length) {
         html += '<div class="wf-table-props">';
         for (var i = 0; i < propKeys.length; i++) {
-            if (propKeys[i] === 'affordances') continue;
-            html += '<span class="wf-table-prop">' + wfEsc(propKeys[i]) + ': ' + wfEsc(String(props[propKeys[i]])) + '</span>';
+            var pk = propKeys[i];
+            var pv = props[pk];
+            /* Find matching affordance by body.key */
+            var pAff = null;
+            for (var ai = 0; ai < propAffs.length; ai++) {
+                if (propAffs[ai].body && propAffs[ai].body.key === pk) { pAff = propAffs[ai]; break; }
+            }
+            var propLabel = pk.replace(/_/g, ' ');
+            html += '<div class="wf-table-prop-row">';
+            html += '<span class="wf-table-prop-label">' + wfEsc(propLabel) + '</span>';
+            if (pAff) {
+                var pOpts = pAff.parameters && pAff.parameters.value && pAff.parameters.value.options;
+                var pvDisplay = pv === true ? 'Yes' : pv === false ? 'No' : pv != null ? String(pv) : '';
+                var tooltip = pAff.method + ' ' + pAff.url + ' ' + JSON.stringify(pAff.body);
+                html += '<span class="wf-field-current">' + (pvDisplay ? wfEsc(pvDisplay) : '<span class="wf-field-empty">(not set)</span>') + '</span>';
+                if (pOpts) {
+                    for (var oi = 0; oi < pOpts.length; oi++) {
+                        var oval = pOpts[oi];
+                        var olabel = oval === true ? 'Yes' : oval === false ? 'No' : String(oval);
+                        var isActive = JSON.stringify(oval) === JSON.stringify(pv);
+                        var fullBody = {key: pk, value: oval};
+                        var btnTooltip = pAff.method + ' ' + pAff.url + ' ' + JSON.stringify(fullBody);
+                        html += '<button class="wf-aff-btn' + (isActive ? ' wf-aff-opt-active' : '') + '" data-aff-url="' + wfEsc(pAff.url) + '" data-aff-body="' + wfEsc(JSON.stringify(fullBody)) + '" title="' + wfEsc(btnTooltip) + '">' + wfEsc(olabel) + '</button>';
+                    }
+                }
+            } else {
+                var pvDisplay = pv === true ? 'Yes' : pv === false ? 'No' : pv != null ? String(pv) : '(not set)';
+                html += '<span class="wf-field-current">' + wfEsc(pvDisplay) + '</span>';
+            }
+            html += '</div>';
         }
-        html += wfRenderAffordances(propAffs);
+        /* Render any property affordances not matched to a key */
+        var unmatchedPropAffs = propAffs.filter(function(a) {
+            return !a.body || !a.body.key || propKeys.indexOf(a.body.key) === -1;
+        });
+        if (unmatchedPropAffs.length) html += wfRenderAffordances(unmatchedPropAffs);
         html += '</div>';
     }
 
     html += '</div>';
+    return html;
+}
+
+/* Render column affordances with current value + control layout */
+function _wfRenderColAffordances(col, affs, cols) {
+    var html = '';
+    var rename = null, setType = null, remove = null, others = [];
+    for (var i = 0; i < affs.length; i++) {
+        var a = affs[i];
+        var b = a.body || {};
+        if (b.name !== undefined && a.parameters && a.parameters.name) rename = a;
+        else if (b.type !== undefined && a.parameters && a.parameters.type) setType = a;
+        else if (Object.keys(a.parameters || {}).length === 0 && Object.keys(b).length <= 1 && b.col !== undefined) remove = a;
+        else others.push(a);
+    }
+
+    /* Name: current value + rename input (uses wf-aff-inline for body-template-aware binding) */
+    if (rename) {
+        var tooltip = rename.method + ' ' + rename.url + ' ' + JSON.stringify(rename.body);
+        html += '<div class="wf-field-row wf-aff-inline" data-aff-url="' + wfEsc(rename.url) + '" data-aff-body="' + wfEsc(JSON.stringify(rename.body)) + '">';
+        html += '<span class="wf-field-current wf-table-colname">' + wfEsc(col.name) + '</span>';
+        html += '<input class="wf-param-input" type="text" data-param="name" placeholder="Rename\u2026">';
+        html += '<button class="wf-aff-go" data-aff-url="' + wfEsc(rename.url) + '" title="' + wfEsc(tooltip) + '">Rename</button>';
+        html += '</div>';
+    } else {
+        html += '<div class="wf-table-colname">' + wfEsc(col.name) + '</div>';
+    }
+
+    /* Type: current value + type dropdown (uses wf-aff-inline for body-template-aware binding) */
+    if (setType) {
+        var typeOpts = setType.parameters.type.options || [];
+        var tooltip = setType.method + ' ' + setType.url + ' ' + JSON.stringify(setType.body);
+        html += '<div class="wf-field-row wf-aff-inline" data-aff-url="' + wfEsc(setType.url) + '" data-aff-body="' + wfEsc(JSON.stringify(setType.body)) + '">';
+        html += '<span class="wf-field-current wf-table-coltype">' + wfEsc(col.type) + '</span>';
+        html += '<select class="wf-param-input" data-param="type">';
+        html += '<option value="">\u2014 Change \u2014</option>';
+        for (var oi = 0; oi < typeOpts.length; oi++) {
+            html += '<option value="' + wfEsc(JSON.stringify(typeOpts[oi])) + '">' + wfEsc(String(typeOpts[oi])) + '</option>';
+        }
+        html += '</select>';
+        html += '<button class="wf-aff-go" data-aff-url="' + wfEsc(setType.url) + '" title="' + wfEsc(tooltip) + '">Set</button>';
+        html += '</div>';
+    } else {
+        html += '<div class="wf-table-coltype">' + wfEsc(col.type) + '</div>';
+    }
+
+    if (col.choices) html += '<div class="wf-table-colmeta">choices: ' + wfEsc(JSON.stringify(col.choices)) + '</div>';
+    if (col.rule) html += '<div class="wf-table-colmeta">rule: ' + wfEsc(wfRuleToExpr(col.rule, cols)) + '</div>';
+
+    /* Remove button */
+    if (remove) {
+        var tooltip = remove.method + ' ' + remove.url + ' ' + JSON.stringify(remove.body);
+        html += '<button class="wf-aff-btn" data-aff-url="' + wfEsc(remove.url) + '" data-aff-body="' + wfEsc(JSON.stringify(remove.body)) + '" title="' + wfEsc(tooltip) + '">Remove</button>';
+    }
+
+    /* Remaining affordances (e.g. set_cell) — generic rendering */
+    if (others.length) html += wfRenderAffordances(others);
+
     return html;
 }
 
@@ -1450,6 +1536,316 @@ function _wfBindAffordances(container) {
     });
 }
 
+/* ── Classify affordances by role ── */
+function _wfClassifyAffordances(affordances) {
+    var focus = [], unfocus = null, objectAffs = [], actionBar = [];
+    for (var i = 0; i < affordances.length; i++) {
+        var a = affordances[i];
+        var url = a.url || '';
+        if (url.match(/\/focus$/) && a.body && a.body.target) {
+            focus.push(a);
+        } else if (url.match(/\/unfocus$/)) {
+            unfocus = a;
+        } else if (url.match(/\/(proceed|go_back|submit|restart|complete|switch_branch|go_to)$/) ||
+                   (a.label && /Proceed|Go back|Submit|Complete|Restart/i.test(a.label))) {
+            actionBar.push(a);
+        } else {
+            objectAffs.push(a);
+        }
+    }
+    return { focus: focus, unfocus: unfocus, objectAffs: objectAffs, actionBar: actionBar };
+}
+
+/* ── Read-only fields (state zone) ── */
+function _wfRenderFieldsReadOnly(fields, fieldCategory) {
+    var keys = Object.keys(fields);
+    if (!keys.length) return '';
+    var html = '<div class="wf-fields">';
+    for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        var f = fields[k];
+        var cat = fieldCategory[k] || null;
+        var catCls = cat ? ' wf-fb-' + cat : '';
+        var tagMap = {outcome:'SET', 'new':'NEW', modified:'CHANGED'};
+        var tagCls = {outcome:'wf-tag-outcome', 'new':'wf-tag-new', modified:'wf-tag-modified'};
+        var tag = cat ? '<span class="' + tagCls[cat] + '">' + tagMap[cat] + '</span>' : '';
+        html += '<div class="wf-field' + catCls + '">';
+        html += '<div class="wf-field-label">' + wfEsc(k) + tag + '</div>';
+        if (f && typeof f === 'object' && 'value' in f) {
+            if (f.value == null) {
+                html += '<div class="wf-field-value wf-field-empty">(not set)</div>';
+            } else {
+                var dv = f.value;
+                if (dv === true) dv = 'Yes';
+                else if (dv === false) dv = 'No';
+                html += '<div class="wf-field-value">' + wfEsc(dv) + '</div>';
+            }
+        } else {
+            html += '<div class="wf-field-value">' + wfRenderValue(f) + '</div>';
+        }
+        html += '</div>';
+    }
+    return html + '</div>';
+}
+
+/* ── Read-only table (state zone) ── */
+function _wfRenderTableReadOnly(table) {
+    if (!table) return '';
+    var cols = table.columns || [];
+    var rows = table.rows || [];
+    var props = table.properties || {};
+    var html = '';
+
+    if (table.summary) {
+        html += '<div class="wf-table-summary">' + wfEsc(table.summary) + '</div>';
+    }
+
+    if (cols.length) {
+        html += '<div class="wf-table-wrap"><table class="wf-table"><thead><tr>';
+        html += '<th class="wf-table-rownum">#</th>';
+        for (var ci = 0; ci < cols.length; ci++) {
+            var c = cols[ci];
+            html += '<th><div class="wf-table-colname">' + wfEsc(c.name) + '</div>';
+            html += '<div class="wf-table-coltype">' + wfEsc(c.type) + '</div>';
+            if (c.choices) html += '<div class="wf-table-colmeta">choices: ' + wfEsc(JSON.stringify(c.choices)) + '</div>';
+            if (c.rule) html += '<div class="wf-table-colmeta">rule: ' + wfEsc(wfRuleToExpr(c.rule, cols)) + '</div>';
+            html += '</th>';
+        }
+        html += '</tr></thead><tbody>';
+        if (rows.length) {
+            for (var ri = 0; ri < rows.length; ri++) {
+                html += '<tr><td class="wf-table-rownum">' + ri + '</td>';
+                for (var ci = 0; ci < cols.length; ci++) {
+                    var val = (ri < rows.length && ci < rows[ri].length) ? rows[ri][ci] : '';
+                    html += '<td>' + (val ? wfEsc(val) : '<span class="wf-table-empty">&mdash;</span>') + '</td>';
+                }
+                html += '</tr>';
+            }
+        } else {
+            html += '<tr><td colspan="' + (cols.length + 1) + '" class="wf-table-empty">(no rows)</td></tr>';
+        }
+        html += '</tbody></table></div>';
+    } else {
+        html += '<div class="wf-table-empty">(no columns defined)</div>';
+    }
+
+    /* Properties — read-only */
+    var propKeys = Object.keys(props).filter(function(k) { return k !== 'affordances'; });
+    if (propKeys.length) {
+        html += '<div class="wf-table-props">';
+        for (var i = 0; i < propKeys.length; i++) {
+            var pk = propKeys[i];
+            var pv = props[pk];
+            var pvDisplay = pv === true ? 'Yes' : pv === false ? 'No' : pv != null ? String(pv) : '(not set)';
+            html += '<div class="wf-table-prop-row">';
+            html += '<span class="wf-table-prop-label">' + wfEsc(pk.replace(/_/g, ' ')) + '</span>';
+            html += '<span class="wf-field-current">' + wfEsc(pvDisplay) + '</span>';
+            html += '</div>';
+        }
+        html += '</div>';
+    }
+
+    return html;
+}
+
+/* ── Read-only execution table (state zone) ── */
+function _wfRenderExecTableReadOnly(et) {
+    if (!et) return '';
+    var cols = et.columns || [];
+    var rows = et.rows || [];
+    if (!cols.length) return '<div class="wf-table-empty">(no columns)</div>';
+
+    var html = '<div class="wf-table-wrap"><table class="wf-table"><thead><tr>';
+    html += '<th class="wf-table-rownum">Row</th>';
+    for (var ci = 0; ci < cols.length; ci++) {
+        var c = cols[ci];
+        html += '<th><div class="wf-table-colname">' + wfEsc(c.name) + '</div>';
+        html += '<div class="wf-table-coltype">' + wfEsc(c.type) + '</div>';
+        html += '</th>';
+    }
+    html += '</tr></thead><tbody>';
+    for (var ri = 0; ri < rows.length; ri++) {
+        var r = rows[ri];
+        var rowCls = r.gated ? ' class="wf-row-gated"' : '';
+        html += '<tr' + rowCls + '>';
+        html += '<td class="wf-table-rownum">';
+        html += wfEsc(r.row_id || String(r.row));
+        var acc = r.acceptance || {};
+        if (acc.passed) {
+            html += '<div class="wf-exec-reason wf-exec-pass">&#10003; pass</div>';
+        } else if (acc.reason) {
+            html += '<div class="wf-exec-reason wf-exec-pending">' + wfEsc(acc.reason) + '</div>';
+        }
+        html += '</td>';
+        var cells = r.cells || [];
+        for (var ci = 0; ci < cells.length; ci++) {
+            var cell = cells[ci];
+            var cellStatus = cell.status || 'empty';
+            var isComplete = cell.display_value && cellStatus !== 'empty' && cellStatus !== 'gated' && cellStatus !== 'locked';
+            var cls = 'wf-exec-cell wf-exec-' + cellStatus;
+            html += '<td class="' + cls + '"' + (isComplete ? ' data-completed="true"' : '') + '>';
+            if (cellStatus === 'gated') {
+                html += '<span class="wf-table-empty">[GATED]</span>';
+            } else if (cellStatus === 'locked') {
+                html += '<span class="wf-table-empty">[LOCKED]</span>';
+            } else if (cell.display_value) {
+                html += '<div class="wf-exec-display">' + wfEsc(cell.display_value) + '</div>';
+            }
+            html += '</td>';
+        }
+        html += '</tr>';
+    }
+    html += '</tbody></table></div>';
+    return html;
+}
+
+/* ── Focus zone ── */
+function _wfRenderFocusZone(s, state, classified, fieldCategory) {
+    var focus = s.focus;
+    if (!focus) {
+        if (classified.focus.length) {
+            return '<div class="wf-focus-hint">Focus on an element to reveal its affordances.</div>';
+        }
+        return '';
+    }
+
+    var html = '<div class="wf-focus-zone">';
+
+    /* Header: breadcrumb + navigation + close */
+    html += '<div class="wf-focus-header">';
+    html += '<span class="wf-focus-breadcrumb">' + wfEsc(s.focus_label || focus) + '</span>';
+    /* Sibling/parent focus navigation */
+    var navAffs = classified.focus.filter(function(a) { return a.body.target !== focus; });
+    if (navAffs.length) {
+        html += '<span class="wf-focus-nav">';
+        for (var i = 0; i < navAffs.length; i++) {
+            var na = navAffs[i];
+            var tooltip = na.method + ' ' + na.url + ' ' + JSON.stringify(na.body);
+            html += '<button class="wf-focus-nav-btn wf-aff-btn" data-aff-url="' + wfEsc(na.url) + '" data-aff-body="' + wfEsc(JSON.stringify(na.body)) + '" title="' + wfEsc(tooltip) + '">' + wfEsc(na.body.target.split('.').pop()) + '</button>';
+        }
+        html += '</span>';
+    }
+    if (classified.unfocus) {
+        var ua = classified.unfocus;
+        var tooltip = ua.method + ' ' + ua.url + ' ' + JSON.stringify(ua.body);
+        html += '<button class="wf-focus-close wf-aff-btn" data-aff-url="' + wfEsc(ua.url) + '" data-aff-body="' + wfEsc(JSON.stringify(ua.body)) + '" title="' + wfEsc(tooltip) + '">Close</button>';
+    }
+    html += '</div>';
+
+    /* Focused object's affordances */
+    var affs = classified.objectAffs;
+    if (focus === 'fields') {
+        /* Render field affordances using the inline field patterns */
+        html += _wfRenderFieldAffordances(s.fields, fieldCategory);
+    } else if (affs.length) {
+        /* Generic: parametric + simple */
+        var paramAffs = [], simpleAffs = [];
+        for (var i = 0; i < affs.length; i++) {
+            var a = affs[i];
+            if (a.parameters && Object.keys(a.parameters).length) {
+                paramAffs.push(a);
+            } else {
+                simpleAffs.push(a);
+            }
+        }
+        if (paramAffs.length) {
+            for (var i = 0; i < paramAffs.length; i++) {
+                html += wfRenderParamAff(paramAffs[i]);
+            }
+        }
+        if (simpleAffs.length) {
+            html += '<div class="wf-action-bar">';
+            for (var i = 0; i < simpleAffs.length; i++) {
+                var a = simpleAffs[i];
+                var aLabel = a.label || (a.body && a.body.key ? a.body.key.replace(/_/g, ' ') : a.url.split('/').pop().replace(/_/g, ' '));
+                var tooltip = a.method + ' ' + a.url + ' ' + JSON.stringify(a.body);
+                html += '<button class="wf-aff-btn" data-aff-url="' + wfEsc(a.url) + '" data-aff-body="' + wfEsc(JSON.stringify(a.body)) + '" title="' + wfEsc(tooltip) + '">' + wfEsc(aLabel) + '</button>';
+            }
+            html += '</div>';
+        }
+    }
+
+    /* Nested focusable objects (e.g., columns when focused on table) */
+    var nestedFocus = classified.focus.filter(function(a) {
+        return a.body.target && a.body.target.indexOf(focus + '.') === 0;
+    });
+    if (nestedFocus.length) {
+        html += '<div class="wf-focus-nested-list">';
+        for (var i = 0; i < nestedFocus.length; i++) {
+            var nf = nestedFocus[i];
+            var tooltip = nf.method + ' ' + nf.url + ' ' + JSON.stringify(nf.body);
+            html += '<button class="wf-focus-nested-btn wf-aff-btn" data-aff-url="' + wfEsc(nf.url) + '" data-aff-body="' + wfEsc(JSON.stringify(nf.body)) + '" title="' + wfEsc(tooltip) + '">' + wfEsc(nf.label.replace(/^Focus on /, '')) + '</button>';
+        }
+        html += '</div>';
+    }
+
+    html += '</div>';
+    return html;
+}
+
+/* ── Field affordances in focus zone (reuses field patterns) ── */
+function _wfRenderFieldAffordances(fields, fieldCategory) {
+    if (!fields) return '';
+    var keys = Object.keys(fields);
+    var html = '<div class="wf-fields">';
+    for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        var f = fields[k];
+        if (!f || typeof f !== 'object' || !('value' in f)) continue;
+        var aff = f.affordance;
+        if (!aff) continue;
+        var cat = fieldCategory[k] || null;
+        var catCls = cat ? ' wf-fb-' + cat : '';
+        html += '<div class="wf-field' + catCls + '">';
+        html += '<div class="wf-field-label">' + wfEsc(k) + '</div>';
+        if (f.instruction) {
+            html += '<div class="wf-field-instruction">' + wfEsc(f.instruction) + '</div>';
+        }
+        var options = (aff.parameters && aff.parameters.value && aff.parameters.value.options) || null;
+        if (options) {
+            var useDropdown = options.length > 3;
+            if (!useDropdown) {
+                for (var oi = 0; oi < options.length; oi++) {
+                    var ol = options[oi] === true ? 'Yes' : options[oi] === false ? 'No' : String(options[oi]);
+                    if (ol.length > 20) { useDropdown = true; break; }
+                }
+            }
+            var curDisplay = f.value === true ? 'Yes' : f.value === false ? 'No' : f.value != null ? String(f.value) : '';
+            html += '<div class="wf-field-row">';
+            html += curDisplay ? '<span class="wf-field-current">' + wfEsc(curDisplay) + '</span>' : '<span class="wf-field-current wf-field-empty">(not set)</span>';
+            if (useDropdown) {
+                html += '<select class="wf-aff-select" data-aff-url="' + wfEsc(aff.url) + '">';
+                html += '<option value="">&mdash; Select &mdash;</option>';
+                for (var oi = 0; oi < options.length; oi++) {
+                    var oval = options[oi];
+                    var olabel = oval === true ? 'Yes' : oval === false ? 'No' : String(oval);
+                    html += '<option value="' + wfEsc(JSON.stringify(oval)) + '">' + wfEsc(olabel) + '</option>';
+                }
+                html += '</select>';
+                html += '<button class="wf-aff-submit" data-aff-url="' + wfEsc(aff.url) + '">Set</button>';
+            } else {
+                for (var oi = 0; oi < options.length; oi++) {
+                    var oval = options[oi];
+                    var olabel = oval === true ? 'Yes' : oval === false ? 'No' : String(oval);
+                    var isActive = JSON.stringify(oval) === JSON.stringify(f.value);
+                    var btnTooltip = aff.method + ' ' + aff.url + ' ' + JSON.stringify({value: oval});
+                    html += '<button class="wf-aff-opt-btn' + (isActive ? ' wf-aff-opt-active' : '') + '" data-aff-url="' + wfEsc(aff.url) + '" data-aff-value="' + wfEsc(JSON.stringify(oval)) + '" title="' + wfEsc(btnTooltip) + '">' + wfEsc(olabel) + '</button>';
+                }
+            }
+            html += '</div>';
+        } else {
+            var curVal = f.value == null ? '' : String(f.value);
+            html += '<div class="wf-field-row">';
+            html += curVal ? '<span class="wf-field-current">' + wfEsc(curVal) + '</span>' : '<span class="wf-field-current wf-field-empty">(not set)</span>';
+            html += '<input class="wf-aff-input" type="text" data-aff-url="' + wfEsc(aff.url) + '" placeholder="New value\u2026">';
+            html += '<button class="wf-aff-submit" data-aff-url="' + wfEsc(aff.url) + '">Set</button>';
+            html += '</div>';
+        }
+        html += '</div>';
+    }
+    return html + '</div>';
+}
+
 /* ── Page renderer (shared default + verbose) ── */
 function _humanPage(container, state, msg, feedback, verbose) {
     if (!container || !state) return;
@@ -1463,6 +1859,8 @@ function _humanPage(container, state, msg, feedback, verbose) {
         (eff.modified_affordances || []).forEach(function(a){ affCategory[a.label] = 'modified'; });
     }
     var html = '', s = state.state || {};
+
+    /* ── Header ── */
     html += '<div class="wf-header"><h1 class="wf-title">' + wfEsc(s.workflow || 'Workflow') + '</h1></div>';
     html += wfRenderBanner(state);
     html += '<div class="wf-section"><div class="wf-section-head">' + wfEsc(s.node_title || s.node) + '</div></div>';
@@ -1472,43 +1870,60 @@ function _humanPage(container, state, msg, feedback, verbose) {
     if (state.instructions) html += '<div class="wf-desc">' + wfEsc(state.instructions) + '</div>';
     html += humanRenderStateProps(state);
     if (s.definition && _isDefinition(s.definition)) { html += _schematicFlowchart(s.definition, s); }
-    /* ── Affordance classification ──
-       Field affordances are now inline in field objects (f.affordance).
-       state.affordances contains only non-field affordances (actions). */
-    var actionAffordances = state.affordances || [];
-    if (s.fields) { html += '<div class="wf-card"><div class="wf-card-head">Fields</div>' + wfRenderFields(s.fields, fieldCategory) + '</div>'; }
-    /* ── Execution table: faithful projection with inline cell controls ── */
-    if (s.execution_table) {
-        html += verbose ? wfRenderExecTable(s.execution_table) : wfRenderExecTableFaithful(s.execution_table, actionAffordances);
-    } else if (s.table) {
-        html += wfRenderTable(s.table);
-    }
-    /* ── Action affordances: split parametric (forms) from simple (buttons) ──
-       Cell-action affordances are excluded here when execution_table is present
-       because they've already been rendered inline in the table cells. */
-    var paramAffordances = [], simpleAffordances = [];
-    for (var i = 0; i < actionAffordances.length; i++) {
-        var a = actionAffordances[i];
-        /* Skip cell_action affordances already rendered inline */
-        if (s.execution_table && a.body && a.body.cell_action !== undefined) continue;
-        if (a.parameters && Object.keys(a.parameters).length) {
-            paramAffordances.push(a);
-        } else {
-            simpleAffordances.push(a);
+
+    /* ── Classify affordances ── */
+    var classified = _wfClassifyAffordances(state.affordances || []);
+
+    /* ── State zone (read-only) ── */
+    if (s.fields) {
+        var fieldFocusBtn = '';
+        for (var fi = 0; fi < classified.focus.length; fi++) {
+            if (classified.focus[fi].body.target === 'fields') {
+                var fa = classified.focus[fi];
+                fieldFocusBtn = '<button class="wf-focus-btn wf-aff-btn" data-aff-url="' + wfEsc(fa.url) + '" data-aff-body="' + wfEsc(JSON.stringify(fa.body)) + '" title="' + wfEsc(fa.method + ' ' + fa.url + ' ' + JSON.stringify(fa.body)) + '">Edit</button>';
+                break;
+            }
         }
-    }
-    if (paramAffordances.length) {
-        html += '<div class="wf-card"><div class="wf-card-head">Operations</div>';
-        for (var i = 0; i < paramAffordances.length; i++) {
-            html += wfRenderParamAff(paramAffordances[i]);
-        }
+        html += '<div class="wf-card"><div class="wf-card-head">Fields' + fieldFocusBtn + '</div>';
+        html += _wfRenderFieldsReadOnly(s.fields, fieldCategory);
         html += '</div>';
     }
-    if (simpleAffordances.length) {
+
+    if (s.execution_table) {
+        var execFocusBtn = '';
+        for (var fi = 0; fi < classified.focus.length; fi++) {
+            if (classified.focus[fi].body.target === 'exec') {
+                var fa = classified.focus[fi];
+                execFocusBtn = '<button class="wf-focus-btn wf-aff-btn" data-aff-url="' + wfEsc(fa.url) + '" data-aff-body="' + wfEsc(JSON.stringify(fa.body)) + '" title="' + wfEsc(fa.method + ' ' + fa.url + ' ' + JSON.stringify(fa.body)) + '">Edit</button>';
+                break;
+            }
+        }
+        html += '<div class="wf-card"><div class="wf-card-head">Execution Table' + execFocusBtn + '</div>';
+        html += _wfRenderExecTableReadOnly(s.execution_table);
+        html += '</div>';
+    } else if (s.table) {
+        var tableFocusBtn = '';
+        for (var fi = 0; fi < classified.focus.length; fi++) {
+            if (classified.focus[fi].body.target === 'table') {
+                var fa = classified.focus[fi];
+                tableFocusBtn = '<button class="wf-focus-btn wf-aff-btn" data-aff-url="' + wfEsc(fa.url) + '" data-aff-body="' + wfEsc(JSON.stringify(fa.body)) + '" title="' + wfEsc(fa.method + ' ' + fa.url + ' ' + JSON.stringify(fa.body)) + '">Edit</button>';
+                break;
+            }
+        }
+        html += '<div class="wf-card"><div class="wf-card-head">Table' + tableFocusBtn + '</div>';
+        html += _wfRenderTableReadOnly(s.table);
+        html += '</div>';
+    }
+
+    /* ── Focus zone ── */
+    html += _wfRenderFocusZone(s, state, classified, fieldCategory);
+
+    /* ── Action bar (always visible) ── */
+    if (classified.actionBar.length) {
         html += '<div class="wf-card"><div class="wf-card-head">Actions</div>';
         html += '<div class="wf-action-bar">';
-        for (var i = 0; i < simpleAffordances.length; i++) {
-            var a = simpleAffordances[i], cls = 'wf-aff-action-btn';
+        for (var i = 0; i < classified.actionBar.length; i++) {
+            var a = classified.actionBar[i], cls = 'wf-aff-action-btn';
             var aLabel = a.label || a.url.split('/').pop().replace(/_/g, ' ');
             if (/Proceed|Submit|Complete/i.test(aLabel)) cls += ' wf-aff-action-primary';
             else if (/go.back/i.test(aLabel)) cls += ' wf-aff-action-nav';
@@ -1517,6 +1932,7 @@ function _humanPage(container, state, msg, feedback, verbose) {
         }
         html += '</div></div>';
     }
+
     container.innerHTML = html;
     _wfBindAffordances(container);
     requestAnimationFrame(function() { _fcFixLayout(container); });
@@ -1598,7 +2014,7 @@ var WF_STRUCTURAL_CSS = ''
     + '.wf-desc { padding:0.25rem 1.5rem 0.75rem; font-size:0.9rem; line-height:1.5; white-space:pre-line; }'
     + '.wf-error { margin:0.5rem 1.5rem; padding:0.6rem 0.8rem; background:#fef2f2; border:1px solid #fca5a5; border-radius:6px; color:#991b1b; font-size:0.85rem; font-weight:500; }'
     + '.wf-card { margin:0.5rem 1.5rem; padding:0.75rem; border:1px solid; border-radius:8px; }'
-    + '.wf-card-head { font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem; }'
+    + '.wf-card-head { font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem; display:flex; align-items:center; }'
     + '.wf-tbl { width:100%; border-collapse:collapse; }'
     + '.wf-tbl td { padding:0.35rem 0.5rem; font-size:0.85rem; vertical-align:top; }'
     + '.wf-key { width:160px; white-space:nowrap; font-weight:500; font-size:0.8rem; }'
@@ -1618,6 +2034,17 @@ var WF_STRUCTURAL_CSS = ''
     + '.wf-field-row { display:flex; align-items:center; gap:0.4rem; }'
     + '.wf-field-current { font-size:0.85rem; flex-shrink:0; max-width:50%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }'
     + '.wf-field-options { font-size:0.72rem; font-family:Consolas,Monaco,monospace; margin-top:0.15rem; }'
+    /* Focus zone */
+    + '.wf-focus-hint { padding:0.5rem 1.5rem; font-size:0.82rem; font-style:italic; }'
+    + '.wf-focus-zone { margin:0.5rem 1.5rem; padding:0.75rem; border-radius:8px; border-left:3px solid; }'
+    + '.wf-focus-header { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem; flex-wrap:wrap; }'
+    + '.wf-focus-breadcrumb { font-size:0.85rem; font-weight:600; flex:1; }'
+    + '.wf-focus-nav { display:flex; gap:0.25rem; }'
+    + '.wf-focus-nav-btn { font-size:0.72rem; padding:0.2rem 0.5rem; border-radius:3px; border:1px solid; cursor:pointer; background:transparent; font-family:inherit; }'
+    + '.wf-focus-close { font-size:0.72rem; padding:0.2rem 0.5rem; border-radius:3px; border:1px solid; cursor:pointer; background:transparent; font-family:inherit; }'
+    + '.wf-focus-nested-list { display:flex; gap:0.35rem; flex-wrap:wrap; margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid; }'
+    + '.wf-focus-nested-btn { font-size:0.78rem; padding:0.3rem 0.6rem; border-radius:4px; border:1px solid; cursor:pointer; background:transparent; font-family:inherit; }'
+    + '.wf-focus-btn { font-size:0.72rem; padding:0.15rem 0.5rem; border-radius:3px; border:1px solid; cursor:pointer; background:transparent; font-family:inherit; margin-left:auto; }'
     + '.wf-aff { margin-bottom:0.4rem; padding:0.5rem 0.6rem; border:1px solid; border-radius:6px; }'
     + '.wf-aff-top { display:flex; align-items:center; gap:0.5rem; }'
     + '.wf-aff-id { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; font-size:0.7rem; font-weight:600; flex-shrink:0; }'
@@ -1655,6 +2082,8 @@ var WF_STRUCTURAL_CSS = ''
     + '.wf-table-empty { font-style:italic; font-size:0.8rem; text-align:center; padding:0.75rem; }'
     + '.wf-table-props { display:flex; gap:1rem; margin-top:0.5rem; font-size:0.72rem; }'
     + '.wf-table-prop { font-family:Consolas,Monaco,monospace; }'
+    + '.wf-table-prop-row { display:flex; align-items:center; gap:0.4rem; padding:0.15rem 0; }'
+    + '.wf-table-prop-label { font-size:0.78rem; font-weight:500; }'
     + '.wf-table-colmeta { font-size:0.68rem; word-break:break-all; max-width:200px; overflow:hidden; }'
     /* Blueprint renderer — workflow definition visualization */
     + '.bp-wrap { margin:0.5rem 1.5rem; }'
@@ -1846,7 +2275,7 @@ function _scopeFC(sel, css) { return css.replace(/\.fc-/g, sel + ' .fc-'); }
             style.textContent = WF_STRUCTURAL_CSS + FC_CSS
                 + _scopeFC('#rc-light', FC_LIGHT)
                 + '#rc-light { background:#f5f5f5; color:#333; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
-                + '#rc-light .wf-title { color:#1a1a2e; } #rc-light .wf-banner { background:#f8f9fb; border-color:#e8e8e8; } #rc-light .wf-dot { background:#dde1e6; color:#888; } #rc-light .wf-step-label { color:#888; } #rc-light .wf-step-active .wf-dot { background:#2a6bcf; color:#fff; } #rc-light .wf-step-active .wf-step-label { color:#1a1a2e; font-weight:600; } #rc-light .wf-step-done .wf-dot { background:#4caf50; color:#fff; } #rc-light .wf-step-done .wf-step-label { color:#555; } #rc-light .wf-conn { background:#dde1e6; } #rc-light .wf-conn-active { background:#4caf50; } #rc-light .wf-section-head { color:#1a1a2e; } #rc-light .wf-desc { color:#666; } #rc-light .wf-card { background:#fff; border-color:#e8e8e8; } #rc-light .wf-card-head { color:#7f8fa6; } #rc-light .wf-tbl td { border-bottom:1px solid #f0f0f0; } #rc-light .wf-key { color:#7f8fa6; } #rc-light .wf-val { color:#333; } #rc-light .wf-null, #rc-light .wf-empty-arr, #rc-light .wf-empty-obj { color:#bbb; } #rc-light .wf-bool, #rc-light .wf-num { color:#2a6bcf; } #rc-light .wf-str { color:#333; } #rc-light .wf-arr-item { border-left-color:#e8e8e8; } #rc-light .wf-field { border-bottom:1px solid #f0f0f0; } #rc-light .wf-field-label { color:#555; } #rc-light .wf-field-instruction { color:#999; } #rc-light .wf-field-value { color:#333; } #rc-light .wf-field-empty { color:#bbb; } #rc-light .wf-field-current { color:#333; } #rc-light .wf-field-options { color:#7f8fa6; } #rc-light .wf-aff { background:#f8f9fb; border-color:#e8e8e8; } #rc-light .wf-aff-id { background:#dde1e6; color:#555; } #rc-light .wf-aff-label { color:#333; } #rc-light .wf-aff-method { color:#7f8fa6; background:#eef1f5; } #rc-light .wf-aff-detail { color:#999; } #rc-light .wf-aff-options { color:#7f8fa6; } #rc-light .wf-aff-primary { border-color:#2a6bcf; background:#f0f5ff; } #rc-light .wf-aff-primary .wf-aff-label { color:#2a6bcf; font-weight:600; } #rc-light .wf-aff-primary .wf-aff-id { background:#2a6bcf; color:#fff; } #rc-light .wf-aff-nav { border-color:#dde1e6; background:#fafafa; } #rc-light .wf-aff-nav .wf-aff-label { color:#888; } #rc-light .wf-aff-selected { border-color:#4caf50; background:#f0fff0; } #rc-light .wf-aff-selected .wf-aff-label { color:#2e7d32; } #rc-light .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; } #rc-light .wf-fb-outcome { border-left:3px solid #2a6bcf; background:#f0f5ff; } #rc-light .wf-fb-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-light .wf-fb-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-light .wf-aff-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-light .wf-aff-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-light .wf-tag-outcome { color:#2a6bcf; } #rc-light .wf-tag-new { color:#4caf50; } #rc-light .wf-tag-modified { color:#e6a817; } #rc-light .wf-table th { background:#f4f6f9; border-color:#e8e8e8; } #rc-light .wf-table td { border-color:#e8e8e8; } #rc-light .wf-table-rownum { color:#aaa; background:#fafbfc; } #rc-light .wf-table-coltype { color:#7f8fa6; } #rc-light .wf-table-empty { color:#bbb; } #rc-light .wf-table-summary { color:#7f8fa6; } #rc-light .wf-table-prop { color:#7f8fa6; } #rc-light .wf-exec-pass { color:#2e7d32; } #rc-light .wf-exec-pending { color:#b0b0b0; } #rc-light [data-completed="true"] { background:#e8f5e9; } #rc-light .wf-exec-reason { color:#999; } #rc-light .wf-parallel { border-color:#c8e6c9; background:#f8fdf8; } #rc-light .wf-branch-label { color:#2e7d32; } #rc-light .wf-branch-node { background:#fff; border-color:#dde1e6; color:#555; } #rc-light .wf-branch-done { background:#e8f5e9; border-color:#4caf50; color:#2e7d32; } #rc-light .wf-branch-active { background:#e3f2fd; border-color:#2a6bcf; color:#1a1a2e; font-weight:600; } #rc-light .wf-dot-router { background:#e65100; } #rc-light .wf-dot-fork { background:#2e7d32; } #rc-light .wf-target { border-color:#e65100; color:#795548; } #rc-light .wf-target-done { background:#fff3e0; color:#e65100; } #rc-light .wf-target-active { background:#fff3e0; border-color:#e65100; color:#e65100; font-weight:600; } #rc-light .mb-node { background:#fff; border-color:#dde1e6; color:#555; } #rc-light .mb-current { background:#e3f2fd; border-color:#2a6bcf; color:#1a1a2e; font-weight:700; } #rc-light .mb-done { background:#e8f5e9; border-color:#4caf50; color:#2e7d32; } #rc-light .mb-router { border-color:#e65100; } #rc-light .mb-router.mb-done { border-color:#4caf50; } #rc-light .mb-fork { border-color:#2e7d32; } #rc-light .mb-fork.mb-done { border-color:#4caf50; } #rc-light .wf-param-form { border-bottom-color:#f0f0f0; } #rc-light .wf-param-head { color:#333; } #rc-light .wf-param-label { color:#555; } #rc-light .wf-param-input { border-color:#ccc; color:#333; } #rc-light .wf-param-input:focus { outline:none; border-color:#2a6bcf; } #rc-light .wf-exec-input { border-color:#ccc; color:#333; } #rc-light .wf-exec-input:focus { outline:none; border-color:#2a6bcf; } #rc-light .wf-exec-select { border-color:#ccc; color:#333; } #rc-light .wf-exec-select:focus { outline:none; border-color:#2a6bcf; } #rc-light .wf-exec-display { color:#333; }'
+                + '#rc-light .wf-title { color:#1a1a2e; } #rc-light .wf-banner { background:#f8f9fb; border-color:#e8e8e8; } #rc-light .wf-dot { background:#dde1e6; color:#888; } #rc-light .wf-step-label { color:#888; } #rc-light .wf-step-active .wf-dot { background:#2a6bcf; color:#fff; } #rc-light .wf-step-active .wf-step-label { color:#1a1a2e; font-weight:600; } #rc-light .wf-step-done .wf-dot { background:#4caf50; color:#fff; } #rc-light .wf-step-done .wf-step-label { color:#555; } #rc-light .wf-conn { background:#dde1e6; } #rc-light .wf-conn-active { background:#4caf50; } #rc-light .wf-section-head { color:#1a1a2e; } #rc-light .wf-desc { color:#666; } #rc-light .wf-card { background:#fff; border-color:#e8e8e8; } #rc-light .wf-card-head { color:#7f8fa6; } #rc-light .wf-tbl td { border-bottom:1px solid #f0f0f0; } #rc-light .wf-key { color:#7f8fa6; } #rc-light .wf-val { color:#333; } #rc-light .wf-null, #rc-light .wf-empty-arr, #rc-light .wf-empty-obj { color:#bbb; } #rc-light .wf-bool, #rc-light .wf-num { color:#2a6bcf; } #rc-light .wf-str { color:#333; } #rc-light .wf-arr-item { border-left-color:#e8e8e8; } #rc-light .wf-field { border-bottom:1px solid #f0f0f0; } #rc-light .wf-field-label { color:#555; } #rc-light .wf-field-instruction { color:#999; } #rc-light .wf-field-value { color:#333; } #rc-light .wf-field-empty { color:#bbb; } #rc-light .wf-field-current { color:#333; } #rc-light .wf-field-options { color:#7f8fa6; } #rc-light .wf-aff { background:#f8f9fb; border-color:#e8e8e8; } #rc-light .wf-aff-id { background:#dde1e6; color:#555; } #rc-light .wf-aff-label { color:#333; } #rc-light .wf-aff-method { color:#7f8fa6; background:#eef1f5; } #rc-light .wf-aff-detail { color:#999; } #rc-light .wf-aff-options { color:#7f8fa6; } #rc-light .wf-aff-primary { border-color:#2a6bcf; background:#f0f5ff; } #rc-light .wf-aff-primary .wf-aff-label { color:#2a6bcf; font-weight:600; } #rc-light .wf-aff-primary .wf-aff-id { background:#2a6bcf; color:#fff; } #rc-light .wf-aff-nav { border-color:#dde1e6; background:#fafafa; } #rc-light .wf-aff-nav .wf-aff-label { color:#888; } #rc-light .wf-aff-selected { border-color:#4caf50; background:#f0fff0; } #rc-light .wf-aff-selected .wf-aff-label { color:#2e7d32; } #rc-light .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; } #rc-light .wf-fb-outcome { border-left:3px solid #2a6bcf; background:#f0f5ff; } #rc-light .wf-fb-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-light .wf-fb-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-light .wf-aff-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-light .wf-aff-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-light .wf-tag-outcome { color:#2a6bcf; } #rc-light .wf-tag-new { color:#4caf50; } #rc-light .wf-tag-modified { color:#e6a817; } #rc-light .wf-table th { background:#f4f6f9; border-color:#e8e8e8; } #rc-light .wf-table td { border-color:#e8e8e8; } #rc-light .wf-table-rownum { color:#aaa; background:#fafbfc; } #rc-light .wf-table-coltype { color:#7f8fa6; } #rc-light .wf-table-empty { color:#bbb; } #rc-light .wf-table-summary { color:#7f8fa6; } #rc-light .wf-table-prop { color:#7f8fa6; } #rc-light .wf-table-prop-label { color:#555; } #rc-light .wf-exec-pass { color:#2e7d32; } #rc-light .wf-exec-pending { color:#b0b0b0; } #rc-light [data-completed="true"] { background:#e8f5e9; } #rc-light .wf-exec-reason { color:#999; } #rc-light .wf-parallel { border-color:#c8e6c9; background:#f8fdf8; } #rc-light .wf-branch-label { color:#2e7d32; } #rc-light .wf-branch-node { background:#fff; border-color:#dde1e6; color:#555; } #rc-light .wf-branch-done { background:#e8f5e9; border-color:#4caf50; color:#2e7d32; } #rc-light .wf-branch-active { background:#e3f2fd; border-color:#2a6bcf; color:#1a1a2e; font-weight:600; } #rc-light .wf-dot-router { background:#e65100; } #rc-light .wf-dot-fork { background:#2e7d32; } #rc-light .wf-target { border-color:#e65100; color:#795548; } #rc-light .wf-target-done { background:#fff3e0; color:#e65100; } #rc-light .wf-target-active { background:#fff3e0; border-color:#e65100; color:#e65100; font-weight:600; } #rc-light .mb-node { background:#fff; border-color:#dde1e6; color:#555; } #rc-light .mb-current { background:#e3f2fd; border-color:#2a6bcf; color:#1a1a2e; font-weight:700; } #rc-light .mb-done { background:#e8f5e9; border-color:#4caf50; color:#2e7d32; } #rc-light .mb-router { border-color:#e65100; } #rc-light .mb-router.mb-done { border-color:#4caf50; } #rc-light .mb-fork { border-color:#2e7d32; } #rc-light .mb-fork.mb-done { border-color:#4caf50; } #rc-light .wf-param-form { border-bottom-color:#f0f0f0; } #rc-light .wf-param-head { color:#333; } #rc-light .wf-param-label { color:#555; } #rc-light .wf-param-input { border-color:#ccc; color:#333; } #rc-light .wf-param-input:focus { outline:none; border-color:#2a6bcf; } #rc-light .wf-exec-input { border-color:#ccc; color:#333; } #rc-light .wf-exec-input:focus { outline:none; border-color:#2a6bcf; } #rc-light .wf-exec-select { border-color:#ccc; color:#333; } #rc-light .wf-exec-select:focus { outline:none; border-color:#2a6bcf; } #rc-light .wf-exec-display { color:#333; } #rc-light .wf-focus-hint { color:#999; } #rc-light .wf-focus-zone { background:#f0f5ff; border-left-color:#2a6bcf; } #rc-light .wf-focus-breadcrumb { color:#1a1a2e; } #rc-light .wf-focus-nav-btn { color:#2a6bcf; border-color:#ccd5e0; } #rc-light .wf-focus-nav-btn:hover { background:#e8ecf1; } #rc-light .wf-focus-close { color:#999; border-color:#ccd5e0; } #rc-light .wf-focus-close:hover { color:#333; background:#e8ecf1; } #rc-light .wf-focus-nested-list { border-top-color:#ccd5e0; } #rc-light .wf-focus-nested-btn { color:#2a6bcf; border-color:#ccd5e0; } #rc-light .wf-focus-nested-btn:hover { background:#e8ecf1; } #rc-light .wf-focus-btn { color:#2a6bcf; border-color:#ccd5e0; } #rc-light .wf-focus-btn:hover { background:#e8ecf1; }'
                 ; document.head.appendChild(style); container = c;
         },
         update: function(state, msg, feedback) { _humanPage(container, state, msg, feedback, false); },
