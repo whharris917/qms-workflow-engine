@@ -382,7 +382,8 @@ def _build_fields(defn: WorkflowDef, node: NodeDef, data: dict) -> dict:
         label = fdef.label
 
         if ftype == "boolean":
-            value = bool(data.get(key))
+            raw = data.get(key)
+            value = None if raw is None else bool(raw)
             instruction = fdef.instruction
         elif ftype == "computed":
             value = _evaluate_computed(defn, fdef, data)

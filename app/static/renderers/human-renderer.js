@@ -140,7 +140,14 @@ function wfRenderFields(fields, fieldCategory, fieldAffordances) {
                         html += '<button class="wf-aff-submit" data-aff-url="' + wfEsc(aff.url) + '">Set</button>';
                         html += '</div>';
                     } else {
-                        html += '<div class="wf-aff-controls">';
+                        /* Short options: current value + buttons on one line */
+                        var curDisplay = f.value === true ? 'Yes' : f.value === false ? 'No' : f.value != null ? String(f.value) : '';
+                        html += '<div class="wf-field-row">';
+                        if (curDisplay) {
+                            html += '<span class="wf-field-current">' + wfEsc(curDisplay) + '</span>';
+                        } else {
+                            html += '<span class="wf-field-current wf-field-empty">(not set)</span>';
+                        }
                         for (var oi = 0; oi < options.length; oi++) {
                             var oval = options[oi];
                             var olabel = oval === true ? 'Yes' : oval === false ? 'No' : String(oval);
@@ -151,10 +158,15 @@ function wfRenderFields(fields, fieldCategory, fieldAffordances) {
                         html += '</div>';
                     }
                 } else {
-                    /* Text input — pre-fill with current value */
+                    /* Text field: current value + input + Set on one line */
                     var curVal = f.value == null ? '' : String(f.value);
-                    html += '<div class="wf-aff-controls">';
-                    html += '<input class="wf-aff-input" type="text" data-aff-url="' + wfEsc(aff.url) + '" value="' + wfEsc(curVal) + '">';
+                    html += '<div class="wf-field-row">';
+                    if (curVal) {
+                        html += '<span class="wf-field-current">' + wfEsc(curVal) + '</span>';
+                    } else {
+                        html += '<span class="wf-field-current wf-field-empty">(not set)</span>';
+                    }
+                    html += '<input class="wf-aff-input" type="text" data-aff-url="' + wfEsc(aff.url) + '" placeholder="New value\u2026">';
                     html += '<button class="wf-aff-submit" data-aff-url="' + wfEsc(aff.url) + '">Set</button>';
                     html += '</div>';
                 }
@@ -439,7 +451,7 @@ function wfRenderAffordances(affs) {
     var html = '<div class="wf-affs">';
     for (var i = 0; i < affs.length; i++) {
         var a = affs[i];
-        var action = a.label || a.url.split('/').pop().replace(/_/g, ' ');
+        var action = a.label || (a.body && a.body.key ? a.body.key.replace(/_/g, ' ') : a.url.split('/').pop().replace(/_/g, ' '));
         var params = a.parameters || {};
         var paramKeys = Object.keys(params);
         var tooltip = a.method + ' ' + a.url + ' ' + JSON.stringify(a.body);
@@ -1377,6 +1389,31 @@ function _wfBindAffordances(container) {
             _wfExecAffordance(url, body);
         });
     });
+    /* Generic inline affordance forms (wfRenderAffordances) */
+    container.querySelectorAll('.wf-aff-go').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var inline = btn.closest('.wf-aff-inline');
+            var url = btn.getAttribute('data-aff-url');
+            var body = JSON.parse(JSON.stringify(JSON.parse(inline.getAttribute('data-aff-body'))));
+            inline.querySelectorAll('.wf-param-input').forEach(function(input) {
+                var param = input.getAttribute('data-param');
+                if (input.tagName === 'SELECT') {
+                    body[param] = JSON.parse(input.value);
+                } else {
+                    body[param] = input.value;
+                }
+            });
+            _wfExecAffordance(url, body);
+        });
+    });
+    /* Generic simple affordance buttons (wfRenderAffordances) */
+    container.querySelectorAll('.wf-aff-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var url = btn.getAttribute('data-aff-url');
+            var body = JSON.parse(btn.getAttribute('data-aff-body'));
+            _wfExecAffordance(url, body);
+        });
+    });
     /* Execution cell submit buttons (fill/amend with value input) */
     container.querySelectorAll('.wf-exec-submit').forEach(function(btn) {
         btn.addEventListener('click', function() {
@@ -1568,6 +1605,8 @@ var WF_STRUCTURAL_CSS = ''
     + '.wf-field-instruction { font-size:0.75rem; font-style:italic; margin-bottom:0.2rem; line-height:1.3; }'
     + '.wf-field-value { font-size:0.85rem; }'
     + '.wf-field-empty { font-style:italic; font-size:0.8rem; }'
+    + '.wf-field-row { display:flex; align-items:center; gap:0.4rem; }'
+    + '.wf-field-current { font-size:0.85rem; flex-shrink:0; max-width:50%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }'
     + '.wf-field-options { font-size:0.72rem; font-family:Consolas,Monaco,monospace; margin-top:0.15rem; }'
     + '.wf-aff { margin-bottom:0.4rem; padding:0.5rem 0.6rem; border:1px solid; border-radius:6px; }'
     + '.wf-aff-top { display:flex; align-items:center; gap:0.5rem; }'
@@ -1797,7 +1836,7 @@ function _scopeFC(sel, css) { return css.replace(/\.fc-/g, sel + ' .fc-'); }
             style.textContent = WF_STRUCTURAL_CSS + FC_CSS
                 + _scopeFC('#rc-light', FC_LIGHT)
                 + '#rc-light { background:#f5f5f5; color:#333; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }'
-                + '#rc-light .wf-title { color:#1a1a2e; } #rc-light .wf-banner { background:#f8f9fb; border-color:#e8e8e8; } #rc-light .wf-dot { background:#dde1e6; color:#888; } #rc-light .wf-step-label { color:#888; } #rc-light .wf-step-active .wf-dot { background:#2a6bcf; color:#fff; } #rc-light .wf-step-active .wf-step-label { color:#1a1a2e; font-weight:600; } #rc-light .wf-step-done .wf-dot { background:#4caf50; color:#fff; } #rc-light .wf-step-done .wf-step-label { color:#555; } #rc-light .wf-conn { background:#dde1e6; } #rc-light .wf-conn-active { background:#4caf50; } #rc-light .wf-section-head { color:#1a1a2e; } #rc-light .wf-desc { color:#666; } #rc-light .wf-card { background:#fff; border-color:#e8e8e8; } #rc-light .wf-card-head { color:#7f8fa6; } #rc-light .wf-tbl td { border-bottom:1px solid #f0f0f0; } #rc-light .wf-key { color:#7f8fa6; } #rc-light .wf-val { color:#333; } #rc-light .wf-null, #rc-light .wf-empty-arr, #rc-light .wf-empty-obj { color:#bbb; } #rc-light .wf-bool, #rc-light .wf-num { color:#2a6bcf; } #rc-light .wf-str { color:#333; } #rc-light .wf-arr-item { border-left-color:#e8e8e8; } #rc-light .wf-field { border-bottom:1px solid #f0f0f0; } #rc-light .wf-field-label { color:#555; } #rc-light .wf-field-instruction { color:#999; } #rc-light .wf-field-value { color:#333; } #rc-light .wf-field-empty { color:#bbb; } #rc-light .wf-field-options { color:#7f8fa6; } #rc-light .wf-aff { background:#f8f9fb; border-color:#e8e8e8; } #rc-light .wf-aff-id { background:#dde1e6; color:#555; } #rc-light .wf-aff-label { color:#333; } #rc-light .wf-aff-method { color:#7f8fa6; background:#eef1f5; } #rc-light .wf-aff-detail { color:#999; } #rc-light .wf-aff-options { color:#7f8fa6; } #rc-light .wf-aff-primary { border-color:#2a6bcf; background:#f0f5ff; } #rc-light .wf-aff-primary .wf-aff-label { color:#2a6bcf; font-weight:600; } #rc-light .wf-aff-primary .wf-aff-id { background:#2a6bcf; color:#fff; } #rc-light .wf-aff-nav { border-color:#dde1e6; background:#fafafa; } #rc-light .wf-aff-nav .wf-aff-label { color:#888; } #rc-light .wf-aff-selected { border-color:#4caf50; background:#f0fff0; } #rc-light .wf-aff-selected .wf-aff-label { color:#2e7d32; } #rc-light .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; } #rc-light .wf-fb-outcome { border-left:3px solid #2a6bcf; background:#f0f5ff; } #rc-light .wf-fb-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-light .wf-fb-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-light .wf-aff-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-light .wf-aff-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-light .wf-tag-outcome { color:#2a6bcf; } #rc-light .wf-tag-new { color:#4caf50; } #rc-light .wf-tag-modified { color:#e6a817; } #rc-light .wf-table th { background:#f4f6f9; border-color:#e8e8e8; } #rc-light .wf-table td { border-color:#e8e8e8; } #rc-light .wf-table-rownum { color:#aaa; background:#fafbfc; } #rc-light .wf-table-coltype { color:#7f8fa6; } #rc-light .wf-table-empty { color:#bbb; } #rc-light .wf-table-summary { color:#7f8fa6; } #rc-light .wf-table-prop { color:#7f8fa6; } #rc-light .wf-exec-pass { color:#2e7d32; } #rc-light .wf-exec-pending { color:#b0b0b0; } #rc-light [data-completed="true"] { background:#e8f5e9; } #rc-light .wf-exec-reason { color:#999; } #rc-light .wf-parallel { border-color:#c8e6c9; background:#f8fdf8; } #rc-light .wf-branch-label { color:#2e7d32; } #rc-light .wf-branch-node { background:#fff; border-color:#dde1e6; color:#555; } #rc-light .wf-branch-done { background:#e8f5e9; border-color:#4caf50; color:#2e7d32; } #rc-light .wf-branch-active { background:#e3f2fd; border-color:#2a6bcf; color:#1a1a2e; font-weight:600; } #rc-light .wf-dot-router { background:#e65100; } #rc-light .wf-dot-fork { background:#2e7d32; } #rc-light .wf-target { border-color:#e65100; color:#795548; } #rc-light .wf-target-done { background:#fff3e0; color:#e65100; } #rc-light .wf-target-active { background:#fff3e0; border-color:#e65100; color:#e65100; font-weight:600; } #rc-light .mb-node { background:#fff; border-color:#dde1e6; color:#555; } #rc-light .mb-current { background:#e3f2fd; border-color:#2a6bcf; color:#1a1a2e; font-weight:700; } #rc-light .mb-done { background:#e8f5e9; border-color:#4caf50; color:#2e7d32; } #rc-light .mb-router { border-color:#e65100; } #rc-light .mb-router.mb-done { border-color:#4caf50; } #rc-light .mb-fork { border-color:#2e7d32; } #rc-light .mb-fork.mb-done { border-color:#4caf50; } #rc-light .wf-param-form { border-bottom-color:#f0f0f0; } #rc-light .wf-param-head { color:#333; } #rc-light .wf-param-label { color:#555; } #rc-light .wf-param-input { border-color:#ccc; color:#333; } #rc-light .wf-param-input:focus { outline:none; border-color:#2a6bcf; } #rc-light .wf-exec-input { border-color:#ccc; color:#333; } #rc-light .wf-exec-input:focus { outline:none; border-color:#2a6bcf; } #rc-light .wf-exec-select { border-color:#ccc; color:#333; } #rc-light .wf-exec-select:focus { outline:none; border-color:#2a6bcf; } #rc-light .wf-exec-display { color:#333; }'
+                + '#rc-light .wf-title { color:#1a1a2e; } #rc-light .wf-banner { background:#f8f9fb; border-color:#e8e8e8; } #rc-light .wf-dot { background:#dde1e6; color:#888; } #rc-light .wf-step-label { color:#888; } #rc-light .wf-step-active .wf-dot { background:#2a6bcf; color:#fff; } #rc-light .wf-step-active .wf-step-label { color:#1a1a2e; font-weight:600; } #rc-light .wf-step-done .wf-dot { background:#4caf50; color:#fff; } #rc-light .wf-step-done .wf-step-label { color:#555; } #rc-light .wf-conn { background:#dde1e6; } #rc-light .wf-conn-active { background:#4caf50; } #rc-light .wf-section-head { color:#1a1a2e; } #rc-light .wf-desc { color:#666; } #rc-light .wf-card { background:#fff; border-color:#e8e8e8; } #rc-light .wf-card-head { color:#7f8fa6; } #rc-light .wf-tbl td { border-bottom:1px solid #f0f0f0; } #rc-light .wf-key { color:#7f8fa6; } #rc-light .wf-val { color:#333; } #rc-light .wf-null, #rc-light .wf-empty-arr, #rc-light .wf-empty-obj { color:#bbb; } #rc-light .wf-bool, #rc-light .wf-num { color:#2a6bcf; } #rc-light .wf-str { color:#333; } #rc-light .wf-arr-item { border-left-color:#e8e8e8; } #rc-light .wf-field { border-bottom:1px solid #f0f0f0; } #rc-light .wf-field-label { color:#555; } #rc-light .wf-field-instruction { color:#999; } #rc-light .wf-field-value { color:#333; } #rc-light .wf-field-empty { color:#bbb; } #rc-light .wf-field-current { color:#333; } #rc-light .wf-field-options { color:#7f8fa6; } #rc-light .wf-aff { background:#f8f9fb; border-color:#e8e8e8; } #rc-light .wf-aff-id { background:#dde1e6; color:#555; } #rc-light .wf-aff-label { color:#333; } #rc-light .wf-aff-method { color:#7f8fa6; background:#eef1f5; } #rc-light .wf-aff-detail { color:#999; } #rc-light .wf-aff-options { color:#7f8fa6; } #rc-light .wf-aff-primary { border-color:#2a6bcf; background:#f0f5ff; } #rc-light .wf-aff-primary .wf-aff-label { color:#2a6bcf; font-weight:600; } #rc-light .wf-aff-primary .wf-aff-id { background:#2a6bcf; color:#fff; } #rc-light .wf-aff-nav { border-color:#dde1e6; background:#fafafa; } #rc-light .wf-aff-nav .wf-aff-label { color:#888; } #rc-light .wf-aff-selected { border-color:#4caf50; background:#f0fff0; } #rc-light .wf-aff-selected .wf-aff-label { color:#2e7d32; } #rc-light .wf-aff-selected .wf-aff-id { background:#4caf50; color:#fff; } #rc-light .wf-fb-outcome { border-left:3px solid #2a6bcf; background:#f0f5ff; } #rc-light .wf-fb-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-light .wf-fb-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-light .wf-aff-new { border-left:3px solid #4caf50; background:#f0faf0; } #rc-light .wf-aff-modified { border-left:3px solid #e6a817; background:#fdf8ed; } #rc-light .wf-tag-outcome { color:#2a6bcf; } #rc-light .wf-tag-new { color:#4caf50; } #rc-light .wf-tag-modified { color:#e6a817; } #rc-light .wf-table th { background:#f4f6f9; border-color:#e8e8e8; } #rc-light .wf-table td { border-color:#e8e8e8; } #rc-light .wf-table-rownum { color:#aaa; background:#fafbfc; } #rc-light .wf-table-coltype { color:#7f8fa6; } #rc-light .wf-table-empty { color:#bbb; } #rc-light .wf-table-summary { color:#7f8fa6; } #rc-light .wf-table-prop { color:#7f8fa6; } #rc-light .wf-exec-pass { color:#2e7d32; } #rc-light .wf-exec-pending { color:#b0b0b0; } #rc-light [data-completed="true"] { background:#e8f5e9; } #rc-light .wf-exec-reason { color:#999; } #rc-light .wf-parallel { border-color:#c8e6c9; background:#f8fdf8; } #rc-light .wf-branch-label { color:#2e7d32; } #rc-light .wf-branch-node { background:#fff; border-color:#dde1e6; color:#555; } #rc-light .wf-branch-done { background:#e8f5e9; border-color:#4caf50; color:#2e7d32; } #rc-light .wf-branch-active { background:#e3f2fd; border-color:#2a6bcf; color:#1a1a2e; font-weight:600; } #rc-light .wf-dot-router { background:#e65100; } #rc-light .wf-dot-fork { background:#2e7d32; } #rc-light .wf-target { border-color:#e65100; color:#795548; } #rc-light .wf-target-done { background:#fff3e0; color:#e65100; } #rc-light .wf-target-active { background:#fff3e0; border-color:#e65100; color:#e65100; font-weight:600; } #rc-light .mb-node { background:#fff; border-color:#dde1e6; color:#555; } #rc-light .mb-current { background:#e3f2fd; border-color:#2a6bcf; color:#1a1a2e; font-weight:700; } #rc-light .mb-done { background:#e8f5e9; border-color:#4caf50; color:#2e7d32; } #rc-light .mb-router { border-color:#e65100; } #rc-light .mb-router.mb-done { border-color:#4caf50; } #rc-light .mb-fork { border-color:#2e7d32; } #rc-light .mb-fork.mb-done { border-color:#4caf50; } #rc-light .wf-param-form { border-bottom-color:#f0f0f0; } #rc-light .wf-param-head { color:#333; } #rc-light .wf-param-label { color:#555; } #rc-light .wf-param-input { border-color:#ccc; color:#333; } #rc-light .wf-param-input:focus { outline:none; border-color:#2a6bcf; } #rc-light .wf-exec-input { border-color:#ccc; color:#333; } #rc-light .wf-exec-input:focus { outline:none; border-color:#2a6bcf; } #rc-light .wf-exec-select { border-color:#ccc; color:#333; } #rc-light .wf-exec-select:focus { outline:none; border-color:#2a6bcf; } #rc-light .wf-exec-display { color:#333; }'
                 ; document.head.appendChild(style); container = c;
         },
         update: function(state, msg, feedback) { _humanPage(container, state, msg, feedback, false); },

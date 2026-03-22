@@ -54,14 +54,14 @@ nodes:
         type: boolean
         key: affects_code
         instruction: Does this change affect code (as opposed to documents only)?
-        default: false
+        default: null
 
       affects_submodule:
         label: Affects Submodule
         type: boolean
         key: affects_submodule
         instruction: Does it affect a controlled submodule?
-        default: false
+        default: null
         visible_when:
           affects_code: true
 
