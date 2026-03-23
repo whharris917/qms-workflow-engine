@@ -90,11 +90,8 @@ def dispatch(defn: WorkflowDef, data: dict, workflow_id: str, body: dict,
     if action == "provider_action":
         return _provider_action(defn, data, workflow_id, body)
 
-    if action == "focus":
-        return _focus(defn, data, workflow_id, body)
-
-    if action == "unfocus":
-        return _unfocus(defn, data, workflow_id)
+    if action == "set_fields":
+        return _set_fields(defn, data, workflow_id, body)
 
     return {"error": f"Unknown action: {action}"}
 
@@ -104,48 +101,6 @@ def _restart(defn: WorkflowDef, data: dict, workflow_id: str) -> dict:
     fresh = _build_default_data(defn)
     data.clear()
     data.update(fresh)
-    return render_page(defn, data, workflow_id)
-
-
-def _focus(defn: WorkflowDef, data: dict, workflow_id: str, body: dict) -> dict:
-    target = body.get("target")
-    if not target:
-        return {"error": "Missing focus target"}
-
-    # Validate target path
-    node = defn.nodes.get(data.get("node", ""))
-    has_fields = bool(node and node.fields)
-    table = data.get("table")
-    has_exec = "execution_state" in data
-
-    if target == "fields":
-        if not has_fields:
-            return {"error": "No fields to focus on"}
-    elif target == "table":
-        if not table:
-            return {"error": "No table to focus on"}
-    elif target.startswith("table.col."):
-        if not table:
-            return {"error": "No table to focus on"}
-        try:
-            ci = int(target.split(".")[-1])
-        except ValueError:
-            return {"error": f"Invalid column index in: {target}"}
-        cols = table.get("columns", [])
-        if ci < 0 or ci >= len(cols):
-            return {"error": f"Column index {ci} out of range (0-{len(cols)-1})"}
-    elif target == "exec":
-        if not has_exec:
-            return {"error": "No execution table to focus on"}
-    else:
-        return {"error": f"Unknown focus target: {target}"}
-
-    data["focus"] = target
-    return render_page(defn, data, workflow_id)
-
-
-def _unfocus(defn: WorkflowDef, data: dict, workflow_id: str) -> dict:
-    data["focus"] = None
     return render_page(defn, data, workflow_id)
 
 
@@ -185,6 +140,57 @@ def _set_field(defn: WorkflowDef, data: dict, workflow_id: str, body: dict) -> d
                 if passed:
                     for k, v in effect.get("set", {}).items():
                         data[k] = v
+
+    return render_page(defn, data, workflow_id)
+
+
+def _set_fields(defn: WorkflowDef, data: dict, workflow_id: str, body: dict) -> dict:
+    """Set multiple fields in a single POST. Body is {"fields": {key: value, ...}}."""
+    fields_to_set = body.get("fields", {})
+    if not isinstance(fields_to_set, dict):
+        return {"error": "Expected 'fields' dict in body."}
+
+    errors = []
+    for field_key, value in fields_to_set.items():
+        if value == "<value>":
+            continue  # placeholder, skip
+
+        fdef = None
+        for fd in defn.all_fields.values():
+            if fd.key == field_key:
+                fdef = fd
+                break
+        if fdef is None:
+            errors.append(f"Unknown field: {field_key}")
+            continue
+
+        ftype = fdef.type
+        if ftype == "boolean":
+            if value is not True and value is not False:
+                errors.append(f"Invalid value for {fdef.label}. Must be true or false.")
+                continue
+            data[field_key] = value
+        elif ftype == "select":
+            options = _get_raw_options(defn, fdef, data)
+            if options and value not in options:
+                errors.append(f"Invalid value for {fdef.label}. Choose: {', '.join(str(o) for o in options)}")
+                continue
+            data[field_key] = value
+        else:  # text
+            data[field_key] = value if value else None
+
+        # Process side effects per field
+        if fdef.side_effects:
+            for effect in fdef.side_effects:
+                when = effect.get("when")
+                if when:
+                    passed, _ = evaluate(when, data)
+                    if passed:
+                        for k, v in effect.get("set", {}).items():
+                            data[k] = v
+
+    if errors:
+        return {"error": "; ".join(errors)}
 
     return render_page(defn, data, workflow_id)
 

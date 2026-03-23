@@ -41,6 +41,11 @@ nodes:
     proceed:
       label: Proceed to Change Definition
       requires: [title, purpose]
+    field_groups:
+      initiation:
+        label: Basic Information
+        fields: [title, affects_code, purpose]
+
     fields:
       title:
         label: Document Title

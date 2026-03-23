@@ -155,15 +155,11 @@ class WorkflowRuntime:
             }
             return internal_body, acted_label
 
+        if resource == "set_fields":
+            return {"action": "set_fields", "fields": body}, "Set fields"
+
         if resource in ("proceed", "go_back", "submit", "restart", "complete"):
             return {"action": resource}, None
-
-        if resource == "focus":
-            target = body.get("target", "")
-            return {"action": "focus", "target": target}, f"Focus on {target}"
-
-        if resource == "unfocus":
-            return {"action": "unfocus"}, "Unfocus"
 
         if resource == "switch_branch":
             return {"action": "switch_branch", "branch": body.get("branch")}, None

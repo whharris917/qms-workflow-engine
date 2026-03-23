@@ -51,6 +51,24 @@ class FieldDef:
 
 
 @dataclass
+class FieldGroupDef:
+    """A group of fields that share a single affordance (set all at once)."""
+    key: str
+    label: str
+    instruction: str | None = None
+    fields: list[str] = field(default_factory=list)  # list of field keys
+
+    @classmethod
+    def from_dict(cls, key: str, d: dict) -> FieldGroupDef:
+        return cls(
+            key=key,
+            label=d.get("label", key),
+            instruction=d.get("instruction"),
+            fields=d.get("fields", []),
+        )
+
+
+@dataclass
 class TableDef:
     """Table component declaration for a node."""
     column_type_catalog: str | None = None  # reference to top-level column_types
@@ -257,6 +275,7 @@ class NodeDef:
     show_all_fields: bool = False
     pause: bool = True  # True = always stop here; False = may auto-advance
     fields: dict[str, FieldDef] = field(default_factory=dict)
+    field_groups: dict[str, FieldGroupDef] = field(default_factory=dict)
     lists: dict[str, ListDef] = field(default_factory=dict)
     table: TableDef | None = None
     execution: bool = False
@@ -272,6 +291,10 @@ class NodeDef:
         fields = {}
         for fid, fdef in (d.get("fields") or {}).items():
             fields[fid] = FieldDef.from_dict(fdef)
+
+        field_groups = {}
+        for gid, gdef in (d.get("field_groups") or {}).items():
+            field_groups[gid] = FieldGroupDef.from_dict(gid, gdef)
 
         lists = {}
         for lid, ldef in (d.get("lists") or {}).items():
@@ -307,6 +330,7 @@ class NodeDef:
             show_all_fields=d.get("show_all_fields", False),
             pause=d.get("pause", True),
             fields=fields,
+            field_groups=field_groups,
             lists=lists,
             table=table,
             execution=d.get("execution", False),

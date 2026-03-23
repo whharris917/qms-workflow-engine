@@ -57,10 +57,23 @@ def get_node_affordances(
     ctx = AffordanceContext(data=data, defn=defn, api_base=api_base)
     sources: list[Any] = []
 
-    # Content: fields
+    # Content: field groups (claim their member fields)
+    grouped_keys: set[str] = set()
+    for gdef in node.field_groups.values():
+        member_fdefs = []
+        for fkey in gdef.fields:
+            fdef = defn.all_fields.get(fkey)
+            if fdef:
+                member_fdefs.append(fdef)
+                grouped_keys.add(fkey)
+        if member_fdefs:
+            sources.append(FieldGroupSource(gdef, member_fdefs))
+
+    # Content: ungrouped fields (individual affordances)
     field_defs = defn.node_fields(node.id)
     for fdef in field_defs.values():
-        sources.append(FieldSource(fdef))
+        if fdef.key not in grouped_keys:
+            sources.append(FieldSource(fdef))
 
     # Content: lists
     for list_def in node.lists.values():
@@ -196,6 +209,54 @@ class FieldSource:
             options = _resolve_options(ctx.defn, fdef, ctx.data, annotate=False)
             if options:
                 a["parameters"] = {"value": {"options": options}}
+        return [a]
+
+
+# ---------------------------------------------------------------------------
+# Source: FieldGroup
+# ---------------------------------------------------------------------------
+
+class FieldGroupSource:
+    """Single affordance for a group of fields (set all at once)."""
+
+    def __init__(self, group_def: "FieldGroupDef", field_defs: list["FieldDef"]):
+        self.group_def = group_def
+        self.field_defs = field_defs
+
+    def get_affordances(self, ctx: AffordanceContext) -> list[dict]:
+        gdef = self.group_def
+        params: dict[str, Any] = {}
+        body: dict[str, Any] = {}
+
+        for fdef in self.field_defs:
+            if not check_visibility(fdef.visible_when, ctx.data):
+                continue
+            ftype = fdef.type
+            if ftype not in ("text", "boolean", "select"):
+                continue
+
+            body[fdef.key] = "<value>"
+            p: dict[str, Any] = {}
+            if ftype == "boolean":
+                p["options"] = [True, False]
+            elif ftype == "select":
+                options = _resolve_options(ctx.defn, fdef, ctx.data, annotate=False)
+                if options:
+                    p["options"] = options
+            if p:
+                params[fdef.key] = p
+
+        if not body:
+            return []
+
+        a: dict[str, Any] = {
+            "method": "POST",
+            "url": f"{ctx.api_base}/set_fields",
+            "body": body,
+            "_field_group_label": gdef.label,
+        }
+        if params:
+            a["parameters"] = params
         return [a]
 
 

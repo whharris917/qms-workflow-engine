@@ -260,8 +260,30 @@ def render_page(defn: WorkflowDef, data: dict, workflow_id: str,
             entry["affordance"] = None
             fields_display[expose_def.label] = entry
 
-    if fields_display:
-        state["fields"] = fields_display
+    # Partition fields into groups and ungrouped
+    grouped_keys: set[str] = set()
+    field_groups_display: dict[str, dict] = {}
+    for gdef in node.field_groups.values():
+        group_fields = {}
+        for fkey in gdef.fields:
+            # Find the display entry by matching the field key
+            for label, fobj in fields_display.items():
+                if fobj.get("key") == fkey:
+                    group_fields[label] = fobj
+                    grouped_keys.add(label)
+                    break
+        if group_fields:
+            field_groups_display[gdef.label] = {
+                "instruction": gdef.instruction,
+                "fields": group_fields,
+            }
+
+    # Emit ungrouped fields as state.fields, grouped as state.field_groups
+    ungrouped = {k: v for k, v in fields_display.items() if k not in grouped_keys}
+    if ungrouped:
+        state["fields"] = ungrouped
+    if field_groups_display:
+        state["field_groups"] = field_groups_display
     if provider_states:
         state["providers"] = provider_states
 
@@ -301,15 +323,19 @@ def render_page(defn: WorkflowDef, data: dict, workflow_id: str,
     # _table_anchor / _col_index.  Everything else stays top-level.
     remaining = []
     field_affs_by_label: dict[str, dict] = {}
+    field_group_affs_by_label: dict[str, dict] = {}
     table_affs: list[dict] = []
     col_affs: dict[int, list[dict]] = {}
     props_affs: list[dict] = []
     for aff in all_affordances:
         fl = aff.pop("_field_label", None)
+        fgl = aff.pop("_field_group_label", None)
         ta = aff.pop("_table_anchor", None)
         ci = aff.pop("_col_index", None)
         if fl is not None:
             field_affs_by_label[fl] = aff
+        elif fgl is not None:
+            field_group_affs_by_label[fgl] = aff
         elif ta == "table":
             table_affs.append(aff)
         elif ta == "column" and ci is not None:
@@ -319,154 +345,62 @@ def render_page(defn: WorkflowDef, data: dict, workflow_id: str,
         else:
             remaining.append(aff)
 
-    # ── Focus state ──
-    focus = data.get("focus")
-    api_base = f"/agent/{workflow_id}"
-    if instance_id:
-        api_base = f"/agent/{workflow_id}/{instance_id}"
-
-    # Build focusable target list (labels are the renderer's responsibility)
-    focusable = []
-    if "fields" in state and field_affs_by_label:
-        focusable.append("fields")
-    if "table" in state:
-        focusable.append("table")
-        for ci in range(len(state["table"].get("columns", []))):
-            focusable.append(f"table.col.{ci}")
-    if "execution_table" in state:
-        focusable.append("exec")
-
-    state["focus"] = focus
-    state["focusable"] = focusable
-
-    # ── Affordance filtering by focus ──
-    # When focused: only emit affordances for the focused object + action bar.
-    # When unfocused: emit focus affordances + action bar (suppress object affordances).
-
+    # ── Emit all affordances (no focus filtering) ──
     aff_id = 1
     output_affordances = []
 
-    if focus is None:
-        # Unfocused: suppress all anchored affordances, emit focus affordances
-        # Field affordances: suppressed (not embedded in field objects)
-        # Table/column/properties affordances: suppressed
-
-        # Focus affordances: one per focusable target
-        for target in focusable:
-            fa = {
-                "id": aff_id, "method": "POST",
-                "url": f"{api_base}/focus",
-                "body": {"target": target},
-            }
+    # Field affordances: embed inline with their field objects
+    for label, field_obj in state.get("fields", {}).items():
+        fa = field_affs_by_label.get(label)
+        if fa is not None:
+            fa["id"] = aff_id
             aff_id += 1
+            field_obj["affordance"] = fa
             output_affordances.append(fa)
 
-        # Action bar (remaining = flow control, navigation, actions)
-        for aff in remaining:
-            aff["id"] = aff_id
+    # Field group affordances: embed on the group object
+    for label, group_obj in state.get("field_groups", {}).items():
+        ga = field_group_affs_by_label.get(label)
+        if ga is not None:
+            ga["id"] = aff_id
             aff_id += 1
-            output_affordances.append(aff)
+            group_obj["affordance"] = ga
+            output_affordances.append(ga)
 
-    else:
-        # Focused: emit only the focused object's affordances + unfocus + action bar
-
-        # Unfocus affordance
-        output_affordances.append({
-            "id": aff_id, "method": "POST",
-            "url": f"{api_base}/unfocus",
-            "body": {},
-        })
+    # Table affordances
+    for a in table_affs:
+        a["id"] = aff_id
         aff_id += 1
+        output_affordances.append(a)
 
-        # Sibling/parent navigation affordances
-        if focus.startswith("table.col."):
-            # Parent: focus on table
-            output_affordances.append({
-                "id": aff_id, "method": "POST",
-                "url": f"{api_base}/focus",
-                "body": {"target": "table"},
-            })
+    # Properties affordances
+    for a in props_affs:
+        a["id"] = aff_id
+        aff_id += 1
+        output_affordances.append(a)
+
+    # Column affordances
+    for ci_key in sorted(col_affs.keys()):
+        for a in col_affs[ci_key]:
+            a["id"] = aff_id
             aff_id += 1
-            # Siblings: other columns
-            for target in focusable:
-                if target.startswith("table.col.") and target != focus:
-                    output_affordances.append({
-                        "id": aff_id, "method": "POST",
-                        "url": f"{api_base}/focus",
-                        "body": {"target": target},
-                    })
-                    aff_id += 1
+            output_affordances.append(a)
 
-        # Focused object's affordances
-        if focus == "fields":
-            for label, field_obj in state.get("fields", {}).items():
-                fa = field_affs_by_label.get(label)
-                if fa is not None:
-                    fa["id"] = aff_id
-                    aff_id += 1
-                    field_obj["affordance"] = fa
-                    output_affordances.append(fa)
+    # Remaining (flow control, navigation, cell actions, etc.)
+    for aff in remaining:
+        aff["id"] = aff_id
+        aff_id += 1
+        output_affordances.append(aff)
 
-        elif focus == "table":
-            for a in table_affs:
-                a["id"] = aff_id
-                aff_id += 1
-                output_affordances.append(a)
-            for a in props_affs:
-                a["id"] = aff_id
-                aff_id += 1
-                output_affordances.append(a)
-            # Column focus affordances (nested focusable objects)
-            for target in focusable:
-                if target.startswith("table.col."):
-                    output_affordances.append({
-                        "id": aff_id, "method": "POST",
-                        "url": f"{api_base}/focus",
-                        "body": {"target": target},
-                    })
-                    aff_id += 1
-
-        elif focus.startswith("table.col."):
-            ci = int(focus.split(".")[-1])
-            for a in col_affs.get(ci, []):
-                a["id"] = aff_id
-                aff_id += 1
-                output_affordances.append(a)
-
-        elif focus == "exec":
-            # Cell-action affordances are in `remaining` — filter them out
-            for aff in remaining[:]:
-                if aff.get("body", {}).get("cell_action") is not None:
-                    aff["id"] = aff_id
-                    aff_id += 1
-                    output_affordances.append(aff)
-                    remaining.remove(aff)
-
-        # Action bar (remaining = flow control, navigation, non-cell actions)
-        for aff in remaining:
-            aff["id"] = aff_id
-            aff_id += 1
-            output_affordances.append(aff)
-
-    # Enrich state.table with anchored affordances (for agent renderer)
-    # Only embed when focused on that specific object
+    # Enrich state.table with anchored affordances
     if "table" in state:
-        if focus == "table":
-            state["table"]["affordances"] = table_affs
-            if props_affs:
-                props = state["table"].get("properties", {})
-                props["affordances"] = props_affs
-        else:
-            state["table"]["affordances"] = []
+        state["table"]["affordances"] = table_affs
+        if props_affs:
             props = state["table"].get("properties", {})
-            if "affordances" in props:
-                props["affordances"] = []
+            props["affordances"] = props_affs
 
         for ci, col_obj in enumerate(state["table"].get("columns", [])):
-            if focus == f"table.col.{ci}":
-                col_obj["affordances"] = col_affs.get(ci, [])
-            else:
-                col_obj["affordances"] = []
+            col_obj["affordances"] = col_affs.get(ci, [])
 
     return {
         "state": state,

@@ -362,7 +362,7 @@ function wfRenderStateProps(state) {
        Known keys (rendered elsewhere): workflow, node, node_title, completed_nodes,
        definition, fields, table, execution_table. */
     var s = state.state || {};
-    var known = ['workflow','node','node_title','completed_nodes','definition','fields','table','execution_table','fork_state','banner_definition','focus','focusable'];
+    var known = ['workflow','node','node_title','completed_nodes','definition','fields','field_groups','table','execution_table','fork_state','banner_definition'];
     var extra = Object.keys(s).filter(function(k) { return known.indexOf(k) === -1; });
     if (!extra.length) return '';
     var html = '';
@@ -1385,7 +1385,7 @@ function humanRenderDefinition(defn) {
 /* ── State props (definition-aware) ── */
 function humanRenderStateProps(state) {
     var s = state.state || {};
-    var known = ['workflow','node','node_title','completed_nodes','definition','fields','table','execution_table','fork_state','banner_definition','focus','focusable'];
+    var known = ['workflow','node','node_title','completed_nodes','definition','fields','field_groups','table','execution_table','fork_state','banner_definition'];
     var extra = Object.keys(s).filter(function(k) { return known.indexOf(k) === -1; });
     if (!extra.length) return '';
     var html = '';
@@ -1502,6 +1502,49 @@ function _wfBindAffordances(container) {
             _wfExecAffordance(url, body);
         });
     });
+    /* Field group: option buttons set a data attribute (no immediate POST) */
+    container.querySelectorAll('.wf-fg-opt').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var key = btn.getAttribute('data-fg-key');
+            var val = btn.getAttribute('data-fg-value');
+            /* Mark active within this field's row */
+            var row = btn.closest('.wf-field-row');
+            if (row) {
+                row.querySelectorAll('.wf-fg-opt').forEach(function(b) { b.classList.remove('wf-aff-opt-active'); });
+                btn.classList.add('wf-aff-opt-active');
+            }
+            /* Store selected value on the button group */
+            btn.setAttribute('data-fg-selected', 'true');
+        });
+    });
+    /* Field group: "Set All" button collects values from all inputs in the card */
+    container.querySelectorAll('.wf-fg-submit').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var card = btn.closest('.wf-card');
+            if (!card) return;
+            var url = btn.getAttribute('data-aff-url');
+            var body = {};
+            /* Collect text inputs */
+            card.querySelectorAll('input.wf-fg-input').forEach(function(input) {
+                var key = input.getAttribute('data-fg-key');
+                if (key && input.value) body[key] = input.value;
+            });
+            /* Collect dropdown selects */
+            card.querySelectorAll('select.wf-fg-input').forEach(function(select) {
+                var key = select.getAttribute('data-fg-key');
+                if (key && select.value) body[key] = JSON.parse(select.value);
+            });
+            /* Collect option button selections */
+            card.querySelectorAll('.wf-fg-opt.wf-aff-opt-active[data-fg-selected]').forEach(function(opt) {
+                var key = opt.getAttribute('data-fg-key');
+                if (key) body[key] = JSON.parse(opt.getAttribute('data-fg-value'));
+            });
+            if (Object.keys(body).length) {
+                btn.title = 'POST ' + url + ' ' + JSON.stringify(body);
+                _wfExecAffordance(url, body);
+            }
+        });
+    });
     /* Generic simple affordance buttons (wfRenderAffordances) */
     container.querySelectorAll('.wf-aff-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
@@ -1536,46 +1579,32 @@ function _wfBindAffordances(container) {
     });
 }
 
-/* ── Focus target label derivation (renderer's responsibility) ── */
-function _wfFocusLabel(target, s) {
-    if (target === 'fields') return 'Fields';
-    if (target === 'table') return 'Table';
-    if (target === 'exec') return 'Execution Table';
-    if (target && target.indexOf('table.col.') === 0) {
-        var ci = parseInt(target.split('.')[2], 10);
-        var cols = (s.table && s.table.columns) || [];
-        var colName = (cols[ci] && cols[ci].name) || ('Column ' + ci);
-        return 'Column ' + ci + ': ' + colName;
-    }
-    return target || '';
-}
-
-function _wfFocusBreadcrumb(target, s) {
-    var label = _wfFocusLabel(target, s);
-    if (target && target.indexOf('table.col.') === 0) {
-        return 'Table > ' + label;
-    }
-    return label;
-}
-
 /* ── Classify affordances by role ── */
-function _wfClassifyAffordances(affordances) {
-    var focus = [], unfocus = null, objectAffs = [], actionBar = [];
+function _wfClassifyAffordances(affordances, fieldKeys) {
+    var objectAffs = [], actionBar = [], fieldAffs = [];
     for (var i = 0; i < affordances.length; i++) {
         var a = affordances[i];
         var url = a.url || '';
-        if (url.match(/\/focus$/) && a.body && a.body.target) {
-            focus.push(a);
-        } else if (url.match(/\/unfocus$/)) {
-            unfocus = a;
-        } else if (url.match(/\/(proceed|go_back|submit|restart|complete|switch_branch|go_to)$/) ||
+        if (url.match(/\/(proceed|go_back|submit|restart|complete|switch_branch|go_to)$/) ||
                    (a.label && /Proceed|Go back|Submit|Complete|Restart/i.test(a.label))) {
             actionBar.push(a);
         } else {
-            objectAffs.push(a);
+            // Check if this affordance is rendered inline (field or field group)
+            var isInline = false;
+            var urlTail = url.split('/').pop();
+            // Field group affordances (rendered by field_groups section renderer)
+            if (urlTail === 'set_fields') { isInline = true; }
+            // Individual field affordances (rendered inline with their fields)
+            if (!isInline && fieldKeys) {
+                for (var fi = 0; fi < fieldKeys.length; fi++) {
+                    if (urlTail === fieldKeys[fi]) { isInline = true; break; }
+                }
+            }
+            if (isInline) fieldAffs.push(a);
+            else objectAffs.push(a);
         }
     }
-    return { focus: focus, unfocus: unfocus, objectAffs: objectAffs, actionBar: actionBar };
+    return { objectAffs: objectAffs, actionBar: actionBar, fieldAffs: fieldAffs };
 }
 
 /* ── Read-only fields (state zone) ── */
@@ -1721,91 +1750,7 @@ function _wfRenderExecTableReadOnly(et) {
     return html;
 }
 
-/* ── Focus zone ── */
-function _wfRenderFocusZone(s, state, classified, fieldCategory) {
-    var focus = s.focus;
-    if (!focus) {
-        if (classified.focus.length) {
-            return '<div class="wf-focus-hint">Focus on an element to reveal its affordances.</div>';
-        }
-        return '';
-    }
-
-    var html = '<div class="wf-focus-zone">';
-
-    /* Header: breadcrumb + navigation + close */
-    html += '<div class="wf-focus-header">';
-    html += '<span class="wf-focus-breadcrumb">' + wfEsc(_wfFocusBreadcrumb(focus, s)) + '</span>';
-    /* Sibling/parent focus navigation */
-    var navAffs = classified.focus.filter(function(a) { return a.body.target !== focus; });
-    if (navAffs.length) {
-        html += '<span class="wf-focus-nav">';
-        for (var i = 0; i < navAffs.length; i++) {
-            var na = navAffs[i];
-            var tooltip = na.method + ' ' + na.url + ' ' + JSON.stringify(na.body);
-            html += '<button class="wf-focus-nav-btn wf-aff-btn" data-aff-url="' + wfEsc(na.url) + '" data-aff-body="' + wfEsc(JSON.stringify(na.body)) + '" title="' + wfEsc(tooltip) + '">' + wfEsc(_wfFocusLabel(na.body.target, s)) + '</button>';
-        }
-        html += '</span>';
-    }
-    if (classified.unfocus) {
-        var ua = classified.unfocus;
-        var tooltip = ua.method + ' ' + ua.url + ' ' + JSON.stringify(ua.body);
-        html += '<button class="wf-focus-close wf-aff-btn" data-aff-url="' + wfEsc(ua.url) + '" data-aff-body="' + wfEsc(JSON.stringify(ua.body)) + '" title="' + wfEsc(tooltip) + '">Close</button>';
-    }
-    html += '</div>';
-
-    /* Focused object's affordances */
-    var affs = classified.objectAffs;
-    if (focus === 'fields') {
-        /* Render field affordances using the inline field patterns */
-        html += _wfRenderFieldAffordances(s.fields, fieldCategory);
-    } else if (affs.length) {
-        /* Generic: parametric + simple */
-        var paramAffs = [], simpleAffs = [];
-        for (var i = 0; i < affs.length; i++) {
-            var a = affs[i];
-            if (a.parameters && Object.keys(a.parameters).length) {
-                paramAffs.push(a);
-            } else {
-                simpleAffs.push(a);
-            }
-        }
-        if (paramAffs.length) {
-            for (var i = 0; i < paramAffs.length; i++) {
-                html += wfRenderParamAff(paramAffs[i]);
-            }
-        }
-        if (simpleAffs.length) {
-            html += '<div class="wf-action-bar">';
-            for (var i = 0; i < simpleAffs.length; i++) {
-                var a = simpleAffs[i];
-                var aLabel = a.label || (a.body && a.body.key ? a.body.key.replace(/_/g, ' ') : a.url.split('/').pop().replace(/_/g, ' '));
-                var tooltip = a.method + ' ' + a.url + ' ' + JSON.stringify(a.body);
-                html += '<button class="wf-aff-btn" data-aff-url="' + wfEsc(a.url) + '" data-aff-body="' + wfEsc(JSON.stringify(a.body)) + '" title="' + wfEsc(tooltip) + '">' + wfEsc(aLabel) + '</button>';
-            }
-            html += '</div>';
-        }
-    }
-
-    /* Nested focusable objects (e.g., columns when focused on table) */
-    var nestedFocus = classified.focus.filter(function(a) {
-        return a.body.target && a.body.target.indexOf(focus + '.') === 0;
-    });
-    if (nestedFocus.length) {
-        html += '<div class="wf-focus-nested-list">';
-        for (var i = 0; i < nestedFocus.length; i++) {
-            var nf = nestedFocus[i];
-            var tooltip = nf.method + ' ' + nf.url + ' ' + JSON.stringify(nf.body);
-            html += '<button class="wf-focus-nested-btn wf-aff-btn" data-aff-url="' + wfEsc(nf.url) + '" data-aff-body="' + wfEsc(JSON.stringify(nf.body)) + '" title="' + wfEsc(tooltip) + '">' + wfEsc(_wfFocusLabel(nf.body.target, s)) + '</button>';
-        }
-        html += '</div>';
-    }
-
-    html += '</div>';
-    return html;
-}
-
-/* ── Field affordances in focus zone (reuses field patterns) ── */
+/* ── Field affordances (inline with fields) ── */
 function _wfRenderFieldAffordances(fields, fieldCategory) {
     if (!fields) return '';
     var keys = Object.keys(fields);
@@ -1868,6 +1813,122 @@ function _wfRenderFieldAffordances(fields, fieldCategory) {
     return html + '</div>';
 }
 
+/* ── Section renderer registry ── */
+/* Each state key maps to a function(value, ctx) → HTML string.
+   ctx = { s, state, fieldCategory, classified }
+   Unknown state keys that aren't structural get a red error box. */
+var _sectionRenderers = {};
+
+/* Structural keys: always handled by the page frame, never dispatched */
+var _structuralKeys = ['workflow','node','node_title','completed_nodes','definition','banner_definition','fork_state','page'];
+
+_sectionRenderers['fields'] = function(fields, ctx) {
+    return '<div class="wf-card"><div class="wf-card-head">Fields</div>'
+        + _wfRenderFieldAffordances(fields, ctx.fieldCategory)
+        + '</div>';
+};
+
+_sectionRenderers['field_groups'] = function(groups, ctx) {
+    var html = '';
+    var groupLabels = Object.keys(groups);
+    for (var gi = 0; gi < groupLabels.length; gi++) {
+        var label = groupLabels[gi];
+        var group = groups[label];
+        var aff = group.affordance;
+        html += '<div class="wf-card wf-card-field-group">';
+        html += '<div class="wf-card-head">' + wfEsc(label) + '</div>';
+        if (group.instruction) {
+            html += '<div class="wf-desc" style="margin:0 0 0.5rem;padding:0;font-size:0.8rem">' + wfEsc(group.instruction) + '</div>';
+        }
+        /* Render each field in the group with current values and input controls */
+        var fields = group.fields || {};
+        var fieldKeys = Object.keys(fields);
+        for (var fi = 0; fi < fieldKeys.length; fi++) {
+            var fk = fieldKeys[fi];
+            var f = fields[fk];
+            if (!f || typeof f !== 'object' || !('value' in f)) continue;
+            var cat = ctx.fieldCategory[fk] || null;
+            var catCls = cat ? ' wf-fb-' + cat : '';
+            html += '<div class="wf-field' + catCls + '">';
+            html += '<div class="wf-field-label">' + wfEsc(fk) + '</div>';
+            if (f.instruction) {
+                html += '<div class="wf-field-instruction">' + wfEsc(f.instruction) + '</div>';
+            }
+            /* Input controls based on field type (options or text) */
+            var params = aff && aff.parameters && aff.parameters[f.key];
+            var options = params && params.options;
+            if (options) {
+                var useDropdown = options.length > 3;
+                if (!useDropdown) {
+                    for (var oi = 0; oi < options.length; oi++) {
+                        var ol = options[oi] === true ? 'Yes' : options[oi] === false ? 'No' : String(options[oi]);
+                        if (ol.length > 20) { useDropdown = true; break; }
+                    }
+                }
+                var curDisplay = f.value === true ? 'Yes' : f.value === false ? 'No' : f.value != null ? String(f.value) : '';
+                html += '<div class="wf-field-row">';
+                html += curDisplay ? '<span class="wf-field-current">' + wfEsc(curDisplay) + '</span>' : '<span class="wf-field-current wf-field-empty">(not set)</span>';
+                if (useDropdown) {
+                    html += '<select class="wf-aff-select wf-fg-input" data-fg-key="' + wfEsc(f.key) + '">';
+                    html += '<option value="">&mdash; Select &mdash;</option>';
+                    for (var oi = 0; oi < options.length; oi++) {
+                        var oval = options[oi];
+                        var olabel = oval === true ? 'Yes' : oval === false ? 'No' : String(oval);
+                        html += '<option value="' + wfEsc(JSON.stringify(oval)) + '">' + wfEsc(olabel) + '</option>';
+                    }
+                    html += '</select>';
+                } else {
+                    for (var oi = 0; oi < options.length; oi++) {
+                        var oval = options[oi];
+                        var olabel = oval === true ? 'Yes' : oval === false ? 'No' : String(oval);
+                        var isActive = JSON.stringify(oval) === JSON.stringify(f.value);
+                        html += '<button class="wf-aff-opt-btn wf-fg-opt' + (isActive ? ' wf-aff-opt-active' : '') + '" data-fg-key="' + wfEsc(f.key) + '" data-fg-value="' + wfEsc(JSON.stringify(oval)) + '">' + wfEsc(olabel) + '</button>';
+                    }
+                }
+                html += '</div>';
+            } else {
+                var curVal = f.value == null ? '' : String(f.value);
+                html += '<div class="wf-field-row">';
+                html += curVal ? '<span class="wf-field-current">' + wfEsc(curVal) + '</span>' : '<span class="wf-field-current wf-field-empty">(not set)</span>';
+                html += '<input class="wf-aff-input wf-fg-input" type="text" data-fg-key="' + wfEsc(f.key) + '" placeholder="New value\u2026">';
+                html += '</div>';
+            }
+            html += '</div>';
+        }
+        /* Single submit button for the entire group */
+        if (aff) {
+            var tooltip = aff.method + ' ' + aff.url + ' {all fields}';
+            html += '<div class="wf-action-bar" style="margin-top:0.5rem">';
+            html += '<button class="wf-aff-action-btn wf-aff-action-primary wf-fg-submit" data-aff-url="' + wfEsc(aff.url) + '" title="' + wfEsc(tooltip) + '">Set All</button>';
+            html += '</div>';
+        }
+        html += '</div>';
+    }
+    return html;
+};
+
+_sectionRenderers['table'] = function(table, ctx) {
+    return '<div class="wf-card"><div class="wf-card-head">Table</div>'
+        + _wfRenderTableReadOnly(table)
+        + '</div>';
+};
+
+_sectionRenderers['execution_table'] = function(execTable, ctx) {
+    return '<div class="wf-card"><div class="wf-card-head">Execution Table</div>'
+        + _wfRenderExecTableReadOnly(execTable)
+        + '</div>';
+};
+
+function _renderUnknownSection(key, value) {
+    var preview;
+    try { preview = JSON.stringify(value, null, 2); } catch(e) { preview = String(value); }
+    if (preview.length > 200) preview = preview.substring(0, 200) + '\u2026';
+    return '<div class="wf-card wf-card-unknown">'
+        + '<div class="wf-card-head wf-card-head-unknown">Unknown: ' + wfEsc(key) + '</div>'
+        + '<pre class="wf-unknown-preview">' + wfEsc(preview) + '</pre>'
+        + '</div>';
+}
+
 /* ── Page renderer (shared default + verbose) ── */
 function _humanPage(container, state, msg, feedback, verbose) {
     if (!container || !state) return;
@@ -1882,7 +1943,7 @@ function _humanPage(container, state, msg, feedback, verbose) {
     }
     var html = '', s = state.state || {};
 
-    /* ── Header ── */
+    /* ── Header (structural — always rendered by the page frame) ── */
     html += '<div class="wf-header"><h1 class="wf-title">' + wfEsc(s.workflow || 'Workflow') + '</h1></div>';
     html += wfRenderBanner(state);
     html += '<div class="wf-section"><div class="wf-section-head">' + wfEsc(s.node_title || s.node) + '</div></div>';
@@ -1894,54 +1955,70 @@ function _humanPage(container, state, msg, feedback, verbose) {
     if (s.definition && _isDefinition(s.definition)) { html += _schematicFlowchart(s.definition, s); }
 
     /* ── Classify affordances ── */
-    var classified = _wfClassifyAffordances(state.affordances || []);
+    var fieldKeys = s.fields ? Object.keys(s.fields).map(function(k) {
+        var f = s.fields[k]; return (f && f.key) ? f.key : k;
+    }) : [];
+    var classified = _wfClassifyAffordances(state.affordances || [], fieldKeys);
 
-    /* ── State zone (read-only) ── */
-    if (s.fields) {
-        var fieldFocusBtn = '';
-        for (var fi = 0; fi < classified.focus.length; fi++) {
-            if (classified.focus[fi].body.target === 'fields') {
-                var fa = classified.focus[fi];
-                fieldFocusBtn = '<button class="wf-focus-btn wf-aff-btn" data-aff-url="' + wfEsc(fa.url) + '" data-aff-body="' + wfEsc(JSON.stringify(fa.body)) + '" title="' + wfEsc(fa.method + ' ' + fa.url + ' ' + JSON.stringify(fa.body)) + '">Focus</button>';
-                break;
+    var ctx = { s: s, state: state, fieldCategory: fieldCategory, classified: classified };
+
+    /* ── Content sections: dispatch via registry ── */
+    /* Render in a stable order: fields first, then execution_table/table, then others */
+    var rendered = {};
+    var orderedKeys = ['fields', 'field_groups', 'execution_table', 'table'];
+    for (var oi = 0; oi < orderedKeys.length; oi++) {
+        var key = orderedKeys[oi];
+        if (s[key] !== undefined && s[key] !== null) {
+            /* execution_table and table are mutually exclusive in rendering */
+            if (key === 'table' && rendered['execution_table']) continue;
+            var renderer = _sectionRenderers[key];
+            if (renderer) {
+                html += renderer(s[key], ctx);
+            } else {
+                html += _renderUnknownSection(key, s[key]);
             }
+            rendered[key] = true;
         }
-        var fieldsFocused = s.focus === 'fields' ? ' wf-card-focused' : '';
-        html += '<div class="wf-card' + fieldsFocused + '"><div class="wf-card-head">Fields' + fieldFocusBtn + '</div>';
-        html += _wfRenderFieldsReadOnly(s.fields, fieldCategory);
-        html += '</div>';
+    }
+    /* Remaining state keys: dispatch or error */
+    var stateKeys = Object.keys(s);
+    for (var si = 0; si < stateKeys.length; si++) {
+        var key = stateKeys[si];
+        if (rendered[key]) continue;
+        if (_structuralKeys.indexOf(key) >= 0) continue;
+        if (orderedKeys.indexOf(key) >= 0) continue;
+        var renderer = _sectionRenderers[key];
+        if (renderer) {
+            html += renderer(s[key], ctx);
+        } else {
+            html += _renderUnknownSection(key, s[key]);
+        }
     }
 
-    if (s.execution_table) {
-        var execFocusBtn = '';
-        for (var fi = 0; fi < classified.focus.length; fi++) {
-            if (classified.focus[fi].body.target === 'exec') {
-                var fa = classified.focus[fi];
-                execFocusBtn = '<button class="wf-focus-btn wf-aff-btn" data-aff-url="' + wfEsc(fa.url) + '" data-aff-body="' + wfEsc(JSON.stringify(fa.body)) + '" title="' + wfEsc(fa.method + ' ' + fa.url + ' ' + JSON.stringify(fa.body)) + '">Focus</button>';
-                break;
+    /* ── Object affordances (table/column/property operations) ── */
+    if (classified.objectAffs.length) {
+        var paramAffs = [], simpleAffs = [];
+        for (var i = 0; i < classified.objectAffs.length; i++) {
+            var a = classified.objectAffs[i];
+            if (a.parameters && Object.keys(a.parameters).length) paramAffs.push(a);
+            else simpleAffs.push(a);
+        }
+        if (paramAffs.length) {
+            for (var i = 0; i < paramAffs.length; i++) {
+                html += wfRenderParamAff(paramAffs[i]);
             }
         }
-        var execFocused = s.focus === 'exec' ? ' wf-card-focused' : '';
-        html += '<div class="wf-card' + execFocused + '"><div class="wf-card-head">Execution Table' + execFocusBtn + '</div>';
-        html += _wfRenderExecTableReadOnly(s.execution_table);
-        html += '</div>';
-    } else if (s.table) {
-        var tableFocusBtn = '';
-        for (var fi = 0; fi < classified.focus.length; fi++) {
-            if (classified.focus[fi].body.target === 'table') {
-                var fa = classified.focus[fi];
-                tableFocusBtn = '<button class="wf-focus-btn wf-aff-btn" data-aff-url="' + wfEsc(fa.url) + '" data-aff-body="' + wfEsc(JSON.stringify(fa.body)) + '" title="' + wfEsc(fa.method + ' ' + fa.url + ' ' + JSON.stringify(fa.body)) + '">Focus</button>';
-                break;
+        if (simpleAffs.length) {
+            html += '<div class="wf-action-bar">';
+            for (var i = 0; i < simpleAffs.length; i++) {
+                var a = simpleAffs[i];
+                var aLabel = a.label || (a.body && a.body.key ? a.body.key.replace(/_/g, ' ') : a.url.split('/').pop().replace(/_/g, ' '));
+                var tooltip = a.method + ' ' + a.url + ' ' + JSON.stringify(a.body);
+                html += '<button class="wf-aff-btn" data-aff-url="' + wfEsc(a.url) + '" data-aff-body="' + wfEsc(JSON.stringify(a.body)) + '" title="' + wfEsc(tooltip) + '">' + wfEsc(aLabel) + '</button>';
             }
+            html += '</div>';
         }
-        var tableFocused = (s.focus && (s.focus === 'table' || s.focus.indexOf('table.col.') === 0)) ? ' wf-card-focused' : '';
-        html += '<div class="wf-card' + tableFocused + '"><div class="wf-card-head">Table' + tableFocusBtn + '</div>';
-        html += _wfRenderTableReadOnly(s.table);
-        html += '</div>';
     }
-
-    /* ── Focus zone ── */
-    html += _wfRenderFocusZone(s, state, classified, fieldCategory);
 
     /* ── Action bar (always visible) ── */
     if (classified.actionBar.length) {
@@ -2038,6 +2115,9 @@ var WF_STRUCTURAL_CSS = ''
     + '.wf-section-head { font-size:1.1rem; font-weight:600; }'
     + '.wf-desc { padding:0.25rem 1.5rem 0.75rem; font-size:0.9rem; line-height:1.5; white-space:pre-line; }'
     + '.wf-error { margin:0.5rem 1.5rem; padding:0.6rem 0.8rem; background:#fef2f2; border:1px solid #fca5a5; border-radius:6px; color:#991b1b; font-size:0.85rem; font-weight:500; }'
+    + '.wf-card-unknown { border:2px dashed #e57373; background:#ffebee; }'
+    + '.wf-card-head-unknown { color:#c62828; }'
+    + '.wf-unknown-preview { font-size:0.75rem; color:#b71c1c; margin:0.25rem 0 0; white-space:pre-wrap; word-break:break-all; max-height:120px; overflow:auto; }'
     + '.wf-card { margin:0.5rem 1.5rem; padding:0.75rem; border:1px solid; border-radius:8px; }'
     + '.wf-card-head { font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.5rem; display:flex; align-items:center; }'
     + '.wf-tbl { width:100%; border-collapse:collapse; }'
@@ -2060,17 +2140,7 @@ var WF_STRUCTURAL_CSS = ''
     + '.wf-field-current { font-size:0.85rem; flex-shrink:0; max-width:50%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }'
     + '.wf-field-options { font-size:0.72rem; font-family:Consolas,Monaco,monospace; margin-top:0.15rem; }'
     /* Focus zone */
-    + '.wf-focus-hint { padding:0.5rem 1.5rem; font-size:0.82rem; font-style:italic; }'
-    + '.wf-focus-zone { margin:0.5rem 1.5rem; padding:0.75rem; border-radius:8px; border-left:3px solid; }'
-    + '.wf-focus-header { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem; flex-wrap:wrap; }'
-    + '.wf-focus-breadcrumb { font-size:0.85rem; font-weight:600; flex:1; }'
-    + '.wf-focus-nav { display:flex; gap:0.25rem; }'
-    + '.wf-focus-nav-btn { font-size:0.72rem; padding:0.2rem 0.5rem; border-radius:3px; border:1px solid; cursor:pointer; background:transparent; font-family:inherit; }'
-    + '.wf-focus-close { font-size:0.72rem; padding:0.2rem 0.5rem; border-radius:3px; border:1px solid; cursor:pointer; background:transparent; font-family:inherit; }'
-    + '.wf-focus-nested-list { display:flex; gap:0.35rem; flex-wrap:wrap; margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid; }'
-    + '.wf-focus-nested-btn { font-size:0.78rem; padding:0.3rem 0.6rem; border-radius:4px; border:1px solid; cursor:pointer; background:transparent; font-family:inherit; }'
-    + '.wf-card-focused { border-left:3px solid; }'
-    + '.wf-focus-btn { font-size:0.72rem; padding:0.15rem 0.5rem; border-radius:3px; border:1px solid; cursor:pointer; background:transparent; font-family:inherit; margin-left:auto; }'
+    /* Focus zone CSS removed — focus mechanism excised */
     + '.wf-aff { margin-bottom:0.4rem; padding:0.5rem 0.6rem; border:1px solid; border-radius:6px; }'
     + '.wf-aff-top { display:flex; align-items:center; gap:0.5rem; }'
     + '.wf-aff-id { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; font-size:0.7rem; font-weight:600; flex-shrink:0; }'
