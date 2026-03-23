@@ -362,7 +362,7 @@ function wfRenderStateProps(state) {
        Known keys (rendered elsewhere): workflow, node, node_title, completed_nodes,
        definition, fields, table, execution_table. */
     var s = state.state || {};
-    var known = ['workflow','node','node_title','completed_nodes','definition','fields','table','execution_table','fork_state','banner_definition'];
+    var known = ['workflow','node','node_title','completed_nodes','definition','fields','table','execution_table','fork_state','banner_definition','focus','focusable'];
     var extra = Object.keys(s).filter(function(k) { return known.indexOf(k) === -1; });
     if (!extra.length) return '';
     var html = '';
@@ -1385,7 +1385,7 @@ function humanRenderDefinition(defn) {
 /* ── State props (definition-aware) ── */
 function humanRenderStateProps(state) {
     var s = state.state || {};
-    var known = ['workflow','node','node_title','completed_nodes','definition','fields','table','execution_table','fork_state','banner_definition'];
+    var known = ['workflow','node','node_title','completed_nodes','definition','fields','table','execution_table','fork_state','banner_definition','focus','focusable'];
     var extra = Object.keys(s).filter(function(k) { return known.indexOf(k) === -1; });
     if (!extra.length) return '';
     var html = '';
