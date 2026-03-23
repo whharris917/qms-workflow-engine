@@ -1536,6 +1536,28 @@ function _wfBindAffordances(container) {
     });
 }
 
+/* ── Focus target label derivation (renderer's responsibility) ── */
+function _wfFocusLabel(target, s) {
+    if (target === 'fields') return 'Fields';
+    if (target === 'table') return 'Table';
+    if (target === 'exec') return 'Execution Table';
+    if (target && target.indexOf('table.col.') === 0) {
+        var ci = parseInt(target.split('.')[2], 10);
+        var cols = (s.table && s.table.columns) || [];
+        var colName = (cols[ci] && cols[ci].name) || ('Column ' + ci);
+        return 'Column ' + ci + ': ' + colName;
+    }
+    return target || '';
+}
+
+function _wfFocusBreadcrumb(target, s) {
+    var label = _wfFocusLabel(target, s);
+    if (target && target.indexOf('table.col.') === 0) {
+        return 'Table > ' + label;
+    }
+    return label;
+}
+
 /* ── Classify affordances by role ── */
 function _wfClassifyAffordances(affordances) {
     var focus = [], unfocus = null, objectAffs = [], actionBar = [];
@@ -1713,7 +1735,7 @@ function _wfRenderFocusZone(s, state, classified, fieldCategory) {
 
     /* Header: breadcrumb + navigation + close */
     html += '<div class="wf-focus-header">';
-    html += '<span class="wf-focus-breadcrumb">' + wfEsc(s.focus_label || focus) + '</span>';
+    html += '<span class="wf-focus-breadcrumb">' + wfEsc(_wfFocusBreadcrumb(focus, s)) + '</span>';
     /* Sibling/parent focus navigation */
     var navAffs = classified.focus.filter(function(a) { return a.body.target !== focus; });
     if (navAffs.length) {
@@ -1721,7 +1743,7 @@ function _wfRenderFocusZone(s, state, classified, fieldCategory) {
         for (var i = 0; i < navAffs.length; i++) {
             var na = navAffs[i];
             var tooltip = na.method + ' ' + na.url + ' ' + JSON.stringify(na.body);
-            html += '<button class="wf-focus-nav-btn wf-aff-btn" data-aff-url="' + wfEsc(na.url) + '" data-aff-body="' + wfEsc(JSON.stringify(na.body)) + '" title="' + wfEsc(tooltip) + '">' + wfEsc(na.body.target.split('.').pop()) + '</button>';
+            html += '<button class="wf-focus-nav-btn wf-aff-btn" data-aff-url="' + wfEsc(na.url) + '" data-aff-body="' + wfEsc(JSON.stringify(na.body)) + '" title="' + wfEsc(tooltip) + '">' + wfEsc(_wfFocusLabel(na.body.target, s)) + '</button>';
         }
         html += '</span>';
     }
@@ -1774,7 +1796,7 @@ function _wfRenderFocusZone(s, state, classified, fieldCategory) {
         for (var i = 0; i < nestedFocus.length; i++) {
             var nf = nestedFocus[i];
             var tooltip = nf.method + ' ' + nf.url + ' ' + JSON.stringify(nf.body);
-            html += '<button class="wf-focus-nested-btn wf-aff-btn" data-aff-url="' + wfEsc(nf.url) + '" data-aff-body="' + wfEsc(JSON.stringify(nf.body)) + '" title="' + wfEsc(tooltip) + '">' + wfEsc(nf.label.replace(/^Focus on /, '')) + '</button>';
+            html += '<button class="wf-focus-nested-btn wf-aff-btn" data-aff-url="' + wfEsc(nf.url) + '" data-aff-body="' + wfEsc(JSON.stringify(nf.body)) + '" title="' + wfEsc(tooltip) + '">' + wfEsc(_wfFocusLabel(nf.body.target, s)) + '</button>';
         }
         html += '</div>';
     }

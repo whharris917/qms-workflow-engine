@@ -325,35 +325,19 @@ def render_page(defn: WorkflowDef, data: dict, workflow_id: str,
     if instance_id:
         api_base = f"/agent/{workflow_id}/{instance_id}"
 
-    # Build focusable object list
+    # Build focusable target list (labels are the renderer's responsibility)
     focusable = []
     if "fields" in state and field_affs_by_label:
-        focusable.append({"target": "fields", "label": "Fields"})
+        focusable.append("fields")
     if "table" in state:
-        focusable.append({"target": "table", "label": "Table"})
-        for ci, col_obj in enumerate(state["table"].get("columns", [])):
-            col_name = col_obj.get("name", f"Column {ci}")
-            focusable.append({"target": f"table.col.{ci}", "label": f"Column {ci}: {col_name}"})
+        focusable.append("table")
+        for ci in range(len(state["table"].get("columns", []))):
+            focusable.append(f"table.col.{ci}")
     if "execution_table" in state:
-        focusable.append({"target": "exec", "label": "Execution Table"})
+        focusable.append("exec")
 
     state["focus"] = focus
     state["focusable"] = focusable
-
-    # Build focus breadcrumb label
-    if focus:
-        focus_label = focus
-        for f_obj in focusable:
-            if f_obj["target"] == focus:
-                focus_label = f_obj["label"]
-                break
-        # Hierarchical breadcrumb: table.col.N → "Table > Column N: Name"
-        if focus.startswith("table.col."):
-            for f_obj in focusable:
-                if f_obj["target"] == "table":
-                    focus_label = f_obj["label"] + " > " + focus_label
-                    break
-        state["focus_label"] = focus_label
 
     # ── Affordance filtering by focus ──
     # When focused: only emit affordances for the focused object + action bar.
@@ -367,13 +351,12 @@ def render_page(defn: WorkflowDef, data: dict, workflow_id: str,
         # Field affordances: suppressed (not embedded in field objects)
         # Table/column/properties affordances: suppressed
 
-        # Focus affordances: one per focusable object
-        for f_obj in focusable:
+        # Focus affordances: one per focusable target
+        for target in focusable:
             fa = {
                 "id": aff_id, "method": "POST",
-                "label": f"Focus on {f_obj['label']}",
                 "url": f"{api_base}/focus",
-                "body": {"target": f_obj["target"]},
+                "body": {"target": target},
             }
             aff_id += 1
             output_affordances.append(fa)
@@ -390,7 +373,6 @@ def render_page(defn: WorkflowDef, data: dict, workflow_id: str,
         # Unfocus affordance
         output_affordances.append({
             "id": aff_id, "method": "POST",
-            "label": "Unfocus",
             "url": f"{api_base}/unfocus",
             "body": {},
         })
@@ -401,20 +383,17 @@ def render_page(defn: WorkflowDef, data: dict, workflow_id: str,
             # Parent: focus on table
             output_affordances.append({
                 "id": aff_id, "method": "POST",
-                "label": "Focus on Table",
                 "url": f"{api_base}/focus",
                 "body": {"target": "table"},
             })
             aff_id += 1
             # Siblings: other columns
-            ci = int(focus.split(".")[-1])
-            for f_obj in focusable:
-                if f_obj["target"].startswith("table.col.") and f_obj["target"] != focus:
+            for target in focusable:
+                if target.startswith("table.col.") and target != focus:
                     output_affordances.append({
                         "id": aff_id, "method": "POST",
-                        "label": f"Focus on {f_obj['label']}",
                         "url": f"{api_base}/focus",
-                        "body": {"target": f_obj["target"]},
+                        "body": {"target": target},
                     })
                     aff_id += 1
 
@@ -438,13 +417,12 @@ def render_page(defn: WorkflowDef, data: dict, workflow_id: str,
                 aff_id += 1
                 output_affordances.append(a)
             # Column focus affordances (nested focusable objects)
-            for f_obj in focusable:
-                if f_obj["target"].startswith("table.col."):
+            for target in focusable:
+                if target.startswith("table.col."):
                     output_affordances.append({
                         "id": aff_id, "method": "POST",
-                        "label": f"Focus on {f_obj['label']}",
                         "url": f"{api_base}/focus",
-                        "body": {"target": f_obj["target"]},
+                        "body": {"target": target},
                     })
                     aff_id += 1
 
