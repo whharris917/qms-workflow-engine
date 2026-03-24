@@ -142,25 +142,16 @@
 <div class="el-section" id="text">
   <div class="el-section-head"><h2>text</h2><span class="el-category">leaf element</span></div>
   <p class="el-desc">A free-form string input. Renders with a current-value display, text input, and Set button. Press Enter or click Set to commit.</p>
-  <div class="el-demo-layout">
-    <div>
-      <div class="el-demo-label">Live demo</div>
-      <div class="el-demo-controls">
-        <button class="el-demo-ctrl-btn" onclick="resetDemo('text')">Reset</button>
-      </div>
-      <div id="demo-text" class="el-demo-frame"></div>
-    </div>
-    <div>
-      <div class="el-demo-label">State JSON</div>
-      <pre id="state-text" class="el-state-json"></pre>
-      <div class="el-demo-label" style="margin-top:1rem">YAML definition</div>
-      <pre class="el-code">fields:
+  <div class="el-demo-label">YAML definition</div>
+  <pre class="el-code">fields:
   title:
     label: Title
     type: text
     instruction: Provide a short, descriptive title.</pre>
-    </div>
-  </div>
+  <div class="el-demo-label" style="margin-top:1rem">State JSON</div>
+  <pre id="state-text" class="el-state-json"></pre>
+  <div class="el-demo-label" style="margin-top:1rem">Rendered</div>
+  <div id="demo-text" class="el-demo-frame"></div>
   <div class="el-notes"><strong>Notes:</strong>
     <ul>
       <li>Supports <code>default</code>, <code>visible_when</code>, <code>side_effects</code></li>
@@ -173,24 +164,15 @@
 <div class="el-section" id="toggle">
   <div class="el-section-head"><h2>toggle</h2><span class="el-category">leaf element</span></div>
   <p class="el-desc">A boolean yes/no element. Always renders as a Yes/No button pair — never a dropdown. The active choice is highlighted.</p>
-  <div class="el-demo-layout">
-    <div>
-      <div class="el-demo-label">Live demo</div>
-      <div class="el-demo-controls">
-        <button class="el-demo-ctrl-btn" onclick="resetDemo('toggle')">Reset</button>
-      </div>
-      <div id="demo-toggle" class="el-demo-frame"></div>
-    </div>
-    <div>
-      <div class="el-demo-label">State JSON</div>
-      <pre id="state-toggle" class="el-state-json"></pre>
-      <div class="el-demo-label" style="margin-top:1rem">YAML definition</div>
-      <pre class="el-code">affects_code:
+  <div class="el-demo-label">YAML definition</div>
+  <pre class="el-code">affects_code:
   label: Code Impact
   type: toggle    <span class="el-code-comment"># legacy: boolean</span>
   instruction: Does this change affect code?</pre>
-    </div>
-  </div>
+  <div class="el-demo-label" style="margin-top:1rem">State JSON</div>
+  <pre id="state-toggle" class="el-state-json"></pre>
+  <div class="el-demo-label" style="margin-top:1rem">Rendered</div>
+  <div id="demo-toggle" class="el-demo-frame"></div>
   <div class="el-notes"><strong>Notes:</strong>
     <ul>
       <li>Value is <code>true</code> or <code>false</code> (not strings)</li>
@@ -204,26 +186,8 @@
 <div class="el-section" id="choice">
   <div class="el-section-head"><h2>choice</h2><span class="el-category">leaf element</span></div>
   <p class="el-desc">A selection from a fixed option set. Renders as buttons (≤3 short options) or a dropdown (>3 options, or any option longer than 20 characters).</p>
-  <div class="el-demo-layout">
-    <div>
-      <div class="el-demo-label">Live demo — button group (3 options)</div>
-      <div class="el-demo-controls">
-        <button class="el-demo-ctrl-btn" onclick="resetDemo('choice-btn')">Reset</button>
-      </div>
-      <div id="demo-choice-btn" class="el-demo-frame"></div>
-      <div class="el-demo-label" style="margin-top:1rem">Live demo — dropdown (6 options)</div>
-      <div class="el-demo-controls">
-        <button class="el-demo-ctrl-btn" onclick="resetDemo('choice-drop')">Reset</button>
-      </div>
-      <div id="demo-choice-drop" class="el-demo-frame"></div>
-    </div>
-    <div>
-      <div class="el-demo-label">State JSON</div>
-      <pre id="state-choice-btn" class="el-state-json"></pre>
-      <div class="el-demo-label" style="margin-top:0.5rem">State JSON</div>
-      <pre id="state-choice-drop" class="el-state-json"></pre>
-      <div class="el-demo-label" style="margin-top:1rem">YAML definition</div>
-      <pre class="el-code">priority:
+  <div class="el-demo-label">YAML definition</div>
+  <pre class="el-code">priority:
   label: Priority
   type: choice    <span class="el-code-comment"># legacy: select</span>
   instruction: Select the urgency level.
@@ -234,8 +198,14 @@ category:
   type: choice
   instruction: Select the change category.
   options_from: change_categories  <span class="el-code-comment"># top-level set</span></pre>
-    </div>
-  </div>
+  <div class="el-demo-label" style="margin-top:1rem">State JSON — button group</div>
+  <pre id="state-choice-btn" class="el-state-json"></pre>
+  <div class="el-demo-label" style="margin-top:0.5rem">State JSON — dropdown</div>
+  <pre id="state-choice-drop" class="el-state-json"></pre>
+  <div class="el-demo-label" style="margin-top:1rem">Rendered — button group (3 options)</div>
+  <div id="demo-choice-btn" class="el-demo-frame"></div>
+  <div class="el-demo-label" style="margin-top:1rem">Rendered — dropdown (6 options)</div>
+  <div id="demo-choice-drop" class="el-demo-frame"></div>
   <div class="el-notes"><strong>Notes:</strong>
     <ul>
       <li>Button vs dropdown threshold: >3 options, or any option >20 chars</li>
@@ -251,20 +221,8 @@ category:
 <div class="el-section" id="indicator">
   <div class="el-section-head"><h2>indicator</h2><span class="el-category">leaf element</span></div>
   <p class="el-desc">A read-only computed value. No affordance — agents cannot set it. The instruction switches between <code>instruction_when_true</code> and <code>instruction_when_false</code> based on the computed value.</p>
-  <div class="el-demo-layout">
-    <div>
-      <div class="el-demo-label">Live demo</div>
-      <div class="el-demo-controls">
-        <button class="el-demo-ctrl-btn" onclick="simulateIndicator()">Toggle computed value</button>
-        <button class="el-demo-ctrl-btn" onclick="resetDemo('indicator')">Reset</button>
-      </div>
-      <div id="demo-indicator" class="el-demo-frame"></div>
-    </div>
-    <div>
-      <div class="el-demo-label">State JSON</div>
-      <pre id="state-indicator" class="el-state-json"></pre>
-      <div class="el-demo-label" style="margin-top:1rem">YAML definition</div>
-      <pre class="el-code">readiness_check:
+  <div class="el-demo-label">YAML definition</div>
+  <pre class="el-code">readiness_check:
   label: Readiness Check
   type: indicator   <span class="el-code-comment"># legacy: computed</span>
   compute:
@@ -272,8 +230,10 @@ category:
     args: [title, category, priority]
   instruction_when_true: All required fields are set.
   instruction_when_false: Please complete all required fields.</pre>
-    </div>
-  </div>
+  <div class="el-demo-label" style="margin-top:1rem">State JSON</div>
+  <pre id="state-indicator" class="el-state-json"></pre>
+  <div class="el-demo-label" style="margin-top:1rem">Rendered</div>
+  <div id="demo-indicator" class="el-demo-frame"></div>
   <div class="el-notes"><strong>Notes:</strong>
     <ul>
       <li>No affordance is emitted — this element is always read-only</li>
@@ -289,19 +249,8 @@ category:
 <div class="el-section" id="group">
   <div class="el-section-head"><h2>group</h2><span class="el-category el-category-container">container element</span></div>
   <p class="el-desc">A named collection of fields that share a single affordance. One POST sets all fields at once. Fill any combination of fields and click Set All to commit.</p>
-  <div class="el-demo-layout">
-    <div>
-      <div class="el-demo-label">Live demo</div>
-      <div class="el-demo-controls">
-        <button class="el-demo-ctrl-btn" onclick="resetDemo('group')">Reset</button>
-      </div>
-      <div id="demo-group" class="el-demo-frame"></div>
-    </div>
-    <div>
-      <div class="el-demo-label">State JSON</div>
-      <pre id="state-group" class="el-state-json"></pre>
-      <div class="el-demo-label" style="margin-top:1rem">YAML definition</div>
-      <pre class="el-code">fields:
+  <div class="el-demo-label">YAML definition</div>
+  <pre class="el-code">fields:
   title:
     label: Title
     type: text
@@ -322,8 +271,10 @@ field_groups:
       Provide the core identifying information.
       All fields are required before you can proceed.
     fields: [title, affects_code, purpose]</pre>
-    </div>
-  </div>
+  <div class="el-demo-label" style="margin-top:1rem">State JSON</div>
+  <pre id="state-group" class="el-state-json"></pre>
+  <div class="el-demo-label" style="margin-top:1rem">Rendered</div>
+  <div id="demo-group" class="el-demo-frame"></div>
   <div class="el-notes"><strong>Notes:</strong>
     <ul>
       <li>Group <code>instruction</code> is required — validated at load time</li>
@@ -337,20 +288,9 @@ field_groups:
 <!-- ═══════════════════════ table ═══════════════════════ -->
 <div class="el-section" id="table">
   <div class="el-section-head"><h2>table</h2><span class="el-category el-category-structural">structural element</span></div>
-  <p class="el-desc">A structured data grid with typed columns. Supports add row operations. Click "Add row" to append a new empty row.</p>
-  <div class="el-demo-layout">
-    <div>
-      <div class="el-demo-label">Live demo</div>
-      <div class="el-demo-controls">
-        <button class="el-demo-ctrl-btn" onclick="resetDemo('table')">Reset</button>
-      </div>
-      <div id="demo-table" class="el-demo-frame"></div>
-    </div>
-    <div>
-      <div class="el-demo-label">State JSON</div>
-      <pre id="state-table" class="el-state-json"></pre>
-      <div class="el-demo-label" style="margin-top:1rem">YAML definition</div>
-      <pre class="el-code">table:
+  <p class="el-desc">A structured data grid with typed columns. Supports add row operations.</p>
+  <div class="el-demo-label">YAML definition</div>
+  <pre class="el-code">table:
   column_type_catalog: test_result
   properties:
     min_rows: 1
@@ -361,8 +301,10 @@ column_types:
   test_result:
     type: choice
     choices: [Pass, Fail, N/A]</pre>
-    </div>
-  </div>
+  <div class="el-demo-label" style="margin-top:1rem">State JSON</div>
+  <pre id="state-table" class="el-state-json"></pre>
+  <div class="el-demo-label" style="margin-top:1rem">Rendered</div>
+  <div id="demo-table" class="el-demo-frame"></div>
   <div class="el-notes"><strong>Notes:</strong>
     <ul>
       <li>Distinct from <code>execution_table</code> — free-form data, not a plan</li>
@@ -375,20 +317,9 @@ column_types:
 <!-- ═══════════════════════ list ═══════════════════════ -->
 <div class="el-section" id="list">
   <div class="el-section-head"><h2>list</h2><span class="el-category el-category-structural">structural element</span></div>
-  <p class="el-desc">An ordered collection of structured items. Each item conforms to an <code>item_schema</code>. Add items with the form below; click Remove to delete.</p>
-  <div class="el-demo-layout">
-    <div>
-      <div class="el-demo-label">Live demo</div>
-      <div class="el-demo-controls">
-        <button class="el-demo-ctrl-btn" onclick="resetDemo('list')">Reset</button>
-      </div>
-      <div id="demo-list" class="el-demo-frame"></div>
-    </div>
-    <div>
-      <div class="el-demo-label">State JSON</div>
-      <pre id="state-list" class="el-state-json"></pre>
-      <div class="el-demo-label" style="margin-top:1rem">YAML definition</div>
-      <pre class="el-code">lists:
+  <p class="el-desc">An ordered collection of structured items. Each item conforms to an <code>item_schema</code>. Add items with the form below; click ✕ to remove.</p>
+  <div class="el-demo-label">YAML definition</div>
+  <pre class="el-code">lists:
   items:
     label: Action Items
     item_schema:
@@ -400,8 +331,10 @@ column_types:
         options: [Open, In Progress, Done]
     operations: [add, remove]
     focus: false</pre>
-    </div>
-  </div>
+  <div class="el-demo-label" style="margin-top:1rem">State JSON</div>
+  <pre id="state-list" class="el-state-json"></pre>
+  <div class="el-demo-label" style="margin-top:1rem">Rendered</div>
+  <div id="demo-list" class="el-demo-frame"></div>
   <div class="el-notes"><strong>Notes:</strong>
     <ul>
       <li>Item schema field types: <code>text</code>, <code>toggle</code>, <code>choice</code></li>
