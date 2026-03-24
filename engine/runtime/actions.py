@@ -119,11 +119,11 @@ def _set_field(defn: WorkflowDef, data: dict, workflow_id: str, body: dict) -> d
 
     ftype = fdef.type
 
-    if ftype == "boolean":
+    if ftype == "toggle":
         if value is not True and value is not False:
             return {"error": f"Invalid value for {fdef.label}. Must be true or false."}
         data[field_key] = value
-    elif ftype == "select":
+    elif ftype == "choice":
         options = _get_raw_options(defn, fdef, data)
         if options and value not in options:
             return {"error": f"Invalid value for {fdef.label}. Choose: {', '.join(str(o) for o in options)}"}
@@ -165,12 +165,12 @@ def _set_fields(defn: WorkflowDef, data: dict, workflow_id: str, body: dict) -> 
             continue
 
         ftype = fdef.type
-        if ftype == "boolean":
+        if ftype == "toggle":
             if value is not True and value is not False:
                 errors.append(f"Invalid value for {fdef.label}. Must be true or false.")
                 continue
             data[field_key] = value
-        elif ftype == "select":
+        elif ftype == "choice":
             options = _get_raw_options(defn, fdef, data)
             if options and value not in options:
                 errors.append(f"Invalid value for {fdef.label}. Choose: {', '.join(str(o) for o in options)}")

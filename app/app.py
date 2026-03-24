@@ -998,18 +998,8 @@ def workshop_spine():
     return render_template("workshop_spine.html", active_page="workshop")
 
 
-@app.route("/workshop/api")
-def workshop_api():
-    return render_template("workshop_api.html", active_page="workshop")
-
-
 @app.route("/workshop/elements")
 def workshop_elements():
     return render_template("workshop_elements.html", active_page="workshop")
-
-
-@app.route("/workshop/console")
-def workshop_console():
-    return render_template("workshop_console.html", active_page="workshop")
 
 

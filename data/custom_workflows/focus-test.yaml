@@ -44,7 +44,7 @@ nodes:
 
       priority:
         label: Priority
-        type: select
+        type: choice
         key: priority
         options_from: priorities
         instruction: How urgent is this?
@@ -52,7 +52,7 @@ nodes:
 
       approved:
         label: Approved
-        type: boolean
+        type: toggle
         key: approved
         instruction: Has this been approved?
         default: null
@@ -66,7 +66,7 @@ nodes:
 
       category:
         label: Category
-        type: select
+        type: choice
         key: category
         options_from: categories
         instruction: Primary classification.
@@ -74,7 +74,7 @@ nodes:
 
       is_recurring:
         label: Recurring
-        type: boolean
+        type: toggle
         key: is_recurring
         instruction: Does this happen on a regular schedule?
         default: null
@@ -89,7 +89,7 @@ nodes:
     table:
       column_type_catalog: column_types
       properties:
-        sequential_execution: {type: boolean, default: false}
+        sequential_execution: {type: toggle, default: false}
       operations:
         - add_column
         - remove_column
@@ -111,7 +111,7 @@ nodes:
             type: text
           done:
             label: Done
-            type: boolean
+            type: toggle
 
     proceed:
       label: Complete

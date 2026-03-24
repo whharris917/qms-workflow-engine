@@ -44,6 +44,9 @@ nodes:
     field_groups:
       initiation:
         label: Basic Information
+        instruction: >-
+          Provide a short descriptive title, classify whether this change affects code,
+          and state the purpose of the change.
         fields: [title, affects_code, purpose]
 
     fields:
@@ -56,14 +59,14 @@ nodes:
 
       affects_code:
         label: Code Impact
-        type: boolean
+        type: toggle
         key: affects_code
         instruction: Does this change affect code (as opposed to documents only)?
         default: null
 
       affects_submodule:
         label: Affects Submodule
-        type: boolean
+        type: toggle
         key: affects_submodule
         instruction: Does it affect a controlled submodule?
         default: null
@@ -72,7 +75,7 @@ nodes:
 
       submodule:
         label: Submodule
-        type: select
+        type: choice
         key: submodule
         options_ref: submodules
         annotate_from: sdlc_governed
@@ -84,7 +87,7 @@ nodes:
 
       sdlc_governed:
         label: SDLC Governed
-        type: computed
+        type: indicator
         key: submodule
         instruction_when_true: >-
           This submodule contains an SDLC-governed system.
@@ -116,6 +119,13 @@ nodes:
     proceed:
       label: Proceed to Pre-Submission Review
       requires: [scope_changes, current_state, proposed_state, change_description, justification]
+    field_groups:
+      definition:
+        label: Change Definition
+        instruction: >-
+          Define the scope, describe the change in detail, assess impact, and outline
+          how the implementation will be verified.
+        fields: [scope_context, scope_changes, scope_files, current_state, proposed_state, change_description, justification, impact_files, impact_documents, impact_other, testing_summary]
     fields:
       scope_context:
         label: "Scope: Context"

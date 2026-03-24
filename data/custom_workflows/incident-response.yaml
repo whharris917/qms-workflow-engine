@@ -45,7 +45,7 @@ nodes:
 
       severity:
         label: Severity
-        type: select
+        type: choice
         key: severity
         options: [Critical, High, Medium, Low]
         instruction: "Critical: data loss or security breach. High: service degradation. Medium: limited impact. Low: cosmetic or minor."
@@ -61,14 +61,14 @@ nodes:
 
       category:
         label: Category
-        type: select
+        type: choice
         key: category
         options: [Infrastructure, Application, Security, Data, Process]
         instruction: The primary domain of the incident.
 
       affected_system:
         label: Affected System
-        type: select
+        type: choice
         key: affected_system
         dynamic_options:
           source_key: category
@@ -82,7 +82,7 @@ nodes:
 
       needs_investigation:
         label: Requires Full Investigation
-        type: boolean
+        type: toggle
         key: needs_investigation
         default: true
         instruction: Auto-set based on severity. Override if needed.
@@ -130,7 +130,7 @@ nodes:
 
       blast_radius:
         label: Blast Radius
-        type: select
+        type: choice
         key: blast_radius
         options: [Single Component, Single Service, Multiple Services, Platform-wide, External/Customer-facing]
 
@@ -142,7 +142,7 @@ nodes:
             type: text
             required: true
           status:
-            type: select
+            type: choice
             options: [Degraded, Down, Recovered, Unaffected]
           notes:
             type: text
@@ -184,7 +184,7 @@ nodes:
     table:
       column_type_catalog: column_types
       properties:
-        sequential_execution: {type: boolean, default: false}
+        sequential_execution: {type: toggle, default: false}
       operations:
         - add_column
         - remove_column

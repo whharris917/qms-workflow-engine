@@ -15,7 +15,7 @@ class FieldDef:
     """A named, typed value — the atomic unit of data collection."""
     key: str
     label: str
-    type: str = "text"  # text | boolean | select | computed
+    type: str = "text"  # text | toggle | choice | indicator
     instruction: str | None = None
     default: Any = None
     options: list[str] | None = None           # select: inline options
@@ -29,12 +29,15 @@ class FieldDef:
     side_effects: list[dict] | None = None     # [{when: expr, set: {key: val}}]
     dynamic_options: dict | None = None        # {source_key: str, mapping: {val: [options]}}
 
+    _TYPE_MAP = {"boolean": "toggle", "select": "choice", "computed": "indicator"}
+
     @classmethod
     def from_dict(cls, d: dict) -> FieldDef:
+        raw_type = d.get("type", "text")
         return cls(
             key=d.get("key", ""),
             label=d.get("label", ""),
-            type=d.get("type", "text"),
+            type=cls._TYPE_MAP.get(raw_type, raw_type),
             instruction=d.get("instruction"),
             default=d.get("default"),
             options=d.get("options"),
@@ -55,15 +58,19 @@ class FieldGroupDef:
     """A group of fields that share a single affordance (set all at once)."""
     key: str
     label: str
-    instruction: str | None = None
+    instruction: str
     fields: list[str] = field(default_factory=list)  # list of field keys
 
     @classmethod
     def from_dict(cls, key: str, d: dict) -> FieldGroupDef:
+        instruction = d.get("instruction")
+        if not instruction or not instruction.strip():
+            label = d.get("label", key)
+            raise ValueError(f"Field group '{label}' (key: '{key}') is missing an instruction.")
         return cls(
             key=key,
             label=d.get("label", key),
-            instruction=d.get("instruction"),
+            instruction=instruction,
             fields=d.get("fields", []),
         )
 
@@ -133,15 +140,18 @@ class ProceedDef:
 class ListItemField:
     """A field within a list item schema."""
     key: str
-    type: str = "text"  # text | boolean | select
+    type: str = "text"  # text | toggle | choice
     required: bool = False
     options: list[str] | None = None
 
+    _TYPE_MAP = {"boolean": "toggle", "select": "choice"}
+
     @classmethod
     def from_dict(cls, key: str, d: dict) -> ListItemField:
+        raw_type = d.get("type", "text")
         return cls(
             key=key,
-            type=d.get("type", "text"),
+            type=cls._TYPE_MAP.get(raw_type, raw_type),
             required=d.get("required", False),
             options=d.get("options"),
         )
@@ -271,7 +281,7 @@ class NodeDef:
     """A discrete step in a workflow."""
     id: str
     title: str
-    instruction: str = ""
+    instruction: str
     show_all_fields: bool = False
     pause: bool = True  # True = always stop here; False = may auto-advance
     fields: dict[str, FieldDef] = field(default_factory=dict)
@@ -288,6 +298,11 @@ class NodeDef:
 
     @classmethod
     def from_dict(cls, nid: str, d: dict) -> NodeDef:
+        instruction = d.get("instruction", "")
+        if not instruction or not instruction.strip():
+            title = d.get("title", nid)
+            raise ValueError(f"Node '{title}' (id: '{nid}') is missing an instruction.")
+
         fields = {}
         for fid, fdef in (d.get("fields") or {}).items():
             fields[fid] = FieldDef.from_dict(fdef)
@@ -326,7 +341,7 @@ class NodeDef:
         return cls(
             id=nid,
             title=d.get("title", nid),
-            instruction=d.get("instruction", ""),
+            instruction=instruction,
             show_all_fields=d.get("show_all_fields", False),
             pause=d.get("pause", True),
             fields=fields,

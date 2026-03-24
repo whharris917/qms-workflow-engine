@@ -260,30 +260,45 @@ def render_page(defn: WorkflowDef, data: dict, workflow_id: str,
             entry["affordance"] = None
             fields_display[expose_def.label] = entry
 
-    # Partition fields into groups and ungrouped
-    grouped_keys: set[str] = set()
-    field_groups_display: dict[str, dict] = {}
+    # Build content: a single ordered list of elements in YAML definition order.
+    # Groups are inserted at the position of their first visible member.
+    field_to_gdef: dict[str, "FieldGroupDef"] = {}
     for gdef in node.field_groups.values():
-        group_fields = {}
         for fkey in gdef.fields:
-            # Find the display entry by matching the field key
-            for label, fobj in fields_display.items():
-                if fobj.get("key") == fkey:
-                    group_fields[label] = fobj
-                    grouped_keys.add(label)
-                    break
-        if group_fields:
-            field_groups_display[gdef.label] = {
-                "instruction": gdef.instruction,
-                "fields": group_fields,
-            }
+            field_to_gdef[fkey] = gdef
 
-    # Emit ungrouped fields as state.fields, grouped as state.field_groups
-    ungrouped = {k: v for k, v in fields_display.items() if k not in grouped_keys}
-    if ungrouped:
-        state["fields"] = ungrouped
-    if field_groups_display:
-        state["field_groups"] = field_groups_display
+    content_items: list[dict] = []
+    seen_groups: set[str] = set()
+    for fkey, fdef in defn.node_fields(node.id).items():
+        gdef = field_to_gdef.get(fkey)
+        if gdef:
+            if gdef.label not in seen_groups:
+                group_fields = []
+                for gfkey in gdef.fields:
+                    for lbl, fobj in fields_display.items():
+                        if fobj.get("key") == gfkey:
+                            entry = dict(fobj)
+                            entry["label"] = lbl
+                            group_fields.append(entry)
+                            break
+                if group_fields:
+                    content_items.append({
+                        "type": "group",
+                        "label": gdef.label,
+                        "instruction": gdef.instruction,
+                        "affordance": None,
+                        "fields": group_fields,
+                    })
+                    seen_groups.add(gdef.label)
+        else:
+            fobj = fields_display.get(fdef.label)
+            if fobj is not None:
+                entry = dict(fobj)
+                entry["label"] = fdef.label
+                content_items.append(entry)  # type already set by _build_fields
+
+    if content_items:
+        state["content"] = content_items
     if provider_states:
         state["providers"] = provider_states
 
@@ -349,23 +364,22 @@ def render_page(defn: WorkflowDef, data: dict, workflow_id: str,
     aff_id = 1
     output_affordances = []
 
-    # Field affordances: embed inline with their field objects
-    for label, field_obj in state.get("fields", {}).items():
-        fa = field_affs_by_label.get(label)
-        if fa is not None:
-            fa["id"] = aff_id
-            aff_id += 1
-            field_obj["affordance"] = fa
-            output_affordances.append(fa)
-
-    # Field group affordances: embed on the group object
-    for label, group_obj in state.get("field_groups", {}).items():
-        ga = field_group_affs_by_label.get(label)
-        if ga is not None:
-            ga["id"] = aff_id
-            aff_id += 1
-            group_obj["affordance"] = ga
-            output_affordances.append(ga)
+    # Field and field_group affordances: embed on content items
+    for item in state.get("content", []):
+        if item["type"] == "field":
+            fa = field_affs_by_label.get(item["label"])
+            if fa is not None:
+                fa["id"] = aff_id
+                aff_id += 1
+                item["affordance"] = fa
+                output_affordances.append(fa)
+        elif item["type"] == "group":
+            ga = field_group_affs_by_label.get(item["label"])
+            if ga is not None:
+                ga["id"] = aff_id
+                aff_id += 1
+                item["affordance"] = ga
+                output_affordances.append(ga)
 
     # Table affordances
     for a in table_affs:
@@ -424,11 +438,11 @@ def _build_fields(defn: WorkflowDef, node: NodeDef, data: dict) -> dict:
         key = fdef.key
         label = fdef.label
 
-        if ftype == "boolean":
+        if ftype == "toggle":
             raw = data.get(key)
             value = None if raw is None else bool(raw)
             instruction = fdef.instruction
-        elif ftype == "computed":
+        elif ftype == "indicator":
             value = _evaluate_computed(defn, fdef, data)
             if value:
                 instruction = fdef.instruction_when_true or fdef.instruction
@@ -440,9 +454,10 @@ def _build_fields(defn: WorkflowDef, node: NodeDef, data: dict) -> dict:
 
         entry = make_field(value, instruction)
         entry["key"] = key
+        entry["type"] = ftype
 
-        # Expose options for select fields
-        if ftype == "select":
+        # Expose options for choice elements
+        if ftype == "choice":
             options = _resolve_options(defn, fdef, data)
             if options:
                 entry["options"] = options

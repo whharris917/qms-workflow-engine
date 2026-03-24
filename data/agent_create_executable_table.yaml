@@ -21,7 +21,7 @@ nodes:
     table:
       column_type_catalog: column_types
       properties:
-        sequential_execution: {type: boolean, default: false}
+        sequential_execution: {type: toggle, default: false}
       operations:
         - add_column
         - remove_column

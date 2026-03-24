@@ -25,13 +25,13 @@ nodes:
         key: description
       severity:
         label: Severity
-        type: select
+        type: choice
         key: severity
         options_from: severity_levels
         instruction: Determines investigation routing.
       category:
         label: Category
-        type: select
+        type: choice
         key: category
         options_from: categories
     proceed:
@@ -258,7 +258,7 @@ nodes:
     fields:
       exec_decision:
         label: Executive Decision
-        type: select
+        type: choice
         key: exec_decision
         options: [Approved, Approved with Conditions, Escalate Further]
       exec_conditions:
@@ -286,7 +286,7 @@ nodes:
     fields:
       disposition:
         label: Disposition
-        type: select
+        type: choice
         key: disposition
         options: [Closed - No Further Action, Closed - CAPA Required, Closed - Monitoring]
     actions:

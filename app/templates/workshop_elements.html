@@ -2,262 +2,687 @@
 {% block title %}Workshop — Element Library{% endblock %}
 {% block content %}
 <style>
-  .el-ws-header { margin-bottom: 1rem; }
-  .el-ws-header h1 { margin-bottom: 0.25rem; }
-  .el-ws-header p { color: #666; line-height: 1.5; margin: 0; }
+  /* ── Page layout ── */
+  .el-page-desc { color: #666; max-width: 700px; line-height: 1.5; margin-bottom: 2.5rem; }
+  .el-toc { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 2.5rem; }
+  .el-toc a { font-size: 0.82rem; padding: 0.25rem 0.6rem; border: 1px solid #ddd; border-radius: 4px; text-decoration: none; color: #444; font-family: Consolas, Monaco, monospace; }
+  .el-toc a:hover { border-color: #999; color: #000; }
 
-  .el-ws-nav {
-    display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;
-  }
-  .el-ws-nav button {
-    padding: 0.35rem 0.75rem; border: 1px solid #ddd; border-radius: 5px;
-    background: #fff; color: #555; font-size: 0.8rem; cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
-  }
-  .el-ws-nav button:hover { border-color: #999; }
-  .el-ws-nav button.active { background: #1976d2; color: #fff; border-color: #1976d2; }
+  .el-section { margin-bottom: 3.5rem; padding-top: 0.5rem; }
+  .el-section-head { display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 0.5rem; border-bottom: 2px solid #eee; padding-bottom: 0.5rem; }
+  .el-section-head h2 { font-size: 1.25rem; font-weight: 700; margin: 0; font-family: Consolas, Monaco, monospace; }
+  .el-section-head .el-category { font-size: 0.72rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 10px; background: #e8f4e8; color: #2a7a2a; text-transform: uppercase; letter-spacing: 0.05em; }
+  .el-category-container { background: #e4ecfb; color: #1a4a9a; }
+  .el-category-structural { background: #fef3e2; color: #8a5200; }
+  .el-desc { font-size: 0.9rem; color: #555; line-height: 1.5; margin-bottom: 1.25rem; max-width: 680px; }
 
-  .el-ws-split {
-    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px;
-    border: 1px solid #ccc; border-radius: 8px; overflow: hidden;
-    height: calc(100vh - 190px); min-height: 400px;
-    background: #ccc;
-  }
+  .el-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  @media (max-width: 860px) { .el-columns { grid-template-columns: 1fr; } }
+  .el-col-label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: #999; margin-bottom: 0.4rem; }
 
-  .el-ws-pane {
-    display: flex; flex-direction: column; overflow: hidden;
-    background: #fff;
-  }
-  .el-ws-pane-header {
-    padding: 0.5rem 0.75rem; background: #f5f5f5; border-bottom: 1px solid #ddd;
-    font-size: 0.8rem; font-weight: 600; color: #555; flex-shrink: 0;
-  }
-  .el-ws-pane-body { flex: 1; overflow: auto; position: relative; }
+  /* Code blocks */
+  .el-code { background: #f5f7fa; border: 1px solid #e2e6ed; border-radius: 6px; padding: 0.75rem 1rem; font-size: 0.78rem; font-family: Consolas, Monaco, monospace; white-space: pre; overflow-x: auto; line-height: 1.55; color: #2d3a4a; }
+  .el-code-comment { color: #7a8fa8; }
 
-  /* JSON viewer */
-  .el-ws-json {
-    margin: 0; padding: 0.75rem; font-family: 'Consolas', 'Monaco', monospace;
-    font-size: 0.8rem; line-height: 1.5; white-space: pre; tab-size: 2;
-    cursor: default;
-  }
+  /* Notes */
+  .el-notes { margin-top: 1rem; padding: 0.6rem 0.85rem; border-left: 3px solid #cbd5e1; background: #f8fafc; font-size: 0.82rem; color: #555; line-height: 1.5; }
+  .el-notes strong { color: #334; }
+  .el-notes ul { margin: 0.3rem 0 0; padding-left: 1.2rem; }
+  .el-notes li { margin: 0.2rem 0; }
 
-  /* JSON syntax */
-  .j-key { color: #881391; }
-  .j-str { color: #1a7f37; }
-  .j-num { color: #0550ae; }
-  .j-bool { color: #cf222e; }
-  .j-null { color: #888; }
-  .j-brace { color: #666; }
-  .j-entry { border-radius: 3px; transition: background 0.1s; }
-  .j-entry.j-hl { background: #fff3cd; }
-  .j-entry.j-hl > .j-key { text-decoration: underline; text-underline-offset: 2px; }
-
-  /* Rendered output */
-  .el-ws-render { padding: 1.25rem; }
-  .r-node { border-radius: 4px; transition: background 0.1s, outline-color 0.1s; }
-  .r-node.r-hl { background: #fff3cd; outline: 2px solid #ffc107; }
-
-  /* ── Human observer: dimming for out-of-focus elements ── */
-  .ho-dimmed { opacity: 0.55; transition: opacity 0.2s; }
-  .ho-focused { opacity: 1; transition: opacity 0.2s; }
-
-  /* ── Container: generic wrapper providing focus ── */
-  .el-container { position: relative; }
-  .el-container-collapsed {
-    display: flex; align-items: center; gap: 0.4rem;
-    padding: 0.4rem 0.6rem; border: 1px solid #e8e8e8; border-radius: 6px;
-    background: #fafafa;
-  }
-  .el-container-focused, .el-container-focused_all {
-    border: 1px solid #90caf9; border-radius: 6px; padding: 0.5rem;
-    background: #fafbff;
-  }
-  .el-container-focused_all { border-color: #81c784; background: #f6fdf6; }
-  .el-container-bar {
-    display: flex; gap: 0.3rem; margin-bottom: 0.35rem; flex-wrap: wrap;
-  }
-  .el-container-collapsed > .el-container-bar {
-    margin-bottom: 0; margin-left: auto; flex-shrink: 0;
-  }
-  .el-container-collapsed > .el-container-summary {
-    display: flex; align-items: center; gap: 0.4rem;
-    overflow: hidden; flex: 1; min-width: 0;
-  }
-  .el-ctn-btn {
-    padding: 0.15rem 0.4rem; border: 1px solid #ccc; border-radius: 3px;
-    background: #f5f5f5; color: #555; font-size: 0.65rem; cursor: pointer;
-    white-space: nowrap;
-  }
-  .el-ctn-btn:hover { background: #e8e8e8; }
-  .el-ctn-focus:hover { background: #e3f2fd; border-color: #90caf9; color: #1565c0; }
-  .el-ctn-unfocus { border-color: #d32f2f; color: #d32f2f; background: #fff; }
-  .el-ctn-unfocus:hover { background: #ffebee; }
-
-  /* ── Unrenderable element ── */
-  .el-error {
-    border: 2px dashed #e57373; border-radius: 6px; padding: 0.75rem 1rem;
-    background: #ffebee; max-width: 420px;
-  }
-  .el-error-type {
-    font-size: 0.8rem; font-weight: 700; color: #c62828; margin-bottom: 0.15rem;
-  }
-  .el-error-msg {
-    font-size: 0.75rem; color: #b71c1c; line-height: 1.3;
-  }
-
-  /* ── Group element ── */
-  .el-group {
-    border: 1px solid #e0e0e0; border-radius: 8px; padding: 0.75rem;
-    max-width: 460px;
-  }
-  .el-group-label {
-    font-size: 0.85rem; font-weight: 600; color: #333; margin-bottom: 0.6rem;
-  }
-  .el-group-children {
-    display: flex; flex-direction: column; gap: 0.6rem;
-  }
-
-  /* ── Action element ── */
-  .el-action {
-    display: inline-block;
-  }
-  .el-action-btn {
-    padding: 0.4rem 1rem; border-radius: 5px; font-size: 0.85rem;
-    cursor: pointer; font-weight: 500;
-  }
-  .el-action-btn.primary { background: #1976d2; color: #fff; border: none; }
-  .el-action-btn.primary:hover { background: #1565c0; }
-  .el-action-btn.secondary { background: #f5f5f5; color: #333; border: 1px solid #ccc; }
-  .el-action-btn.secondary:hover { background: #e8e8e8; }
-  .el-action-btn.danger { background: #fff; color: #c62828; border: 1px solid #e57373; }
-  .el-action-btn.danger:hover { background: #ffebee; }
-
-  /* ── Badge element ── */
-  .el-badge {
-    display: inline-flex; align-items: center; gap: 0.35rem;
-    padding: 0.2rem 0.6rem; border-radius: 4px;
-    font-size: 0.8rem; font-weight: 600;
-  }
-  .el-badge-label { font-weight: 400; opacity: 0.7; }
-  .el-badge.info { background: #e3f2fd; color: #1565c0; }
-  .el-badge.success { background: #e8f5e9; color: #2e7d32; }
-  .el-badge.warning { background: #fff3e0; color: #e65100; }
-  .el-badge.error { background: #fce4ec; color: #c62828; }
-
-  /* ── Summary element ── */
-  .el-summary {
-    display: flex; align-items: center; gap: 0.5rem;
-    padding: 0.4rem 0.6rem; border: 1px solid #e8e8e8; border-radius: 5px;
-    background: #fafafa; max-width: 420px;
-  }
-  .el-summary-type {
-    font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
-    color: #888; background: #eee; padding: 0.1rem 0.35rem; border-radius: 3px;
-    letter-spacing: 0.03em; flex-shrink: 0;
-  }
-  .el-summary-label {
-    font-size: 0.8rem; font-weight: 600; color: #333;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .el-summary-preview {
-    font-size: 0.75rem; color: #888; white-space: nowrap;
-    overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;
-  }
-  .el-summary-meta {
-    font-size: 0.7rem; color: #aaa; flex-shrink: 0;
-  }
-
-  /* ── Note element ── */
-  .el-note {
-    font-size: 0.85rem; color: #555; line-height: 1.5;
-    padding: 0.5rem 0.75rem; background: #f9f9f9; border-left: 3px solid #ddd;
-    border-radius: 0 4px 4px 0; max-width: 420px;
-  }
-
-  /* ── Field element ── */
-  .el-field {
-    border: 1px solid #e0e0e0; border-radius: 6px; padding: 0.75rem 1rem;
-    max-width: 420px;
-  }
-  .el-field-label {
-    font-size: 0.8rem; font-weight: 600; color: #333; margin-bottom: 0.15rem;
-  }
-  .el-field-instruction {
-    font-size: 0.75rem; color: #888; margin-bottom: 0.5rem; line-height: 1.3;
-  }
-  .el-field-value {
-    font-size: 0.9rem; color: #111; margin-bottom: 0.5rem;
-  }
-  .el-field-value.empty { color: #bbb; font-style: italic; }
-
-  /* Affordance controls */
-  .el-aff { margin-top: 0.4rem; }
-  .el-aff-row {
-    display: flex; align-items: center; gap: 0.35rem;
-  }
-  .el-aff-input {
-    padding: 0.25rem 0.5rem; border: 1px solid #ccc; border-radius: 4px;
-    font-size: 0.8rem; flex: 1; min-width: 0;
-  }
-  .el-aff-btn {
-    padding: 0.25rem 0.6rem; border: 1px solid #ccc; border-radius: 4px;
-    background: #f5f5f5; color: #333; font-size: 0.8rem; cursor: pointer;
-    white-space: nowrap;
-  }
-  .el-aff-btn:hover { background: #e8e8e8; }
-  .el-aff-opt {
-    padding: 0.25rem 0.6rem; border: 1px solid #ddd; border-radius: 4px;
-    background: #f9f9f9; color: #555; font-size: 0.8rem; cursor: pointer;
-  }
-  .el-aff-opt:hover { background: #e8e8e8; }
-  .el-aff-opt.active {
-    background: #e3f2fd; color: #1565c0; border-color: #90caf9; font-weight: 600;
-  }
-
-  /* Affordance tooltip */
-  .el-aff-tooltip {
-    position: fixed; z-index: 1000; pointer-events: none;
-    background: #1e1e1e; color: #d4d4d4; border-radius: 6px;
-    padding: 0.5rem 0.65rem; font-family: 'Consolas', 'Monaco', monospace;
-    font-size: 0.75rem; line-height: 1.45; white-space: pre;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-    max-width: 420px; overflow: hidden;
-  }
-  .el-aff-tooltip .tt-method { color: #569cd6; font-weight: 700; }
-  .el-aff-tooltip .tt-url { color: #ce9178; }
-  .el-aff-tooltip .tt-key { color: #9cdcfe; }
-  .el-aff-tooltip .tt-val { color: #b5cea8; }
-  .el-aff-tooltip .tt-str { color: #ce9178; }
-  .el-aff-tooltip .tt-brace { color: #d4d4d4; }
+  /* ── Extracted wf-* CSS from human-renderer.js ── */
+  .wf-card { margin: 0; padding: 0.75rem; border: 1px solid #d1d9e6; border-radius: 8px; background: #fff; }
+  .wf-card-head { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; display: flex; align-items: center; color: #5a6a7e; }
+  .wf-card-field-group > .wf-card-head { color: #4a5a6a; }
+  .wf-fields { display: flex; flex-direction: column; gap: 0.15rem; }
+  .wf-field { padding: 0.5rem 0.6rem; border-bottom: 1px solid #f0f2f5; }
+  .wf-field:last-child { border-bottom: none; }
+  .wf-field-label { font-size: 0.8rem; font-weight: 600; margin-bottom: 0.15rem; color: #2d3a4a; }
+  .wf-field-instruction { font-size: 0.75rem; font-style: italic; margin-bottom: 0.2rem; line-height: 1.3; color: #6b7a8d; }
+  .wf-field-value { font-size: 0.85rem; color: #2d3a4a; }
+  .wf-field-empty { font-style: italic; font-size: 0.8rem; color: #a0aab5; }
+  .wf-field-row { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+  .wf-field-current { font-size: 0.85rem; flex-shrink: 0; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #2d3a4a; }
+  .wf-field-current.wf-field-empty { color: #a0aab5; }
+  .wf-aff-opt-btn { font-size: 0.78rem; padding: 0.3rem 0.7rem; border-radius: 4px; border: 1px solid #ccc; background: #f8f9fb; color: #333; cursor: pointer; }
+  .wf-aff-opt-active { background: #2a6bcf !important; color: #fff !important; border-color: #2a6bcf !important; }
+  .wf-aff-input { flex: 1; font-size: 0.82rem; padding: 0.3rem 0.5rem; border: 1px solid #ccc; border-radius: 4px; min-width: 120px; font-family: inherit; }
+  .wf-aff-select { flex: 1; font-size: 0.82rem; padding: 0.3rem 0.5rem; border: 1px solid #ccc; border-radius: 4px; min-width: 120px; font-family: inherit; background: #fff; }
+  .wf-aff-submit { font-size: 0.78rem; padding: 0.3rem 0.7rem; border-radius: 4px; border: 1px solid #2a6bcf; background: #2a6bcf; color: #fff; cursor: pointer; }
+  .wf-aff-action-btn { font-size: 0.82rem; padding: 0.35rem 0.9rem; border-radius: 4px; border: 1px solid #218838; background: #218838; color: #fff; cursor: pointer; font-weight: 500; }
+  .wf-aff-action-primary { background: #2a6bcf !important; border-color: #2a6bcf !important; }
+  .wf-action-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; padding: 0.25rem 0; }
+  .wf-desc-inline { font-size: 0.8rem; font-style: italic; line-height: 1.4; color: #6b7a8d; margin: 0 0 0.5rem; padding: 0; }
+  .wf-table-wrap { overflow-x: auto; }
+  .wf-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  .wf-table th, .wf-table td { padding: 0.4rem 0.6rem; border: 1px solid #d1d9e6; text-align: left; vertical-align: top; }
+  .wf-table th { background: #f5f7fa; }
+  .wf-table-rownum { width: 40px; text-align: center; font-size: 0.75rem; font-weight: 600; }
+  .wf-table-colname { font-weight: 600; font-size: 0.82rem; }
+  .wf-table-coltype { font-size: 0.68rem; color: #888; }
+  .wf-table-empty { font-style: italic; font-size: 0.8rem; text-align: center; padding: 0.75rem; color: #a0aab5; }
+  .wf-list-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.6rem; border-bottom: 1px solid #f0f2f5; font-size: 0.85rem; }
+  .wf-list-item:last-child { border-bottom: none; }
+  .wf-list-ops { display: flex; gap: 0.35rem; margin-top: 0.5rem; }
+  .wf-list-op-btn { font-size: 0.75rem; padding: 0.25rem 0.55rem; border-radius: 4px; border: 1px solid #ccc; background: #f8f9fb; color: #555; cursor: pointer; }
 </style>
 
-<div class="el-ws-header">
-  <h1>Element Library</h1>
-  <p>Canonical representations and renderings of UI elements.</p>
+<h1>Element Library</h1>
+<p class="el-page-desc">
+  Reference catalog for all workflow element types defined by the QMS Workflow Engine.
+  Each entry documents the YAML definition syntax, the state JSON shape emitted by the renderer,
+  and a static visual preview using the renderer's own CSS classes.
+</p>
+
+<nav class="el-toc">
+  <a href="#text">text</a>
+  <a href="#toggle">toggle</a>
+  <a href="#choice">choice</a>
+  <a href="#indicator">indicator</a>
+  <a href="#group">group</a>
+  <a href="#table">table</a>
+  <a href="#list">list</a>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- text                                                    -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="el-section" id="text">
+  <div class="el-section-head">
+    <h2>text</h2>
+    <span class="el-category">leaf element</span>
+  </div>
+  <p class="el-desc">
+    A free-form string input. The most basic data-collection element. Renders as a label,
+    optional instruction, current value, and a text input with a Set button.
+  </p>
+  <div class="el-columns">
+    <div>
+      <div class="el-col-label">YAML definition</div>
+      <div class="el-code"><span class="el-code-comment"># Inside a node's fields: block</span>
+title:
+  label: Title
+  type: text
+  instruction: Provide a short, descriptive title.
+  default: null</div>
+      <div class="el-col-label" style="margin-top:1rem">State JSON (in content array)</div>
+      <div class="el-code">{
+  "type": "text",
+  "key": "title",
+  "label": "Title",
+  "instruction": "Provide a short, descriptive title.",
+  "value": null,
+  "affordance": {
+    "method": "POST",
+    "url": "/api/wf/{id}/title",
+    "parameters": {
+      "value": { "type": "string" }
+    }
+  }
+}</div>
+    </div>
+    <div>
+      <div class="el-col-label">Rendered preview</div>
+      <div class="wf-card">
+        <div class="wf-fields">
+          <div class="wf-field">
+            <div class="wf-field-label">Title</div>
+            <div class="wf-field-instruction">Provide a short, descriptive title.</div>
+            <div class="wf-field-row">
+              <span class="wf-field-current wf-field-empty">(not set)</span>
+              <input class="wf-aff-input" type="text" placeholder="New value…" disabled>
+              <button class="wf-aff-submit">Set</button>
+            </div>
+          </div>
+          <div class="wf-field">
+            <div class="wf-field-label">Title</div>
+            <div class="wf-field-instruction">Provide a short, descriptive title.</div>
+            <div class="wf-field-row">
+              <span class="wf-field-current">Fix renderer ordering bug</span>
+              <input class="wf-aff-input" type="text" placeholder="New value…" disabled>
+              <button class="wf-aff-submit">Set</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="el-notes">
+        <strong>Notes:</strong>
+        <ul>
+          <li>Top example: value is null → shows <em>(not set)</em></li>
+          <li>Bottom example: value is set → shows current value alongside input</li>
+          <li>Supports <code>visible_when</code> and <code>side_effects</code> attributes</li>
+        </ul>
+      </div>
+    </div>
+  </div>
 </div>
 
-<div class="el-ws-nav" id="el-nav"></div>
-
-<div class="el-ws-split">
-  <div class="el-ws-pane">
-    <div class="el-ws-pane-header">Agent JSON</div>
-    <div class="el-ws-pane-body">
-      <div class="el-ws-json" id="el-json"></div>
-    </div>
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- toggle                                                  -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="el-section" id="toggle">
+  <div class="el-section-head">
+    <h2>toggle</h2>
+    <span class="el-category">leaf element</span>
   </div>
-  <div class="el-ws-pane">
-    <div class="el-ws-pane-header">Agent View</div>
-    <div class="el-ws-pane-body">
-      <div class="el-ws-render" id="el-render"></div>
+  <p class="el-desc">
+    A boolean yes/no element. Renders as two option buttons (Yes / No). The active choice
+    is highlighted. YAML accepts <code>type: toggle</code> or the legacy alias <code>type: boolean</code>.
+  </p>
+  <div class="el-columns">
+    <div>
+      <div class="el-col-label">YAML definition</div>
+      <div class="el-code">affects_code:
+  label: Code Impact
+  type: toggle          <span class="el-code-comment"># or: boolean</span>
+  instruction: Does this change affect any code?
+  default: null</div>
+      <div class="el-col-label" style="margin-top:1rem">State JSON</div>
+      <div class="el-code">{
+  "type": "toggle",
+  "key": "affects_code",
+  "label": "Code Impact",
+  "instruction": "Does this change affect any code?",
+  "value": true,
+  "affordance": {
+    "method": "POST",
+    "url": "/api/wf/{id}/affects_code",
+    "parameters": {
+      "value": { "options": [true, false] }
+    }
+  }
+}</div>
     </div>
-  </div>
-  <div class="el-ws-pane">
-    <div class="el-ws-pane-header">Human Observer</div>
-    <div class="el-ws-pane-body">
-      <div class="el-ws-render" id="el-human"></div>
+    <div>
+      <div class="el-col-label">Rendered preview</div>
+      <div class="wf-card">
+        <div class="wf-fields">
+          <div class="wf-field">
+            <div class="wf-field-label">Code Impact</div>
+            <div class="wf-field-instruction">Does this change affect any code?</div>
+            <div class="wf-field-row">
+              <span class="wf-field-current wf-field-empty">(not set)</span>
+              <button class="wf-aff-opt-btn">Yes</button>
+              <button class="wf-aff-opt-btn">No</button>
+            </div>
+          </div>
+          <div class="wf-field">
+            <div class="wf-field-label">Code Impact</div>
+            <div class="wf-field-instruction">Does this change affect any code?</div>
+            <div class="wf-field-row">
+              <span class="wf-field-current">Yes</span>
+              <button class="wf-aff-opt-btn wf-aff-opt-active">Yes</button>
+              <button class="wf-aff-opt-btn">No</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="el-notes">
+        <strong>Notes:</strong>
+        <ul>
+          <li>Always renders as button pair — never as a dropdown</li>
+          <li><code>true</code> → "Yes", <code>false</code> → "No" in display</li>
+          <li>Commonly used with <code>side_effects</code> to reveal other elements</li>
+        </ul>
+      </div>
     </div>
   </div>
 </div>
 
-<script src="/static/workshop/elements.js"></script>
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- choice                                                  -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="el-section" id="choice">
+  <div class="el-section-head">
+    <h2>choice</h2>
+    <span class="el-category">leaf element</span>
+  </div>
+  <p class="el-desc">
+    A selection from a fixed option set. Renders as buttons (≤3 short options) or a
+    dropdown (>3 options, or any option longer than 20 characters). YAML accepts
+    <code>type: choice</code> or the legacy alias <code>type: select</code>.
+  </p>
+  <div class="el-columns">
+    <div>
+      <div class="el-col-label">YAML definition — inline options</div>
+      <div class="el-code">priority:
+  label: Priority
+  type: choice          <span class="el-code-comment"># or: select</span>
+  instruction: Select the urgency level.
+  options: [Low, Medium, High]</div>
+      <div class="el-col-label" style="margin-top:1rem">YAML — options from named set</div>
+      <div class="el-code">category:
+  label: Category
+  type: choice
+  instruction: Select the category.
+  options_from: change_categories  <span class="el-code-comment"># top-level option_sets key</span>
+  annotate_from: approved_set      <span class="el-code-comment"># mark subset as approved</span>
+  annotation: "Approved"</div>
+      <div class="el-col-label" style="margin-top:1rem">YAML — dynamic options</div>
+      <div class="el-code">sub_type:
+  label: Sub-Type
+  type: choice
+  instruction: Select a sub-type.
+  dynamic_options:
+    source_key: category           <span class="el-code-comment"># watches this field</span>
+    mapping:
+      Software: [Bugfix, Feature, Refactor]
+      Hardware: [Design, Assembly]</div>
+      <div class="el-col-label" style="margin-top:1rem">State JSON</div>
+      <div class="el-code">{
+  "type": "choice",
+  "key": "priority",
+  "label": "Priority",
+  "instruction": "Select the urgency level.",
+  "value": "Medium",
+  "affordance": {
+    "method": "POST",
+    "url": "/api/wf/{id}/priority",
+    "parameters": {
+      "value": { "options": ["Low", "Medium", "High"] }
+    }
+  }
+}</div>
+    </div>
+    <div>
+      <div class="el-col-label">Rendered preview — button group (≤3)</div>
+      <div class="wf-card">
+        <div class="wf-fields">
+          <div class="wf-field">
+            <div class="wf-field-label">Priority</div>
+            <div class="wf-field-instruction">Select the urgency level.</div>
+            <div class="wf-field-row">
+              <span class="wf-field-current">Medium</span>
+              <button class="wf-aff-opt-btn">Low</button>
+              <button class="wf-aff-opt-btn wf-aff-opt-active">Medium</button>
+              <button class="wf-aff-opt-btn">High</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="el-col-label" style="margin-top:1rem">Rendered preview — dropdown (>3)</div>
+      <div class="wf-card">
+        <div class="wf-fields">
+          <div class="wf-field">
+            <div class="wf-field-label">Category</div>
+            <div class="wf-field-instruction">Select the category.</div>
+            <div class="wf-field-row">
+              <span class="wf-field-current wf-field-empty">(not set)</span>
+              <select class="wf-aff-select" disabled>
+                <option>— Select —</option>
+                <option>Software</option>
+                <option>Hardware</option>
+                <option>Process</option>
+                <option>Documentation</option>
+              </select>
+              <button class="wf-aff-submit">Set</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="el-notes">
+        <strong>Notes:</strong>
+        <ul>
+          <li>Button vs dropdown threshold: >3 options, or any option >20 chars</li>
+          <li><code>options</code>: inline list in YAML</li>
+          <li><code>options_from</code>: reference to top-level <code>option_sets</code></li>
+          <li><code>dynamic_options</code>: options derived from another field's value</li>
+          <li><code>annotate_from</code> + <code>annotation</code>: visually mark a subset of options</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- indicator                                               -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="el-section" id="indicator">
+  <div class="el-section-head">
+    <h2>indicator</h2>
+    <span class="el-category">leaf element</span>
+  </div>
+  <p class="el-desc">
+    A read-only computed value. No affordance is emitted — the value is derived server-side
+    from a <code>compute</code> expression. Supports conditional instructions
+    (<code>instruction_when_true</code> / <code>instruction_when_false</code>).
+    YAML accepts <code>type: indicator</code> or the legacy alias <code>type: computed</code>.
+  </p>
+  <div class="el-columns">
+    <div>
+      <div class="el-col-label">YAML definition</div>
+      <div class="el-code">ready_to_proceed:
+  label: Readiness Check
+  type: indicator       <span class="el-code-comment"># or: computed</span>
+  compute:
+    fn: all_set
+    args: [title, category, priority]
+  instruction_when_true: All required fields are set. You may proceed.
+  instruction_when_false: Please set all required fields before proceeding.</div>
+      <div class="el-col-label" style="margin-top:1rem">State JSON — value is false</div>
+      <div class="el-code">{
+  "type": "indicator",
+  "key": "ready_to_proceed",
+  "label": "Readiness Check",
+  "instruction": "Please set all required fields before proceeding.",
+  "value": false
+  <span class="el-code-comment">/* no affordance key */</span>
+}</div>
+    </div>
+    <div>
+      <div class="el-col-label">Rendered preview — not ready</div>
+      <div class="wf-card">
+        <div class="wf-fields">
+          <div class="wf-field">
+            <div class="wf-field-label">Readiness Check</div>
+            <div class="wf-field-instruction">Please set all required fields before proceeding.</div>
+            <div class="wf-field-value">No</div>
+          </div>
+        </div>
+      </div>
+      <div class="el-col-label" style="margin-top:1rem">Rendered preview — ready</div>
+      <div class="wf-card">
+        <div class="wf-fields">
+          <div class="wf-field">
+            <div class="wf-field-label">Readiness Check</div>
+            <div class="wf-field-instruction">All required fields are set. You may proceed.</div>
+            <div class="wf-field-value">Yes</div>
+          </div>
+        </div>
+      </div>
+      <div class="el-notes">
+        <strong>Notes:</strong>
+        <ul>
+          <li>No affordance — agents cannot set this value</li>
+          <li>Instruction switches based on current computed value</li>
+          <li>Commonly used as a proceed gate prerequisite check</li>
+          <li>Supported <code>compute.fn</code> values: <code>all_set</code>, <code>any_set</code>, <code>equals</code>, <code>not_equals</code>, and others</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- group                                                   -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="el-section" id="group">
+  <div class="el-section-head">
+    <h2>group</h2>
+    <span class="el-category el-category-container">container element</span>
+  </div>
+  <p class="el-desc">
+    A named collection of fields that share a single affordance (one POST sets all fields at once).
+    Defined under <code>field_groups</code> in a node. Each field referenced must also be declared
+    in the node's <code>fields</code> block. The engine preserves YAML definition order for
+    element rendering within the group.
+  </p>
+  <div class="el-columns">
+    <div>
+      <div class="el-col-label">YAML definition</div>
+      <div class="el-code"><span class="el-code-comment"># Node fields block (declares elements)</span>
+fields:
+  title:
+    label: Title
+    type: text
+    instruction: Short, descriptive title.
+  affects_code:
+    label: Code Impact
+    type: toggle
+    instruction: Does this change affect code?
+  purpose:
+    label: Purpose
+    type: text
+    instruction: Why is this change needed?
+
+<span class="el-code-comment"># Node field_groups block (groups them)</span>
+field_groups:
+  initiation:
+    label: Basic Information
+    instruction: |
+      Provide the core identifying information for this change.
+      All fields are required before you can proceed.
+    fields: [title, affects_code, purpose]</div>
+      <div class="el-col-label" style="margin-top:1rem">State JSON (in content array)</div>
+      <div class="el-code">{
+  "type": "group",
+  "label": "Basic Information",
+  "instruction": "Provide the core identifying information...",
+  "fields": [
+    { "key": "title", "label": "Title",
+      "type": "text", "value": null,
+      "instruction": "Short, descriptive title." },
+    { "key": "affects_code", "label": "Code Impact",
+      "type": "toggle", "value": null,
+      "instruction": "Does this change affect code?" },
+    { "key": "purpose", "label": "Purpose",
+      "type": "text", "value": null,
+      "instruction": "Why is this change needed?" }
+  ],
+  "affordance": {
+    "method": "POST",
+    "url": "/api/wf/{id}/set_fields",
+    "parameters": {
+      "title":        { "type": "string" },
+      "affects_code": { "options": [true, false] },
+      "purpose":      { "type": "string" }
+    }
+  }
+}</div>
+    </div>
+    <div>
+      <div class="el-col-label">Rendered preview</div>
+      <div class="wf-card" style="padding:0.75rem">
+        <div class="wf-card-head">Basic Information</div>
+        <div class="wf-desc-inline">Provide the core identifying information for this change. All fields are required before you can proceed.</div>
+        <div class="wf-field">
+          <div class="wf-field-label">Title</div>
+          <div class="wf-field-instruction">Short, descriptive title.</div>
+          <div class="wf-field-row">
+            <span class="wf-field-current wf-field-empty">(not set)</span>
+            <input class="wf-aff-input" type="text" placeholder="New value…" disabled>
+          </div>
+        </div>
+        <div class="wf-field">
+          <div class="wf-field-label">Code Impact</div>
+          <div class="wf-field-instruction">Does this change affect code?</div>
+          <div class="wf-field-row">
+            <span class="wf-field-current wf-field-empty">(not set)</span>
+            <button class="wf-aff-opt-btn">Yes</button>
+            <button class="wf-aff-opt-btn">No</button>
+          </div>
+        </div>
+        <div class="wf-field">
+          <div class="wf-field-label">Purpose</div>
+          <div class="wf-field-instruction">Why is this change needed?</div>
+          <div class="wf-field-row">
+            <span class="wf-field-current wf-field-empty">(not set)</span>
+            <input class="wf-aff-input" type="text" placeholder="New value…" disabled>
+          </div>
+        </div>
+        <div class="wf-action-bar" style="margin-top:0.5rem">
+          <button class="wf-aff-action-btn wf-aff-action-primary">Set All</button>
+        </div>
+      </div>
+      <div class="el-notes">
+        <strong>Notes:</strong>
+        <ul>
+          <li>Group <code>instruction</code> is required — validated at load time</li>
+          <li>All fields in <code>field_groups.fields</code> must exist in <code>fields</code></li>
+          <li>Rendering order follows the order in <code>fields</code> list</li>
+          <li>Element order across the node follows YAML definition order (unified <code>content</code> array)</li>
+          <li>A single "Set All" affordance covers all fields in the group</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- table                                                   -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="el-section" id="table">
+  <div class="el-section-head">
+    <h2>table</h2>
+    <span class="el-category el-category-structural">structural element</span>
+  </div>
+  <p class="el-desc">
+    A structured data grid with typed columns and row data. Supports operations
+    such as add, edit, remove, and reorder. Column types are declared in a
+    top-level <code>column_types</code> catalog or inline.
+  </p>
+  <div class="el-columns">
+    <div>
+      <div class="el-col-label">YAML definition</div>
+      <div class="el-code"><span class="el-code-comment"># Top-level column type catalog</span>
+column_types:
+  test_result:
+    type: choice
+    choices: [Pass, Fail, N/A]
+
+<span class="el-code-comment"># Inside a node</span>
+table:
+  column_type_catalog: test_result
+  properties:
+    min_rows: 1
+    requires_all_pass: true
+  operations: [add, edit, remove]</div>
+      <div class="el-col-label" style="margin-top:1rem">State JSON (state.table)</div>
+      <div class="el-code">{
+  "columns": [
+    { "name": "Test Case", "type": "text" },
+    { "name": "Result",    "type": "choice",
+      "choices": ["Pass", "Fail", "N/A"] }
+  ],
+  "rows": [
+    ["Nominal operation",  "Pass"],
+    ["Edge case input",    null]
+  ],
+  "properties": {
+    "min_rows": 1,
+    "requires_all_pass": true
+  }
+}</div>
+    </div>
+    <div>
+      <div class="el-col-label">Rendered preview</div>
+      <div class="wf-card">
+        <div class="wf-card-head">Table</div>
+        <div class="wf-table-wrap">
+          <table class="wf-table">
+            <thead>
+              <tr>
+                <th class="wf-table-rownum">#</th>
+                <th><div class="wf-table-colname">Test Case</div><div class="wf-table-coltype">text</div></th>
+                <th><div class="wf-table-colname">Result</div><div class="wf-table-coltype">choice: Pass, Fail, N/A</div></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="wf-table-rownum">0</td>
+                <td>Nominal operation</td>
+                <td>Pass</td>
+              </tr>
+              <tr>
+                <td class="wf-table-rownum">1</td>
+                <td>Edge case input</td>
+                <td><span class="wf-table-empty">—</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="el-notes">
+        <strong>Notes:</strong>
+        <ul>
+          <li>Distinct from <code>execution_table</code> — this is free-form data, not a plan</li>
+          <li><code>column_type_catalog</code> references a top-level <code>column_types</code> entry</li>
+          <li><code>operations</code>: <code>add</code>, <code>edit</code>, <code>remove</code>, <code>reorder</code></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- list                                                    -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="el-section" id="list">
+  <div class="el-section-head">
+    <h2>list</h2>
+    <span class="el-category el-category-structural">structural element</span>
+  </div>
+  <p class="el-desc">
+    An ordered collection of structured items. Each item conforms to an
+    <code>item_schema</code> defining per-item fields. Supports add, edit,
+    remove, and reorder operations. When <code>focus: true</code>, selecting an item
+    scopes subsequent node rendering to that item's data.
+  </p>
+  <div class="el-columns">
+    <div>
+      <div class="el-col-label">YAML definition</div>
+      <div class="el-code"><span class="el-code-comment"># Inside a node's lists: block</span>
+lists:
+  items:
+    label: Items
+    item_schema:
+      name:
+        type: text
+        required: true
+      quantity:
+        type: text
+        required: false
+      status:
+        type: choice
+        options: [Pending, Complete, N/A]
+    operations: [add, edit, remove, reorder]
+    focus: false</div>
+      <div class="el-col-label" style="margin-top:1rem">State JSON (state.items)</div>
+      <div class="el-code">{
+  "label": "Items",
+  "items": [
+    { "id": "abc1", "name": "Verify outputs",
+      "quantity": "3", "status": "Complete" },
+    { "id": "abc2", "name": "Archive records",
+      "quantity": null, "status": "Pending" }
+  ],
+  "operations": ["add", "edit", "remove", "reorder"],
+  "focus": false
+}</div>
+    </div>
+    <div>
+      <div class="el-col-label">Rendered preview</div>
+      <div class="wf-card">
+        <div class="wf-card-head">Items</div>
+        <div class="wf-list-item">
+          <span style="flex:1">Verify outputs</span>
+          <span style="font-size:0.78rem;color:#888">×3</span>
+          <span style="font-size:0.75rem;padding:0.1rem 0.4rem;border-radius:3px;background:#d4edda;color:#155724">Complete</span>
+        </div>
+        <div class="wf-list-item">
+          <span style="flex:1">Archive records</span>
+          <span style="font-size:0.78rem;color:#a0aab5">—</span>
+          <span style="font-size:0.75rem;padding:0.1rem 0.4rem;border-radius:3px;background:#fff3cd;color:#856404">Pending</span>
+        </div>
+        <div class="wf-list-ops">
+          <button class="wf-list-op-btn">+ Add</button>
+          <button class="wf-list-op-btn">Edit</button>
+          <button class="wf-list-op-btn">Remove</button>
+          <button class="wf-list-op-btn">⇅ Reorder</button>
+        </div>
+      </div>
+      <div class="el-notes">
+        <strong>Notes:</strong>
+        <ul>
+          <li>Item schema field types: <code>text</code>, <code>toggle</code>, <code>choice</code></li>
+          <li><code>required: true</code> fields must be set before an item can be saved</li>
+          <li><code>focus: true</code> enables item-scoped rendering — selecting an item
+              restricts the visible state to that item's fields</li>
+          <li>Operations default to all four if not specified</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}

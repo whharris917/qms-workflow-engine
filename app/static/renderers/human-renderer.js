@@ -362,7 +362,7 @@ function wfRenderStateProps(state) {
        Known keys (rendered elsewhere): workflow, node, node_title, completed_nodes,
        definition, fields, table, execution_table. */
     var s = state.state || {};
-    var known = ['workflow','node','node_title','completed_nodes','definition','fields','field_groups','table','execution_table','fork_state','banner_definition'];
+    var known = ['workflow','node','node_title','completed_nodes','definition','content','table','execution_table','fork_state','banner_definition'];
     var extra = Object.keys(s).filter(function(k) { return known.indexOf(k) === -1; });
     if (!extra.length) return '';
     var html = '';
@@ -1108,13 +1108,13 @@ function _fcNodeCard(nd, idx) {
             var fld = fields[fi];
             var typeCls = 'fc-ft-text';
             var typeLabel = 'T';
-            if (fld.type === 'boolean') { typeCls = 'fc-ft-bool'; typeLabel = '?'; }
-            else if (fld.type === 'select') { typeCls = 'fc-ft-sel'; typeLabel = '\u25BE'; }
+            if (fld.type === 'toggle') { typeCls = 'fc-ft-bool'; typeLabel = '?'; }
+            else if (fld.type === 'choice') { typeCls = 'fc-ft-sel'; typeLabel = '\u25BE'; }
             h += '<div class="fc-field">';
             h += '<span class="fc-field-dot ' + typeCls + '">' + typeLabel + '</span>';
             h += '<span class="fc-field-name">' + wfEsc(fld.label || fld.key) + '</span>';
             h += '<code class="fc-field-key">' + wfEsc(fld.key) + '</code>';
-            if (fld.type === 'select' && fld.options && fld.options.length) {
+            if (fld.type === 'choice' && fld.options && fld.options.length) {
                 h += '<div class="fc-field-opts">';
                 for (var oi = 0; oi < fld.options.length; oi++) {
                     h += '<div class="fc-field-opt">' + wfEsc(fld.options[oi]) + '</div>';
@@ -1385,7 +1385,7 @@ function humanRenderDefinition(defn) {
 /* ── State props (definition-aware) ── */
 function humanRenderStateProps(state) {
     var s = state.state || {};
-    var known = ['workflow','node','node_title','completed_nodes','definition','fields','field_groups','table','execution_table','fork_state','banner_definition'];
+    var known = ['workflow','node','node_title','completed_nodes','definition','content','table','execution_table','fork_state','banner_definition'];
     var extra = Object.keys(s).filter(function(k) { return known.indexOf(k) === -1; });
     if (!extra.length) return '';
     var html = '';
@@ -1822,87 +1822,140 @@ var _sectionRenderers = {};
 /* Structural keys: always handled by the page frame, never dispatched */
 var _structuralKeys = ['workflow','node','node_title','completed_nodes','definition','banner_definition','fork_state','page'];
 
-_sectionRenderers['fields'] = function(fields, ctx) {
-    return '<div class="wf-card"><div class="wf-card-head">Fields</div>'
-        + _wfRenderFieldAffordances(fields, ctx.fieldCategory)
-        + '</div>';
-};
-
-_sectionRenderers['field_groups'] = function(groups, ctx) {
-    var html = '';
-    var groupLabels = Object.keys(groups);
-    for (var gi = 0; gi < groupLabels.length; gi++) {
-        var label = groupLabels[gi];
-        var group = groups[label];
-        var aff = group.affordance;
-        html += '<div class="wf-card wf-card-field-group">';
-        html += '<div class="wf-card-head">' + wfEsc(label) + '</div>';
-        if (group.instruction) {
-            html += '<div class="wf-desc" style="margin:0 0 0.5rem;padding:0;font-size:0.8rem">' + wfEsc(group.instruction) + '</div>';
-        }
-        /* Render each field in the group with current values and input controls */
-        var fields = group.fields || {};
-        var fieldKeys = Object.keys(fields);
-        for (var fi = 0; fi < fieldKeys.length; fi++) {
-            var fk = fieldKeys[fi];
-            var f = fields[fk];
-            if (!f || typeof f !== 'object' || !('value' in f)) continue;
-            var cat = ctx.fieldCategory[fk] || null;
-            var catCls = cat ? ' wf-fb-' + cat : '';
-            html += '<div class="wf-field' + catCls + '">';
-            html += '<div class="wf-field-label">' + wfEsc(fk) + '</div>';
-            if (f.instruction) {
-                html += '<div class="wf-field-instruction">' + wfEsc(f.instruction) + '</div>';
+/* ── Render a single field item (type: "field") ── */
+function _renderContentField(item, ctx) {
+    var aff = item.affordance;
+    if (!aff) return '';   /* read-only / no affordance — omit */
+    var cat = ctx.fieldCategory[item.label] || null;
+    var catCls = cat ? ' wf-fb-' + cat : '';
+    var html = '<div class="wf-field' + catCls + '">';
+    html += '<div class="wf-field-label">' + wfEsc(item.label) + '</div>';
+    if (item.instruction) {
+        html += '<div class="wf-field-instruction">' + wfEsc(item.instruction) + '</div>';
+    }
+    var options = (aff.parameters && aff.parameters.value && aff.parameters.value.options) || null;
+    if (options) {
+        var useDropdown = options.length > 3;
+        if (!useDropdown) {
+            for (var oi = 0; oi < options.length; oi++) {
+                var ol = options[oi] === true ? 'Yes' : options[oi] === false ? 'No' : String(options[oi]);
+                if (ol.length > 20) { useDropdown = true; break; }
             }
-            /* Input controls based on field type (options or text) */
-            var params = aff && aff.parameters && aff.parameters[f.key];
-            var options = params && params.options;
-            if (options) {
-                var useDropdown = options.length > 3;
-                if (!useDropdown) {
-                    for (var oi = 0; oi < options.length; oi++) {
-                        var ol = options[oi] === true ? 'Yes' : options[oi] === false ? 'No' : String(options[oi]);
-                        if (ol.length > 20) { useDropdown = true; break; }
-                    }
+        }
+        var curDisplay = item.value === true ? 'Yes' : item.value === false ? 'No' : item.value != null ? String(item.value) : '';
+        html += '<div class="wf-field-row">';
+        html += curDisplay ? '<span class="wf-field-current">' + wfEsc(curDisplay) + '</span>' : '<span class="wf-field-current wf-field-empty">(not set)</span>';
+        if (useDropdown) {
+            html += '<select class="wf-aff-select" data-aff-url="' + wfEsc(aff.url) + '">';
+            html += '<option value="">&mdash; Select &mdash;</option>';
+            for (var oi = 0; oi < options.length; oi++) {
+                var oval = options[oi];
+                var olabel = oval === true ? 'Yes' : oval === false ? 'No' : String(oval);
+                html += '<option value="' + wfEsc(JSON.stringify(oval)) + '">' + wfEsc(olabel) + '</option>';
+            }
+            html += '</select>';
+            html += '<button class="wf-aff-submit" data-aff-url="' + wfEsc(aff.url) + '">Set</button>';
+        } else {
+            for (var oi = 0; oi < options.length; oi++) {
+                var oval = options[oi];
+                var olabel = oval === true ? 'Yes' : oval === false ? 'No' : String(oval);
+                var isActive = JSON.stringify(oval) === JSON.stringify(item.value);
+                var btnTooltip = aff.method + ' ' + aff.url + ' ' + JSON.stringify({value: oval});
+                html += '<button class="wf-aff-opt-btn' + (isActive ? ' wf-aff-opt-active' : '') + '" data-aff-url="' + wfEsc(aff.url) + '" data-aff-value="' + wfEsc(JSON.stringify(oval)) + '" title="' + wfEsc(btnTooltip) + '">' + wfEsc(olabel) + '</button>';
+            }
+        }
+        html += '</div>';
+    } else {
+        var curVal = item.value == null ? '' : String(item.value);
+        html += '<div class="wf-field-row">';
+        html += curVal ? '<span class="wf-field-current">' + wfEsc(curVal) + '</span>' : '<span class="wf-field-current wf-field-empty">(not set)</span>';
+        html += '<input class="wf-aff-input" type="text" data-aff-url="' + wfEsc(aff.url) + '" placeholder="New value\u2026">';
+        html += '<button class="wf-aff-submit" data-aff-url="' + wfEsc(aff.url) + '">Set</button>';
+        html += '</div>';
+    }
+    html += '</div>';
+    return html;
+}
+
+/* ── Render a field_group item (type: "field_group") ── */
+function _renderContentFieldGroup(item, ctx) {
+    var aff = item.affordance;
+    var html = '<div class="wf-card wf-card-field-group">';
+    html += '<div class="wf-card-head">' + wfEsc(item.label) + '</div>';
+    if (item.instruction) {
+        html += '<div class="wf-desc" style="margin:0 0 0.5rem;padding:0;font-size:0.8rem">' + wfEsc(item.instruction) + '</div>';
+    }
+    var fields = item.fields || [];
+    for (var fi = 0; fi < fields.length; fi++) {
+        var f = fields[fi];
+        if (!f || typeof f !== 'object' || !('value' in f)) continue;
+        var cat = ctx.fieldCategory[f.label] || null;
+        var catCls = cat ? ' wf-fb-' + cat : '';
+        html += '<div class="wf-field' + catCls + '">';
+        html += '<div class="wf-field-label">' + wfEsc(f.label) + '</div>';
+        if (f.instruction) {
+            html += '<div class="wf-field-instruction">' + wfEsc(f.instruction) + '</div>';
+        }
+        var params = aff && aff.parameters && aff.parameters[f.key];
+        var options = params && params.options;
+        if (options) {
+            var useDropdown = options.length > 3;
+            if (!useDropdown) {
+                for (var oi = 0; oi < options.length; oi++) {
+                    var ol = options[oi] === true ? 'Yes' : options[oi] === false ? 'No' : String(options[oi]);
+                    if (ol.length > 20) { useDropdown = true; break; }
                 }
-                var curDisplay = f.value === true ? 'Yes' : f.value === false ? 'No' : f.value != null ? String(f.value) : '';
-                html += '<div class="wf-field-row">';
-                html += curDisplay ? '<span class="wf-field-current">' + wfEsc(curDisplay) + '</span>' : '<span class="wf-field-current wf-field-empty">(not set)</span>';
-                if (useDropdown) {
-                    html += '<select class="wf-aff-select wf-fg-input" data-fg-key="' + wfEsc(f.key) + '">';
-                    html += '<option value="">&mdash; Select &mdash;</option>';
-                    for (var oi = 0; oi < options.length; oi++) {
-                        var oval = options[oi];
-                        var olabel = oval === true ? 'Yes' : oval === false ? 'No' : String(oval);
-                        html += '<option value="' + wfEsc(JSON.stringify(oval)) + '">' + wfEsc(olabel) + '</option>';
-                    }
-                    html += '</select>';
-                } else {
-                    for (var oi = 0; oi < options.length; oi++) {
-                        var oval = options[oi];
-                        var olabel = oval === true ? 'Yes' : oval === false ? 'No' : String(oval);
-                        var isActive = JSON.stringify(oval) === JSON.stringify(f.value);
-                        html += '<button class="wf-aff-opt-btn wf-fg-opt' + (isActive ? ' wf-aff-opt-active' : '') + '" data-fg-key="' + wfEsc(f.key) + '" data-fg-value="' + wfEsc(JSON.stringify(oval)) + '">' + wfEsc(olabel) + '</button>';
-                    }
+            }
+            var curDisplay = f.value === true ? 'Yes' : f.value === false ? 'No' : f.value != null ? String(f.value) : '';
+            html += '<div class="wf-field-row">';
+            html += curDisplay ? '<span class="wf-field-current">' + wfEsc(curDisplay) + '</span>' : '<span class="wf-field-current wf-field-empty">(not set)</span>';
+            if (useDropdown) {
+                html += '<select class="wf-aff-select wf-fg-input" data-fg-key="' + wfEsc(f.key) + '">';
+                html += '<option value="">&mdash; Select &mdash;</option>';
+                for (var oi = 0; oi < options.length; oi++) {
+                    var oval = options[oi];
+                    var olabel = oval === true ? 'Yes' : oval === false ? 'No' : String(oval);
+                    html += '<option value="' + wfEsc(JSON.stringify(oval)) + '">' + wfEsc(olabel) + '</option>';
                 }
-                html += '</div>';
+                html += '</select>';
             } else {
-                var curVal = f.value == null ? '' : String(f.value);
-                html += '<div class="wf-field-row">';
-                html += curVal ? '<span class="wf-field-current">' + wfEsc(curVal) + '</span>' : '<span class="wf-field-current wf-field-empty">(not set)</span>';
-                html += '<input class="wf-aff-input wf-fg-input" type="text" data-fg-key="' + wfEsc(f.key) + '" placeholder="New value\u2026">';
-                html += '</div>';
+                for (var oi = 0; oi < options.length; oi++) {
+                    var oval = options[oi];
+                    var olabel = oval === true ? 'Yes' : oval === false ? 'No' : String(oval);
+                    var isActive = JSON.stringify(oval) === JSON.stringify(f.value);
+                    html += '<button class="wf-aff-opt-btn wf-fg-opt' + (isActive ? ' wf-aff-opt-active' : '') + '" data-fg-key="' + wfEsc(f.key) + '" data-fg-value="' + wfEsc(JSON.stringify(oval)) + '">' + wfEsc(olabel) + '</button>';
+                }
             }
             html += '</div>';
-        }
-        /* Single submit button for the entire group */
-        if (aff) {
-            var tooltip = aff.method + ' ' + aff.url + ' {all fields}';
-            html += '<div class="wf-action-bar" style="margin-top:0.5rem">';
-            html += '<button class="wf-aff-action-btn wf-aff-action-primary wf-fg-submit" data-aff-url="' + wfEsc(aff.url) + '" title="' + wfEsc(tooltip) + '">Set All</button>';
+        } else {
+            var curVal = f.value == null ? '' : String(f.value);
+            html += '<div class="wf-field-row">';
+            html += curVal ? '<span class="wf-field-current">' + wfEsc(curVal) + '</span>' : '<span class="wf-field-current wf-field-empty">(not set)</span>';
+            html += '<input class="wf-aff-input wf-fg-input" type="text" data-fg-key="' + wfEsc(f.key) + '" placeholder="New value\u2026">';
             html += '</div>';
         }
         html += '</div>';
+    }
+    if (aff) {
+        var tooltip = aff.method + ' ' + aff.url + ' {all fields}';
+        html += '<div class="wf-action-bar" style="margin-top:0.5rem">';
+        html += '<button class="wf-aff-action-btn wf-aff-action-primary wf-fg-submit" data-aff-url="' + wfEsc(aff.url) + '" title="' + wfEsc(tooltip) + '">Set All</button>';
+        html += '</div>';
+    }
+    html += '</div>';
+    return html;
+}
+
+_sectionRenderers['content'] = function(contentItems, ctx) {
+    var html = '';
+    for (var i = 0; i < contentItems.length; i++) {
+        var item = contentItems[i];
+        if (item.type === 'group') {
+            html += _renderContentFieldGroup(item, ctx);
+        } else if (item.type === 'text' || item.type === 'toggle' || item.type === 'choice' || item.type === 'indicator') {
+            var fieldHtml = _renderContentField(item, ctx);
+            if (fieldHtml) html += '<div class="wf-card"><div class="wf-fields">' + fieldHtml + '</div></div>';
+        }
     }
     return html;
 };
@@ -1955,41 +2008,28 @@ function _humanPage(container, state, msg, feedback, verbose) {
     if (s.definition && _isDefinition(s.definition)) { html += _schematicFlowchart(s.definition, s); }
 
     /* ── Classify affordances ── */
-    var fieldKeys = s.fields ? Object.keys(s.fields).map(function(k) {
-        var f = s.fields[k]; return (f && f.key) ? f.key : k;
-    }) : [];
+    var fieldKeys = [];
+    (s.content || []).forEach(function(item) {
+        if ((item.type === 'text' || item.type === 'toggle' || item.type === 'choice' || item.type === 'indicator') && item.key) fieldKeys.push(item.key);
+        else if (item.type === 'group') {
+            (item.fields || []).forEach(function(f) { if (f.key) fieldKeys.push(f.key); });
+        }
+    });
     var classified = _wfClassifyAffordances(state.affordances || [], fieldKeys);
 
     var ctx = { s: s, state: state, fieldCategory: fieldCategory, classified: classified };
 
     /* ── Content sections: dispatch via registry ── */
-    /* Render in a stable order: fields first, then execution_table/table, then others */
     var rendered = {};
-    var orderedKeys = ['fields', 'field_groups', 'execution_table', 'table'];
-    for (var oi = 0; oi < orderedKeys.length; oi++) {
-        var key = orderedKeys[oi];
-        if (s[key] !== undefined && s[key] !== null) {
-            /* execution_table and table are mutually exclusive in rendering */
-            if (key === 'table' && rendered['execution_table']) continue;
-            var renderer = _sectionRenderers[key];
-            if (renderer) {
-                html += renderer(s[key], ctx);
-            } else {
-                html += _renderUnknownSection(key, s[key]);
-            }
-            rendered[key] = true;
-        }
-    }
-    /* Remaining state keys: dispatch or error */
     var stateKeys = Object.keys(s);
     for (var si = 0; si < stateKeys.length; si++) {
         var key = stateKeys[si];
-        if (rendered[key]) continue;
         if (_structuralKeys.indexOf(key) >= 0) continue;
-        if (orderedKeys.indexOf(key) >= 0) continue;
+        if (key === 'table' && rendered['execution_table']) continue;
         var renderer = _sectionRenderers[key];
         if (renderer) {
             html += renderer(s[key], ctx);
+            rendered[key] = true;
         } else {
             html += _renderUnknownSection(key, s[key]);
         }

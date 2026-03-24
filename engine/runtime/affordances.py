@@ -185,11 +185,11 @@ class FieldSource:
             return []
 
         ftype = fdef.type
-        if ftype not in ("text", "boolean", "select"):
+        if ftype not in ("text", "toggle", "choice"):
             return []
 
         current = ctx.data.get(fdef.key)
-        if ftype == "boolean":
+        if ftype == "toggle":
             current = bool(current)
 
         if isinstance(current, str) and current:
@@ -203,9 +203,9 @@ class FieldSource:
             "body": {"value": "<value>"},
             "_field_label": fdef.label,  # transient tag for partitioning
         }
-        if ftype == "boolean":
+        if ftype == "toggle":
             a["parameters"] = {"value": {"options": [True, False]}}
-        elif ftype == "select":
+        elif ftype == "choice":
             options = _resolve_options(ctx.defn, fdef, ctx.data, annotate=False)
             if options:
                 a["parameters"] = {"value": {"options": options}}
@@ -232,14 +232,14 @@ class FieldGroupSource:
             if not check_visibility(fdef.visible_when, ctx.data):
                 continue
             ftype = fdef.type
-            if ftype not in ("text", "boolean", "select"):
+            if ftype not in ("text", "toggle", "choice"):
                 continue
 
             body[fdef.key] = "<value>"
             p: dict[str, Any] = {}
-            if ftype == "boolean":
+            if ftype == "toggle":
                 p["options"] = [True, False]
-            elif ftype == "select":
+            elif ftype == "choice":
                 options = _resolve_options(ctx.defn, fdef, ctx.data, annotate=False)
                 if options:
                     p["options"] = options

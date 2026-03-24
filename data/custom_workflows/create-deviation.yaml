@@ -15,7 +15,7 @@ nodes:
         instruction: A short, descriptive title summarizing the deviation.
       classification:
         label: Classification
-        type: select
+        type: choice
         key: classification
         default: null
         instruction: 'Minor: no impact on product quality. Major: potential impact,
@@ -32,7 +32,7 @@ nodes:
         instruction: How was this deviation discovered? During what activity? By whom?
       affected_area:
         label: Affected Area
-        type: select
+        type: choice
         key: affected_area
         default: null
         instruction: The primary area affected by this deviation.
@@ -83,7 +83,7 @@ nodes:
           training, or tooling improvements.
       requires_investigation:
         label: Requires Investigation
-        type: boolean
+        type: toggle
         key: requires_investigation
         default: null
         instruction: Does this deviation warrant a formal Investigation (INV)? Set

@@ -51,13 +51,13 @@ nodes:
         instruction: Brief title describing the proposed change.
       risk_level:
         label: Risk Level
-        type: select
+        type: choice
         key: risk_level
         instruction: Assessed risk of this change.
         options_from: risk_levels
       category:
         label: Category
-        type: select
+        type: choice
         key: category
         instruction: Primary category of the change.
         options_from: change_categories
@@ -91,7 +91,7 @@ nodes:
             requires_compliance: false
       affected_system:
         label: Affected System
-        type: select
+        type: choice
         key: affected_system
         instruction: Which system is primarily affected?
         dynamic_options:
@@ -130,12 +130,12 @@ nodes:
           default: []
       requires_downtime:
         label: Requires Downtime
-        type: boolean
+        type: toggle
         key: requires_downtime
         instruction: Will this change require scheduled downtime?
       requires_compliance:
         label: Requires Compliance Review
-        type: computed
+        type: indicator
         key: requires_compliance
         compute:
           op: OR
@@ -151,7 +151,7 @@ nodes:
         instruction_when_false: No compliance review required for this category.
       has_exec_sponsor:
         label: Executive Sponsor Identified
-        type: boolean
+        type: toggle
         key: has_exec_sponsor
         instruction: Has an executive sponsor been identified for this change?
         visible_when:
@@ -217,7 +217,7 @@ nodes:
         instruction: Brief justification for fast-track approval.
       fasttrack_approved:
         label: Fast-Track Approved
-        type: boolean
+        type: toggle
         key: fasttrack_approved
         instruction: Approve this low-risk change for immediate implementation?
     navigation:
@@ -263,7 +263,7 @@ nodes:
             type: text
             required: true
           impact_level:
-            type: select
+            type: choice
             required: false
             options:
             - None
@@ -288,7 +288,7 @@ nodes:
             type: text
             required: true
           role:
-            type: select
+            type: choice
             required: false
             options:
             - Owner
@@ -352,7 +352,7 @@ nodes:
     fields:
       tech_feasibility:
         label: Technical Feasibility
-        type: select
+        type: choice
         key: tech_feasibility
         options:
         - Feasible
@@ -360,7 +360,7 @@ nodes:
         - Not Feasible
       perf_impact:
         label: Performance Impact
-        type: select
+        type: choice
         key: perf_impact
         options:
         - None
@@ -387,7 +387,7 @@ nodes:
     fields:
       regulatory_status:
         label: Regulatory Compliance
-        type: select
+        type: choice
         key: regulatory_status
         options:
         - Compliant
@@ -428,7 +428,7 @@ nodes:
         instruction: Why is this change necessary from a business perspective?
       exec_decision:
         label: Executive Decision
-        type: select
+        type: choice
         key: exec_decision
         options:
         - Approved
@@ -467,7 +467,7 @@ nodes:
       column_type_catalog: column_types
       properties:
         sequential_execution:
-          type: boolean
+          type: toggle
           default: false
       operations:
       - add_column
@@ -492,7 +492,7 @@ nodes:
     fields:
       final_decision:
         label: Decision
-        type: select
+        type: choice
         key: final_decision
         options:
         - Approved
@@ -505,7 +505,7 @@ nodes:
         instruction: Explain the reasoning behind the decision.
       is_approved:
         label: Is Approved
-        type: computed
+        type: indicator
         key: is_approved
         compute:
           type: field_equals

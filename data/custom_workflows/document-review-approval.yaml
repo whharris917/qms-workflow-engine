@@ -16,7 +16,7 @@ nodes:
         instruction: The title of the document under review.
       document_type:
         label: Document Type
-        type: select
+        type: choice
         key: document_type
         instruction: The category of document being submitted for review.
         options:
@@ -37,7 +37,7 @@ nodes:
         instruction: Summarize the changes being introduced in this document revision.
       severity:
         label: Severity
-        type: select
+        type: choice
         key: severity
         instruction: 'Classification that determines the review path. Critical: executive
           escalation. Major: parallel technical + compliance review. Minor: streamlined
@@ -102,7 +102,7 @@ nodes:
         instruction: Name of the executive who will sponsor this critical change.
       risk_assessment:
         label: Risk Assessment
-        type: select
+        type: choice
         key: risk_assessment
         instruction: Executive assessment of the risk level for this critical change.
         options:
@@ -120,7 +120,7 @@ nodes:
           value: Acceptable with mitigations
       executive_approval:
         label: Executive Approval
-        type: boolean
+        type: toggle
         key: executive_approval
         instruction: The executive sponsor confirms they have reviewed and approve
           this critical change.
@@ -167,7 +167,7 @@ nodes:
         instruction: Name of the technical reviewer performing this assessment.
       tech_assessment:
         label: Technical Assessment
-        type: select
+        type: choice
         key: tech_assessment
         instruction: Overall technical judgment on the document.
         options:
@@ -207,7 +207,7 @@ nodes:
         instruction: Name of the compliance reviewer.
       regulatory_alignment:
         label: Regulatory Alignment
-        type: select
+        type: choice
         key: regulatory_alignment
         instruction: Assessment of alignment with applicable regulations and standards.
         options:
@@ -243,7 +243,7 @@ nodes:
     fields:
       reviews_acceptable:
         label: All Reviews Acceptable
-        type: computed
+        type: indicator
         key: reviews_acceptable
         compute:
           op: AND
@@ -291,7 +291,7 @@ nodes:
         instruction: Name of the reviewer performing the quick assessment.
       quick_assessment:
         label: Assessment
-        type: select
+        type: choice
         key: quick_assessment
         instruction: Quick review outcome.
         options:
@@ -326,7 +326,7 @@ nodes:
         instruction: Name of the individual making the final approval decision.
       approval_decision:
         label: Approval Decision
-        type: select
+        type: choice
         key: approval_decision
         instruction: Final disposition of the document.
         options:

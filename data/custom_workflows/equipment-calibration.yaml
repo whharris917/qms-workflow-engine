@@ -21,11 +21,11 @@ nodes:
         key: location
       trigger:
         label: Calibration Trigger
-        type: select
+        type: choice
         key: trigger
       criticality:
         label: Equipment Criticality
-        type: select
+        type: choice
         key: criticality
       last_cal_date:
         label: Last Calibration Date
@@ -43,7 +43,7 @@ nodes:
         key: ref_standard
       std_cert_valid:
         label: Standard Certificate Valid
-        type: boolean
+        type: toggle
         key: std_cert_valid
         instruction: Confirm reference standard is within calibration validity
       technician:
@@ -77,7 +77,7 @@ nodes:
         key: as_found
       adjustments:
         label: Adjustments Made
-        type: boolean
+        type: toggle
         key: adjustments
       as_left:
         label: As-Left Readings
@@ -85,7 +85,7 @@ nodes:
         key: as_left
       cal_result:
         label: Calibration Result
-        type: select
+        type: choice
         key: cal_result
       tech_signature:
         label: Technician Signature
@@ -115,7 +115,7 @@ nodes:
         instruction: Evaluate impact on products measured since last successful calibration
       root_cause:
         label: Root Cause
-        type: select
+        type: choice
         key: root_cause
       affected_products:
         label: Affected Products/Batches
@@ -131,11 +131,11 @@ nodes:
         key: preventive_action
       disposition:
         label: Equipment Disposition
-        type: select
+        type: choice
         key: disposition
       qa_review:
         label: QA Review Required
-        type: boolean
+        type: toggle
         key: qa_review
     navigation:
     - action: go_back
