@@ -6,10 +6,16 @@
   .el-page-desc { color: #666; max-width: 700px; line-height: 1.5; margin-bottom: 2rem; }
   .el-toc { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 2.5rem; }
   .el-toc a { font-size: 0.82rem; padding: 0.25rem 0.6rem; border: 1px solid #ddd;
-    border-radius: 4px; text-decoration: none; color: #444; font-family: Consolas, Monaco, monospace; }
+    border-radius: 4px; text-decoration: none; color: #444; font-family: Consolas, Monaco, monospace;
+    cursor: pointer; }
   .el-toc a:hover { border-color: #999; color: #000; }
+  .el-toc a.el-tab-active { background: #2a6bcf; color: #fff; border-color: #2a6bcf; }
+  .el-toc-label { width: 100%; font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: #bbb; margin-top: 0.5rem; }
+  .el-toc-label:first-child { margin-top: 0; }
 
-  .el-section { margin-bottom: 3.5rem; padding-top: 0.5rem; }
+  .el-section { margin-bottom: 3.5rem; padding-top: 0.5rem; display: none; }
+  .el-section.el-tab-visible { display: block; }
   .el-section-head { display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 0.5rem;
     border-bottom: 2px solid #eee; padding-bottom: 0.5rem; }
   .el-section-head h2 { font-size: 1.25rem; font-weight: 700; margin: 0; font-family: Consolas, Monaco, monospace; }
@@ -32,7 +38,7 @@
 
   .el-state-json { background: #f5f7fa; border: 1px solid #e2e6ed; border-radius: 6px;
     padding: 0.6rem 0.8rem; font-size: 0.75rem; font-family: Consolas, Monaco, monospace;
-    white-space: pre; overflow-x: auto; line-height: 1.5; color: #2d3a4a; margin: 0; max-height: 200px; overflow-y: auto; }
+    white-space: pre; overflow-x: auto; line-height: 1.5; color: #2d3a4a; margin: 0; max-height: 320px; overflow-y: auto; }
   .el-code { background: #f5f7fa; border: 1px solid #e2e6ed; border-radius: 6px;
     padding: 0.6rem 0.8rem; font-size: 0.75rem; font-family: Consolas, Monaco, monospace;
     white-space: pre; overflow-x: auto; line-height: 1.5; color: #2d3a4a; margin: 0; }
@@ -120,6 +126,34 @@
   .el-list-empty { font-style: italic; font-size: 0.82rem; color: #bbb; padding: 0.4rem 0.6rem; }
 
   .el-desc-inline { font-size: 0.8rem; font-style: italic; line-height: 1.4; color: #7f8fa6; padding: 0 0.6rem 0.4rem; }
+
+  /* ── New category types ── */
+  .el-category-behavioral { background: #f0e6ff; color: #5a0fa0; }
+  .el-category-flow { background: #e0f7fa; color: #00607a; }
+  .el-category-ref { background: #e8f0fe; color: #1a4fa0; }
+
+  /* ── Section divider ── */
+  .el-section-divider { display: flex; align-items: center; gap: 0.75rem; margin: 2.5rem 0 1.5rem; }
+  .el-section-divider::before, .el-section-divider::after { content: ''; flex: 1; border-top: 1px solid #e0e0e0; }
+  .el-section-divider span { font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: #aaa; white-space: nowrap; }
+
+  /* ── Side-effect badge ── */
+  .el-side-effect-badge { display: inline-flex; align-items: center; font-size: 0.78rem;
+    padding: 0.2rem 0.5rem; border-radius: 10px; background: #fff7e0; border: 1px solid #f0d070; color: #7a5500; }
+  .el-side-effect-badge.el-badge-triggered { background: #eafaf0; border-color: #60c080; color: #1a6a30; }
+
+  /* ── Proceed button ── */
+  .el-proceed-btn { font-size: 0.82rem; padding: 0.35rem 0.9rem; border-radius: 4px;
+    border: 1px solid #ccc; background: #f0f0f0; color: #aaa; cursor: default; font-weight: 500; }
+  .el-proceed-btn.active { border-color: #218838; background: #218838; color: #fff; }
+
+  /* ── Reference tables ── */
+  .el-aff-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin: 0.5rem 0; }
+  .el-aff-table th, .el-aff-table td { padding: 0.35rem 0.6rem; border: 1px solid #e2e6ed;
+    text-align: left; vertical-align: top; }
+  .el-aff-table th { background: #f4f6f9; font-weight: 600; }
+  .el-aff-table code { font-size: 0.75rem; background: #f0f2f5; padding: 0.05em 0.25em; border-radius: 3px; }
 </style>
 
 <h1>Element Library</h1>
@@ -129,6 +163,7 @@
 </p>
 
 <nav class="el-toc">
+  <span class="el-toc-label">Element Types</span>
   <a href="#text">text</a>
   <a href="#toggle">toggle</a>
   <a href="#choice">choice</a>
@@ -136,6 +171,14 @@
   <a href="#group">group</a>
   <a href="#table">table</a>
   <a href="#list">list</a>
+  <span class="el-toc-label">Behavioral Features</span>
+  <a href="#visible_when">visible_when</a>
+  <a href="#side_effects">side_effects</a>
+  <span class="el-toc-label">Flow Control</span>
+  <a href="#proceed">proceed</a>
+  <a href="#navigation">navigation</a>
+  <span class="el-toc-label">Reference</span>
+  <a href="#expressions">expressions</a>
 </nav>
 
 <!-- ═══════════════════════ text ═══════════════════════ -->
@@ -148,7 +191,7 @@
     label: Title
     type: text
     instruction: Provide a short, descriptive title.</pre>
-  <div class="el-demo-label" style="margin-top:1rem">State JSON</div>
+  <div class="el-demo-label" style="margin-top:1rem">Agent view</div>
   <pre id="state-text" class="el-state-json"></pre>
   <div class="el-demo-label" style="margin-top:1rem">Rendered</div>
   <div id="demo-text" class="el-demo-frame"></div>
@@ -169,7 +212,7 @@
   label: Code Impact
   type: toggle    <span class="el-code-comment"># legacy: boolean</span>
   instruction: Does this change affect code?</pre>
-  <div class="el-demo-label" style="margin-top:1rem">State JSON</div>
+  <div class="el-demo-label" style="margin-top:1rem">Agent view</div>
   <pre id="state-toggle" class="el-state-json"></pre>
   <div class="el-demo-label" style="margin-top:1rem">Rendered</div>
   <div id="demo-toggle" class="el-demo-frame"></div>
@@ -198,9 +241,9 @@ category:
   type: choice
   instruction: Select the change category.
   options_from: change_categories  <span class="el-code-comment"># top-level set</span></pre>
-  <div class="el-demo-label" style="margin-top:1rem">State JSON — button group</div>
+  <div class="el-demo-label" style="margin-top:1rem">Agent view — button group</div>
   <pre id="state-choice-btn" class="el-state-json"></pre>
-  <div class="el-demo-label" style="margin-top:0.5rem">State JSON — dropdown</div>
+  <div class="el-demo-label" style="margin-top:0.5rem">Agent view — dropdown</div>
   <pre id="state-choice-drop" class="el-state-json"></pre>
   <div class="el-demo-label" style="margin-top:1rem">Rendered — button group (3 options)</div>
   <div id="demo-choice-btn" class="el-demo-frame"></div>
@@ -230,7 +273,7 @@ category:
     args: [title, category, priority]
   instruction_when_true: All required fields are set.
   instruction_when_false: Please complete all required fields.</pre>
-  <div class="el-demo-label" style="margin-top:1rem">State JSON</div>
+  <div class="el-demo-label" style="margin-top:1rem">Agent view</div>
   <pre id="state-indicator" class="el-state-json"></pre>
   <div class="el-demo-label" style="margin-top:1rem">Rendered</div>
   <div id="demo-indicator" class="el-demo-frame"></div>
@@ -271,7 +314,7 @@ field_groups:
       Provide the core identifying information.
       All fields are required before you can proceed.
     fields: [title, affects_code, purpose]</pre>
-  <div class="el-demo-label" style="margin-top:1rem">State JSON</div>
+  <div class="el-demo-label" style="margin-top:1rem">Agent view</div>
   <pre id="state-group" class="el-state-json"></pre>
   <div class="el-demo-label" style="margin-top:1rem">Rendered</div>
   <div id="demo-group" class="el-demo-frame"></div>
@@ -301,7 +344,7 @@ column_types:
   test_result:
     type: choice
     choices: [Pass, Fail, N/A]</pre>
-  <div class="el-demo-label" style="margin-top:1rem">State JSON</div>
+  <div class="el-demo-label" style="margin-top:1rem">Agent view</div>
   <pre id="state-table" class="el-state-json"></pre>
   <div class="el-demo-label" style="margin-top:1rem">Rendered</div>
   <div id="demo-table" class="el-demo-frame"></div>
@@ -331,7 +374,7 @@ column_types:
         options: [Open, In Progress, Done]
     operations: [add, remove]
     focus: false</pre>
-  <div class="el-demo-label" style="margin-top:1rem">State JSON</div>
+  <div class="el-demo-label" style="margin-top:1rem">Agent view</div>
   <pre id="state-list" class="el-state-json"></pre>
   <div class="el-demo-label" style="margin-top:1rem">Rendered</div>
   <div id="demo-list" class="el-demo-frame"></div>
@@ -341,6 +384,227 @@ column_types:
       <li><code>required: true</code> fields must be set before an item can be saved</li>
       <li><code>focus: true</code> enables item-scoped rendering — selecting an item restricts visible state to that item's fields</li>
       <li>Operations default to all four if not specified</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ═══════════════════════ visible_when ═══════════════════════ -->
+<div class="el-section" id="visible_when">
+  <div class="el-section-head"><h2>visible_when</h2><span class="el-category el-category-behavioral">behavioral</span></div>
+  <p class="el-desc">A field-level predicate that hides the field (and its affordance) until the condition is met. Hidden fields are absent from the content array entirely — the agent cannot accidentally set them. Set <em>Code Impact</em> below to reveal the <em>Submodule</em> field.</p>
+  <div class="el-demo-label">YAML definition</div>
+  <pre class="el-code">fields:
+  affects_code:
+    label: Code Impact
+    type: toggle
+    instruction: Does this change affect code?
+
+  submodule:
+    label: Submodule
+    type: choice
+    options: [flow-state, qms-cli, qms-workflow-engine]
+    instruction: Which submodule is affected?
+    visible_when:              <span class="el-code-comment"># legacy: {field_key: expected_value} — all pairs ANDed</span>
+      affects_code: true       <span class="el-code-comment"># hidden until affects_code == true</span>
+
+  sdlc_governed:
+    label: SDLC Governed
+    type: indicator
+    visible_when:              <span class="el-code-comment"># modern expression tree format:</span>
+      op: AND
+      conditions:
+        - { type: field_equals, key: affects_code, value: true }
+        - { type: field_not_null, key: submodule }</pre>
+  <div class="el-demo-label" style="margin-top:1rem">Agent view</div>
+  <pre id="state-visibility" class="el-state-json"></pre>
+  <div class="el-demo-label" style="margin-top:1rem">Rendered</div>
+  <div id="demo-visibility" class="el-demo-frame"></div>
+  <div class="el-notes"><strong>Notes:</strong>
+    <ul>
+      <li>Hidden fields are absent from the content array — not just greyed out</li>
+      <li>Hidden fields also emit no affordance — cannot be set while invisible</li>
+      <li>Legacy format: <code>{ key: expected_value }</code> — all pairs must match (implicit AND); use <code>not_null</code> as a sentinel value to match any non-null</li>
+      <li>Modern format: full expression tree — supports AND/OR/NOT and all leaf condition types (see <a href="#expressions">Expression Language</a>)</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ═══════════════════════ side_effects ═══════════════════════ -->
+<div class="el-section" id="side_effects">
+  <div class="el-section-head"><h2>side_effects</h2><span class="el-category el-category-behavioral">behavioral</span></div>
+  <p class="el-desc">A field-level list of conditional writes. When the field is set, each <code>when</code> condition is evaluated against the new state; matching entries immediately write their <code>set</code> dict into workflow state. The agent takes one action; the cascade happens automatically. Set <em>Category</em> to Security or Data below to trigger a compliance flag.</p>
+  <div class="el-demo-label">YAML definition</div>
+  <pre class="el-code">fields:
+  category:
+    label: Category
+    type: choice
+    options: [Software, Hardware, Process, Security, Data]
+    instruction: Primary category of this change.
+    side_effects:
+      - when:
+          op: OR
+          conditions:
+            - { type: field_equals, key: category, value: Security }
+            - { type: field_equals, key: category, value: Data }
+        set:
+          requires_compliance: true
+      - when:
+          op: NOT
+          conditions:
+            - op: OR
+              conditions:
+                - { type: field_equals, key: category, value: Security }
+                - { type: field_equals, key: category, value: Data }
+        set:
+          requires_compliance: null</pre>
+  <div class="el-demo-label" style="margin-top:1rem">Agent view</div>
+  <pre id="state-sideeffects" class="el-state-json"></pre>
+  <div class="el-demo-label" style="margin-top:1rem">Rendered</div>
+  <div id="demo-sideeffects" class="el-demo-frame"></div>
+  <div class="el-notes"><strong>Notes:</strong>
+    <ul>
+      <li>All side effects are evaluated in order; multiple may match and all are applied</li>
+      <li>Side effects are evaluated <em>after</em> the triggering field is written, so conditions may reference the new value</li>
+      <li>The <code>set</code> dict can write any key in workflow state — including keys from other nodes</li>
+      <li>Commonly used to set derived flags (compliance requirements, routing hints, pre-populated defaults)</li>
+      <li>Side effects are invisible to the agent — the updated keys simply appear in subsequent state reads</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ═══════════════════════ proceed ═══════════════════════ -->
+<div class="el-section" id="proceed">
+  <div class="el-section-head"><h2>proceed</h2><span class="el-category el-category-flow">flow control</span></div>
+  <p class="el-desc">A gated navigation affordance that advances the workflow to the next node. The proceed affordance only appears in the agent's affordance list when the optional <code>gate</code> expression evaluates to true. Fill both fields below to unlock the button.</p>
+  <div class="el-demo-label">YAML definition</div>
+  <pre class="el-code">nodes:
+  initiation:
+    title: Initiation
+    instruction: Fill in the required fields before proceeding.
+    fields:
+      title:  { label: Title,   type: text, instruction: ... }
+      purpose: { label: Purpose, type: text, instruction: ... }
+    proceed:
+      label: Proceed to Change Definition
+      gate:                                 <span class="el-code-comment"># omit gate = always available</span>
+        op: AND
+        conditions:
+          - { type: field_not_null, key: title }
+          - { type: field_not_null, key: purpose }
+      target: definition                    <span class="el-code-comment"># optional — defaults to next sequential node</span></pre>
+  <div class="el-demo-label" style="margin-top:1rem">Agent view</div>
+  <pre id="state-proceed" class="el-state-json"></pre>
+  <div class="el-demo-label" style="margin-top:1rem">Rendered</div>
+  <div id="demo-proceed" class="el-demo-frame"></div>
+  <div class="el-notes"><strong>Notes:</strong>
+    <ul>
+      <li>When the gate is unmet, the proceed affordance is absent — not just disabled</li>
+      <li>Proceed affordance body: <code>{}</code> normally; <code>{"target": "node_id"}</code> when <code>target:</code> is set</li>
+      <li>Mutually exclusive with <code>fork</code> and <code>router</code> — a node has at most one flow-control primitive</li>
+      <li>Pair with an <code>indicator</code> element to surface readiness feedback while the gate is unmet</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ═══════════════════════ navigation ═══════════════════════ -->
+<div class="el-section" id="navigation">
+  <div class="el-section-head"><h2>navigation</h2><span class="el-category el-category-flow">flow control</span></div>
+  <p class="el-desc">Node-level affordances for moving between nodes without triggering the proceed gate. <code>navigation</code> entries cover backward/lateral movement; <code>actions</code> cover terminal operations. Both render after content elements and before the proceed/fork affordance.</p>
+  <div class="el-demo-label">YAML definition</div>
+  <pre class="el-code">nodes:
+  definition:
+    title: Change Definition
+    instruction: Define the scope and impact of this change.
+    navigation:
+      - action: go_back
+        label: Go back to Initiation
+      - action: go_to
+        label: Jump to Review
+        node: review                   <span class="el-code-comment"># required for go_to</span>
+        when:                          <span class="el-code-comment"># optional guard — affordance suppressed if false</span>
+          type: field_not_null
+          key: title
+    actions:
+      - action: submit
+        label: Submit for Review       <span class="el-code-comment"># always emitted, regardless of state</span>
+      - action: restart
+        label: Restart Workflow</pre>
+  <div class="el-demo-label" style="margin-top:1rem">Affordance shapes</div>
+  <table class="el-aff-table">
+    <thead><tr><th>Type</th><th>URL</th><th>Body</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><code>go_back</code></td><td><code>POST /agent/{wf}/go_back</code></td><td><code>{}</code></td><td>Returns to previous node in history stack</td></tr>
+      <tr><td><code>go_to</code></td><td><code>POST /agent/{wf}/go_to</code></td><td><code>{"node": "node_id"}</code></td><td>Jumps to named node; requires <code>node:</code> in YAML</td></tr>
+      <tr><td><code>submit</code></td><td><code>POST /agent/{wf}/submit</code></td><td><code>{}</code></td><td>Terminal — closes the workflow instance</td></tr>
+      <tr><td><code>restart</code></td><td><code>POST /agent/{wf}/restart</code></td><td><code>{}</code></td><td>Resets all state and returns to the first node</td></tr>
+    </tbody>
+  </table>
+  <div class="el-notes"><strong>Notes:</strong>
+    <ul>
+      <li><code>go_back</code> and <code>go_to</code> are declared under <code>navigation:</code>; terminal operations are under <code>actions:</code></li>
+      <li>Navigation entries with a <code>when</code> guard are only emitted when the guard passes — the agent sees no affordance when the guard fails</li>
+      <li><code>go_to</code> can target any node by ID, including earlier nodes; useful for correction flows</li>
+      <li><code>actions</code> are always emitted regardless of any state condition</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ═══════════════════════ expressions ═══════════════════════ -->
+<div class="el-section" id="expressions">
+  <div class="el-section-head"><h2>Expression Language</h2><span class="el-category el-category-ref">reference</span></div>
+  <p class="el-desc">All conditions in the engine — <code>proceed</code> gates, <code>visible_when</code> predicates, <code>side_effects</code> guards, and <code>navigation</code> guards — use the same expression tree. An empty or absent expression is always <code>true</code>. Unknown types fail closed (<code>false</code>).</p>
+
+  <div class="el-demo-label">Composite operators</div>
+  <pre class="el-code">{ op: AND, conditions: [...] }   <span class="el-code-comment"># true iff ALL conditions pass</span>
+{ op: OR,  conditions: [...] }   <span class="el-code-comment"># true iff ANY condition passes</span>
+{ op: NOT, conditions: [expr] }  <span class="el-code-comment"># true iff the single condition FAILS</span></pre>
+
+  <div class="el-demo-label" style="margin-top:1rem">Leaf condition types</div>
+  <table class="el-aff-table">
+    <thead><tr><th><code>type</code></th><th>Additional keys</th><th>Passes when…</th></tr></thead>
+    <tbody>
+      <tr><td><code>field_truthy</code></td><td><code>key</code></td><td>Value is truthy (non-null, non-empty string, non-false)</td></tr>
+      <tr><td><code>field_not_null</code></td><td><code>key</code></td><td>Value is not <code>null</code></td></tr>
+      <tr><td><code>field_equals</code></td><td><code>key</code>, <code>value</code></td><td>Value exactly equals <code>value</code></td></tr>
+      <tr><td><code>set_membership</code></td><td><code>key</code>, <code>set_ref</code></td><td>Value is a member of the named <code>option_sets</code> entry</td></tr>
+      <tr><td><code>table_has_columns</code></td><td>—</td><td>Table has at least one column defined</td></tr>
+      <tr><td><code>table_has_rows</code></td><td>—</td><td>Table has at least one row</td></tr>
+    </tbody>
+  </table>
+
+  <div class="el-demo-label" style="margin-top:1rem"><code>visible_when</code> legacy format</div>
+  <pre class="el-code">visible_when:
+  affects_code: true   <span class="el-code-comment"># field_equals — all pairs ANDed; cannot express OR or NOT</span>
+  submodule: not_null  <span class="el-code-comment"># special sentinel for field_not_null</span></pre>
+
+  <div class="el-demo-label" style="margin-top:1rem"><code>indicator</code> compute functions (<code>compute.fn</code>)</div>
+  <table class="el-aff-table">
+    <thead><tr><th><code>fn</code></th><th>Additional keys</th><th>True when…</th></tr></thead>
+    <tbody>
+      <tr><td><code>all_set</code></td><td><code>args: [key, ...]</code></td><td>All listed keys are non-null</td></tr>
+      <tr><td><code>any_set</code></td><td><code>args: [key, ...]</code></td><td>At least one listed key is non-null</td></tr>
+      <tr><td><code>equals</code></td><td><code>key</code>, <code>value</code></td><td>Named key exactly equals value</td></tr>
+      <tr><td><code>not_equals</code></td><td><code>key</code>, <code>value</code></td><td>Named key does not equal value</td></tr>
+    </tbody>
+  </table>
+
+  <div class="el-demo-label" style="margin-top:1rem">Example: compound gate</div>
+  <pre class="el-code">proceed:
+  label: Proceed to Review
+  gate:
+    op: AND
+    conditions:
+      - { type: field_not_null, key: title }
+      - op: OR
+        conditions:
+          - { type: field_equals, key: risk_level, value: Low }
+          - { type: field_not_null, key: risk_justification }</pre>
+
+  <div class="el-notes"><strong>Notes:</strong>
+    <ul>
+      <li>Expressions are evaluated against the live workflow state dict at the moment the affordance list is requested</li>
+      <li><code>provider_state</code> is an additional leaf type for external state integrations (not commonly needed)</li>
+      <li>The evaluator returns <code>(passed: bool, reason: str)</code> — the reason string is available in server logs for debugging</li>
     </ul>
   </div>
 </div>
@@ -357,6 +621,31 @@ function registerRenderer(r) {
 /* ══════════════════════════════════════════════════════════════
    Demo system — intercepts affordance calls and updates local state
    ══════════════════════════════════════════════════════════════ */
+
+/* ── Expression evaluator (mirrors engine/runtime/evaluator.py) ── */
+function evalExpr(expr, state) {
+    if (!expr) return true;
+    var op = expr.op;
+    if (op === 'AND') return (expr.conditions || []).every(function(c) { return evalExpr(c, state); });
+    if (op === 'OR')  return (expr.conditions || []).some(function(c)  { return evalExpr(c, state); });
+    if (op === 'NOT') return expr.conditions && expr.conditions.length ? !evalExpr(expr.conditions[0], state) : true;
+    var t = expr.type, k = expr.key;
+    if (t === 'field_truthy')   return !!state[k];
+    if (t === 'field_not_null') return state[k] != null;
+    if (t === 'field_equals')   return state[k] === expr.value;
+    return false;
+}
+function checkVisible(vw, state) {
+    if (!vw) return true;
+    if (vw.type || vw.op) return evalExpr(vw, state);
+    for (var k in vw) {
+        if (!Object.prototype.hasOwnProperty.call(vw, k)) continue;
+        var exp = vw[k], val = state[k];
+        if (exp === 'not_null') { if (val == null) return false; }
+        else if (val !== exp) return false;
+    }
+    return true;
+}
 
 /* Override the global affordance executor */
 _wfExecAffordance = function(url, body) {
@@ -377,8 +666,18 @@ _wfExecAffordance = function(url, body) {
     } else if (action === 'add_row') {
         var ncols = (d.table.columns || []).length;
         d.table.rows.push(new Array(ncols).fill(null));
+    } else if (d.state) {
+        /* State-based demos (visibility, sideeffects, proceed) */
+        d.state[action] = body.value;
+        if (d.side_effects) {
+            d.side_effects.forEach(function(eff) {
+                if (evalExpr(eff.when, d.state)) {
+                    Object.keys(eff.set).forEach(function(k) { d.state[k] = eff.set[k]; });
+                }
+            });
+        }
     } else {
-        /* Single-field update */
+        /* Content-based single-field update */
         (d.content || []).forEach(function(item) {
             if (item.type === 'group') {
                 (item.fields || []).forEach(function(f) {
@@ -490,6 +789,59 @@ function makeInitialState() {
                 }]
             }
         },
+        'visibility': {
+            type: 'visibility',
+            state: { affects_code: null, submodule: null },
+            fields: [
+                { key: 'affects_code', label: 'Code Impact', type: 'toggle', visible_when: null,
+                  instruction: 'Does this change affect code?',
+                  affordance: { method: 'POST', url: '/demo/visibility/affects_code',
+                    parameters: { value: { options: [true, false] } } } },
+                { key: 'submodule', label: 'Submodule', type: 'choice',
+                  visible_when: { affects_code: true },
+                  instruction: 'Which submodule is affected?',
+                  affordance: { method: 'POST', url: '/demo/visibility/submodule',
+                    parameters: { value: { options: ['flow-state', 'qms-cli', 'qms-workflow-engine'] } } } }
+            ]
+        },
+        'sideeffects': {
+            type: 'sideeffects',
+            state: { category: null, requires_compliance: null },
+            side_effects: [
+                { when: { op: 'OR', conditions: [
+                    { type: 'field_equals', key: 'category', value: 'Security' },
+                    { type: 'field_equals', key: 'category', value: 'Data' }
+                  ]}, set: { requires_compliance: true } },
+                { when: { op: 'NOT', conditions: [{ op: 'OR', conditions: [
+                    { type: 'field_equals', key: 'category', value: 'Security' },
+                    { type: 'field_equals', key: 'category', value: 'Data' }
+                  ]}]}, set: { requires_compliance: null } }
+            ],
+            fields: [
+                { key: 'category', label: 'Category', type: 'choice',
+                  instruction: 'Primary category of this change.',
+                  affordance: { method: 'POST', url: '/demo/sideeffects/category',
+                    parameters: { value: { options: ['Software', 'Hardware', 'Process', 'Security', 'Data'] } } } }
+            ]
+        },
+        'proceed': {
+            type: 'proceed',
+            state: { title: null, purpose: null },
+            gate: { op: 'AND', conditions: [
+                { type: 'field_not_null', key: 'title' },
+                { type: 'field_not_null', key: 'purpose' }
+            ]},
+            fields: [
+                { key: 'title', label: 'Document Title', type: 'text',
+                  instruction: 'A short, descriptive title for this Change Record.',
+                  affordance: { method: 'POST', url: '/demo/proceed/title',
+                    parameters: { value: { type: 'string' } } } },
+                { key: 'purpose', label: 'Purpose', type: 'text',
+                  instruction: 'Why is this change needed?',
+                  affordance: { method: 'POST', url: '/demo/proceed/purpose',
+                    parameters: { value: { type: 'string' } } } }
+            ]
+        },
         'list': {
             type: 'list',
             list: {
@@ -511,7 +863,8 @@ function makeInitialState() {
 var DEMOS = makeInitialState();
 
 /* Attach container refs */
-['text','toggle','choice-btn','choice-drop','indicator','group','table','list'].forEach(function(id) {
+['text','toggle','choice-btn','choice-drop','indicator','group','table','list',
+ 'visibility','sideeffects','proceed'].forEach(function(id) {
     DEMOS[id].container = document.getElementById('demo-' + id);
     DEMOS[id].stateEl = document.getElementById('state-' + id);
 });
@@ -585,12 +938,33 @@ function renderListDemo(d) {
     return html;
 }
 
-/* ── State JSON display ── */
+/* ── Agent view display (content + affordances) ── */
 function stateSnapshot(d) {
+    if (d.state) {
+        /* State-based demos: collect affordances from currently visible fields */
+        var affs = [], affId = 1;
+        (d.fields || []).filter(function(f) { return checkVisible(f.visible_when, d.state); })
+            .forEach(function(f) {
+                if (f.affordance) {
+                    var a = JSON.parse(JSON.stringify(f.affordance));
+                    a.id = affId++;
+                    affs.push(a);
+                }
+            });
+        if (d.gate && evalExpr(d.gate, d.state)) {
+            affs.push({ id: affId++, method: 'POST', url: '/agent/{wf}/proceed', body: {} });
+        }
+        return JSON.stringify({ state: d.state, affordances: affs }, null, 2);
+    }
     if (d.type === 'content') {
-        /* Show clean content array (just key/label/type/value) */
+        var affs = [], affId = 1;
         var cleaned = (d.content || []).map(function(item) {
             if (item.type === 'group') {
+                if (item.affordance) {
+                    var a = JSON.parse(JSON.stringify(item.affordance));
+                    a.id = affId++;
+                    affs.push(a);
+                }
                 return {
                     type: item.type, label: item.label,
                     fields: (item.fields || []).map(function(f) {
@@ -598,23 +972,53 @@ function stateSnapshot(d) {
                     })
                 };
             }
+            if (item.affordance) {
+                var a = JSON.parse(JSON.stringify(item.affordance));
+                a.id = affId++;
+                affs.push(a);
+            }
             return { type: item.type, key: item.key, label: item.label, value: item.value };
         });
-        return JSON.stringify(cleaned.length === 1 ? cleaned[0] : cleaned, null, 2);
+        return JSON.stringify({
+            content: cleaned.length === 1 ? cleaned[0] : cleaned,
+            affordances: affs
+        }, null, 2);
     }
     if (d.type === 'indicator') {
         var it = d.item;
-        return JSON.stringify({ type: it.type, key: it.key, label: it.label, value: it.value }, null, 2);
+        return JSON.stringify({
+            content: { type: it.type, key: it.key, label: it.label, value: it.value },
+            affordances: []  /* indicators are read-only — no affordance emitted */
+        }, null, 2);
     }
     if (d.type === 'table') {
         return JSON.stringify({
-            columns: d.table.columns.map(function(c) { return { name: c.name, type: c.type }; }),
-            rows: d.table.rows,
-            summary: d.table.columns.length + ' columns, ' + d.table.rows.length + ' rows'
+            table: {
+                columns: d.table.columns.map(function(c) { return { name: c.name, type: c.type }; }),
+                rows: d.table.rows
+            },
+            affordances: d.table.affordances || []
         }, null, 2);
     }
     if (d.type === 'list') {
-        return JSON.stringify(d.list.items, null, 2);
+        var affs = [], affId = 1;
+        var ops = d.list.operations || [];
+        if (ops.indexOf('add') >= 0) {
+            var body = { list_key: d.list.key }, params = {};
+            Object.keys(d.list.item_schema || {}).forEach(function(k) {
+                body[k] = '<' + k + '>';
+                var fd = d.list.item_schema[k];
+                params[k] = fd.options ? { options: fd.options } : {};
+            });
+            affs.push({ id: affId++, method: 'POST', url: '/agent/{wf}/list_add', body: body, parameters: params });
+        }
+        if (ops.indexOf('remove') >= 0 && d.list.items.length) {
+            affs.push({ id: affId++, method: 'POST', url: '/agent/{wf}/list_remove',
+                body: { list_key: d.list.key, index: '<index>' },
+                parameters: { index: { options: d.list.items.map(function(_, i) { return i; }) } }
+            });
+        }
+        return JSON.stringify({ list: d.list.items, affordances: affs }, null, 2);
     }
     return '{}';
 }
@@ -644,6 +1048,48 @@ function renderDemo(id) {
         html += wfRenderTable(d.table);
     } else if (d.type === 'list') {
         html += renderListDemo(d);
+    } else if (d.type === 'visibility') {
+        var visCtx = { s: {}, state: {}, fieldCategory: {}, classified: {} };
+        d.fields.filter(function(f) { return checkVisible(f.visible_when, d.state); })
+            .forEach(function(f) {
+                var item = { type: f.type, key: f.key, label: f.label,
+                    instruction: f.instruction, value: d.state[f.key], affordance: f.affordance };
+                var fh = _renderContentField(item, visCtx);
+                if (fh) html += '<div class="wf-card"><div class="wf-fields">' + fh + '</div></div>';
+            });
+    } else if (d.type === 'sideeffects') {
+        var seCtx = { s: {}, state: {}, fieldCategory: {}, classified: {} };
+        d.fields.forEach(function(f) {
+            var item = { type: f.type, key: f.key, label: f.label,
+                instruction: f.instruction, value: d.state[f.key], affordance: f.affordance };
+            var fh = _renderContentField(item, seCtx);
+            if (fh) html += '<div class="wf-card"><div class="wf-fields">' + fh + '</div></div>';
+        });
+        var rc = d.state.requires_compliance;
+        html += '<div class="wf-card" style="margin: 0 1.5rem 0.5rem;">';
+        html += '<div class="wf-fields"><div class="wf-field">';
+        html += '<div class="wf-field-label">Requires Compliance <span style="font-weight:400;font-size:0.72rem;color:#aaa;">(auto-computed)</span></div>';
+        html += '<div class="wf-field-value">';
+        if (rc === null) {
+            html += '<span class="el-side-effect-badge">null — not triggered</span>';
+        } else {
+            html += '<span class="el-side-effect-badge el-badge-triggered">&#x2713; true — compliance required</span>';
+        }
+        html += '</div></div></div></div>';
+    } else if (d.type === 'proceed') {
+        var pdCtx = { s: {}, state: {}, fieldCategory: {}, classified: {} };
+        d.fields.forEach(function(f) {
+            var item = { type: f.type, key: f.key, label: f.label,
+                instruction: f.instruction, value: d.state[f.key], affordance: f.affordance };
+            var fh = _renderContentField(item, pdCtx);
+            if (fh) html += '<div class="wf-card"><div class="wf-fields">' + fh + '</div></div>';
+        });
+        var gateOk = evalExpr(d.gate, d.state);
+        html += '<div class="wf-action-bar" style="padding: 0.25rem 1.5rem 0.5rem;">';
+        html += '<button class="el-proceed-btn' + (gateOk ? ' active' : '') + '"';
+        if (!gateOk) html += ' title="Gate unmet — both fields required"';
+        html += '>Proceed to Change Definition \u2192</button>';
+        html += '</div>';
     }
 
     d.container.innerHTML = html;
@@ -699,8 +1145,44 @@ function simulateIndicator() {
 Object.keys(DEMOS).forEach(function(id) { DEMOS[id]._id = id; });
 
 /* ── Initialize all demos ── */
-['text','toggle','choice-btn','choice-drop','indicator','group','table','list'].forEach(function(id) {
+['text','toggle','choice-btn','choice-drop','indicator','group','table','list',
+ 'visibility','sideeffects','proceed'].forEach(function(id) {
     renderDemo(id);
 });
+
+/* ── Tab system ── */
+(function() {
+    var tabs = document.querySelectorAll('.el-toc a');
+    var sections = document.querySelectorAll('.el-section');
+
+    function activateTab(id) {
+        var found = false;
+        sections.forEach(function(s) {
+            var match = s.id === id;
+            s.classList.toggle('el-tab-visible', match);
+            if (match) found = true;
+        });
+        if (!found) {
+            /* Fallback: show first section */
+            if (sections.length) sections[0].classList.add('el-tab-visible');
+            id = sections.length ? sections[0].id : id;
+        }
+        tabs.forEach(function(t) {
+            t.classList.toggle('el-tab-active', t.getAttribute('href') === '#' + id);
+        });
+        history.replaceState(null, '', '#' + id);
+    }
+
+    tabs.forEach(function(tab) {
+        tab.addEventListener('click', function(e) {
+            e.preventDefault();
+            activateTab(tab.getAttribute('href').slice(1));
+        });
+    });
+
+    /* Initial tab: use URL hash if valid, otherwise first tab */
+    var initial = location.hash ? location.hash.slice(1) : '';
+    activateTab(initial || (tabs.length ? tabs[0].getAttribute('href').slice(1) : ''));
+})();
 </script>
 {% endblock %}
