@@ -13,11 +13,11 @@ from __future__ import annotations
 
 import copy
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from html import escape
 from typing import Any
 
-from engine.affordances import Affordance, SetValueAffordance
+from engine.affordances import Affordance, CheckboxAffordance, SetValueAffordance
 from engine.store import Store
 
 
@@ -142,10 +142,52 @@ class TextForm(Eigenform):
                 label=f"Set {self.label}",
                 method="POST",
                 url=self.url,
-                parameters={"value": {"type": "string"}},
+                body={"value": "<value>"},
+                instruction=f"Replace <value> with the desired {self.label.lower()}.",
             )
         ]
 
     def handle(self, body: dict) -> dict:
         self._store.set(self._scope, self.key, body.get("value"))
+        return self.serialize()
+
+
+@dataclass
+class CheckboxForm(Eigenform):
+    """Multi-select: a set of items, each independently selectable."""
+    items: list[str] = field(default_factory=list)
+
+    @property
+    def checked(self) -> dict[str, bool]:
+        """Current state: {item: bool} for each item."""
+        stored = self.value or {}
+        return {item: stored.get(item, False) for item in self.items}
+
+    def _serialize_state(self) -> dict:
+        return {
+            "form": self.form,
+            "key": self.key,
+            "label": self.label,
+            "instruction": self.instruction,
+            "items": self.checked,
+        }
+
+    def get_affordances(self) -> list[Affordance]:
+        return [
+            CheckboxAffordance(
+                label=f"Set {self.label}",
+                method="POST",
+                url=self.url,
+                body={item: "<true | false>" for item in self.items},
+                instruction="Set one or more items. Omitted items are unchanged.",
+                items=self.checked,
+            )
+        ]
+
+    def handle(self, body: dict) -> dict:
+        current = self.checked
+        for item_key, value in body.items():
+            if item_key in current:
+                current[item_key] = value
+        self._store.set(self._scope, self.key, current)
         return self.serialize()

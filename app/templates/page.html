@@ -2,9 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Agent Portal</title>
+    <title>{{ title }}</title>
 </head>
 <body>
-    {{ page_html }}
+    <div id="page-content">{{ page_html }}</div>
+    <script>
+        var source = new EventSource('/page/{{ page_id }}/stream');
+        source.onmessage = function(event) {
+            location.reload();
+        };
+    </script>
 </body>
 </html>
