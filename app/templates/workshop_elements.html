@@ -163,6 +163,7 @@
 </p>
 
 <nav class="el-toc">
+  <a href="#overview">What is an Element?</a>
   <span class="el-toc-label">Element Types</span>
   <a href="#text">text</a>
   <a href="#toggle">toggle</a>
@@ -180,6 +181,132 @@
   <span class="el-toc-label">Reference</span>
   <a href="#expressions">expressions</a>
 </nav>
+
+<!-- ═══════════════════════ overview ═══════════════════════ -->
+<div class="el-section" id="overview">
+  <div class="el-section-head"><h2>What is an Element?</h2></div>
+
+  <p class="el-desc">
+    A workflow is a sequence of <strong>nodes</strong>. Each node presents the user (human or agent) with
+    things to read and things to do. Those things are <strong>elements</strong> — the atomic building blocks
+    of every workflow page.
+  </p>
+
+  <p class="el-desc">
+    An element is anything that occupies space in a node's content area: a text field to fill in,
+    a yes/no toggle, a selection from a list of options, a read-only indicator, a group of related
+    fields, a table, or a managed list. The engine does not distinguish between "inputs" and "displays" —
+    they are all elements, differing only in type and in whether they generate affordances.
+  </p>
+
+  <div class="el-section-divider"><span>Three representations</span></div>
+
+  <p class="el-desc">
+    Every element exists in three forms simultaneously. Understanding these three representations is
+    the key to understanding the engine.
+  </p>
+
+  <div style="display: flex; flex-direction: column; gap: 1.25rem; max-width: 700px; margin-bottom: 1.5rem;">
+    <div>
+      <div class="el-demo-label">1. Definition (YAML)</div>
+      <p class="el-desc" style="margin-bottom: 0.5rem;">
+        The workflow author declares elements in YAML. This is the source of truth — it defines the
+        element's type, label, instruction text, options, visibility rules, and side effects. The
+        engine reads this once at load time and never modifies it.
+      </p>
+      <pre class="el-code">fields:
+  title:
+    label: Document Title
+    type: text
+    instruction: A short, descriptive title.</pre>
+    </div>
+
+    <div>
+      <div class="el-demo-label">2. State + Affordances (JSON)</div>
+      <p class="el-desc" style="margin-bottom: 0.5rem;">
+        At runtime, the engine projects the definition into a canonical response: the element's current
+        <strong>state</strong> (its value, label, visibility) and its <strong>affordances</strong> (what
+        actions are currently possible). This is what an agent receives from <code>GET /agent/{id}/{inst}</code>.
+        The two are always delivered together — an agent never sees state without knowing what it can do.
+      </p>
+      <pre class="el-code"><span class="el-code-comment">// state — in the content array</span>
+{"type": "text", "label": "Document Title", "value": null,
+ "instruction": "A short, descriptive title."}
+
+<span class="el-code-comment">// affordance — in the affordances array</span>
+{"id": 1, "label": "Set Document Title",
+ "method": "POST", "params": {"value": "(text)"}}</pre>
+    </div>
+
+    <div>
+      <div class="el-demo-label">3. Rendered (UI)</div>
+      <p class="el-desc" style="margin-bottom: 0.5rem;">
+        The human renderer projects the same state and affordances into interactive HTML. Every
+        visible control traces back to an affordance; every affordance has a corresponding control.
+        This is the <strong>faithful projection</strong> principle — the human view and the agent view
+        are two lenses on the same data, never diverging.
+      </p>
+    </div>
+  </div>
+
+  <div class="el-section-divider"><span>The content array</span></div>
+
+  <p class="el-desc">
+    A node's elements are delivered as an ordered <code>content</code> array in the state response.
+    Each item carries its own <code>type</code> field, so the renderer can dispatch without any
+    external schema. The order of items in the array matches the order declared in the YAML
+    definition — what you write is what the user sees.
+  </p>
+
+  <pre class="el-code"><span class="el-code-comment">// GET response → state.content</span>
+[
+  {"type": "group", "label": "Basic Information", "fields": [...]},
+  {"type": "toggle", "label": "Affects Code", "value": false},
+  {"type": "choice", "label": "Priority", "value": null, "options": ["Low", "Medium", "High"]}
+]</pre>
+
+  <div class="el-section-divider"><span>Element taxonomy</span></div>
+
+  <p class="el-desc">
+    Seven element types, organized by role:
+  </p>
+
+  <table class="el-aff-table" style="max-width: 700px;">
+    <thead>
+      <tr><th>Category</th><th>Types</th><th>Role</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="el-category">leaf element</span></td>
+        <td><code>text</code>, <code>toggle</code>, <code>choice</code>, <code>indicator</code></td>
+        <td>Single values. Each generates one affordance (except indicator, which is read-only).</td>
+      </tr>
+      <tr>
+        <td><span class="el-category el-category-container">container</span></td>
+        <td><code>group</code></td>
+        <td>Bundles multiple leaf fields under a single <code>set_fields</code> affordance, reducing agent round-trips.</td>
+      </tr>
+      <tr>
+        <td><span class="el-category el-category-structural">structural</span></td>
+        <td><code>table</code>, <code>list</code></td>
+        <td>Multi-row data structures with their own operation vocabularies.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="el-desc" style="margin-top: 1.25rem;">
+    Elements can also have <strong>behavioral features</strong> layered on top: <code>visible_when</code>
+    hides an element until a condition is met, <code>side_effects</code> auto-sets other fields when
+    a value changes, and <code>default</code> provides an initial value. These are not element types —
+    they are properties that any leaf element can carry.
+  </p>
+
+  <div class="el-notes">
+    <strong>Explore each type below</strong> — click a tab to see its YAML definition, live agent view,
+    and interactive rendered form. Every demo on this page is driven by the same renderer code that
+    runs in production.
+  </div>
+</div>
 
 <!-- ═══════════════════════ text ═══════════════════════ -->
 <div class="el-section" id="text">
