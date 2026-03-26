@@ -7,7 +7,7 @@
 <body>
     <div id="page-content">{{ page_html }}</div>
     <script>
-        var source = new EventSource('/page/{{ page_id }}/stream');
+        var source = new EventSource('/pages/{{ page_key }}/stream');
         source.onmessage = function(event) {
             window.location.reload(true);
         };

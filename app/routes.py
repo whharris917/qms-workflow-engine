@@ -11,23 +11,28 @@ bp = Blueprint("main", __name__)
 
 pages = build_pages(data_dir=Path("data"))
 
-# SSE subscribers: {page_id: [queue, ...]}
+# SSE subscribers: {page_key: [queue, ...]}
 subscribers: dict[str, list[queue.Queue]] = {}
 
 
-def notify_subscribers(page_id: str, data: dict):
+def wants_html(req) -> bool:
+    """True if the client prefers HTML (i.e. a browser)."""
+    return "text/html" in req.accept_mimetypes
+
+
+def notify_subscribers(page_key: str, data: dict):
     """Push an SSE event to all subscribers of a page."""
-    if page_id not in subscribers:
+    if page_key not in subscribers:
         return
     message = f"data: {json.dumps(data)}\n\n"
     dead = []
-    for q in subscribers[page_id]:
+    for q in subscribers[page_key]:
         try:
             q.put_nowait(message)
         except queue.Full:
             dead.append(q)
     for q in dead:
-        subscribers[page_id].remove(q)
+        subscribers[page_key].remove(q)
 
 
 @bp.route("/")
@@ -35,32 +40,33 @@ def index():
     return render_template("index.html")
 
 
-@bp.route("/page/<page_id>")
-def page(page_id):
-    pg = pages.get(page_id)
+@bp.route("/pages/<page_key>", methods=["GET", "POST"])
+def page(page_key):
+    pg = pages.get(page_key)
     if pg is None:
-        return jsonify({"error": f"Unknown page: {page_id}"}), 404
+        if wants_html(request):
+            return "Not found", 404
+        return jsonify({"error": f"Unknown page: {page_key}"}), 404
+    if request.method == "POST":
+        pg.handle(request.json)
+        result = pg.serialize()
+        notify_subscribers(page_key, result)
+        return jsonify(result)
+    if wants_html(request):
+        html = Markup(pg.render())
+        return render_template("page.html", page_html=html, title=pg.label, page_key=page_key)
     return jsonify(pg.serialize())
 
 
-@bp.route("/page/<page_id>/view")
-def page_view(page_id):
-    pg = pages.get(page_id)
-    if pg is None:
-        return "Not found", 404
-    html = Markup(pg.render())
-    return render_template("page.html", page_html=html, title=pg.label, page_id=page_id)
-
-
-@bp.route("/page/<page_id>/stream")
-def page_stream(page_id):
-    if page_id not in pages:
-        return jsonify({"error": f"Unknown page: {page_id}"}), 404
+@bp.route("/pages/<page_key>/stream")
+def page_stream(page_key):
+    if page_key not in pages:
+        return jsonify({"error": f"Unknown page: {page_key}"}), 404
 
     q = queue.Queue(maxsize=50)
-    if page_id not in subscribers:
-        subscribers[page_id] = []
-    subscribers[page_id].append(q)
+    if page_key not in subscribers:
+        subscribers[page_key] = []
+    subscribers[page_key].append(q)
 
     def generate():
         try:
@@ -68,20 +74,35 @@ def page_stream(page_id):
                 message = q.get()
                 yield message
         except GeneratorExit:
-            if page_id in subscribers and q in subscribers[page_id]:
-                subscribers[page_id].remove(q)
+            if page_key in subscribers and q in subscribers[page_key]:
+                subscribers[page_key].remove(q)
 
     return Response(generate(), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
-@bp.route("/page/<page_id>/<key>", methods=["POST"])
-def handle_action(page_id, key):
-    pg = pages.get(page_id)
+@bp.route("/pages/<page_key>/<key>", methods=["GET", "POST"])
+def eigenform(page_key, key):
+    pg = pages.get(page_key)
     if pg is None:
-        return jsonify({"error": f"Unknown page: {page_id}"}), 404
+        if wants_html(request):
+            return "Not found", 404
+        return jsonify({"error": f"Unknown page: {page_key}"}), 404
+
+    if request.method == "GET":
+        ef = pg.find_eigenform(key)
+        if ef is None:
+            if wants_html(request):
+                return "Not found", 404
+            return jsonify({"error": f"Unknown key: {key}"}), 404
+        if wants_html(request):
+            html = Markup(ef.render())
+            return render_template("page.html", page_html=html, title=ef.label, page_key=page_key)
+        return jsonify(ef.serialize())
+
+    # POST — mutate
     result = pg.handle_action(key, request.json)
     if result is None:
         return jsonify({"error": f"Unknown key: {key}"}), 404
-    notify_subscribers(page_id, result)
+    notify_subscribers(page_key, result)
     return jsonify(result)

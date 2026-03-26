@@ -61,7 +61,7 @@ class PageForm(Eigenform):
             SimpleButtonAffordance(
                 label="Reset Page",
                 method="POST",
-                url=f"{self._url_prefix}/{self.key}",
+                url=self._url_prefix,
                 body={"action": "reset"},
                 instruction="Clear all state on this page.",
             )
@@ -85,6 +85,28 @@ class PageForm(Eigenform):
         html += '</div>'
         return html
 
+    def find_eigenform(self, key: str) -> Eigenform | None:
+        """Find any eigenform by key, recursing into all containers."""
+        return self._find_recursive(key, self.eigenforms)
+
+    def _find_recursive(self, key: str, eigenforms: list[Eigenform]) -> Eigenform | None:
+        for ef in eigenforms:
+            if ef.key == key:
+                return ef
+            if hasattr(ef, 'eigenforms'):
+                found = self._find_recursive(key, ef.eigenforms)
+                if found:
+                    return found
+            if hasattr(ef, 'steps'):
+                found = self._find_recursive(key, ef.steps)
+                if found:
+                    return found
+            if hasattr(ef, 'tabs'):
+                found = self._find_recursive(key, list(ef.tabs.values()))
+                if found:
+                    return found
+        return None
+
     def _clear_recursive(self, eigenforms: list[Eigenform]):
         """Clear state for all eigenforms, recursing into containers."""
         for ef in eigenforms:
@@ -106,10 +128,6 @@ class PageForm(Eigenform):
 
     def handle_action(self, key: str, body: dict) -> dict | None:
         """Route a POST to the correct nested eigenform. Returns full page state."""
-        # Page-level action
-        if key == self.key:
-            self.handle(body)
-            return self.serialize()
         for ef in self.eigenforms:
             # Direct match
             if ef.key == key:
