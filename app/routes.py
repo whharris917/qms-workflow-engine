@@ -5,81 +5,14 @@ from pathlib import Path
 from flask import Blueprint, Response, render_template, request, jsonify
 from markupsafe import Markup
 
-from engine.chain import ChainForm
-from engine.choice import ChoiceForm
-from engine.eigenforms import CheckboxForm, TextForm
-from engine.listform import ListForm
-from engine.multi import FieldDescriptor, MultiForm
-from engine.table import TableForm
-from engine.rubiks import RubiksCubeForm
-from engine.page import PageForm
-from engine.tab import TabForm
+from pages import build_pages
 
 bp = Blueprint("main", __name__)
 
-DATA_DIR = Path("data")
+pages = build_pages(data_dir=Path("data"))
 
 # SSE subscribers: {page_id: [queue, ...]}
 subscribers: dict[str, list[queue.Queue]] = {}
-
-# Definitions — these are templates, not live instances
-title_def = TextForm(key="title", label="Document Title", instruction="A short, descriptive title.")
-purpose_def = TextForm(key="purpose", label="Purpose", instruction="What problem does this CR solve?")
-impacts_def = CheckboxForm(
-    key="impacts", label="Impact Areas", instruction="Select all that apply.",
-    items=["code", "documentation", "tests", "infrastructure"],
-)
-
-# Each page gets its own bound copies via bind()
-pages = {
-    "1": PageForm(key="1", label="Page 1", eigenforms=[title_def, purpose_def, impacts_def])
-            .bind(data_dir=DATA_DIR, scope="1", url_prefix="/page/1"),
-    "2": PageForm(key="2", label="Page 2", instruction="Fill out each tab to complete the change request.", eigenforms=[
-                TabForm(key="tabs", label="Details", tabs={
-                    "basic": TextForm(key="title", label="Document Title", instruction="A short, descriptive title."),
-                    "scope": TextForm(key="scope", label="Scope", instruction="What is affected by this change?"),
-                    "impact": CheckboxForm(key="impacts", label="Impact Areas", instruction="Select all that apply.",
-                                           items=["code", "documentation", "tests", "infrastructure"]),
-                }),
-            ]).bind(data_dir=DATA_DIR, scope="2", url_prefix="/page/2"),
-    "4": PageForm(key="4", label="Page 4", instruction="Complete each step in sequence.", eigenforms=[
-                ChainForm(key="chain", label="Change Request Wizard", instruction="Fill out each step to proceed.", steps=[
-                    TextForm(key="title", label="Document Title", instruction="A short, descriptive title."),
-                    TextForm(key="purpose", label="Purpose", instruction="What problem does this CR solve?"),
-                    TextForm(key="scope", label="Scope", instruction="What is affected by this change?"),
-                    CheckboxForm(key="impacts", label="Impact Areas", instruction="Select all that apply.",
-                                 items=["code", "documentation", "tests", "infrastructure"]),
-                ]),
-            ]).bind(data_dir=DATA_DIR, scope="4", url_prefix="/page/4"),
-    "6": PageForm(key="6", label="Page 6", instruction="A change request form showcasing ChoiceForm, ListForm, and MultiForm.", eigenforms=[
-                MultiForm(key="basic_info", label="Basic Information",
-                          instruction="Provide the core details for this change request.",
-                          fields=[
-                              FieldDescriptor(key="title", label="Title", instruction="Short descriptive title."),
-                              FieldDescriptor(key="author", label="Author", instruction="Who is proposing this change?"),
-                              FieldDescriptor(key="priority", label="Priority", type="choice",
-                                              options=["Low", "Medium", "High", "Critical"]),
-                          ]),
-                ChoiceForm(key="change_type", label="Change Type",
-                           instruction="What kind of change is this?",
-                           options=["New Feature", "Bug Fix", "Refactor", "Documentation", "Infrastructure"]),
-                CheckboxForm(key="affected_areas", label="Affected Areas",
-                             instruction="Select all areas impacted by this change.",
-                             items=["frontend", "backend", "database", "API", "CI/CD"]),
-                ListForm(key="requirements", label="Requirements",
-                         instruction="List the requirements for this change."),
-                ListForm(key="risks", label="Risks",
-                         instruction="List any risks or concerns."),
-            ]).bind(data_dir=DATA_DIR, scope="6", url_prefix="/page/6"),
-    "5": PageForm(key="5", label="Page 5", instruction="Build and populate a table.", eigenforms=[
-                TableForm(key="table", label="Data Table",
-                          instruction="Add columns, then rows, then fill in cells."),
-            ]).bind(data_dir=DATA_DIR, scope="5", url_prefix="/page/5"),
-    "3": PageForm(key="3", label="Page 3", eigenforms=[
-                RubiksCubeForm(key="cube", label="Rubik's Cube",
-                               instruction="A fully functional cube. Rotate any face."),
-            ]).bind(data_dir=DATA_DIR, scope="3", url_prefix="/page/3"),
-}
 
 
 def notify_subscribers(page_id: str, data: dict):
