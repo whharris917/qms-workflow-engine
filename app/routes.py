@@ -8,6 +8,7 @@ from markupsafe import Markup
 from engine.eigenforms import CheckboxForm, TextForm
 from engine.page import PageForm
 from engine.store import Store
+from engine.tab import TabForm
 
 bp = Blueprint("main", __name__)
 
@@ -28,8 +29,14 @@ impacts_def = CheckboxForm(
 pages = {
     "1": PageForm(key="1", label="Page 1", eigenforms=[title_def, purpose_def, impacts_def])
             .bind(store=store, scope="1", url_prefix="/page/1"),
-    "2": PageForm(key="2", label="Page 2", eigenforms=[title_def])
-            .bind(store=store, scope="2", url_prefix="/page/2"),
+    "2": PageForm(key="2", label="Page 2", eigenforms=[
+                TabForm(key="tabs", label="Details", tabs={
+                    "basic": TextForm(key="title", label="Document Title", instruction="A short, descriptive title."),
+                    "scope": TextForm(key="scope", label="Scope", instruction="What is affected by this change?"),
+                    "impact": CheckboxForm(key="impacts", label="Impact Areas", instruction="Select all that apply.",
+                                           items=["code", "documentation", "tests", "infrastructure"]),
+                }),
+            ]).bind(store=store, scope="2", url_prefix="/page/2"),
     "3": PageForm(key="3", label="Page 3", eigenforms=[title_def])
             .bind(store=store, scope="3", url_prefix="/page/3"),
 }

@@ -54,16 +54,15 @@ class PageForm(Eigenform):
         html += "".join(ef.render() for ef in self.eigenforms)
         return html
 
-    def find_eigenform(self, key: str) -> Eigenform | None:
-        for ef in self.eigenforms:
-            if ef.key == key:
-                return ef
-        return None
-
     def handle_action(self, key: str, body: dict) -> dict | None:
         """Route a POST to the correct nested eigenform. Returns full page state."""
-        ef = self.find_eigenform(key)
-        if ef is None:
-            return None
-        ef.handle(body)
-        return self.serialize()
+        for ef in self.eigenforms:
+            # Direct match
+            if ef.key == key:
+                ef.handle(body)
+                return self.serialize()
+            # Delegate to containers that can route internally
+            if hasattr(ef, 'handle_action'):
+                if ef.handle_action(key, body):
+                    return self.serialize()
+        return None

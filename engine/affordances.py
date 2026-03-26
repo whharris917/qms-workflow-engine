@@ -55,6 +55,33 @@ class SetValueAffordance(Affordance):
         )
 
 
+class SwitchTabAffordance(Affordance):
+    """An affordance that switches the active tab."""
+
+    def __init__(self, label: str, method: str, url: str, body: dict,
+                 instruction: str | None = None, is_active: bool = False):
+        super().__init__(label=label, method=method, url=url, body=body, instruction=instruction)
+        self.is_active = is_active
+
+    def render(self) -> str:
+        endpoint = f'{self.method} {self.url}'
+        if self.is_active:
+            return (
+                f'<button disabled style="font-weight: bold; margin-right: 4px;"'
+                f' title="{escape(endpoint)} {escape(json.dumps(self.body))}">'
+                f'{escape(self.label)}</button>'
+            )
+        body_js = json.dumps(self.body).replace('"', '&quot;')
+        return (
+            f'<button onclick="fetch(\'{self.url}\','
+            f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+            f'body:JSON.stringify({body_js})}})"'
+            f' style="margin-right: 4px; cursor: pointer;"'
+            f' title="{escape(endpoint)} {escape(json.dumps(self.body))}">'
+            f'{escape(self.label)}</button>'
+        )
+
+
 class CheckboxAffordance(Affordance):
     """An affordance that sets multiple boolean items. Renders as individual checkboxes."""
 
