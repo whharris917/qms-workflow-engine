@@ -6,7 +6,10 @@ from flask import Blueprint, Response, render_template, request, jsonify
 from markupsafe import Markup
 
 from engine.chain import ChainForm
+from engine.choice import ChoiceForm
 from engine.eigenforms import CheckboxForm, TextForm
+from engine.listform import ListForm
+from engine.multi import FieldDescriptor, MultiForm
 from engine.table import TableForm
 from engine.rubiks import RubiksCubeForm
 from engine.page import PageForm
@@ -49,6 +52,26 @@ pages = {
                                  items=["code", "documentation", "tests", "infrastructure"]),
                 ]),
             ]).bind(store=store, scope="4", url_prefix="/page/4"),
+    "6": PageForm(key="6", label="Page 6", instruction="A change request form showcasing ChoiceForm, ListForm, and MultiForm.", eigenforms=[
+                MultiForm(key="basic_info", label="Basic Information",
+                          instruction="Provide the core details for this change request.",
+                          fields=[
+                              FieldDescriptor(key="title", label="Title", instruction="Short descriptive title."),
+                              FieldDescriptor(key="author", label="Author", instruction="Who is proposing this change?"),
+                              FieldDescriptor(key="priority", label="Priority", type="choice",
+                                              options=["Low", "Medium", "High", "Critical"]),
+                          ]),
+                ChoiceForm(key="change_type", label="Change Type",
+                           instruction="What kind of change is this?",
+                           options=["New Feature", "Bug Fix", "Refactor", "Documentation", "Infrastructure"]),
+                CheckboxForm(key="affected_areas", label="Affected Areas",
+                             instruction="Select all areas impacted by this change.",
+                             items=["frontend", "backend", "database", "API", "CI/CD"]),
+                ListForm(key="requirements", label="Requirements",
+                         instruction="List the requirements for this change."),
+                ListForm(key="risks", label="Risks",
+                         instruction="List any risks or concerns."),
+            ]).bind(store=store, scope="6", url_prefix="/page/6"),
     "5": PageForm(key="5", label="Page 5", instruction="Build and populate a table.", eigenforms=[
                 TableForm(key="table", label="Data Table",
                           instruction="Add columns, then rows, then fill in cells."),
