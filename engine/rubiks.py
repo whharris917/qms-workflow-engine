@@ -269,6 +269,8 @@ class RubiksCubeForm(Eigenform):
         html += '<div style="margin-top: 8px; font-size: 14px;">'
         rotate_aff = next((a for a in affs if a.get("body", {}).get("action") == "rotate"), None)
         if rotate_aff and not solved:
+            from engine.eigenforms import Eigenform
+            Eigenform.mark_rendered(rotate_aff)
             url = rotate_aff["url"]
             endpoint = f'POST {url}'
             for direction, arrow in [("cw", "↻"), ("ccw", "↺")]:
@@ -284,15 +286,15 @@ class RubiksCubeForm(Eigenform):
                         f'{face} {arrow}</button>'
                     )
                 html += '<br>'
-        # Shuffle/Restart buttons
+        # Remaining affordances (Shuffle/Restart)
         for aff in affs:
-            if aff.get("body", {}).get("action") in ("shuffle", "restart"):
+            if not aff.get("_rendered"):
                 html += render_affordance_html(aff)
         html += '</div>'
 
         return html
 
-    def handle(self, body: dict) -> dict:
+    def _handle(self, body: dict) -> dict:
         action = body.get("action", "rotate")
         if action == "rotate":
             face = body.get("face", "")

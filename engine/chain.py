@@ -22,6 +22,10 @@ class ChainForm(Eigenform):
     steps: list[Eigenform] = field(default_factory=list)
 
     @property
+    def children(self) -> list[Eigenform]:
+        return self.steps
+
+    @property
     def is_complete(self) -> bool:
         return all(ef.is_complete for ef in self.steps)
 
@@ -41,11 +45,9 @@ class ChainForm(Eigenform):
             for ef in self.steps:
                 if ef.key == focused:
                     return ef
-        # Auto-focus: first incomplete step
         for ef in self.steps:
             if not ef.is_complete:
                 return ef
-        # All complete: show the last one
         return self.steps[-1] if self.steps else None
 
     @property
@@ -53,17 +55,11 @@ class ChainForm(Eigenform):
         active = self.active_step
         return active.key if active else None
 
-    def bind(self, store: Store, scope: str, url_prefix: str) -> ChainForm:
-        import copy
-        bound = copy.deepcopy(self)
-        bound._store = store
-        bound._scope = scope
-        bound._url_prefix = url_prefix
-        bound.steps = [
-            ef.bind(store=store, scope=bound.key, url_prefix=f"{url_prefix}/{bound.key}")
+    def _bind_children(self, store: Store, url_prefix: str):
+        self.steps = [
+            ef.bind(store=store, scope=self.key, url_prefix=f"{url_prefix}/{self.key}")
             for ef in self.steps
         ]
-        return bound
 
     def _serialize_state(self) -> dict:
         return {
@@ -120,18 +116,14 @@ class ChainForm(Eigenform):
         progress = data.get("progress", [])
         affs = data.get("affordances", [])
 
-        # Build a set of affordances matched to progress steps (jump-back buttons)
-        rendered_affs = set()
-
         # Progress bar
         html += '<div style="margin-bottom: 8px;">'
         for step in progress:
             if step["complete"] and step["key"] != active_key:
                 # Completed: render as jump-back affordance
-                for i, aff in enumerate(affs):
+                for aff in affs:
                     if aff.get("body", {}).get("focus") == step["key"]:
                         html += render_affordance_html(aff)
-                        rendered_affs.add(i)
                         break
             elif step["key"] == active_key:
                 html += (
@@ -145,8 +137,8 @@ class ChainForm(Eigenform):
                     f' color: #aaa;">{escape(step["label"])}</span>'
                 )
         # Render any remaining affordances (e.g. Continue button)
-        for i, aff in enumerate(affs):
-            if i not in rendered_affs:
+        for aff in affs:
+            if not aff.get("_rendered"):
                 html += render_affordance_html(aff)
         html += '</div>'
 
@@ -157,7 +149,7 @@ class ChainForm(Eigenform):
 
         return html
 
-    def handle(self, body: dict) -> dict:
+    def _handle(self, body: dict) -> dict:
         """Handle focus change or continue."""
         if body.get("action") == "continue":
             self._store.set(self._scope, self.key, None)

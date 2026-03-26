@@ -117,7 +117,7 @@ class MultiForm(Eigenform):
             )
         ]
 
-    def handle(self, body: dict) -> dict:
+    def _handle(self, body: dict) -> dict:
         current = dict(self.values)
         valid_keys = {fd.key for fd in self.fields}
         for key, value in body.items():

@@ -1,9 +1,13 @@
-"""Affordance — a single action that can be performed on an eigenform.
+"""Affordance — a description of an action that can be performed on an eigenform.
 
-An affordance serializes to a dict containing everything needed to both
-display it to an agent (label, method, url, body, instruction) and render
-it as interactive HTML (render_hints). The standalone render_affordance_html()
-function produces HTML purely from this serialized dict.
+Affordances are pure data. They describe what actions are available, with
+what parameters, at what URL. They serialize to dicts that appear in the
+eigenform's JSON output.
+
+Affordances do NOT render themselves. The eigenform that produces them is
+responsible for accounting for each one in its render_from_data() method.
+The render_affordance_html() utility is available as a convenience for
+eigenforms that don't need custom placement.
 """
 
 from __future__ import annotations
@@ -15,7 +19,12 @@ from html import escape
 
 @dataclass
 class Affordance:
-    """A single action that can be performed on an eigenform."""
+    """A description of a possible action on an eigenform.
+
+    Affordances are data, not renderers. They serialize to dicts for
+    agents and include render_hints for eigenforms that use the
+    render_affordance_html() utility.
+    """
     label: str
     method: str
     url: str
@@ -70,11 +79,14 @@ class CheckboxAffordance(Affordance):
 
 
 # ---------------------------------------------------------------------------
-# Standalone HTML renderer — pure function of the serialized affordance dict
+# Utility for eigenforms — renders an affordance dict as HTML.
+# Eigenforms may use this for simple cases or build custom HTML instead.
+# Either way, the eigenform must account for every affordance.
 # ---------------------------------------------------------------------------
 
 def render_affordance_html(aff: dict) -> str:
-    """Render an affordance dict as interactive HTML."""
+    """Render an affordance dict as interactive HTML. Marks it as rendered."""
+    aff["_rendered"] = True
     hints = aff.get("render_hints", {})
     aff_type = hints.get("type", "")
     label = aff.get("label", "")
@@ -100,7 +112,10 @@ def render_affordance_html(aff: dict) -> str:
     elif aff_type == "small_button":
         return _render_small_button(label, url, endpoint, body)
     else:
-        # Fallback: render as a generic button
+        # Fallback: check for fillable parameters in body
+        param_keys = [k for k, v in body.items() if isinstance(v, str) and v.startswith("<")]
+        if param_keys:
+            return _render_parameterized(label, url, endpoint, body, param_keys)
         return _render_button(label, url, endpoint, body)
 
 
@@ -121,12 +136,14 @@ def _render_text_input(label: str, url: str, endpoint: str) -> str:
 def _render_button(label: str, url: str, endpoint: str, body: dict) -> str:
     body_js = json.dumps(body).replace('"', '&quot;')
     return (
+        f'<div style="margin: 4px 0;">'
         f'<button onclick="fetch(\'{url}\','
         f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
         f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
-        f' style="margin: 1px; cursor: pointer; font-size: 12px; padding: 4px 10px;"'
+        f' style="cursor: pointer; font-size: 12px; padding: 4px 10px;"'
         f' title="{escape(endpoint)} {escape(json.dumps(body))}">'
         f'{escape(label)}</button>'
+        f'</div>'
     )
 
 
@@ -236,6 +253,34 @@ def _render_text_input_add(label: str, url: str, endpoint: str, body: dict, plac
         f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps(body))}">'
         f'{escape(label)}</button>'
         f'</form>'
+    )
+
+
+def _render_parameterized(label: str, url: str, endpoint: str, body: dict, param_keys: list[str]) -> str:
+    """Render an affordance with fillable parameters as a form with inputs."""
+    fixed_parts = {k: v for k, v in body.items() if k not in param_keys}
+
+    js_build = "var b={};"
+    for k, v in fixed_parts.items():
+        js_build += f"b['{k}']='{v}';"
+    for pk in param_keys:
+        js_build += f"b['{pk}']=this.elements['{pk}'].value;"
+
+    inputs = ""
+    for pk in param_keys:
+        inputs += f'<input name="{escape(pk)}" type="text" placeholder="{escape(pk)}" style="width: 100px; margin-right: 4px;" />'
+
+    return (
+        f'<div style="margin: 4px 0; padding: 4px 0; border-top: 1px solid #eee;">'
+        f'<form style="margin: 0;" onsubmit="'
+        f"{js_build}"
+        f"fetch('{url}',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
+        f"body:JSON.stringify(b)}}).then(()=>location.reload()); return false\">"
+        f'{inputs}'
+        f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps(body))}">'
+        f'{escape(label)}</button>'
+        f'</form>'
+        f'</div>'
     )
 
 

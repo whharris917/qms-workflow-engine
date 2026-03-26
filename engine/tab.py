@@ -23,30 +23,26 @@ class TabForm(Eigenform):
     tabs: dict[str, Eigenform] = field(default_factory=dict)  # {tab_key: eigenform}
 
     @property
+    def children(self) -> list[Eigenform]:
+        return list(self.tabs.values())
+
+    @property
     def active_tab_key(self) -> str:
         """The currently active tab key, from the store."""
         stored = self.value
         if stored and stored in self.tabs:
             return stored
-        # Default to first tab
         return next(iter(self.tabs)) if self.tabs else ""
 
     @property
     def active_tab(self) -> Eigenform | None:
         return self.tabs.get(self.active_tab_key)
 
-    def bind(self, store: Store, scope: str, url_prefix: str) -> TabForm:
-        """Produce a bound copy with all tabs bound."""
-        import copy
-        bound = copy.deepcopy(self)
-        bound._store = store
-        bound._scope = scope
-        bound._url_prefix = url_prefix
-        bound.tabs = {
-            tab_key: ef.bind(store=store, scope=f"{bound.key}", url_prefix=f"{url_prefix}/{bound.key}")
+    def _bind_children(self, store: Store, url_prefix: str):
+        self.tabs = {
+            tab_key: ef.bind(store=store, scope=self.key, url_prefix=f"{url_prefix}/{self.key}")
             for tab_key, ef in self.tabs.items()
         }
-        return bound
 
     def _serialize_state(self) -> dict:
         return {
@@ -113,7 +109,7 @@ class TabForm(Eigenform):
             html += active.render()
         return html
 
-    def handle(self, body: dict) -> dict:
+    def _handle(self, body: dict) -> dict:
         """Handle tab switch."""
         tab_key = body.get("tab")
         if tab_key and tab_key in self.tabs:

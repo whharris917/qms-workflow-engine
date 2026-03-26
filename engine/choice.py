@@ -68,7 +68,7 @@ class ChoiceForm(Eigenform):
             html += render_affordance_html(aff)
         return html
 
-    def handle(self, body: dict) -> dict:
+    def _handle(self, body: dict) -> dict:
         value = body.get("value")
         if value in self.options:
             self._store.set(self._scope, self.key, value)

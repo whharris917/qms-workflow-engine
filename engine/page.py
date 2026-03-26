@@ -26,6 +26,10 @@ class PageForm(Eigenform):
     """
     eigenforms: list[Eigenform] = field(default_factory=list)
 
+    @property
+    def children(self) -> list[Eigenform]:
+        return self.eigenforms
+
     def bind(self, data_dir: Path, scope: str, url_prefix: str) -> PageForm:
         """Produce a bound copy of this page and all nested eigenforms.
 
@@ -70,7 +74,7 @@ class PageForm(Eigenform):
 
     def serialize(self) -> dict:
         state = self._serialize_state()
-        state["eigenforms"] = [ef.serialize() for ef in self.eigenforms]
+        state["eigenforms"] = [s for ef in self.eigenforms if (s := ef.serialize()) is not None]
         state["complete"] = self.is_complete
         state["affordances"] = [a.serialize() for a in self.get_affordances()]
         return state
@@ -87,17 +91,6 @@ class PageForm(Eigenform):
         html += '</div>'
         return html
 
-    @staticmethod
-    def _get_children(ef: Eigenform) -> list[Eigenform]:
-        """Get the direct children of a container eigenform."""
-        if hasattr(ef, 'eigenforms'):
-            return ef.eigenforms
-        if hasattr(ef, 'steps'):
-            return ef.steps
-        if hasattr(ef, 'tabs'):
-            return list(ef.tabs.values())
-        return []
-
     def find_eigenform(self, path: str) -> Eigenform | None:
         """Find an eigenform by its path (e.g., 'tabs/title')."""
         segments = path.split("/")
@@ -108,22 +101,17 @@ class PageForm(Eigenform):
                 return None
             if segment == segments[-1]:
                 return match
-            children = self._get_children(match)
+            children = match.children
         return None
 
     def _clear_recursive(self, eigenforms: list[Eigenform]):
-        """Clear state for all eigenforms, recursing into containers."""
+        """Clear state for all eigenforms, recursing via children property."""
         for ef in eigenforms:
             if ef._scope:
                 self._store.clear_scope(ef._scope)
-            if hasattr(ef, 'eigenforms'):
-                self._clear_recursive(ef.eigenforms)
-            if hasattr(ef, 'steps'):
-                self._clear_recursive(ef.steps)
-            if hasattr(ef, 'tabs'):
-                self._clear_recursive(list(ef.tabs.values()))
+            self._clear_recursive(ef.children)
 
-    def handle(self, body: dict) -> dict:
+    def _handle(self, body: dict) -> dict:
         """Handle page-level actions."""
         if body.get("action") == "reset":
             self._store.clear_scope(self._scope)

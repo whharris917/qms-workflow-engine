@@ -153,12 +153,17 @@ class ListForm(Eigenform):
 
         items = data.get("items", [])
         if items:
-            # Build lookup of move affordances per item
+            # Build lookup of move affordances per item, mark them as rendered
+            from engine.eigenforms import Eigenform
             move_affs: dict[str, list[dict]] = {}
             for aff in affs:
-                if aff.get("body", {}).get("action") == "move":
+                action = aff.get("body", {}).get("action")
+                if action == "move":
                     item_id = aff["body"].get("id")
                     move_affs.setdefault(item_id, []).append(aff)
+                    Eigenform.mark_rendered(aff)
+                elif action in ("edit", "remove"):
+                    Eigenform.mark_rendered(aff)
 
             # Find the URL from any affordance (they all share it)
             url = affs[0]["url"] if affs else ""
@@ -206,11 +211,10 @@ class ListForm(Eigenform):
         else:
             html += '<p style="color: #888;">No items yet.</p>'
 
-        # Bottom controls: Add + N/A (skip move/edit/remove — rendered inline above)
+        # Bottom controls: render remaining affordances (add, N/A)
         html += '<div style="margin-top: 8px;">'
         for aff in affs:
-            action = aff.get("body", {}).get("action")
-            if action in ("add", "na", "clear_na"):
+            if not aff.get("_rendered"):
                 html += render_affordance_html(aff)
         html += '</div>'
 
@@ -222,7 +226,7 @@ class ListForm(Eigenform):
         result["failed_action"] = action
         return result
 
-    def handle(self, body: dict) -> dict:
+    def _handle(self, body: dict) -> dict:
         action = body.get("action", "")
         items = [dict(i) for i in self.items]
         next_id = self._next_id

@@ -221,31 +221,76 @@ class TableForm(Eigenform):
         if columns:
             html += '<table style="border-collapse: collapse; margin: 8px 0;">'
 
-            # Header
+            # Header — column labels are inline-editable
             html += '<tr>'
             html += '<th style="border: 1px solid #ccc; padding: 4px 8px; background: #f0f0f0;">ID</th>'
             for col in columns:
+                rm_col_body = json.dumps({"action": "remove_column", "column": col["key"]})
                 html += (
-                    f'<th style="border: 1px solid #ccc; padding: 4px 8px; background: #f0f0f0;">'
-                    f'{escape(col["label"])}'
-                    f'<br><span style="font-size: 10px; color: #888;">{escape(col["key"])}</span>'
+                    f'<th style="border: 1px solid #ccc; padding: 2px; background: #f0f0f0;">'
+                    f'<form style="margin:0" onsubmit="fetch(\'{url}\','
+                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+                    f'body:JSON.stringify({{action:\'rename_column\',column:\'{col["key"]}\','
+                    f'label:this.elements.v.value}})'
+                    f'}}).then(()=>location.reload()); return false">'
+                    f'<input name="v" type="text" value="{escape(col["label"])}"'
+                    f' style="border: none; width: 100%; box-sizing: border-box; padding: 2px 4px;'
+                    f' background: transparent; font-weight: bold; text-align: center;"'
+                    f' oninput="this.title=\'POST {url} \'+JSON.stringify({{action:\'rename_column\',column:\'{col["key"]}\',label:this.value}})"'
+                    f' title="POST {url} {escape(json.dumps({"action": "rename_column", "column": col["key"], "label": col["label"]}))}" />'
+                    f'</form>'
+                    f'<div style="display: flex; justify-content: space-between; align-items: center; padding: 0 4px;">'
+                    f'<span style="font-size: 10px; color: #888;">{escape(col["key"])}</span>'
+                    f'<button onclick="fetch(\'{url}\','
+                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+                    f'body:JSON.stringify({rm_col_body.replace(chr(34), "&quot;")})}}).then(()=>location.reload())"'
+                    f' style="cursor: pointer; border: none; background: none; color: #c00;'
+                    f' font-size: 14px; font-weight: bold; padding: 0 2px; line-height: 1;"'
+                    f' title="POST {url} {escape(rm_col_body)}">−</button>'
+                    f'</div>'
+                    f'</th>'
+                )
+            # +Column as last header cell — inline input
+            add_col_aff = next((a for a in affs if a.get("body", {}).get("action") == "add_column"), None)
+            if add_col_aff:
+                add_col_body_preview = json.dumps({"action": "add_column", "label": ""})
+                html += (
+                    f'<th style="border: 1px solid #ccc; padding: 2px; background: #f0f0f0; vertical-align: middle;">'
+                    f'<form style="margin:0" onsubmit="fetch(\'{url}\','
+                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+                    f'body:JSON.stringify({{action:\'add_column\',label:this.elements.v.value}})'
+                    f'}}).then(()=>location.reload()); return false">'
+                    f'<input name="v" type="text" placeholder="+"'
+                    f' style="border: none; width: 60px; box-sizing: border-box; padding: 2px 4px;'
+                    f' background: transparent; text-align: center; color: #2a2; font-weight: bold;"'
+                    f' oninput="this.title=\'POST {url} \'+JSON.stringify({{action:\'add_column\',label:this.value}})"'
+                    f' title="POST {url} {escape(add_col_body_preview)}" />'
+                    f'</form>'
                     f'</th>'
                 )
             html += '</tr>'
 
-            # Rows — each cell is an inline form
+            # Rows — each cell is an inline form, with a remove button at the end
             for row_data in rows:
                 row_id = row_data["_id"]
+                rm_row_body = json.dumps({"action": "remove_row", "row": row_id})
                 html += '<tr>'
                 html += (
                     f'<td style="border: 1px solid #ccc; padding: 4px 8px; color: #888;'
-                    f' font-size: 11px;">{escape(row_id)}</td>'
+                    f' font-size: 11px; white-space: nowrap;">'
+                    f'<button onclick="fetch(\'{url}\','
+                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+                    f'body:JSON.stringify({rm_row_body.replace(chr(34), "&quot;")})}}).then(()=>location.reload())"'
+                    f' style="cursor: pointer; border: none; background: none; color: #c00;'
+                    f' font-size: 14px; font-weight: bold; padding: 0 2px; line-height: 1; vertical-align: middle;"'
+                    f' title="POST {url} {escape(rm_row_body)}">−</button>'
+                    f' {escape(row_id)}'
+                    f'</td>'
                 )
                 for col in columns:
                     cell_value = row_data.get(col["key"])
                     display = escape(str(cell_value)) if cell_value is not None else ""
-                    endpoint = f'POST {url}'
-                    body_preview = json.dumps({"action": "set_cell", "row": row_id, "column": col["key"], "value": ""})
+                    cell_val_escaped = escape(str(cell_value)) if cell_value is not None else ""
 
                     html += (
                         f'<td style="border: 1px solid #ccc; padding: 2px;">'
@@ -256,25 +301,79 @@ class TableForm(Eigenform):
                         f'}}).then(()=>location.reload()); return false">'
                         f'<input name="v" type="text" value="{display}"'
                         f' style="border: none; width: 100%; box-sizing: border-box; padding: 2px 4px;"'
-                        f' title="{escape(endpoint)} {escape(body_preview)}" />'
+                        f' oninput="this.title=\'POST {url} \'+JSON.stringify({{action:\'set_cell\',row:\'{row_id}\',column:\'{col["key"]}\',value:this.value}})"'
+                        f' title="POST {url} {escape(json.dumps({"action": "set_cell", "row": row_id, "column": col["key"], "value": cell_val_escaped}))}" />'
                         f'</form>'
                         f'</td>'
                     )
+                if add_col_aff:
+                    html += '<td style="border: 1px solid #ccc;"></td>'
+                html += '</tr>'
+
+            # +Row button as a final row, aligned with the "−" buttons
+            add_row_aff = next((a for a in affs if a.get("body", {}).get("action") == "add_row"), None)
+            if add_row_aff:
+                add_row_body = json.dumps({"action": "add_row"})
+                html += (
+                    f'<tr>'
+                    f'<td style="border: 1px solid #ccc; padding: 4px 8px;">'
+                    f'<button onclick="fetch(\'{url}\','
+                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+                    f'body:JSON.stringify({add_row_body.replace(chr(34), "&quot;")})}}).then(()=>location.reload())"'
+                    f' style="cursor: pointer; border: none; background: none; color: #2a2;'
+                    f' font-size: 14px; font-weight: bold; padding: 0 2px; line-height: 1;"'
+                    f' title="POST {url} {escape(add_row_body)}">+</button>'
+                    f'</td>'
+                )
+                for _ in columns:
+                    html += '<td style="border: 1px solid #ccc;"></td>'
+                if add_col_aff:
+                    html += '<td style="border: 1px solid #ccc;"></td>'
                 html += '</tr>'
 
             html += '</table>'
         else:
-            html += '<p style="color: #888;">No columns defined. Add a column to get started.</p>'
+            # Empty table — show just the +Column input to get started
+            add_col_aff = next((a for a in affs if a.get("body", {}).get("action") == "add_column"), None)
+            if add_col_aff:
+                add_col_body_preview = json.dumps({"action": "add_column", "label": ""})
+                html += (
+                    f'<table style="border-collapse: collapse; margin: 8px 0;">'
+                    f'<tr>'
+                    f'<th style="border: 1px solid #ccc; padding: 2px; background: #f0f0f0;">'
+                    f'<form style="margin:0; display: flex; align-items: center;" onsubmit="fetch(\'{url}\','
+                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+                    f'body:JSON.stringify({{action:\'add_column\',label:this.elements.v.value}})'
+                    f'}}).then(()=>location.reload()); return false">'
+                    f'<input name="v" type="text" placeholder="Column name"'
+                    f' style="border: 1px solid #ddd; width: 100px; padding: 2px 4px;"'
+                    f' oninput="this.title=\'POST {url} \'+JSON.stringify({{action:\'add_column\',label:this.value}})"'
+                    f' title="POST {url} {escape(add_col_body_preview)}" />'
+                    f' <button type="submit" style="cursor: pointer; border: none; background: none; color: #2a2;'
+                    f' font-size: 14px; font-weight: bold; padding: 0 4px; line-height: 1;"'
+                    f' title="POST {url} {escape(add_col_body_preview)}">+</button>'
+                    f'</form>'
+                    f'</th>'
+                    f'</tr>'
+                    f'</table>'
+                )
 
         if columns and not rows:
             html += '<p style="color: #888;">No rows yet. Add a row to start entering data.</p>'
 
-        # Affordance controls — skip inline_cell (rendered in table above)
+        # Mark affordances rendered inline in the table
+        from engine.eigenforms import Eigenform
+        for aff in affs:
+            hints_type = aff.get("render_hints", {}).get("type", "")
+            action = aff.get("body", {}).get("action", "")
+            if hints_type == "inline_cell" or action in ("rename_column", "remove_column", "remove_row", "add_row", "add_column"):
+                Eigenform.mark_rendered(aff)
+
+        # Remaining affordance controls
         html += '<div style="margin-top: 8px;">'
         for aff in affs:
-            if aff.get("render_hints", {}).get("type") == "inline_cell":
-                continue
-            html += render_affordance_html(aff)
+            if not aff.get("_rendered"):
+                html += render_affordance_html(aff)
         html += '</div>'
 
         return html
@@ -286,7 +385,7 @@ class TableForm(Eigenform):
         result["failed_action"] = action
         return result
 
-    def handle(self, body: dict) -> dict:
+    def _handle(self, body: dict) -> dict:
         action = body.get("action", "")
         columns = list(self.columns)
         rows = dict(self.rows)

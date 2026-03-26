@@ -1,8 +1,13 @@
-"""Eigenform — the self-contained, self-rendering unit of workflow interaction.
+"""Eigenform — the self-contained unit of workflow interaction.
 
-An eigenform has internal state, renders itself, and exposes affordances
-as POSTable endpoints that mutate its state. Each eigenform is a
-HATEOAS-compliant mini-application.
+An eigenform has internal state, serializes itself to JSON, renders
+HTML from that JSON, and exposes affordances as POSTable actions.
+Each eigenform is a HATEOAS-compliant mini-application.
+
+render() calls serialize() first, then render_from_data(data) produces
+HTML purely from the serialized dict. This guarantees HTML and JSON
+cannot diverge. Affordances are pure data — the eigenform is responsible
+for accounting for each one in render_from_data().
 
 Once bound to a store, scope, and url_prefix, an eigenform is fully
 self-sufficient — it can serialize, render, and handle actions
@@ -33,12 +38,27 @@ class Eigenform:
     _scope: str | None = None
     _url_prefix: str | None = None
 
+    @property
+    def children(self) -> list[Eigenform]:
+        """Direct child eigenforms. Containers override this."""
+        return []
+
+    def _bind_children(self, store: Store, url_prefix: str):
+        """Bind all children. Containers with non-standard child storage override this."""
+        pass
+
     def bind(self, store: Store, scope: str, url_prefix: str) -> Eigenform:
-        """Produce a bound copy of this eigenform. The original is unchanged."""
+        """Produce a bound copy of this eigenform. The original is unchanged.
+
+        Containers that hold children should override _bind_children()
+        rather than bind() itself, unless they need custom bind logic
+        (e.g., PageForm creates its own Store).
+        """
         bound = copy.deepcopy(self)
         bound._store = store
         bound._scope = scope
         bound._url_prefix = url_prefix
+        bound._bind_children(store, url_prefix)
         return bound
 
     @property
@@ -85,7 +105,14 @@ class Eigenform:
         return state
 
     def render_from_data(self, data: dict) -> str:
-        """Render HTML from the canonical serialized dict. Subclasses override this."""
+        """Render HTML from the canonical serialized dict.
+
+        Subclasses override this. Every affordance in data["affordances"]
+        must be accounted for — either by calling render_affordance_html()
+        (which marks it automatically) or by calling mark_rendered() after
+        handling it with custom HTML. Unaccounted affordances raise a
+        RuntimeError after this method returns.
+        """
         from engine.affordances import render_affordance_html
         html = f'<h3>{escape(data.get("label", ""))}</h3>'
         if data.get("instruction"):
@@ -94,15 +121,32 @@ class Eigenform:
             html += render_affordance_html(aff)
         return html
 
+    @staticmethod
+    def mark_rendered(aff: dict):
+        """Mark an affordance dict as accounted for (rendered or intentionally skipped)."""
+        aff["_rendered"] = True
+
     def render(self) -> str:
         """Render this eigenform as HTML, wrapped in a standard container.
 
         Calls serialize() first, then render_from_data() on the result.
         This guarantees HTML and JSON cannot diverge — both derive from
-        the same serialized dict.
+        the same serialized dict. After rendering, checks that all
+        affordances were accounted for.
         """
         data = self.serialize()
+        for aff in data.get("affordances", []):
+            aff["_rendered"] = False
         inner = self.render_from_data(data)
+
+        unrendered = [a for a in data.get("affordances", []) if not a.get("_rendered")]
+        if unrendered:
+            labels = [a.get("label", "?") for a in unrendered]
+            raise RuntimeError(
+                f"{type(self).__name__}(key={self.key!r}) did not render "
+                f"{len(unrendered)} affordance(s): {labels}. "
+                f"Use render_affordance_html() to render or Eigenform.mark_rendered() to skip."
+            )
 
         json_str = escape(json.dumps(data, indent=2))
         uid = self.uid
@@ -122,7 +166,25 @@ class Eigenform:
         )
 
     def handle(self, body: dict) -> dict:
-        """Handle a POST action. Persists to store, returns serialized state."""
+        """Handle a POST action. Persists to store, returns serialized state.
+
+        If body contains {"action": "batch", "actions": [...]}, each
+        action is executed in sequence. The response is the final
+        serialized state. If any action produces an error, execution
+        stops and the error is returned.
+        """
+        if body.get("action") == "batch":
+            actions = body.get("actions", [])
+            result = self.serialize()
+            for action_body in actions:
+                result = self.handle(action_body)
+                if "error" in result:
+                    return result
+            return result
+        return self._handle(body)
+
+    def _handle(self, body: dict) -> dict:
+        """Handle a single action. Subclasses must implement."""
         raise NotImplementedError
 
 
@@ -165,7 +227,7 @@ class TextForm(Eigenform):
             )
         ]
 
-    def handle(self, body: dict) -> dict:
+    def _handle(self, body: dict) -> dict:
         self._store.set(self._scope, self.key, body.get("value"))
         return self.serialize()
 
@@ -234,7 +296,7 @@ class CheckboxForm(Eigenform):
             ),
         ]
 
-    def handle(self, body: dict) -> dict:
+    def _handle(self, body: dict) -> dict:
         action = body.get("action")
         if action == "na":
             # Clear all items and set N/A
