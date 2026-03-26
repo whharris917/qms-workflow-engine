@@ -1,18 +1,24 @@
-"""Page registry — auto-discovers page_*.py modules and binds their definitions."""
+"""Page registry — auto-discovers page modules and binds their definitions."""
 
 import importlib
 from pathlib import Path
 
 
 def build_pages(data_dir: Path) -> dict:
-    """Import all page_*.py modules, bind their definitions, return {key: PageForm}."""
+    """Import all page modules, bind their definitions, return {key: PageForm}.
+
+    Each .py file in this directory (except __init__.py) must export a
+    `definition` — an unbound PageForm. The page key comes from the
+    definition's key attribute, not the filename.
+    """
     pages = {}
     pages_dir = Path(__file__).parent
-    for module_path in sorted(pages_dir.glob("page_*.py")):
-        # page_1.py -> page-1
-        page_key = module_path.stem.replace("_", "-")
+    for module_path in sorted(pages_dir.glob("*.py")):
+        if module_path.name == "__init__.py":
+            continue
         module = importlib.import_module(f"pages.{module_path.stem}")
         definition = module.definition
+        page_key = definition.key
         pages[page_key] = definition.bind(
             data_dir=data_dir,
             scope=page_key,

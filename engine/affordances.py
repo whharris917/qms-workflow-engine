@@ -20,6 +20,7 @@ class Affordance:
     url: str
     body: dict = field(default_factory=dict)
     instruction: str | None = None
+    _rendered: bool = field(default=False, init=False, repr=False)
 
     def serialize(self) -> dict:
         result = {
@@ -33,14 +34,24 @@ class Affordance:
         return result
 
     def render(self) -> str:
-        """Render this affordance as interactive HTML."""
+        """Render this affordance as interactive HTML.
+
+        Sets _rendered flag, then delegates to render_html().
+        Eigenform.render() checks that all affordances were rendered
+        and raises if any were missed.
+        """
+        self._rendered = True
+        return self.render_html()
+
+    def render_html(self) -> str:
+        """Produce the HTML for this affordance. Subclasses must implement."""
         raise NotImplementedError
 
 
 class SetValueAffordance(Affordance):
     """An affordance that sets a single value via a text input."""
 
-    def render(self) -> str:
+    def render_html(self) -> str:
         endpoint = f'{self.method} {self.url}'
         return (
             f'<form style="display: inline" onsubmit="fetch(\'{self.url}\','
@@ -58,7 +69,7 @@ class SetValueAffordance(Affordance):
 class SwitchTabAffordance(Affordance):
     """An affordance that switches the active tab."""
 
-    def render(self) -> str:
+    def render_html(self) -> str:
         endpoint = f'{self.method} {self.url}'
         body_js = json.dumps(self.body).replace('"', '&quot;')
         return (
@@ -74,7 +85,7 @@ class SwitchTabAffordance(Affordance):
 class ConfirmAffordance(Affordance):
     """An affordance that confirms an eigenform without changing its value."""
 
-    def render(self) -> str:
+    def render_html(self) -> str:
         endpoint = f'{self.method} {self.url}'
         body_js = json.dumps(self.body).replace('"', '&quot;')
         return (
@@ -91,7 +102,7 @@ class ConfirmAffordance(Affordance):
 class SimpleButtonAffordance(Affordance):
     """An affordance that renders as a single button with a fixed body."""
 
-    def render(self) -> str:
+    def render_html(self) -> str:
         endpoint = f'{self.method} {self.url}'
         body_js = json.dumps(self.body).replace('"', '&quot;')
         return (
@@ -112,7 +123,7 @@ class CheckboxAffordance(Affordance):
         super().__init__(label=label, method=method, url=url, body=body, instruction=instruction)
         self.items = items or {}
 
-    def render(self) -> str:
+    def render_html(self) -> str:
         endpoint = f'{self.method} {self.url}'
         parts = []
         for item_key, checked in self.items.items():

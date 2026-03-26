@@ -38,7 +38,7 @@ class SetFieldsAffordance(Affordance):
         self.fields = fields or []
         self.values = values or {}
 
-    def render(self) -> str:
+    def render_html(self) -> str:
         endpoint = f'{self.method} {self.url}'
 
         # Build a form with one input per field

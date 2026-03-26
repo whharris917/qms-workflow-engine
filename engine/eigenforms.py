@@ -98,6 +98,14 @@ class Eigenform:
         affordances = self.get_affordances()
         inner = self.render_inner(affordances)
 
+        unrendered = [a for a in affordances if not a._rendered]
+        if unrendered:
+            labels = [a.label for a in unrendered]
+            raise RuntimeError(
+                f"{type(self).__name__}(key={self.key!r}) did not render "
+                f"{len(unrendered)} affordance(s): {labels}"
+            )
+
         json_str = escape(json.dumps(self.serialize(), indent=2))
         uid = self.uid
 

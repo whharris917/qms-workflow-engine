@@ -147,7 +147,7 @@ def _apply_rotation(cube: dict, face: str, direction: str) -> dict:
 class RotateAffordance(Affordance):
     """Single affordance for rotating a face of the cube."""
 
-    def render(self) -> str:
+    def render_html(self) -> str:
         endpoint = f'{self.method} {self.url}'
         body_js = json.dumps(self.body).replace('"', '&quot;')
         return (

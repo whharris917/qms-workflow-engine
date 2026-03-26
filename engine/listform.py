@@ -16,7 +16,7 @@ from engine.eigenforms import Eigenform
 class AddItemAffordance(Affordance):
     """An affordance that adds an item to the list."""
 
-    def render(self) -> str:
+    def render_html(self) -> str:
         endpoint = f'{self.method} {self.url}'
         return (
             f'<form style="display: inline" onsubmit="fetch(\'{self.url}\','

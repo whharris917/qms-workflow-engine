@@ -25,7 +25,7 @@ from engine.store import Store
 class SetCellAffordance(Affordance):
     """An affordance that sets a single cell value."""
 
-    def render(self) -> str:
+    def render_html(self) -> str:
         # Rendered inline by TableForm.render_inner, not standalone
         return ""
 
@@ -33,7 +33,7 @@ class SetCellAffordance(Affordance):
 class AddColumnAffordance(Affordance):
     """An affordance that adds a column to the table."""
 
-    def render(self) -> str:
+    def render_html(self) -> str:
         endpoint = f'{self.method} {self.url}'
         return (
             f'<form style="display: inline" onsubmit="fetch(\'{self.url}\','

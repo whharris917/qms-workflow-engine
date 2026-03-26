@@ -81,8 +81,8 @@ def page_stream(page_key):
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
-@bp.route("/pages/<page_key>/<key>", methods=["GET", "POST"])
-def eigenform(page_key, key):
+@bp.route("/pages/<page_key>/<path:path>", methods=["GET", "POST"])
+def eigenform(page_key, path):
     pg = pages.get(page_key)
     if pg is None:
         if wants_html(request):
@@ -90,19 +90,19 @@ def eigenform(page_key, key):
         return jsonify({"error": f"Unknown page: {page_key}"}), 404
 
     if request.method == "GET":
-        ef = pg.find_eigenform(key)
+        ef = pg.find_eigenform(path)
         if ef is None:
             if wants_html(request):
                 return "Not found", 404
-            return jsonify({"error": f"Unknown key: {key}"}), 404
+            return jsonify({"error": f"Unknown path: {path}"}), 404
         if wants_html(request):
             html = Markup(ef.render())
             return render_template("page.html", page_html=html, title=ef.label, page_key=page_key)
         return jsonify(ef.serialize())
 
     # POST — mutate
-    result = pg.handle_action(key, request.json)
+    result = pg.handle_action(path, request.json)
     if result is None:
-        return jsonify({"error": f"Unknown key: {key}"}), 404
+        return jsonify({"error": f"Unknown path: {path}"}), 404
     notify_subscribers(page_key, result)
     return jsonify(result)

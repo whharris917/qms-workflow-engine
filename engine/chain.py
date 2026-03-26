@@ -60,7 +60,7 @@ class ChainForm(Eigenform):
         bound._scope = scope
         bound._url_prefix = url_prefix
         bound.steps = [
-            ef.bind(store=store, scope=bound.key, url_prefix=url_prefix)
+            ef.bind(store=store, scope=bound.key, url_prefix=f"{url_prefix}/{bound.key}")
             for ef in self.steps
         ]
         return bound
@@ -87,7 +87,18 @@ class ChainForm(Eigenform):
         return state
 
     def get_affordances(self) -> list[Affordance]:
+        from engine.affordances import SimpleButtonAffordance
         affordances: list[Affordance] = []
+        active = self.active_step
+        # If viewing a completed step (jumped back), offer Continue
+        if active and active.is_complete and self._focused_key is not None:
+            affordances.append(SimpleButtonAffordance(
+                label="Continue",
+                method="POST",
+                url=f"{self._url_prefix}/{self.key}",
+                body={"action": "continue"},
+                instruction="Resume from the next incomplete step.",
+            ))
         for ef in self.steps:
             if ef.is_complete and ef.key != self.active_key:
                 affordances.append(SwitchTabAffordance(
@@ -125,6 +136,10 @@ class ChainForm(Eigenform):
                     f'<span style="margin-right: 4px; padding: 2px 8px;'
                     f' color: #aaa;">{escape(ef.label)}</span>'
                 )
+        # Render any remaining affordances (e.g. Continue button)
+        for aff in affordances:
+            if not aff._rendered:
+                html += aff.render()
         html += '</div>'
 
         # Active step
@@ -135,7 +150,10 @@ class ChainForm(Eigenform):
         return html
 
     def handle(self, body: dict) -> dict:
-        """Handle focus change."""
+        """Handle focus change or continue."""
+        if body.get("action") == "continue":
+            self._store.set(self._scope, self.key, None)
+            return self.serialize()
         focus = body.get("focus")
         if focus and focus in {ef.key for ef in self.steps}:
             self._store.set(self._scope, self.key, focus)

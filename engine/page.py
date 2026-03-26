@@ -85,26 +85,28 @@ class PageForm(Eigenform):
         html += '</div>'
         return html
 
-    def find_eigenform(self, key: str) -> Eigenform | None:
-        """Find any eigenform by key, recursing into all containers."""
-        return self._find_recursive(key, self.eigenforms)
+    @staticmethod
+    def _get_children(ef: Eigenform) -> list[Eigenform]:
+        """Get the direct children of a container eigenform."""
+        if hasattr(ef, 'eigenforms'):
+            return ef.eigenforms
+        if hasattr(ef, 'steps'):
+            return ef.steps
+        if hasattr(ef, 'tabs'):
+            return list(ef.tabs.values())
+        return []
 
-    def _find_recursive(self, key: str, eigenforms: list[Eigenform]) -> Eigenform | None:
-        for ef in eigenforms:
-            if ef.key == key:
-                return ef
-            if hasattr(ef, 'eigenforms'):
-                found = self._find_recursive(key, ef.eigenforms)
-                if found:
-                    return found
-            if hasattr(ef, 'steps'):
-                found = self._find_recursive(key, ef.steps)
-                if found:
-                    return found
-            if hasattr(ef, 'tabs'):
-                found = self._find_recursive(key, list(ef.tabs.values()))
-                if found:
-                    return found
+    def find_eigenform(self, path: str) -> Eigenform | None:
+        """Find an eigenform by its path (e.g., 'tabs/title')."""
+        segments = path.split("/")
+        children = self.eigenforms
+        for segment in segments:
+            match = next((ef for ef in children if ef.key == segment), None)
+            if match is None:
+                return None
+            if segment == segments[-1]:
+                return match
+            children = self._get_children(match)
         return None
 
     def _clear_recursive(self, eigenforms: list[Eigenform]):
@@ -126,19 +128,14 @@ class PageForm(Eigenform):
             self._clear_recursive(self.eigenforms)
         return self.serialize()
 
-    def handle_action(self, key: str, body: dict) -> dict | None:
-        """Route a POST to the correct nested eigenform. Returns full page state."""
-        for ef in self.eigenforms:
-            # Direct match
-            if ef.key == key:
-                result = ef.handle(body)
-                page_state = self.serialize()
-                if "error" in result:
-                    page_state["error"] = result["error"]
-                    page_state["failed_action"] = result.get("failed_action")
-                return page_state
-            # Delegate to containers that can route internally
-            if hasattr(ef, 'handle_action'):
-                if ef.handle_action(key, body):
-                    return self.serialize()
-        return None
+    def handle_action(self, path: str, body: dict) -> dict | None:
+        """Route a POST to the correct nested eigenform by path. Returns full page state."""
+        ef = self.find_eigenform(path)
+        if ef is None:
+            return None
+        result = ef.handle(body)
+        page_state = self.serialize()
+        if "error" in result:
+            page_state["error"] = result["error"]
+            page_state["failed_action"] = result.get("failed_action")
+        return page_state

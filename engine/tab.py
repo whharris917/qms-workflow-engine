@@ -43,7 +43,7 @@ class TabForm(Eigenform):
         bound._scope = scope
         bound._url_prefix = url_prefix
         bound.tabs = {
-            tab_key: ef.bind(store=store, scope=f"{bound.key}", url_prefix=url_prefix)
+            tab_key: ef.bind(store=store, scope=f"{bound.key}", url_prefix=f"{url_prefix}/{bound.key}")
             for tab_key, ef in self.tabs.items()
         }
         return bound
@@ -83,8 +83,11 @@ class TabForm(Eigenform):
         return affordances
 
     def render_inner(self, affordances: list[Affordance]) -> str:
+        html = f'<h3>{escape(self.label)}</h3>'
+        if self.instruction:
+            html += f'<p>{escape(self.instruction)}</p>'
         # Tab bar — active tab shown as bold label, inactive tabs as affordance buttons
-        html = '<div style="margin-bottom: 8px;">'
+        html += '<div style="margin-bottom: 8px;">'
         for tab_key, ef in self.tabs.items():
             if tab_key == self.active_tab_key:
                 html += (

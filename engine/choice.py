@@ -21,7 +21,7 @@ class SelectAffordance(Affordance):
         self.options = options or []
         self.current = current
 
-    def render(self) -> str:
+    def render_html(self) -> str:
         endpoint = f'{self.method} {self.url}'
         html = '<div style="margin: 4px 0;">'
         for opt in self.options:
