@@ -38,55 +38,16 @@ class SetFieldsAffordance(Affordance):
         self.fields = fields or []
         self.values = values or {}
 
-    def render_html(self) -> str:
-        endpoint = f'{self.method} {self.url}'
-
-        # Build a form with one input per field
-        js_keys = []
-        inputs = ""
-        for fd in self.fields:
-            current = self.values.get(fd.key)
-            display = escape(str(current)) if current is not None else ""
-
-            if fd.type == "choice" and fd.options:
-                inputs += f'<div style="margin: 4px 0;"><label>{escape(fd.label)}: '
-                inputs += f'<select name="{fd.key}">'
-                inputs += f'<option value="">--</option>'
-                for opt in fd.options:
-                    selected = " selected" if opt == current else ""
-                    inputs += f'<option value="{escape(opt)}"{selected}>{escape(opt)}</option>'
-                inputs += '</select></label>'
-                if fd.instruction:
-                    inputs += f' <span style="font-size: 11px; color: #888;">{escape(fd.instruction)}</span>'
-                inputs += '</div>'
-            else:
-                inputs += (
-                    f'<div style="margin: 4px 0;"><label>{escape(fd.label)}: '
-                    f'<input name="{fd.key}" type="text" value="{display}" style="width: 200px;" />'
-                    f'</label>'
-                )
-                if fd.instruction:
-                    inputs += f' <span style="font-size: 11px; color: #888;">{escape(fd.instruction)}</span>'
-                inputs += '</div>'
-
-            js_keys.append(fd.key)
-
-        # Build JS that collects all fields into one object
-        js_collect = "var b={};"
-        for k in js_keys:
-            js_collect += f"b['{k}']=this.elements['{k}'].value;"
-
-        return (
-            f'<form onsubmit="'
-            f"{js_collect}"
-            f"fetch('{self.url}',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
-            f"body:JSON.stringify(b)}}).then(()=>location.reload()); return false\">"
-            f'{inputs}'
-            f'<button type="submit" style="margin-top: 4px;"'
-            f' title="{escape(endpoint)} {escape(json.dumps(self.body))}">'
-            f'{escape(self.label)}</button>'
-            f'</form>'
-        )
+    def _render_hints(self) -> dict:
+        return {
+            "type": "multi_field",
+            "fields": [
+                {"key": fd.key, "label": fd.label, "type": fd.type,
+                 "instruction": fd.instruction, "options": fd.options}
+                for fd in self.fields
+            ],
+            "values": self.values,
+        }
 
 
 @dataclass
@@ -155,14 +116,6 @@ class MultiForm(Eigenform):
                 values=self.values,
             )
         ]
-
-    def render_inner(self, affordances: list[Affordance]) -> str:
-        html = f'<h3>{self.label}</h3>'
-        if self.instruction:
-            html += f'<p>{self.instruction}</p>'
-        for aff in affordances:
-            html += aff.render()
-        return html
 
     def handle(self, body: dict) -> dict:
         current = dict(self.values)

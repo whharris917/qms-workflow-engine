@@ -147,17 +147,8 @@ def _apply_rotation(cube: dict, face: str, direction: str) -> dict:
 class RotateAffordance(Affordance):
     """Single affordance for rotating a face of the cube."""
 
-    def render_html(self) -> str:
-        endpoint = f'{self.method} {self.url}'
-        body_js = json.dumps(self.body).replace('"', '&quot;')
-        return (
-            f'<button onclick="fetch(\'{self.url}\','
-            f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-            f'body:JSON.stringify({body_js})}})"'
-            f' style="margin: 1px; cursor: pointer; width: 28px; height: 28px; font-size: 11px;"'
-            f' title="{escape(endpoint)} {escape(json.dumps(self.body))}">'
-            f'{escape(self.label)}</button>'
-        )
+    def _render_hints(self) -> dict:
+        return {"type": "small_button"}
 
 
 def _render_face(stickers: list[str], label: str) -> str:
@@ -237,15 +228,19 @@ class RubiksCubeForm(Eigenform):
             ),
         ]
 
-    def render_inner(self, affordances: list[Affordance]) -> str:
-        c = self.cube
+    def render_from_data(self, data: dict) -> str:
+        from engine.affordances import render_affordance_html
+        faces = data.get("faces", {})
+        solved = data.get("solved", False)
+        affs = data.get("affordances", [])
+
         sz = 30
         gap = 1
-        face_w = sz * 3 + gap * 2 + 4  # 3 cells + gaps + margins
+        face_w = sz * 3 + gap * 2 + 4
 
-        html = f'<h3>{self.label}</h3>'
-        if self.instruction:
-            html += f'<p>{self.instruction}</p>'
+        html = f'<h3>{escape(data["label"])}</h3>'
+        if data.get("instruction"):
+            html += f'<p>{escape(data["instruction"])}</p>'
 
         # Unfolded cube layout:
         #       U
@@ -253,58 +248,46 @@ class RubiksCubeForm(Eigenform):
         #       D
         html += '<div style="display: inline-block; font-size: 0;">'
 
-        # Row 1: U (centered)
         html += f'<div style="padding-left: {face_w}px;">'
-        html += _render_face(c[U], 'U')
+        html += _render_face(faces.get(U, []), 'U')
         html += '</div>'
 
-        # Row 2: L F R B
         html += '<div>'
-        html += _render_face(c[L], 'L')
-        html += _render_face(c[F], 'F')
-        html += _render_face(c[R], 'R')
-        html += _render_face(c[B], 'B')
+        html += _render_face(faces.get(L, []), 'L')
+        html += _render_face(faces.get(F, []), 'F')
+        html += _render_face(faces.get(R, []), 'R')
+        html += _render_face(faces.get(B, []), 'B')
         html += '</div>'
 
-        # Row 3: D (centered)
         html += f'<div style="padding-left: {face_w}px;">'
-        html += _render_face(c[D], 'D')
+        html += _render_face(faces.get(D, []), 'D')
         html += '</div>'
 
         html += '</div>'
 
-        # Controls — rendered from affordances
+        # Controls — expand the Rotate affordance into 12 concrete buttons
         html += '<div style="margin-top: 8px; font-size: 14px;">'
-        if not self.is_solved:
-            for face in [U, D, L, R, F, B]:
-                body = {"action": "rotate", "face": face, "direction": "cw"}
-                body_js = json.dumps(body).replace('"', '&quot;')
-                endpoint = f'POST {self.url}'
-                html += (
-                    f'<button onclick="fetch(\'{self.url}\','
-                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                    f'body:JSON.stringify({body_js})}})"'
-                    f' style="margin: 1px; cursor: pointer; width: 36px; height: 28px; font-size: 11px;"'
-                    f' title="{escape(endpoint)} {escape(json.dumps(body))}">'
-                    f'{face} ↻</button>'
-                )
-            html += '<br>'
-            for face in [U, D, L, R, F, B]:
-                body = {"action": "rotate", "face": face, "direction": "ccw"}
-                body_js = json.dumps(body).replace('"', '&quot;')
-                endpoint = f'POST {self.url}'
-                html += (
-                    f'<button onclick="fetch(\'{self.url}\','
-                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                    f'body:JSON.stringify({body_js})}})"'
-                    f' style="margin: 1px; cursor: pointer; width: 36px; height: 28px; font-size: 11px;"'
-                    f' title="{escape(endpoint)} {escape(json.dumps(body))}">'
-                    f'{face} ↺</button>'
-                )
-            html += '<br>'
-        for aff in affordances:
-            if aff.body.get("action") in ("shuffle", "restart"):
-                html += aff.render()
+        rotate_aff = next((a for a in affs if a.get("body", {}).get("action") == "rotate"), None)
+        if rotate_aff and not solved:
+            url = rotate_aff["url"]
+            endpoint = f'POST {url}'
+            for direction, arrow in [("cw", "↻"), ("ccw", "↺")]:
+                for face in [U, D, L, R, F, B]:
+                    body = {"action": "rotate", "face": face, "direction": direction}
+                    body_js = json.dumps(body).replace('"', '&quot;')
+                    html += (
+                        f'<button onclick="fetch(\'{url}\','
+                        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+                        f'body:JSON.stringify({body_js})}})"'
+                        f' style="margin: 1px; cursor: pointer; width: 36px; height: 28px; font-size: 11px;"'
+                        f' title="{escape(endpoint)} {escape(json.dumps(body))}">'
+                        f'{face} {arrow}</button>'
+                    )
+                html += '<br>'
+        # Shuffle/Restart buttons
+        for aff in affs:
+            if aff.get("body", {}).get("action") in ("shuffle", "restart"):
+                html += render_affordance_html(aff)
         html += '</div>'
 
         return html

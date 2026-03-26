@@ -37,7 +37,8 @@ def notify_subscribers(page_key: str, data: dict):
 
 @bp.route("/")
 def index():
-    return render_template("index.html")
+    page_list = [{"key": k, "label": pg.label} for k, pg in pages.items()]
+    return render_template("index.html", pages=page_list)
 
 
 @bp.route("/pages/<page_key>", methods=["GET", "POST"])

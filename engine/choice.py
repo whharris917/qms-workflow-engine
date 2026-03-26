@@ -21,23 +21,8 @@ class SelectAffordance(Affordance):
         self.options = options or []
         self.current = current
 
-    def render_html(self) -> str:
-        endpoint = f'{self.method} {self.url}'
-        html = '<div style="margin: 4px 0;">'
-        for opt in self.options:
-            checked = " checked" if opt == self.current else ""
-            body_js = json.dumps({"value": opt}).replace('"', '&quot;')
-            html += (
-                f'<label style="display: block; cursor: pointer; padding: 2px 0;">'
-                f'<input type="radio" name="{escape(self.url)}"{checked} onchange="'
-                f"fetch('{self.url}',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
-                f"body:JSON.stringify({{value:'{escape(opt)}'}})}}).then(()=>location.reload())"
-                f'" title="{escape(endpoint)} {escape(json.dumps({"value": opt}))}"'
-                f' /> {escape(opt)}'
-                f'</label>'
-            )
-        html += '</div>'
-        return html
+    def _render_hints(self) -> dict:
+        return {"type": "radio", "options": self.options, "current": self.current}
 
 
 @dataclass
@@ -73,13 +58,14 @@ class ChoiceForm(Eigenform):
             )
         ]
 
-    def render_inner(self, affordances: list[Affordance]) -> str:
-        html = f'<h3>{self.label}</h3>'
-        if self.instruction:
-            html += f'<p>{self.instruction}</p>'
-        html += f'<p><strong>Selected:</strong> {escape(str(self.value or "None"))}</p>'
-        for aff in affordances:
-            html += aff.render()
+    def render_from_data(self, data: dict) -> str:
+        from engine.affordances import render_affordance_html
+        html = f'<h3>{escape(data["label"])}</h3>'
+        if data.get("instruction"):
+            html += f'<p>{escape(data["instruction"])}</p>'
+        html += f'<p><strong>Selected:</strong> {escape(str(data["value"] or "None"))}</p>'
+        for aff in data.get("affordances", []):
+            html += render_affordance_html(aff)
         return html
 
     def handle(self, body: dict) -> dict:

@@ -25,26 +25,15 @@ from engine.store import Store
 class SetCellAffordance(Affordance):
     """An affordance that sets a single cell value."""
 
-    def render_html(self) -> str:
-        # Rendered inline by TableForm.render_inner, not standalone
-        return ""
+    def _render_hints(self) -> dict:
+        return {"type": "inline_cell"}
 
 
 class AddColumnAffordance(Affordance):
     """An affordance that adds a column to the table."""
 
-    def render_html(self) -> str:
-        endpoint = f'{self.method} {self.url}'
-        return (
-            f'<form style="display: inline" onsubmit="fetch(\'{self.url}\','
-            f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-            f'body:JSON.stringify({{action:\'add_column\',label:this.elements.label.value}})'
-            f'}}).then(()=>location.reload()); return false">'
-            f'<input name="label" type="text" placeholder="Column name" style="width: 120px;" />'
-            f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps(self.body))}">'
-            f'{escape(self.label)}</button>'
-            f'</form>'
-        )
+    def _render_hints(self) -> dict:
+        return {"type": "text_input_add", "placeholder": "Column name"}
 
 
 @dataclass
@@ -216,18 +205,26 @@ class TableForm(Eigenform):
 
         return affordances
 
-    def render_inner(self, affordances: list[Affordance]) -> str:
-        html = f'<h3>{self.label}</h3>'
-        if self.instruction:
-            html += f'<p>{self.instruction}</p>'
+    def render_from_data(self, data: dict) -> str:
+        from engine.affordances import render_affordance_html
+        html = f'<h3>{escape(data["label"])}</h3>'
+        if data.get("instruction"):
+            html += f'<p>{escape(data["instruction"])}</p>'
 
-        if self.columns:
+        columns = data.get("columns", [])
+        rows = data.get("rows", [])
+        affs = data.get("affordances", [])
+
+        # Find the URL from any affordance
+        url = affs[0]["url"] if affs else ""
+
+        if columns:
             html += '<table style="border-collapse: collapse; margin: 8px 0;">'
 
             # Header
             html += '<tr>'
             html += '<th style="border: 1px solid #ccc; padding: 4px 8px; background: #f0f0f0;">ID</th>'
-            for col in self.columns:
+            for col in columns:
                 html += (
                     f'<th style="border: 1px solid #ccc; padding: 4px 8px; background: #f0f0f0;">'
                     f'{escape(col["label"])}'
@@ -237,22 +234,22 @@ class TableForm(Eigenform):
             html += '</tr>'
 
             # Rows — each cell is an inline form
-            for row_id in self.row_order:
-                row = self.rows.get(row_id, {})
+            for row_data in rows:
+                row_id = row_data["_id"]
                 html += '<tr>'
                 html += (
                     f'<td style="border: 1px solid #ccc; padding: 4px 8px; color: #888;'
                     f' font-size: 11px;">{escape(row_id)}</td>'
                 )
-                for col in self.columns:
-                    cell_value = row.get(col["key"])
+                for col in columns:
+                    cell_value = row_data.get(col["key"])
                     display = escape(str(cell_value)) if cell_value is not None else ""
-                    endpoint = f'POST {self.url}'
+                    endpoint = f'POST {url}'
                     body_preview = json.dumps({"action": "set_cell", "row": row_id, "column": col["key"], "value": ""})
 
                     html += (
                         f'<td style="border: 1px solid #ccc; padding: 2px;">'
-                        f'<form style="margin:0" onsubmit="fetch(\'{self.url}\','
+                        f'<form style="margin:0" onsubmit="fetch(\'{url}\','
                         f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
                         f'body:JSON.stringify({{action:\'set_cell\',row:\'{row_id}\','
                         f'column:\'{col["key"]}\',value:this.elements.v.value}})'
@@ -269,45 +266,15 @@ class TableForm(Eigenform):
         else:
             html += '<p style="color: #888;">No columns defined. Add a column to get started.</p>'
 
-        if self.columns and not self.row_order:
+        if columns and not rows:
             html += '<p style="color: #888;">No rows yet. Add a row to start entering data.</p>'
 
-        # Affordance controls
+        # Affordance controls — skip inline_cell (rendered in table above)
         html += '<div style="margin-top: 8px;">'
-        for aff in affordances:
-            if isinstance(aff, SetCellAffordance):
+        for aff in affs:
+            if aff.get("render_hints", {}).get("type") == "inline_cell":
                 continue
-            if isinstance(aff, (SimpleButtonAffordance, AddColumnAffordance)):
-                html += aff.render()
-            else:
-                # Affordances with fillable parameters — render as input + button
-                param_keys = []
-                fixed_parts = {}
-                for k, v in aff.body.items():
-                    if isinstance(v, str) and v.startswith("<"):
-                        param_keys.append(k)
-                    else:
-                        fixed_parts[k] = v
-                if param_keys:
-                    endpoint = f'{aff.method} {aff.url}'
-                    js_build = "var b={};"
-                    for k, v in fixed_parts.items():
-                        js_build += f"b['{k}']='{v}';"
-                    for pk in param_keys:
-                        js_build += f"b['{pk}']=this.elements['{pk}'].value;"
-                    html += (
-                        f'<form style="display: inline; margin: 2px 0;" onsubmit="'
-                        f"{js_build}"
-                        f"fetch('{aff.url}',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
-                        f"body:JSON.stringify(b)}}).then(()=>location.reload()); return false\">"
-                    )
-                    for pk in param_keys:
-                        html += f'<input name="{pk}" type="text" placeholder="{escape(pk)}" style="width: 80px; margin-right: 2px;" />'
-                    html += (
-                        f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps(aff.body))}">'
-                        f'{escape(aff.label)}</button>'
-                        f'</form> '
-                    )
+            html += render_affordance_html(aff)
         html += '</div>'
 
         return html

@@ -82,24 +82,29 @@ class TabForm(Eigenform):
                 ))
         return affordances
 
-    def render_inner(self, affordances: list[Affordance]) -> str:
-        html = f'<h3>{escape(self.label)}</h3>'
-        if self.instruction:
-            html += f'<p>{escape(self.instruction)}</p>'
+    def render_from_data(self, data: dict) -> str:
+        from engine.affordances import render_affordance_html
+        html = f'<h3>{escape(data["label"])}</h3>'
+        if data.get("instruction"):
+            html += f'<p>{escape(data["instruction"])}</p>'
         # Tab bar — active tab shown as bold label, inactive tabs as affordance buttons
+        active_key = data.get("active_tab", "")
+        affs = data.get("affordances", [])
         html += '<div style="margin-bottom: 8px;">'
-        for tab_key, ef in self.tabs.items():
-            if tab_key == self.active_tab_key:
+        for tab_key in data.get("tab_keys", []):
+            if tab_key == active_key:
+                # Get the label from the active tab eigenform
+                tab_ef = self.tabs.get(tab_key)
+                label = tab_ef.label if tab_ef else tab_key
                 html += (
                     f'<span style="font-weight: bold; margin-right: 4px;'
                     f' padding: 2px 8px; border-bottom: 2px solid #333;">'
-                    f'{escape(ef.label)}</span>'
+                    f'{escape(label)}</span>'
                 )
             else:
-                # Find the matching affordance and render it
-                for aff in affordances:
-                    if aff.body.get("tab") == tab_key:
-                        html += aff.render()
+                for aff in affs:
+                    if aff.get("body", {}).get("tab") == tab_key:
+                        html += render_affordance_html(aff)
                         break
         html += '</div>'
         # Active tab content

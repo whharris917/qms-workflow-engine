@@ -16,18 +16,8 @@ from engine.eigenforms import Eigenform
 class AddItemAffordance(Affordance):
     """An affordance that adds an item to the list."""
 
-    def render_html(self) -> str:
-        endpoint = f'{self.method} {self.url}'
-        return (
-            f'<form style="display: inline" onsubmit="fetch(\'{self.url}\','
-            f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-            f'body:JSON.stringify({{action:\'add\',value:this.elements.v.value}})'
-            f'}}).then(()=>location.reload()); return false">'
-            f'<input name="v" type="text" placeholder="New item" style="width: 160px;" />'
-            f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps(self.body))}">'
-            f'{escape(self.label)}</button>'
-            f'</form>'
-        )
+    def _render_hints(self) -> dict:
+        return {"type": "text_input_add", "placeholder": "New item"}
 
 
 @dataclass
@@ -147,34 +137,39 @@ class ListForm(Eigenform):
 
         return affordances
 
-    def render_inner(self, affordances: list[Affordance]) -> str:
-        html = f'<h3>{self.label}</h3>'
-        if self.instruction:
-            html += f'<p>{self.instruction}</p>'
+    def render_from_data(self, data: dict) -> str:
+        from engine.affordances import render_affordance_html
+        html = f'<h3>{escape(data["label"])}</h3>'
+        if data.get("instruction"):
+            html += f'<p>{escape(data["instruction"])}</p>'
 
-        if self.na:
+        affs = data.get("affordances", [])
+
+        if data.get("na"):
             html += '<p style="color: #888; font-style: italic;">N/A</p>'
-            for aff in affordances:
-                html += aff.render()
+            for aff in affs:
+                html += render_affordance_html(aff)
             return html
 
-        if self.items:
-            # Build a lookup of move affordances per item
-            move_affs = {}
-            for aff in affordances:
-                if isinstance(aff, SimpleButtonAffordance) and isinstance(aff.body.get("action"), str) and aff.body.get("action") == "move":
-                    item_id = aff.body.get("id")
-                    if item_id not in move_affs:
-                        move_affs[item_id] = []
-                    move_affs[item_id].append(aff)
+        items = data.get("items", [])
+        if items:
+            # Build lookup of move affordances per item
+            move_affs: dict[str, list[dict]] = {}
+            for aff in affs:
+                if aff.get("body", {}).get("action") == "move":
+                    item_id = aff["body"].get("id")
+                    move_affs.setdefault(item_id, []).append(aff)
+
+            # Find the URL from any affordance (they all share it)
+            url = affs[0]["url"] if affs else ""
 
             html += '<ol style="margin: 4px 0; padding-left: 24px;">'
-            for item in self.items:
+            for idx, item in enumerate(items):
                 item_id = item["id"]
                 item_val = escape(str(item.get("value", "")))
                 html += (
                     f'<li style="margin: 4px 0; display: flex; align-items: center; gap: 4px;">'
-                    f'<form style="display: inline; margin: 0;" onsubmit="fetch(\'{self.url}\','
+                    f'<form style="display: inline; margin: 0;" onsubmit="fetch(\'{url}\','
                     f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
                     f"body:JSON.stringify({{action:'edit',id:'{item_id}',value:this.elements.v.value}})"
                     f'}}).then(()=>location.reload()); return false">'
@@ -184,23 +179,21 @@ class ListForm(Eigenform):
                 )
                 # Move up/down buttons inline
                 for maff in move_affs.get(item_id, []):
-                    direction = "up" if maff.body.get("position", 0) < next(
-                        i for i, it in enumerate(self.items) if it["id"] == item_id
-                    ) else "down"
+                    direction = "up" if maff["body"].get("position", 0) < idx else "down"
                     arrow = "&#9650;" if direction == "up" else "&#9660;"
-                    body_js = json.dumps(maff.body).replace('"', '&quot;')
+                    body_js = json.dumps(maff["body"]).replace('"', '&quot;')
                     html += (
-                        f'<button onclick="fetch(\'{self.url}\','
+                        f'<button onclick="fetch(\'{url}\','
                         f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
                         f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
                         f' style="cursor: pointer; border: 1px solid #ccc; background: #f8f8f8;'
                         f' width: 24px; height: 24px; font-size: 10px; padding: 0;"'
-                        f' title="{escape(maff.instruction or "")}">{arrow}</button>'
+                        f' title="{escape(maff.get("instruction", ""))}">{arrow}</button>'
                     )
                 # Remove button inline
                 body_js = json.dumps({"action": "remove", "id": item_id}).replace('"', '&quot;')
                 html += (
-                    f'<button onclick="fetch(\'{self.url}\','
+                    f'<button onclick="fetch(\'{url}\','
                     f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
                     f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
                     f' style="cursor: pointer; border: 1px solid #ccc; background: #f8f8f8;'
@@ -213,13 +206,12 @@ class ListForm(Eigenform):
         else:
             html += '<p style="color: #888;">No items yet.</p>'
 
-        # Bottom controls: Add + N/A
+        # Bottom controls: Add + N/A (skip move/edit/remove — rendered inline above)
         html += '<div style="margin-top: 8px;">'
-        for aff in affordances:
-            if isinstance(aff, AddItemAffordance):
-                html += aff.render()
-            elif isinstance(aff, SimpleButtonAffordance) and aff.body.get("action") == "na":
-                html += aff.render()
+        for aff in affs:
+            action = aff.get("body", {}).get("action")
+            if action in ("add", "na", "clear_na"):
+                html += render_affordance_html(aff)
         html += '</div>'
 
         return html

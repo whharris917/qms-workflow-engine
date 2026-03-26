@@ -84,29 +84,27 @@ class Eigenform:
         state["affordances"] = [a.serialize() for a in self.get_affordances()]
         return state
 
-    def render_inner(self, affordances: list[Affordance]) -> str:
-        """Render this eigenform's content as HTML. Subclasses may override."""
-        html = f'<h3>{self.label}</h3>'
-        if self.instruction:
-            html += f'<p>{self.instruction}</p>'
-        for aff in affordances:
-            html += aff.render()
+    def render_from_data(self, data: dict) -> str:
+        """Render HTML from the canonical serialized dict. Subclasses override this."""
+        from engine.affordances import render_affordance_html
+        html = f'<h3>{escape(data.get("label", ""))}</h3>'
+        if data.get("instruction"):
+            html += f'<p>{escape(data["instruction"])}</p>'
+        for aff in data.get("affordances", []):
+            html += render_affordance_html(aff)
         return html
 
     def render(self) -> str:
-        """Render this eigenform as HTML, wrapped in a standard container."""
-        affordances = self.get_affordances()
-        inner = self.render_inner(affordances)
+        """Render this eigenform as HTML, wrapped in a standard container.
 
-        unrendered = [a for a in affordances if not a._rendered]
-        if unrendered:
-            labels = [a.label for a in unrendered]
-            raise RuntimeError(
-                f"{type(self).__name__}(key={self.key!r}) did not render "
-                f"{len(unrendered)} affordance(s): {labels}"
-            )
+        Calls serialize() first, then render_from_data() on the result.
+        This guarantees HTML and JSON cannot diverge — both derive from
+        the same serialized dict.
+        """
+        data = self.serialize()
+        inner = self.render_from_data(data)
 
-        json_str = escape(json.dumps(self.serialize(), indent=2))
+        json_str = escape(json.dumps(data, indent=2))
         uid = self.uid
 
         complete_color = '#2a2' if self.is_complete else '#888'
@@ -146,14 +144,14 @@ class TextForm(Eigenform):
             "value": self.value if self.value is not None else self.default,
         }
 
-    def render_inner(self, affordances: list[Affordance]) -> str:
-        display = self.value if self.value is not None else self.default
-        html = f'<h3>{self.label}</h3>'
-        if self.instruction:
-            html += f'<p>{self.instruction}</p>'
-        html += f'<p><strong>Value:</strong> {escape(str(display))}</p>'
-        for aff in affordances:
-            html += aff.render()
+    def render_from_data(self, data: dict) -> str:
+        from engine.affordances import render_affordance_html
+        html = f'<h3>{escape(data["label"])}</h3>'
+        if data.get("instruction"):
+            html += f'<p>{escape(data["instruction"])}</p>'
+        html += f'<p><strong>Value:</strong> {escape(str(data["value"]))}</p>'
+        for aff in data.get("affordances", []):
+            html += render_affordance_html(aff)
         return html
 
     def get_affordances(self) -> list[Affordance]:

@@ -110,36 +110,44 @@ class ChainForm(Eigenform):
                 ))
         return affordances
 
-    def render_inner(self, affordances: list[Affordance]) -> str:
-        html = f'<h3>{self.label}</h3>'
-        if self.instruction:
-            html += f'<p>{self.instruction}</p>'
+    def render_from_data(self, data: dict) -> str:
+        from engine.affordances import render_affordance_html
+        html = f'<h3>{escape(data["label"])}</h3>'
+        if data.get("instruction"):
+            html += f'<p>{escape(data["instruction"])}</p>'
+
+        active_key = data.get("active_step")
+        progress = data.get("progress", [])
+        affs = data.get("affordances", [])
+
+        # Build a set of affordances matched to progress steps (jump-back buttons)
+        rendered_affs = set()
 
         # Progress bar
         html += '<div style="margin-bottom: 8px;">'
-        for ef in self.steps:
-            is_active = ef.key == self.active_key
-            if ef.is_complete and not is_active:
+        for step in progress:
+            if step["complete"] and step["key"] != active_key:
                 # Completed: render as jump-back affordance
-                for aff in affordances:
-                    if aff.body.get("focus") == ef.key:
-                        html += aff.render()
+                for i, aff in enumerate(affs):
+                    if aff.get("body", {}).get("focus") == step["key"]:
+                        html += render_affordance_html(aff)
+                        rendered_affs.add(i)
                         break
-            elif is_active:
+            elif step["key"] == active_key:
                 html += (
                     f'<span style="font-weight: bold; margin-right: 4px;'
                     f' padding: 2px 8px; border-bottom: 2px solid #333;">'
-                    f'{escape(ef.label)}</span>'
+                    f'{escape(step["label"])}</span>'
                 )
             else:
                 html += (
                     f'<span style="margin-right: 4px; padding: 2px 8px;'
-                    f' color: #aaa;">{escape(ef.label)}</span>'
+                    f' color: #aaa;">{escape(step["label"])}</span>'
                 )
         # Render any remaining affordances (e.g. Continue button)
-        for aff in affordances:
-            if not aff._rendered:
-                html += aff.render()
+        for i, aff in enumerate(affs):
+            if i not in rendered_affs:
+                html += render_affordance_html(aff)
         html += '</div>'
 
         # Active step

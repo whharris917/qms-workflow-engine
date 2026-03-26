@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from html import escape
 from pathlib import Path
 from typing import Any
 
@@ -74,14 +75,15 @@ class PageForm(Eigenform):
         state["affordances"] = [a.serialize() for a in self.get_affordances()]
         return state
 
-    def render_inner(self, affordances: list[Affordance]) -> str:
-        html = f'<h2>{self.label}</h2>'
-        if self.instruction:
-            html += f'<p>{self.instruction}</p>'
+    def render_from_data(self, data: dict) -> str:
+        from engine.affordances import render_affordance_html
+        html = f'<h2>{escape(data["label"])}</h2>'
+        if data.get("instruction"):
+            html += f'<p>{escape(data["instruction"])}</p>'
         html += "".join(ef.render() for ef in self.eigenforms)
         html += '<div style="margin-top: 12px;">'
-        for aff in affordances:
-            html += aff.render()
+        for aff in data.get("affordances", []):
+            html += render_affordance_html(aff)
         html += '</div>'
         return html
 

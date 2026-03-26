@@ -7,13 +7,9 @@
 <body>
     <h1>Welcome to the Agent Portal.</h1>
     <ul>
-        <li><a href="/pages/page-1">Page 1</a></li>
-        <li><a href="/pages/page-2">Page 2</a></li>
-        <li><a href="/pages/page-3">Page 3</a></li>
-        <li><a href="/pages/page-4">Page 4</a></li>
-        <li><a href="/pages/page-5">Page 5</a></li>
-        <li><a href="/pages/page-6">Page 6</a></li>
-        <li><a href="/pages/math-test">Math Test</a></li>
+        {% for page in pages %}
+        <li><a href="/pages/{{ page.key }}">{{ page.label }}</a></li>
+        {% endfor %}
     </ul>
 </body>
 </html>
