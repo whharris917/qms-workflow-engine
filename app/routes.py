@@ -13,12 +13,11 @@ from engine.multi import FieldDescriptor, MultiForm
 from engine.table import TableForm
 from engine.rubiks import RubiksCubeForm
 from engine.page import PageForm
-from engine.store import Store
 from engine.tab import TabForm
 
 bp = Blueprint("main", __name__)
 
-store = Store(Path("data/state.json"))
+DATA_DIR = Path("data")
 
 # SSE subscribers: {page_id: [queue, ...]}
 subscribers: dict[str, list[queue.Queue]] = {}
@@ -34,7 +33,7 @@ impacts_def = CheckboxForm(
 # Each page gets its own bound copies via bind()
 pages = {
     "1": PageForm(key="1", label="Page 1", eigenforms=[title_def, purpose_def, impacts_def])
-            .bind(store=store, scope="1", url_prefix="/page/1"),
+            .bind(data_dir=DATA_DIR, scope="1", url_prefix="/page/1"),
     "2": PageForm(key="2", label="Page 2", instruction="Fill out each tab to complete the change request.", eigenforms=[
                 TabForm(key="tabs", label="Details", tabs={
                     "basic": TextForm(key="title", label="Document Title", instruction="A short, descriptive title."),
@@ -42,7 +41,7 @@ pages = {
                     "impact": CheckboxForm(key="impacts", label="Impact Areas", instruction="Select all that apply.",
                                            items=["code", "documentation", "tests", "infrastructure"]),
                 }),
-            ]).bind(store=store, scope="2", url_prefix="/page/2"),
+            ]).bind(data_dir=DATA_DIR, scope="2", url_prefix="/page/2"),
     "4": PageForm(key="4", label="Page 4", instruction="Complete each step in sequence.", eigenforms=[
                 ChainForm(key="chain", label="Change Request Wizard", instruction="Fill out each step to proceed.", steps=[
                     TextForm(key="title", label="Document Title", instruction="A short, descriptive title."),
@@ -51,7 +50,7 @@ pages = {
                     CheckboxForm(key="impacts", label="Impact Areas", instruction="Select all that apply.",
                                  items=["code", "documentation", "tests", "infrastructure"]),
                 ]),
-            ]).bind(store=store, scope="4", url_prefix="/page/4"),
+            ]).bind(data_dir=DATA_DIR, scope="4", url_prefix="/page/4"),
     "6": PageForm(key="6", label="Page 6", instruction="A change request form showcasing ChoiceForm, ListForm, and MultiForm.", eigenforms=[
                 MultiForm(key="basic_info", label="Basic Information",
                           instruction="Provide the core details for this change request.",
@@ -71,15 +70,15 @@ pages = {
                          instruction="List the requirements for this change."),
                 ListForm(key="risks", label="Risks",
                          instruction="List any risks or concerns."),
-            ]).bind(store=store, scope="6", url_prefix="/page/6"),
+            ]).bind(data_dir=DATA_DIR, scope="6", url_prefix="/page/6"),
     "5": PageForm(key="5", label="Page 5", instruction="Build and populate a table.", eigenforms=[
                 TableForm(key="table", label="Data Table",
                           instruction="Add columns, then rows, then fill in cells."),
-            ]).bind(store=store, scope="5", url_prefix="/page/5"),
+            ]).bind(data_dir=DATA_DIR, scope="5", url_prefix="/page/5"),
     "3": PageForm(key="3", label="Page 3", eigenforms=[
                 RubiksCubeForm(key="cube", label="Rubik's Cube",
                                instruction="A fully functional cube. Rotate any face."),
-            ]).bind(store=store, scope="3", url_prefix="/page/3"),
+            ]).bind(data_dir=DATA_DIR, scope="3", url_prefix="/page/3"),
 }
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from engine.affordances import Affordance, SimpleButtonAffordance
@@ -17,12 +18,22 @@ class PageForm(Eigenform):
     PageForm is responsible for rendering itself, but it delegates rendering
     of its nested eigenforms to the eigenforms themselves. It provides each
     nested eigenform a region and lets them fill it.
+
+    PageForm is the persistence boundary. Each page owns its own Store
+    backed by a separate JSON file (data_dir / "{scope}.json"). Children
+    inherit this store via bind().
     """
     eigenforms: list[Eigenform] = field(default_factory=list)
 
-    def bind(self, store: Store, scope: str, url_prefix: str) -> PageForm:
-        """Produce a bound copy of this page and all nested eigenforms."""
+    def bind(self, data_dir: Path, scope: str, url_prefix: str) -> PageForm:
+        """Produce a bound copy of this page and all nested eigenforms.
+
+        Unlike other eigenforms, PageForm creates its own Store from
+        data_dir rather than receiving one. This makes the page the
+        persistence boundary — one JSON file per page.
+        """
         import copy
+        store = Store(data_dir / f"{scope}.json")
         bound = copy.deepcopy(self)
         bound._store = store
         bound._scope = scope
