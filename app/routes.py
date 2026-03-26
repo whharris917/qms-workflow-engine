@@ -5,7 +5,9 @@ from pathlib import Path
 from flask import Blueprint, Response, render_template, request, jsonify
 from markupsafe import Markup
 
+from engine.chain import ChainForm
 from engine.eigenforms import CheckboxForm, TextForm
+from engine.rubiks import RubiksCubeForm
 from engine.page import PageForm
 from engine.store import Store
 from engine.tab import TabForm
@@ -29,7 +31,7 @@ impacts_def = CheckboxForm(
 pages = {
     "1": PageForm(key="1", label="Page 1", eigenforms=[title_def, purpose_def, impacts_def])
             .bind(store=store, scope="1", url_prefix="/page/1"),
-    "2": PageForm(key="2", label="Page 2", eigenforms=[
+    "2": PageForm(key="2", label="Page 2", instruction="Fill out each tab to complete the change request.", eigenforms=[
                 TabForm(key="tabs", label="Details", tabs={
                     "basic": TextForm(key="title", label="Document Title", instruction="A short, descriptive title."),
                     "scope": TextForm(key="scope", label="Scope", instruction="What is affected by this change?"),
@@ -37,8 +39,19 @@ pages = {
                                            items=["code", "documentation", "tests", "infrastructure"]),
                 }),
             ]).bind(store=store, scope="2", url_prefix="/page/2"),
-    "3": PageForm(key="3", label="Page 3", eigenforms=[title_def])
-            .bind(store=store, scope="3", url_prefix="/page/3"),
+    "4": PageForm(key="4", label="Page 4", instruction="Complete each step in sequence.", eigenforms=[
+                ChainForm(key="chain", label="Change Request Wizard", instruction="Fill out each step to proceed.", steps=[
+                    TextForm(key="title", label="Document Title", instruction="A short, descriptive title."),
+                    TextForm(key="purpose", label="Purpose", instruction="What problem does this CR solve?"),
+                    TextForm(key="scope", label="Scope", instruction="What is affected by this change?"),
+                    CheckboxForm(key="impacts", label="Impact Areas", instruction="Select all that apply.",
+                                 items=["code", "documentation", "tests", "infrastructure"]),
+                ]),
+            ]).bind(store=store, scope="4", url_prefix="/page/4"),
+    "3": PageForm(key="3", label="Page 3", eigenforms=[
+                RubiksCubeForm(key="cube", label="Rubik's Cube",
+                               instruction="A fully functional cube. Rotate any face."),
+            ]).bind(store=store, scope="3", url_prefix="/page/3"),
 }
 
 

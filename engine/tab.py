@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from html import escape
 from typing import Any
 
 from engine.affordances import Affordance, SwitchTabAffordance
@@ -64,24 +65,39 @@ class TabForm(Eigenform):
         state["affordances"] = [a.serialize() for a in self.get_affordances()]
         return state
 
+    @property
+    def is_complete(self) -> bool:
+        return all(ef.is_complete for ef in self.tabs.values())
+
     def get_affordances(self) -> list[Affordance]:
         affordances: list[Affordance] = []
         for tab_key, ef in self.tabs.items():
-            affordances.append(SwitchTabAffordance(
-                label=ef.label,
-                method="POST",
-                url=f"{self._url_prefix}/{self.key}",
-                body={"tab": tab_key},
-                instruction=f"Switch to the {ef.label} tab.",
-                is_active=(tab_key == self.active_tab_key),
-            ))
+            if tab_key != self.active_tab_key:
+                affordances.append(SwitchTabAffordance(
+                    label=ef.label,
+                    method="POST",
+                    url=f"{self._url_prefix}/{self.key}",
+                    body={"tab": tab_key},
+                    instruction=f"Switch to the {ef.label} tab.",
+                ))
         return affordances
 
     def render_inner(self, affordances: list[Affordance]) -> str:
-        # Tab bar
+        # Tab bar — active tab shown as bold label, inactive tabs as affordance buttons
         html = '<div style="margin-bottom: 8px;">'
-        for aff in affordances:
-            html += aff.render()
+        for tab_key, ef in self.tabs.items():
+            if tab_key == self.active_tab_key:
+                html += (
+                    f'<span style="font-weight: bold; margin-right: 4px;'
+                    f' padding: 2px 8px; border-bottom: 2px solid #333;">'
+                    f'{escape(ef.label)}</span>'
+                )
+            else:
+                # Find the matching affordance and render it
+                for aff in affordances:
+                    if aff.body.get("tab") == tab_key:
+                        html += aff.render()
+                        break
         html += '</div>'
         # Active tab content
         active = self.active_tab

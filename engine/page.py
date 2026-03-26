@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from engine.affordances import Affordance
+from engine.affordances import Affordance, SimpleButtonAffordance
 from engine.eigenforms import Eigenform
 from engine.store import Store
 
@@ -33,6 +33,10 @@ class PageForm(Eigenform):
         ]
         return bound
 
+    @property
+    def is_complete(self) -> bool:
+        return all(ef.is_complete for ef in self.eigenforms)
+
     def _serialize_state(self) -> dict:
         return {
             "form": self.form,
@@ -41,9 +45,21 @@ class PageForm(Eigenform):
             "instruction": self.instruction,
         }
 
+    def get_affordances(self) -> list[Affordance]:
+        return [
+            SimpleButtonAffordance(
+                label="Reset Page",
+                method="POST",
+                url=f"{self._url_prefix}/{self.key}",
+                body={"action": "reset"},
+                instruction="Clear all state on this page.",
+            )
+        ]
+
     def serialize(self) -> dict:
         state = self._serialize_state()
         state["eigenforms"] = [ef.serialize() for ef in self.eigenforms]
+        state["complete"] = self.is_complete
         state["affordances"] = [a.serialize() for a in self.get_affordances()]
         return state
 
@@ -52,10 +68,37 @@ class PageForm(Eigenform):
         if self.instruction:
             html += f'<p>{self.instruction}</p>'
         html += "".join(ef.render() for ef in self.eigenforms)
+        html += '<div style="margin-top: 12px;">'
+        for aff in affordances:
+            html += aff.render()
+        html += '</div>'
         return html
+
+    def _clear_recursive(self, eigenforms: list[Eigenform]):
+        """Clear state for all eigenforms, recursing into containers."""
+        for ef in eigenforms:
+            if ef._scope:
+                self._store.clear_scope(ef._scope)
+            if hasattr(ef, 'eigenforms'):
+                self._clear_recursive(ef.eigenforms)
+            if hasattr(ef, 'steps'):
+                self._clear_recursive(ef.steps)
+            if hasattr(ef, 'tabs'):
+                self._clear_recursive(list(ef.tabs.values()))
+
+    def handle(self, body: dict) -> dict:
+        """Handle page-level actions."""
+        if body.get("action") == "reset":
+            self._store.clear_scope(self._scope)
+            self._clear_recursive(self.eigenforms)
+        return self.serialize()
 
     def handle_action(self, key: str, body: dict) -> dict | None:
         """Route a POST to the correct nested eigenform. Returns full page state."""
+        # Page-level action
+        if key == self.key:
+            self.handle(body)
+            return self.serialize()
         for ef in self.eigenforms:
             # Direct match
             if ef.key == key:

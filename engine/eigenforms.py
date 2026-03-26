@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from html import escape
 from typing import Any
 
-from engine.affordances import Affordance, CheckboxAffordance, SetValueAffordance
+from engine.affordances import Affordance, CheckboxAffordance, SetValueAffordance, SimpleButtonAffordance
 from engine.store import Store
 
 
@@ -49,6 +49,11 @@ class Eigenform:
         return self._store.get(self._scope, self.key)
 
     @property
+    def is_complete(self) -> bool:
+        """Whether this eigenform has been completed. Subclasses must implement."""
+        raise NotImplementedError
+
+    @property
     def url(self) -> str:
         """The URL for this eigenform's actions."""
         return f"{self._url_prefix}/{self.key}"
@@ -75,6 +80,7 @@ class Eigenform:
     def serialize(self) -> dict:
         """Produce the complete canonical representation: state + affordances."""
         state = self._serialize_state()
+        state["complete"] = self.is_complete
         state["affordances"] = [a.serialize() for a in self.get_affordances()]
         return state
 
@@ -95,9 +101,11 @@ class Eigenform:
         json_str = escape(json.dumps(self.serialize(), indent=2))
         uid = self.uid
 
+        complete_color = '#2a2' if self.is_complete else '#888'
+
         return (
             f'<div class="eigenform" data-form="{self.form}" data-key="{self.key}"'
-            f' style="border: 1px solid #888; padding: 30px 12px 12px 12px; margin: 8px 0; position: relative;">'
+            f' style="border: 2px solid {complete_color}; padding: 30px 12px 12px 12px; margin: 8px 0; position: relative;">'
             f'<button onclick="var h=document.getElementById(\'{uid}-human\'),j=document.getElementById(\'{uid}-json\'),'
             f'v=j.style.display===\'none\';j.style.display=v?\'block\':\'none\';h.style.display=v?\'none\':\'block\';'
             f'this.textContent=v?\'See HTML\':\'See JSON\'"'
@@ -116,6 +124,10 @@ class Eigenform:
 class TextForm(Eigenform):
     """Single free-form string input."""
     default: str | None = None
+
+    @property
+    def is_complete(self) -> bool:
+        return self.value is not None
 
     def _serialize_state(self) -> dict:
         return {
@@ -154,7 +166,11 @@ class TextForm(Eigenform):
 
 @dataclass
 class CheckboxForm(Eigenform):
-    """Multi-select: a set of items, each independently selectable."""
+    """Multi-select: a set of items, each independently selectable.
+
+    Incomplete until at least one item is checked. Include an "N/A" item
+    if it's valid for none of the others to apply.
+    """
     items: list[str] = field(default_factory=list)
 
     @property
@@ -163,6 +179,16 @@ class CheckboxForm(Eigenform):
         stored = self.value or {}
         return {item: stored.get(item, False) for item in self.items}
 
+    @property
+    def na(self) -> bool:
+        """Whether N/A has been selected."""
+        stored = self.value or {}
+        return bool(stored.get("__na"))
+
+    @property
+    def is_complete(self) -> bool:
+        return self.na or any(self.checked.values())
+
     def _serialize_state(self) -> dict:
         return {
             "form": self.form,
@@ -170,9 +196,20 @@ class CheckboxForm(Eigenform):
             "label": self.label,
             "instruction": self.instruction,
             "items": self.checked,
+            "na": self.na,
         }
 
     def get_affordances(self) -> list[Affordance]:
+        if self.na:
+            return [
+                SimpleButtonAffordance(
+                    label="Clear N/A",
+                    method="POST",
+                    url=self.url,
+                    body={"action": "clear_na"},
+                    instruction="Clear N/A and allow item selection.",
+                )
+            ]
         return [
             CheckboxAffordance(
                 label=f"Set {self.label}",
@@ -181,13 +218,31 @@ class CheckboxForm(Eigenform):
                 body={item: "<true | false>" for item in self.items},
                 instruction="Set one or more items. Omitted items are unchanged.",
                 items=self.checked,
-            )
+            ),
+            SimpleButtonAffordance(
+                label="N/A",
+                method="POST",
+                url=self.url,
+                body={"action": "na"},
+                instruction="Mark as not applicable. Clears all selections.",
+            ),
         ]
 
     def handle(self, body: dict) -> dict:
-        current = self.checked
-        for item_key, value in body.items():
-            if item_key in current:
-                current[item_key] = value
-        self._store.set(self._scope, self.key, current)
+        action = body.get("action")
+        if action == "na":
+            # Clear all items and set N/A
+            cleared = {item: False for item in self.items}
+            cleared["__na"] = True
+            self._store.set(self._scope, self.key, cleared)
+        elif action == "clear_na":
+            # Clear N/A, keep items at false
+            cleared = {item: False for item in self.items}
+            self._store.set(self._scope, self.key, cleared)
+        else:
+            current = self.checked
+            for item_key, value in body.items():
+                if item_key in current:
+                    current[item_key] = value
+            self._store.set(self._scope, self.key, current)
         return self.serialize()

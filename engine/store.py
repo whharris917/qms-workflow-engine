@@ -22,5 +22,14 @@ class Store:
         if scope not in self._data:
             self._data[scope] = {}
         self._data[scope][key] = value
+        self._save()
+
+    def clear_scope(self, scope: str):
+        """Remove all data for a scope."""
+        if scope in self._data:
+            del self._data[scope]
+            self._save()
+
+    def _save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(self._data, indent=2))

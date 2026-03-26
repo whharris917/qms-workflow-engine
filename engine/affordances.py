@@ -58,25 +58,47 @@ class SetValueAffordance(Affordance):
 class SwitchTabAffordance(Affordance):
     """An affordance that switches the active tab."""
 
-    def __init__(self, label: str, method: str, url: str, body: dict,
-                 instruction: str | None = None, is_active: bool = False):
-        super().__init__(label=label, method=method, url=url, body=body, instruction=instruction)
-        self.is_active = is_active
-
     def render(self) -> str:
         endpoint = f'{self.method} {self.url}'
-        if self.is_active:
-            return (
-                f'<button disabled style="font-weight: bold; margin-right: 4px;"'
-                f' title="{escape(endpoint)} {escape(json.dumps(self.body))}">'
-                f'{escape(self.label)}</button>'
-            )
         body_js = json.dumps(self.body).replace('"', '&quot;')
         return (
             f'<button onclick="fetch(\'{self.url}\','
             f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
             f'body:JSON.stringify({body_js})}})"'
             f' style="margin-right: 4px; cursor: pointer;"'
+            f' title="{escape(endpoint)} {escape(json.dumps(self.body))}">'
+            f'{escape(self.label)}</button>'
+        )
+
+
+class ConfirmAffordance(Affordance):
+    """An affordance that confirms an eigenform without changing its value."""
+
+    def render(self) -> str:
+        endpoint = f'{self.method} {self.url}'
+        body_js = json.dumps(self.body).replace('"', '&quot;')
+        return (
+            f'<button onclick="fetch(\'{self.url}\','
+            f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+            f'body:JSON.stringify({body_js})}})"'
+            f' style="margin: 2px; cursor: pointer; font-size: 12px; padding: 3px 8px;'
+            f' background: #e8e8e8; border: 1px solid #aaa; border-radius: 3px;"'
+            f' title="{escape(endpoint)} {escape(json.dumps(self.body))}">'
+            f'{escape(self.label)}</button>'
+        )
+
+
+class SimpleButtonAffordance(Affordance):
+    """An affordance that renders as a single button with a fixed body."""
+
+    def render(self) -> str:
+        endpoint = f'{self.method} {self.url}'
+        body_js = json.dumps(self.body).replace('"', '&quot;')
+        return (
+            f'<button onclick="fetch(\'{self.url}\','
+            f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+            f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
+            f' style="margin: 1px; cursor: pointer; font-size: 12px; padding: 4px 10px;"'
             f' title="{escape(endpoint)} {escape(json.dumps(self.body))}">'
             f'{escape(self.label)}</button>'
         )
@@ -99,7 +121,7 @@ class CheckboxAffordance(Affordance):
                 f'<label style="display: block; cursor: pointer;">'
                 f'<input type="checkbox"{checked_attr} onchange="'
                 f"fetch('{self.url}',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
-                f"body:JSON.stringify({{{item_key}:this.checked}})}})"
+                f"body:JSON.stringify({{{item_key}:this.checked}})}}).then(()=>location.reload())"
                 f'" title="{escape(endpoint)} {escape(json.dumps({item_key: not checked}))}"'
                 f' /> {escape(item_key)}'
                 f'</label>'

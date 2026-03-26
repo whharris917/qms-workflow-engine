@@ -9,7 +9,7 @@
     <script>
         var source = new EventSource('/page/{{ page_id }}/stream');
         source.onmessage = function(event) {
-            location.reload();
+            window.location.reload(true);
         };
     </script>
 </body>
