@@ -102,8 +102,12 @@ class PageForm(Eigenform):
         for ef in self.eigenforms:
             # Direct match
             if ef.key == key:
-                ef.handle(body)
-                return self.serialize()
+                result = ef.handle(body)
+                page_state = self.serialize()
+                if "error" in result:
+                    page_state["error"] = result["error"]
+                    page_state["failed_action"] = result.get("failed_action")
+                return page_state
             # Delegate to containers that can route internally
             if hasattr(ef, 'handle_action'):
                 if ef.handle_action(key, body):

@@ -7,6 +7,7 @@ from markupsafe import Markup
 
 from engine.chain import ChainForm
 from engine.eigenforms import CheckboxForm, TextForm
+from engine.table import TableForm
 from engine.rubiks import RubiksCubeForm
 from engine.page import PageForm
 from engine.store import Store
@@ -48,6 +49,10 @@ pages = {
                                  items=["code", "documentation", "tests", "infrastructure"]),
                 ]),
             ]).bind(store=store, scope="4", url_prefix="/page/4"),
+    "5": PageForm(key="5", label="Page 5", instruction="Build and populate a table.", eigenforms=[
+                TableForm(key="table", label="Data Table",
+                          instruction="Add columns, then rows, then fill in cells."),
+            ]).bind(store=store, scope="5", url_prefix="/page/5"),
     "3": PageForm(key="3", label="Page 3", eigenforms=[
                 RubiksCubeForm(key="cube", label="Rubik's Cube",
                                instruction="A fully functional cube. Rotate any face."),
