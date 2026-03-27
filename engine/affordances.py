@@ -55,7 +55,7 @@ class SetValueAffordance(Affordance):
 
 class SwitchTabAffordance(Affordance):
     def _render_hints(self) -> dict:
-        return {"type": "button"}
+        return {"type": "tab_button"}
 
 
 class ConfirmAffordance(Affordance):
@@ -103,6 +103,8 @@ def render_affordance_html(aff: dict) -> str:
         return _render_checkbox(url, endpoint, hints.get("items", {}))
     elif aff_type == "radio":
         return _render_radio(url, endpoint, hints.get("options", []), hints.get("current"))
+    elif aff_type == "tab_button":
+        return _render_tab_button(label, url, endpoint, body)
     elif aff_type == "multi_field":
         return _render_multi_field(label, url, endpoint, hints.get("fields", []), hints.get("values", {}))
     elif aff_type == "text_input_add":
@@ -111,6 +113,22 @@ def render_affordance_html(aff: dict) -> str:
         return ""
     elif aff_type == "small_button":
         return _render_small_button(label, url, endpoint, body)
+    elif aff_type == "number_input":
+        return _render_number_input(label, url, endpoint, hints)
+    elif aff_type == "date_input":
+        return _render_date_input(label, url, endpoint, hints)
+    elif aff_type == "toggle":
+        return _render_toggle(label, url, endpoint, hints)
+    elif aff_type == "range_input":
+        return _render_range_input(label, url, endpoint, hints)
+    elif aff_type == "textarea":
+        return _render_textarea(label, url, endpoint, hints)
+    elif aff_type == "rating":
+        return _render_rating(label, url, endpoint, hints)
+    elif aff_type == "kv_input_add":
+        return _render_kv_add(label, url, endpoint, hints)
+    elif aff_type == "accordion_toggle":
+        return _render_accordion_toggle(label, url, endpoint, body, hints)
     else:
         # Fallback: check for fillable parameters in body
         param_keys = [k for k, v in body.items() if isinstance(v, str) and v.startswith("<")]
@@ -204,11 +222,12 @@ def _render_multi_field(label: str, url: str, endpoint: str, fields: list, value
                 f'</div>'
             )
         else:
+            placeholder = fd.get("instruction") or ""
             inputs += (
                 f'<div style="margin: 4px 0;">'
                 f'<label>{escape(fd["label"])}: '
                 f'<input name="{escape(fd["key"])}" type="text" value="{display}" '
-                f'placeholder="{escape(fd.get("instruction", ""))}" '
+                f'placeholder="{escape(placeholder)}" '
                 f'style="width: 200px;" /></label>'
                 f'</div>'
             )
@@ -284,6 +303,18 @@ def _render_parameterized(label: str, url: str, endpoint: str, body: dict, param
     )
 
 
+def _render_tab_button(label: str, url: str, endpoint: str, body: dict) -> str:
+    body_js = json.dumps(body).replace('"', '&quot;')
+    return (
+        f'<button onclick="fetch(\'{url}\','
+        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+        f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
+        f' style="cursor: pointer; font-size: 12px; padding: 2px 8px;"'
+        f' title="{escape(endpoint)} {escape(json.dumps(body))}">'
+        f'{escape(label)}</button>'
+    )
+
+
 def _render_small_button(label: str, url: str, endpoint: str, body: dict) -> str:
     body_js = json.dumps(body).replace('"', '&quot;')
     return (
@@ -293,4 +324,136 @@ def _render_small_button(label: str, url: str, endpoint: str, body: dict) -> str
         f' style="margin: 1px; cursor: pointer; width: 28px; height: 28px; font-size: 11px;"'
         f' title="{escape(endpoint)} {escape(json.dumps(body))}">'
         f'{escape(label)}</button>'
+    )
+
+
+def _render_number_input(label: str, url: str, endpoint: str, hints: dict) -> str:
+    min_attr = f' min="{hints["min"]}"' if hints.get("min") is not None else ""
+    max_attr = f' max="{hints["max"]}"' if hints.get("max") is not None else ""
+    step_attr = f' step="{hints["step"]}"' if hints.get("step") is not None else ""
+    return (
+        f'<form style="display: inline" onsubmit="fetch(\'{url}\','
+        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+        f'body:JSON.stringify({{value:parseFloat(this.elements.value.value)}})}}).then(()=>location.reload()); return false">'
+        f'<input name="value" type="number"{min_attr}{max_attr}{step_attr} style="width: 120px;" />'
+        f' <button type="submit" title="{escape(endpoint)}">{escape(label)}</button>'
+        f'</form>'
+    )
+
+
+def _render_date_input(label: str, url: str, endpoint: str, hints: dict) -> str:
+    input_type = "datetime-local" if hints.get("include_time") else "date"
+    min_attr = f' min="{escape(hints["min"])}"' if hints.get("min") else ""
+    max_attr = f' max="{escape(hints["max"])}"' if hints.get("max") else ""
+    return (
+        f'<form style="display: inline" onsubmit="fetch(\'{url}\','
+        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+        f'body:JSON.stringify({{value:this.elements.value.value}})}}).then(()=>location.reload()); return false">'
+        f'<input name="value" type="{input_type}"{min_attr}{max_attr} />'
+        f' <button type="submit" title="{escape(endpoint)}">{escape(label)}</button>'
+        f'</form>'
+    )
+
+
+def _render_toggle(label: str, url: str, endpoint: str, hints: dict) -> str:
+    current = hints.get("current")
+    true_label = escape(hints.get("true_label", "Yes"))
+    false_label = escape(hints.get("false_label", "No"))
+    true_style = "background: #2a2; color: white;" if current is True else ""
+    false_style = "background: #c22; color: white;" if current is False else ""
+    return (
+        f'<div style="display: flex; gap: 4px; margin: 4px 0;">'
+        f'<button onclick="fetch(\'{url}\','
+        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+        f'body:JSON.stringify({{value:true}})}}).then(()=>location.reload())"'
+        f' style="cursor: pointer; padding: 4px 12px; {true_style}"'
+        f' title="{escape(endpoint)} {escape(json.dumps({"value": True}))}">'
+        f'{true_label}</button>'
+        f'<button onclick="fetch(\'{url}\','
+        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+        f'body:JSON.stringify({{value:false}})}}).then(()=>location.reload())"'
+        f' style="cursor: pointer; padding: 4px 12px; {false_style}"'
+        f' title="{escape(endpoint)} {escape(json.dumps({"value": False}))}">'
+        f'{false_label}</button>'
+        f'</div>'
+    )
+
+
+def _render_range_input(label: str, url: str, endpoint: str, hints: dict) -> str:
+    min_val = hints.get("min", 0)
+    max_val = hints.get("max", 100)
+    step = hints.get("step", 1)
+    current = hints.get("current")
+    default = current if current is not None else min_val
+    return (
+        f'<form style="margin: 4px 0;" onsubmit="fetch(\'{url}\','
+        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+        f'body:JSON.stringify({{value:parseFloat(this.elements.value.value)}})}}).then(()=>location.reload()); return false">'
+        f'<input name="value" type="range" min="{min_val}" max="{max_val}" step="{step}" value="{default}"'
+        f' oninput="this.nextElementSibling.textContent=this.value" style="width: 200px; vertical-align: middle;" />'
+        f'<span style="margin-left: 8px;">{default}</span>'
+        f' <button type="submit" title="{escape(endpoint)}">{escape(label)}</button>'
+        f'</form>'
+    )
+
+
+def _render_textarea(label: str, url: str, endpoint: str, hints: dict) -> str:
+    max_attr = f' maxlength="{hints["max_length"]}"' if hints.get("max_length") else ""
+    return (
+        f'<form onsubmit="fetch(\'{url}\','
+        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+        f'body:JSON.stringify({{value:this.elements.value.value}})}}).then(()=>location.reload()); return false">'
+        f'<textarea name="value" rows="5" style="width: 100%; box-sizing: border-box;"{max_attr}></textarea>'
+        f'<button type="submit" title="{escape(endpoint)}">{escape(label)}</button>'
+        f'</form>'
+    )
+
+
+def _render_rating(label: str, url: str, endpoint: str, hints: dict) -> str:
+    max_rating = hints.get("max", 5)
+    current = hints.get("current")
+    labels = hints.get("labels") or {}
+    html = '<div style="display: flex; gap: 4px; margin: 4px 0;">'
+    for i in range(1, max_rating + 1):
+        active = "background: #f0a020; color: white; font-weight: bold;" if current is not None and i <= current else ""
+        title_label = labels.get(str(i), labels.get(i, ""))
+        title_suffix = f" ({title_label})" if title_label else ""
+        html += (
+            f'<button onclick="fetch(\'{url}\','
+            f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+            f'body:JSON.stringify({{value:{i}}})}}).then(()=>location.reload())"'
+            f' style="cursor: pointer; width: 32px; height: 32px; {active}"'
+            f' title="{escape(endpoint)} {{value: {i}}}{escape(title_suffix)}">'
+            f'{i}</button>'
+        )
+    html += '</div>'
+    return html
+
+
+def _render_kv_add(label: str, url: str, endpoint: str, hints: dict) -> str:
+    key_label = escape(hints.get("key_label", "Key"))
+    value_label = escape(hints.get("value_label", "Value"))
+    return (
+        f'<form style="display: inline" onsubmit="'
+        f"fetch('{url}',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
+        f"body:JSON.stringify({{action:'add',key:this.elements.k.value,value:this.elements.v.value}})}}).then(()=>location.reload()); return false\">"
+        f'<input name="k" type="text" placeholder="{key_label}" style="width: 120px; margin-right: 4px;" />'
+        f'<input name="v" type="text" placeholder="{value_label}" style="width: 160px; margin-right: 4px;" />'
+        f' <button type="submit" title="{escape(endpoint)}">{escape(label)}</button>'
+        f'</form>'
+    )
+
+
+def _render_accordion_toggle(label: str, url: str, endpoint: str, body: dict, hints: dict) -> str:
+    expanded = hints.get("expanded", True)
+    arrow = "&#9660;" if expanded else "&#9654;"
+    body_js = json.dumps(body).replace('"', '&quot;')
+    return (
+        f'<div onclick="fetch(\'{url}\','
+        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+        f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
+        f' style="cursor: pointer; padding: 6px 8px; background: #eee; margin: 4px 0;'
+        f' border-radius: 4px; font-weight: bold; user-select: none;"'
+        f' title="{escape(endpoint)} {escape(json.dumps(body))}">'
+        f'{arrow} {escape(label)}</div>'
     )

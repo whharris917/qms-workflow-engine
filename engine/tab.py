@@ -86,14 +86,14 @@ class TabForm(Eigenform):
         # Tab bar — active tab shown as bold label, inactive tabs as affordance buttons
         active_key = data.get("active_tab", "")
         affs = data.get("affordances", [])
-        html += '<div style="margin-bottom: 8px;">'
+        html += '<div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;">'
         for tab_key in data.get("tab_keys", []):
             if tab_key == active_key:
                 # Get the label from the active tab eigenform
                 tab_ef = self.tabs.get(tab_key)
                 label = tab_ef.label if tab_ef else tab_key
                 html += (
-                    f'<span style="font-weight: bold; margin-right: 4px;'
+                    f'<span style="font-weight: bold;'
                     f' padding: 2px 8px; border-bottom: 2px solid #333;">'
                     f'{escape(label)}</span>'
                 )

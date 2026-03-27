@@ -38,6 +38,8 @@ class VisibilityForm(Eigenform):
     @property
     def visible(self) -> bool:
         val = self._dep_value
+        if callable(self.visible_when):
+            return self.visible_when(val)
         if isinstance(self.visible_when, list):
             return val in self.visible_when
         return val == self.visible_when
