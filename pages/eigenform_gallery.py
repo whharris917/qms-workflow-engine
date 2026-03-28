@@ -58,8 +58,9 @@ simple_values = GroupForm(
             key="number-demo",
             label="NumberForm",
             instruction=(
-                "Numeric input with constraints. This one is clamped to 1-100, "
-                "step 0.5, and rounds to float. Try posting a value outside the range."
+                "Numeric input with constraints. This one accepts 1-100, "
+                "step 0.5. Out-of-range or invalid-step values are rejected "
+                "with a structured error in the feedback banner."
             ),
             min_val=1,
             max_val=100,
@@ -152,9 +153,10 @@ selection_forms = GroupForm(
             key="checkbox-demo",
             label="CheckboxForm",
             instruction=(
-                "Multi-select with N/A escape hatch. Check individual items with "
-                "{\"item\": \"true\"}, or mark N/A to indicate 'none of these'. "
-                "Complete when any item is checked OR N/A is set."
+                "Multi-select with explicit confirmation. Check items, then click Done. "
+                "Done with nothing checked means 'none of these apply'. "
+                "Changing items after Done requires re-confirmation. "
+                "This prevents premature auto-advance in ChainForm."
             ),
             items=["Unit Tests", "Integration Tests", "Load Tests", "Manual QA"],
         ),
@@ -162,9 +164,10 @@ selection_forms = GroupForm(
             key="rank-demo",
             label="RankForm",
             instruction=(
-                "Drag to reorder (via Up/Down buttons) or submit a complete ordering. "
-                "POST {\"action\": \"set_order\", \"order\": [\"cost\", \"quality\", \"speed\", \"scope\"]} "
-                "to rank all at once. Complete only after an explicit ranking action."
+                "Reorder via Up/Down buttons, then click Done to confirm. "
+                "Done with the default order is valid (confirming the original ranking). "
+                "Moving items after Done requires re-confirmation. "
+                "Same confirmation pattern as CheckboxForm."
             ),
             items=["cost", "quality", "speed", "scope"],
         ),
@@ -202,8 +205,8 @@ collection_forms = GroupForm(
             key="list-demo",
             label="ListForm",
             instruction=(
-                "Ordered list with add/edit/remove/reorder. Supports N/A mode. "
-                "Try adding items, then reordering with move up/down. "
+                "Ordered list with add/edit/remove/reorder. "
+                "Try adding items, then reordering with the arrow buttons. "
                 "Item IDs are stable (item_0, item_1, ...) — removing item_1 doesn't renumber item_2."
             ),
         ),
