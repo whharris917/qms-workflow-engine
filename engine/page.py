@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 from dataclasses import dataclass, field
 from html import escape
 from pathlib import Path
@@ -33,6 +34,9 @@ class PageForm(Eigenform):
 
     # Preserved during bind() — unbound seed eigenforms for callable matching
     _seed: list[Eigenform] = field(default_factory=list, repr=False)
+
+    # Transient feedback from the most recent action (not persisted to store)
+    _feedback: dict | None = field(default=None, repr=False)
 
     @property
     def children(self) -> list[Eigenform]:
@@ -135,6 +139,38 @@ class PageForm(Eigenform):
         ]
         return self.serialize()
 
+    def _set_feedback(self, status: str, message: str, target: str | None = None):
+        self._feedback = {
+            "status": status,
+            "message": message,
+            "target": target,
+            "timestamp": datetime.datetime.now().isoformat(timespec="seconds"),
+        }
+
+    _PAGE_ACTION_MESSAGES = {
+        "reset": "Page reset.",
+        "rebuild_from_seed": "Rebuilt from seed definition.",
+    }
+
+    def handle(self, body: dict) -> dict:
+        """Handle a page-level action, capturing feedback."""
+        result = super().handle(body)
+        action = body.get("action", "")
+        if "error" in result:
+            self._set_feedback("error", result["error"])
+        elif action in self._PAGE_ACTION_MESSAGES:
+            self._set_feedback("success", self._PAGE_ACTION_MESSAGES[action])
+        elif action == "add_eigenform":
+            self._set_feedback("success", f"Added '{body.get('key', '?')}'.")
+        elif action == "remove_eigenform":
+            self._set_feedback("success", f"Removed '{body.get('key', '?')}'.")
+        elif action == "move_eigenform":
+            self._set_feedback("success",
+                               f"Moved '{body.get('key', '?')}' to position {body.get('position', '?')}.")
+        elif action == "clear":
+            self._set_feedback("success", "Page cleared.")
+        return result
+
     @property
     def is_complete(self) -> bool:
         return all(ef.is_complete for ef in self.eigenforms)
@@ -222,6 +258,9 @@ class PageForm(Eigenform):
 
     def serialize(self) -> dict:
         state = self._serialize_state()
+        if self._feedback:
+            state["feedback"] = self._feedback
+            self._feedback = None  # One-shot: consumed after first serialize
         state["eigenforms"] = [s for ef in self.eigenforms if (s := ef.serialize()) is not None]
         state["complete"] = self.is_complete
         state["affordances"] = [a.serialize() for a in self.get_affordances()]
@@ -232,6 +271,26 @@ class PageForm(Eigenform):
         html = f'<h2>{escape(data["label"])}</h2>'
         if data.get("instruction"):
             html += f'<p>{escape(data["instruction"])}</p>'
+
+        # Feedback banner
+        fb = data.get("feedback")
+        if fb:
+            is_error = fb["status"] == "error"
+            bg = "#fdecea" if is_error else "#edf7ed"
+            border = "#f5c6cb" if is_error else "#c3e6cb"
+            color = "#721c24" if is_error else "#155724"
+            icon = "&#10007;" if is_error else "&#10003;"
+            label = "Error" if is_error else "OK"
+            target = f' <span style="opacity: 0.7;">({escape(fb["target"])})</span>' if fb.get("target") else ""
+            html += (
+                f'<div style="background: {bg}; border: 1px solid {border}; color: {color};'
+                f' padding: 8px 12px; margin: 8px 0 12px 0; border-radius: 4px;'
+                f' display: flex; justify-content: space-between; align-items: center;">'
+                f'<span><strong>{icon} {label}:</strong> {escape(fb["message"])}{target}</span>'
+                f'<span style="opacity: 0.5; font-size: 0.85em;">{escape(fb.get("timestamp", ""))}</span>'
+                f'</div>'
+            )
+
         html += "".join(ef.render() for ef in self.eigenforms)
         html += '<div style="margin-top: 12px;">'
         for aff in data.get("affordances", []):
@@ -419,6 +478,13 @@ class PageForm(Eigenform):
         if structural_actions and self.mutable_structure:
             for sa in structural_actions:
                 self._handle(sa)
+
+        # Capture feedback
+        if "error" in result:
+            self._set_feedback("error", result["error"], target=path)
+        else:
+            action = body.get("action", "set")
+            self._set_feedback("success", f"{action} \u2192 {path}", target=path)
 
         page_state = self.serialize()
         if "error" in result:

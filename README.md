@@ -20,8 +20,13 @@ app/
   __init__.py           Flask app factory
   routes.py             Routes, SSE, content negotiation
   templates/            index.html, page.html (SSE client)
-engine/                 Eigenform implementations
-pages/                  Page definitions (auto-discovered)
+engine/
+  eigenforms.py         Base Eigenform, TextForm, CheckboxForm
+  registry.py           Type registry (name → class mapping, from_descriptor)
+  page.py               PageForm (persistence, structural mutations, self-modification)
+  store.py              JSON file store (one file per page, scoped by key)
+  ...                   One module per eigenform type (29 total)
+pages/                  Page definitions (auto-discovered, one file per page)
 data/                   Per-page JSON state files (created at runtime)
 ```
 
@@ -140,6 +145,96 @@ Pages are auto-discovered at startup. No registration needed.
 - **ComputedForm** with `store_result=True` must appear before any VisibilityForm that depends on its result (serialization is sequential).
 - **DynamicChoiceForm** dependencies must appear before the DynamicChoiceForm itself.
 
+## Eigenform Type Registry
+
+The registry (`engine/registry.py`) maps type name strings to eigenform classes. It enables runtime instantiation from descriptors and is the foundation for structural persistence.
+
+```python
+from engine.registry import registry
+
+registry.lookup("text")        # -> TextForm
+registry.lookup("rubikscube")  # -> RubiksCubeForm
+registry.available()           # -> sorted list of all 29 type names
+```
+
+**Type name derivation:** Strip `Form` suffix and lowercase (e.g., `TextForm` → `"text"`, `RubiksCubeForm` → `"rubikscube"`).
+
+**GroupForm subclasses** register under their own derived names (e.g., `BugReport` → `"bugreport"`), not under `"group"`.
+
+All 29 built-in types are auto-registered on first access via a lazy proxy.
+
+## Structural Persistence
+
+Every eigenform implements `to_descriptor()`, which serializes the tree structure (type, key, label, config, children) to a plain dict. `from_descriptor()` in the registry reconstructs the tree from that dict.
+
+PageForm uses this for **structural persistence**:
+
+1. **First bind:** Serializes the seed eigenforms to a `__structure` key in the store.
+2. **Subsequent binds:** Reads `__structure` from the store and reconstructs eigenforms via `from_descriptor()`, matching against the seed to preserve callables (event handlers, validators, compute functions).
+
+This means the eigenform tree structure survives server restarts. If the stored structure is corrupt or missing, PageForm falls back to the seed definition.
+
+### Descriptor Format
+
+```json
+{
+  "type": "text",
+  "key": "name",
+  "label": "Your Name",
+  "config": {"instruction": "Enter your full name"}
+}
+```
+
+Container descriptors include their children under the appropriate field:
+
+| Container | Children Field |
+|-----------|---------------|
+| PageForm, GroupForm | `"eigenforms"` (list) |
+| TabForm | `"tabs"` (dict) |
+| ChainForm | `"steps"` (list) |
+| AccordionForm | `"sections"` (dict) |
+| SwitchForm | `"cases"` (dict) |
+| RepeaterForm | `"template"` (list) |
+| VisibilityForm | `"eigenform"` (single) |
+
+## Structural Mutations (Mutable Pages)
+
+Pages with `mutable_structure=True` expose affordances for runtime structure modification:
+
+```python
+definition = PageForm(key="my-page", label="My Page",
+                      mutable_structure=True, eigenforms=[...])
+```
+
+**Available mutations:**
+
+| Action | Description |
+|--------|-------------|
+| `add_eigenform` | Insert a new eigenform by type name + config. Place after a sibling or at end. |
+| `remove_eigenform` | Remove an eigenform and surgically clean its data from the store. |
+| `move_eigenform` | Reorder an eigenform to a new position. |
+| `rebuild_from_seed` | Discard all structural mutations and restore the original Python definition. |
+
+All mutations persist to the `__structure` key in the store. After each mutation, the live eigenform tree is rebuilt and rebound.
+
+**Reset Page** (available on all pages) clears stored values but preserves structure. **Rebuild from Seed** (mutable pages only) discards both structure mutations and stored values.
+
+## Self-Modifying Pages
+
+ActionForm's `action_fn` can return `structural_actions` in its result, enabling pages that reshape themselves in response to user interaction:
+
+```python
+def generate_questions(context, store, scope):
+    actions = [
+        {"action": "add_eigenform", "type": "text", "key": "q1", "label": "Q1: ..."},
+        {"action": "add_eigenform", "type": "choice", "key": "q2", "label": "Q2: ...",
+         "config": {"options": ["A", "B", "C"]}},
+    ]
+    return {"message": "Generated 2 questions", "structural_actions": actions}
+```
+
+When PageForm processes the action response, it intercepts `structural_actions`, applies each one, and strips them from the stored result (they are internal plumbing, not user-visible state). This requires `mutable_structure=True` on the page.
+
 ## Demo Pages
 
 | Page | Key | Description |
@@ -148,7 +243,7 @@ Pages are auto-discovered at startup. No registration needed.
 | Page 2 | `page-2` | TabForm with 3 tabs |
 | Rubik's Cube | `page-3` | RubiksCubeForm showcase |
 | Chain Wizard | `page-4` | ChainForm 4-step sequential |
-| Table | `page-5` | TableForm with dynamic columns/rows |
+| Table | `example-table` | TableForm with dynamic columns/rows |
 | Change Request | `page-6` | MultiForm + ChoiceForm + CheckboxForm + ListForm |
 | Math Test | `math-test` | Mixed eigenforms with ScoreForm grading |
 | Upgraded Math Test | `upgraded-math-test` | All questions in outer ChainForm |
@@ -157,3 +252,6 @@ Pages are auto-discovered at startup. No registration needed.
 | Vendor Assessment | `vendor-assessment` | All 23+ eigenform types, 3-level nesting, computed scores |
 | Switch Demo | `switch-demo` | SwitchForm with ticket type driving BugReport/FeatureRequest/Question |
 | Weird Experiments | `weird-experiments` | ValidationForm, DynamicChoiceForm, ActionForm, RepeaterForm |
+| Mutable Demo | `mutable-demo` | Add/remove/reorder eigenforms at runtime |
+| Survey Builder | `survey-builder` | Self-modifying page — ActionForm generates questions via structural actions |
+| Eigenform Gallery | `eigenform-gallery` | Interactive tutorial covering all 29 eigenform types across 8 tabbed sections |

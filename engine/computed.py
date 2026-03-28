@@ -31,6 +31,10 @@ class ComputedForm(Eigenform):
     display_format: str | None = None
 
     @property
+    def has_data(self) -> bool:
+        return False  # Computed, not user-entered
+
+    @property
     def is_complete(self) -> bool:
         return True
 

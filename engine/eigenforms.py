@@ -84,6 +84,16 @@ class Eigenform:
         return self._store.get(self._scope, self.key)
 
     @property
+    def has_data(self) -> bool:
+        """Whether this eigenform has user-entered data that can be cleared."""
+        return self.value is not None
+
+    def _clear_data(self):
+        """Remove this eigenform's data from the store."""
+        if self._store is not None:
+            self._store.delete(self._scope, self.key)
+
+    @property
     def is_complete(self) -> bool:
         """Whether this eigenform has been completed. Subclasses must implement."""
         raise NotImplementedError
@@ -152,7 +162,16 @@ class Eigenform:
         """Produce the complete canonical representation: state + affordances."""
         state = self._serialize_state()
         state["complete"] = self.is_complete
-        state["affordances"] = [a.serialize() for a in self.get_affordances()]
+        affordances = self.get_affordances()
+        if self.has_data:
+            affordances.append(SimpleButtonAffordance(
+                label="Clear",
+                method="POST",
+                url=self.url,
+                body={"action": "clear"},
+                instruction=f"Clear all data from this {self.label}.",
+            ))
+        state["affordances"] = [a.serialize() for a in affordances]
         return state
 
     def render_from_data(self, data: dict) -> str:
@@ -232,6 +251,9 @@ class Eigenform:
                 if "error" in result:
                     return result
             return result
+        if body.get("action") == "clear":
+            self._clear_data()
+            return self.serialize()
         return self._handle(body)
 
     def _handle(self, body: dict) -> dict:

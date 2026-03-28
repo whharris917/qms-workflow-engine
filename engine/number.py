@@ -93,8 +93,22 @@ class NumberForm(Eigenform):
             result["failed_action"] = body
             return result
         if self.min_val is not None and val < self.min_val:
-            val = self.min_val
+            result = self.serialize()
+            result["error"] = f"Value {val} is below minimum {self.min_val}"
+            result["failed_action"] = body
+            return result
         if self.max_val is not None and val > self.max_val:
-            val = self.max_val
+            result = self.serialize()
+            result["error"] = f"Value {val} is above maximum {self.max_val}"
+            result["failed_action"] = body
+            return result
+        if self.step is not None:
+            base = self.min_val if self.min_val is not None else 0
+            remainder = abs((val - base) % self.step)
+            if min(remainder, self.step - remainder) > 1e-9:
+                result = self.serialize()
+                result["error"] = f"Value {val} is not a valid step (step {self.step} from {base})"
+                result["failed_action"] = body
+                return result
         self._store.set(self._scope, self.key, val)
         return self.serialize()

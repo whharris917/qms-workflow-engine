@@ -330,28 +330,27 @@ def _render_small_button(label: str, url: str, endpoint: str, body: dict) -> str
 
 
 def _render_number_input(label: str, url: str, endpoint: str, hints: dict) -> str:
-    min_attr = f' min="{hints["min"]}"' if hints.get("min") is not None else ""
-    max_attr = f' max="{hints["max"]}"' if hints.get("max") is not None else ""
-    step_attr = f' step="{hints["step"]}"' if hints.get("step") is not None else ""
+    # type="text" with inputmode="decimal" — gives numeric keyboard on mobile
+    # without any browser-side validation. Server validates and returns
+    # structured errors via the feedback banner.
     return (
         f'<form style="display: inline" onsubmit="fetch(\'{url}\','
         f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-        f'body:JSON.stringify({{value:parseFloat(this.elements.value.value)}})}}).then(()=>location.reload()); return false">'
-        f'<input name="value" type="number"{min_attr}{max_attr}{step_attr} style="width: 120px;" />'
+        f'body:JSON.stringify({{value:this.elements.value.value}})}}).then(()=>location.reload()); return false">'
+        f'<input name="value" type="text" inputmode="decimal" style="width: 120px;" />'
         f' <button type="submit" title="{escape(endpoint)}">{escape(label)}</button>'
         f'</form>'
     )
 
 
 def _render_date_input(label: str, url: str, endpoint: str, hints: dict) -> str:
+    # No min/max HTML attributes — server validates and returns structured errors.
     input_type = "datetime-local" if hints.get("include_time") else "date"
-    min_attr = f' min="{escape(hints["min"])}"' if hints.get("min") else ""
-    max_attr = f' max="{escape(hints["max"])}"' if hints.get("max") else ""
     return (
         f'<form style="display: inline" onsubmit="fetch(\'{url}\','
         f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
         f'body:JSON.stringify({{value:this.elements.value.value}})}}).then(()=>location.reload()); return false">'
-        f'<input name="value" type="{input_type}"{min_attr}{max_attr} />'
+        f'<input name="value" type="{input_type}" />'
         f' <button type="submit" title="{escape(endpoint)}">{escape(label)}</button>'
         f'</form>'
     )

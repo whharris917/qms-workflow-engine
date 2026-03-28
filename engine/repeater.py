@@ -31,6 +31,10 @@ class EntryGroup(Eigenform):
     eigenforms: list[Eigenform] = field(default_factory=list)
 
     @property
+    def has_data(self) -> bool:
+        return False  # Internal container; parent RepeaterForm handles clearing
+
+    @property
     def children(self) -> list[Eigenform]:
         return self.eigenforms
 
@@ -81,6 +85,17 @@ class RepeaterForm(Eigenform):
         desc = super().to_descriptor()
         desc["template"] = [ef.to_descriptor() for ef in self.template]
         return desc
+
+    @property
+    def has_data(self) -> bool:
+        return len(self._entry_ids) > 0
+
+    def _clear_data(self):
+        """Clear all entries and their sub-scoped data."""
+        for entry_id in self._entry_ids:
+            self._store.clear_scope(f"{self.key}/{entry_id}")
+        self._store.delete(self._scope, self.key)
+        self._rebuild_entries()
 
     @property
     def _structural_state(self) -> dict:

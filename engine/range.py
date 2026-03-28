@@ -97,6 +97,15 @@ class RangeForm(Eigenform):
             result["error"] = f"Invalid number: {body.get('value')}"
             result["failed_action"] = body
             return result
-        val = max(self.min_val, min(self.max_val, val))
+        if val < self.min_val:
+            result = self.serialize()
+            result["error"] = f"Value {val} is below minimum {self.min_val}"
+            result["failed_action"] = body
+            return result
+        if val > self.max_val:
+            result = self.serialize()
+            result["error"] = f"Value {val} is above maximum {self.max_val}"
+            result["failed_action"] = body
+            return result
         self._store.set(self._scope, self.key, val)
         return self.serialize()
