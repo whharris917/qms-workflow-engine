@@ -268,7 +268,7 @@ class TextForm(Eigenform):
 
     @property
     def is_complete(self) -> bool:
-        return self.value is not None
+        return self.value is not None and self.value != ""
 
     def _serialize_state(self) -> dict:
         return {

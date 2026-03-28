@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import json
 from dataclasses import dataclass, field
 from html import escape
 from pathlib import Path
@@ -35,8 +36,6 @@ class PageForm(Eigenform):
     # Preserved during bind() — unbound seed eigenforms for callable matching
     _seed: list[Eigenform] = field(default_factory=list, repr=False)
 
-    # Transient feedback from the most recent action (not persisted to store)
-    _feedback: dict | None = field(default=None, repr=False)
 
     @property
     def children(self) -> list[Eigenform]:
@@ -139,13 +138,38 @@ class PageForm(Eigenform):
         ]
         return self.serialize()
 
+    def _get_feedback(self) -> dict:
+        """Read the feedback structure from the store."""
+        fb = self._store.get(self._scope, "__feedback") if self._store else None
+        if fb and isinstance(fb, dict) and "errors" in fb:
+            return fb
+        return {"errors": {}, "success": None}
+
     def _set_feedback(self, status: str, message: str, target: str | None = None):
-        self._feedback = {
-            "status": status,
-            "message": message,
-            "target": target,
-            "timestamp": datetime.datetime.now().isoformat(timespec="seconds"),
-        }
+        now = datetime.datetime.now().isoformat(timespec="seconds")
+        fb = self._get_feedback()
+
+        if target is None:
+            # Page-level action: fresh start
+            fb = {"errors": {}, "success": None}
+            if status == "error":
+                fb["errors"]["__page"] = {"message": message, "timestamp": now}
+            else:
+                fb["success"] = {"message": message, "timestamp": now}
+        elif status == "error":
+            fb["success"] = None  # Error replaces previous success
+            fb["errors"][target] = {"message": message, "timestamp": now}
+        else:
+            fb["errors"].pop(target, None)  # Success clears error for this target
+            fb["success"] = {"message": message, "target": target, "timestamp": now}
+
+        self._store.set(self._scope, "__feedback", fb)
+
+    def _dismiss_feedback(self, target: str):
+        """Remove a specific error from the feedback."""
+        fb = self._get_feedback()
+        fb["errors"].pop(target, None)
+        self._store.set(self._scope, "__feedback", fb)
 
     _PAGE_ACTION_MESSAGES = {
         "reset": "Page reset.",
@@ -185,15 +209,27 @@ class PageForm(Eigenform):
         }
 
     def get_affordances(self) -> list[Affordance]:
-        affs = [
-            SimpleButtonAffordance(
+        affs = []
+
+        # Dismiss affordances for active errors
+        fb = self._get_feedback()
+        for target in fb["errors"]:
+            affs.append(SimpleButtonAffordance(
+                label=f"Dismiss error ({target})",
+                method="POST",
+                url=self._url_prefix,
+                body={"action": "dismiss_feedback", "target": target},
+                instruction=f"Dismiss the error for '{target}'.",
+            ))
+
+        affs.append(SimpleButtonAffordance(
                 label="Reset Page",
                 method="POST",
                 url=self._url_prefix,
                 body={"action": "reset"},
                 instruction="Clear all state on this page.",
             )
-        ]
+        )
 
         if self.mutable_structure:
             from engine.registry import get_registry
@@ -258,9 +294,14 @@ class PageForm(Eigenform):
 
     def serialize(self) -> dict:
         state = self._serialize_state()
-        if self._feedback:
-            state["feedback"] = self._feedback
-            self._feedback = None  # One-shot: consumed after first serialize
+        fb = self._get_feedback()
+        if fb["errors"] or fb["success"]:
+            state["feedback"] = {
+                "errors": [
+                    {"target": t, **v} for t, v in fb["errors"].items()
+                ],
+                "success": fb["success"],
+            }
         state["eigenforms"] = [s for ef in self.eigenforms if (s := ef.serialize()) is not None]
         state["complete"] = self.is_complete
         state["affordances"] = [a.serialize() for a in self.get_affordances()]
@@ -272,29 +313,68 @@ class PageForm(Eigenform):
         if data.get("instruction"):
             html += f'<p>{escape(data["instruction"])}</p>'
 
-        # Feedback banner
+        # Feedback banners
         fb = data.get("feedback")
         if fb:
-            is_error = fb["status"] == "error"
-            bg = "#fdecea" if is_error else "#edf7ed"
-            border = "#f5c6cb" if is_error else "#c3e6cb"
-            color = "#721c24" if is_error else "#155724"
-            icon = "&#10007;" if is_error else "&#10003;"
-            label = "Error" if is_error else "OK"
-            target = f' <span style="opacity: 0.7;">({escape(fb["target"])})</span>' if fb.get("target") else ""
-            html += (
-                f'<div style="background: {bg}; border: 1px solid {border}; color: {color};'
-                f' padding: 8px 12px; margin: 8px 0 12px 0; border-radius: 4px;'
-                f' display: flex; justify-content: space-between; align-items: center;">'
-                f'<span><strong>{icon} {label}:</strong> {escape(fb["message"])}{target}</span>'
-                f'<span style="opacity: 0.5; font-size: 0.85em;">{escape(fb.get("timestamp", ""))}</span>'
-                f'</div>'
-            )
+            affs = data.get("affordances", [])
+
+            # Index dismiss affordances by target for inline rendering
+            dismiss_affs = {}
+            for aff in affs:
+                body = aff.get("body", {})
+                if body.get("action") == "dismiss_feedback":
+                    dismiss_affs[body.get("target", "")] = aff
+
+            # Persistent errors (each with dismiss button from affordance)
+            for err in fb.get("errors", []):
+                target = err.get("target", "")
+                target_label = f' <span style="opacity: 0.7;">({escape(target)})</span>' if target else ""
+                dismiss_html = ""
+                aff = dismiss_affs.get(target)
+                if aff:
+                    Eigenform.mark_rendered(aff)
+                    dismiss_body = json.dumps(aff["body"])
+                    endpoint = f'{aff["method"]} {aff["url"]}'
+                    tooltip = f'{escape(endpoint)} {escape(dismiss_body)}'
+                    dismiss_html = (
+                        f'<button onclick="fetch(\'{aff["url"]}\','
+                        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+                        f'body:JSON.stringify({escape(dismiss_body)})}}).then(()=>location.reload())"'
+                        f' style="cursor: pointer; font-size: 11px; padding: 1px 6px;'
+                        f' background: transparent; border: 1px solid #c88; color: #721c24;'
+                        f' border-radius: 3px;" title="{tooltip}">&#10005;</button>'
+                    )
+                html += (
+                    f'<div style="background: #fdecea; border: 1px solid #f5c6cb; color: #721c24;'
+                    f' padding: 8px 12px; margin: 4px 0; border-radius: 4px;'
+                    f' display: flex; justify-content: space-between; align-items: center;">'
+                    f'<span><strong>&#10007; Error:</strong> {escape(err["message"])}{target_label}</span>'
+                    f'<span style="display: flex; align-items: center; gap: 8px;">'
+                    f'<span style="opacity: 0.5; font-size: 0.85em;">{escape(err.get("timestamp", ""))}</span>'
+                    f'{dismiss_html}'
+                    f'</span></div>'
+                )
+            # Latest success
+            succ = fb.get("success")
+            if succ:
+                target = succ.get("target", "")
+                target_label = f' <span style="opacity: 0.7;">({escape(target)})</span>' if target else ""
+                html += (
+                    f'<div style="background: #edf7ed; border: 1px solid #c3e6cb; color: #155724;'
+                    f' padding: 8px 12px; margin: 4px 0; border-radius: 4px;'
+                    f' display: flex; justify-content: space-between; align-items: center;">'
+                    f'<span><strong>&#10003; OK:</strong> {escape(succ["message"])}{target_label}</span>'
+                    f'<span style="opacity: 0.5; font-size: 0.85em;">{escape(succ.get("timestamp", ""))}</span>'
+                    f'</div>'
+                )
+            if fb.get("errors") or succ:
+                html += '<div style="margin-bottom: 8px;"></div>'
 
         html += "".join(ef.render() for ef in self.eigenforms)
         html += '<div style="margin-top: 12px;">'
         for aff in data.get("affordances", []):
-            html += render_affordance_html(aff)
+            if not aff.get("_rendered"):
+                html += render_affordance_html(aff)
         html += '</div>'
         return html
 
@@ -335,6 +415,11 @@ class PageForm(Eigenform):
     def _handle(self, body: dict) -> dict:
         """Handle page-level actions."""
         action = body.get("action", "")
+
+        if action == "dismiss_feedback":
+            target = body.get("target", "")
+            self._dismiss_feedback(target)
+            return self.serialize()
 
         if action == "reset":
             structure = self._store.get(self._scope, "__structure")

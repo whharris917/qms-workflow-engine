@@ -77,6 +77,23 @@ class NumberForm(Eigenform):
         html = f'<h3>{escape(data["label"])}</h3>'
         if data.get("instruction"):
             html += f'<p>{escape(data["instruction"])}</p>'
+
+        # Constraints summary
+        constraints = []
+        if data.get("min") is not None:
+            constraints.append(f'min: {data["min"]}')
+        if data.get("max") is not None:
+            constraints.append(f'max: {data["max"]}')
+        if data.get("step") is not None:
+            constraints.append(f'step: {data["step"]}')
+        if data.get("integer"):
+            constraints.append("integer")
+        if constraints:
+            html += (
+                f'<p style="color: #666; font-size: 0.9em; margin: 2px 0;">'
+                f'{escape(", ".join(constraints))}</p>'
+            )
+
         val = data["value"]
         html += f'<p><strong>Value:</strong> {escape(str(val if val is not None else "None"))}</p>'
         for aff in data.get("affordances", []):
