@@ -77,6 +77,11 @@ class RepeaterForm(Eigenform):
     # Populated at bind time
     _entry_groups: list[EntryGroup] = field(default_factory=list, repr=False)
 
+    def to_descriptor(self) -> dict:
+        desc = super().to_descriptor()
+        desc["template"] = [ef.to_descriptor() for ef in self.template]
+        return desc
+
     @property
     def _structural_state(self) -> dict:
         stored = self.value

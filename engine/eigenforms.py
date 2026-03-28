@@ -17,6 +17,7 @@ without any external input.
 from __future__ import annotations
 
 import copy
+import dataclasses
 import json
 from dataclasses import dataclass, field
 from html import escape
@@ -24,6 +25,20 @@ from typing import Any
 
 from engine.affordances import Affordance, CheckboxAffordance, SetValueAffordance, SimpleButtonAffordance
 from engine.store import Store
+
+# Fields that belong to the base protocol, not type-specific config
+_BASE_FIELDS = frozenset({"key", "label", "instruction", "_store", "_scope", "_url_prefix"})
+
+
+def _is_json_safe(val) -> bool:
+    """Check if a value can survive a JSON round-trip."""
+    if val is None or isinstance(val, (bool, int, float, str)):
+        return True
+    if isinstance(val, (list, tuple)):
+        return all(_is_json_safe(v) for v in val)
+    if isinstance(val, dict):
+        return all(isinstance(k, str) and _is_json_safe(v) for k, v in val.items())
+    return False
 
 
 @dataclass
@@ -88,6 +103,42 @@ class Eigenform:
         """The eigenform's type name, derived from the class."""
         name = type(self).__name__
         return name.removesuffix("Form").lower()
+
+    # --- Structural descriptors (Phase C) ---
+
+    def _descriptor_config(self) -> dict:
+        """Auto-extract serializable config from dataclass fields.
+
+        Returns a dict of field_name -> value for all fields that are
+        JSON-safe and not part of the base Eigenform protocol. Private
+        fields (starting with _) are excluded.
+
+        Subclasses may override to handle non-standard fields (e.g.,
+        FieldDescriptor lists, callable-bearing fields).
+        """
+        config = {}
+        for f in dataclasses.fields(type(self)):
+            if f.name in _BASE_FIELDS or f.name.startswith("_"):
+                continue
+            val = getattr(self, f.name)
+            if _is_json_safe(val):
+                config[f.name] = val
+        return config
+
+    def to_descriptor(self) -> dict:
+        """Serialize this eigenform's structural description.
+
+        Returns a dict that, combined with the registry and optionally
+        a seed eigenform, can reconstruct this eigenform. Containers
+        override to include children.
+        """
+        desc = {"type": self.form, "key": self.key, "label": self.label}
+        if self.instruction:
+            desc["instruction"] = self.instruction
+        config = self._descriptor_config()
+        if config:
+            desc["config"] = config
+        return desc
 
     def _serialize_state(self) -> dict:
         """Serialize this eigenform's state fields. Subclasses implement this."""

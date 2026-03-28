@@ -24,6 +24,12 @@ class Store:
         self._data[scope][key] = value
         self._save()
 
+    def delete(self, scope: str, key: str):
+        """Remove a single key from a scope."""
+        if scope in self._data and key in self._data[scope]:
+            del self._data[scope][key]
+            self._save()
+
     def clear_scope(self, scope: str):
         """Remove all data for a scope."""
         if scope in self._data:

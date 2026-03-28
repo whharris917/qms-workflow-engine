@@ -24,6 +24,12 @@ class VisibilityForm(Eigenform):
     depends_on: str = ""
     visible_when: Any = None  # single value or list of values
 
+    def to_descriptor(self) -> dict:
+        desc = super().to_descriptor()
+        if self.eigenform:
+            desc["eigenform"] = self.eigenform.to_descriptor()
+        return desc
+
     @property
     def children(self) -> list:
         return [self.eigenform] if self.eigenform else []

@@ -60,6 +60,18 @@ class MultiForm(Eigenform):
     """
     fields: list[FieldDescriptor] = field(default_factory=list)
 
+    def _descriptor_config(self) -> dict:
+        """Serialize FieldDescriptors to plain dicts."""
+        return {
+            "fields": [
+                {k: v for k, v in {
+                    "key": fd.key, "label": fd.label, "type": fd.type,
+                    "instruction": fd.instruction, "options": fd.options,
+                }.items() if v is not None}
+                for fd in self.fields
+            ]
+        }
+
     @property
     def values(self) -> dict:
         stored = self.value

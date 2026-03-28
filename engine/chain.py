@@ -21,6 +21,11 @@ class ChainForm(Eigenform):
     """A sequence of eigenforms, auto-advancing through them one at a time."""
     steps: list[Eigenform] = field(default_factory=list)
 
+    def to_descriptor(self) -> dict:
+        desc = super().to_descriptor()
+        desc["steps"] = [ef.to_descriptor() for ef in self.steps]
+        return desc
+
     @property
     def children(self) -> list[Eigenform]:
         return self.steps

@@ -22,6 +22,11 @@ class TabForm(Eigenform):
     """
     tabs: dict[str, Eigenform] = field(default_factory=dict)  # {tab_key: eigenform}
 
+    def to_descriptor(self) -> dict:
+        desc = super().to_descriptor()
+        desc["tabs"] = {k: v.to_descriptor() for k, v in self.tabs.items()}
+        return desc
+
     @property
     def children(self) -> list[Eigenform]:
         return list(self.tabs.values())

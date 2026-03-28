@@ -38,6 +38,11 @@ class AccordionForm(Eigenform):
     """A container with collapsible sections."""
     sections: dict[str, Eigenform] = field(default_factory=dict)
 
+    def to_descriptor(self) -> dict:
+        desc = super().to_descriptor()
+        desc["sections"] = {k: v.to_descriptor() for k, v in self.sections.items()}
+        return desc
+
     @property
     def children(self) -> list[Eigenform]:
         return list(self.sections.values())

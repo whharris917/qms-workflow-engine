@@ -50,6 +50,11 @@ class GroupForm(Eigenform):
     """A named group of eigenforms. The simplest container."""
     eigenforms: list[Eigenform] = field(default_factory=list)
 
+    def to_descriptor(self) -> dict:
+        desc = super().to_descriptor()
+        desc["eigenforms"] = [ef.to_descriptor() for ef in self.eigenforms]
+        return desc
+
     @property
     def children(self) -> list[Eigenform]:
         return self.eigenforms

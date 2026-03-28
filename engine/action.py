@@ -124,9 +124,13 @@ class ActionForm(Eigenform):
             return result
         try:
             fn_result = self.action_fn(context, self._store, self._scope)
+            # Strip structural_actions from stored result — it's internal plumbing
+            stored_result = fn_result
+            if isinstance(fn_result, dict) and "structural_actions" in fn_result:
+                stored_result = {k: v for k, v in fn_result.items() if k != "structural_actions"}
             self._store.set(self._scope, self.key, {
                 "status": "success",
-                "result": fn_result,
+                "result": stored_result,
                 "executed_at": datetime.now(timezone.utc).isoformat(),
             })
         except Exception as e:
@@ -135,7 +139,11 @@ class ActionForm(Eigenform):
                 "error": str(e),
                 "executed_at": datetime.now(timezone.utc).isoformat(),
             })
-        return self.serialize()
+        result = self.serialize()
+        # Pass structural actions up to the page (Phase E)
+        if isinstance(fn_result, dict) and "structural_actions" in fn_result:
+            result["_structural_actions"] = fn_result["structural_actions"]
+        return result
 
     def render_from_data(self, data: dict) -> str:
         from engine.affordances import render_affordance_html
