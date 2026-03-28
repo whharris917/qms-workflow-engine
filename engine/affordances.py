@@ -171,11 +171,13 @@ def _render_checkbox(url: str, endpoint: str, items: dict) -> str:
     parts = []
     for item_key, checked in items.items():
         checked_attr = " checked" if checked else ""
+        key_escaped = item_key.replace("\\", "\\\\").replace("'", "\\'")
         parts.append(
             f'<label style="display: block; cursor: pointer;">'
-            f'<input type="checkbox"{checked_attr} onchange="'
+            f'<input type="checkbox"{checked_attr} autocomplete="off" onchange="'
+            f"var b={{}};b['{key_escaped}']=this.checked;"
             f"fetch('{url}',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
-            f"body:JSON.stringify({{{item_key}:this.checked}})}}).then(()=>location.reload())"
+            f"body:JSON.stringify(b)}}).then(()=>location.reload())"
             f'" title="{escape(endpoint)} {escape(json.dumps({item_key: not checked}))}"'
             f' /> {escape(item_key)}'
             f'</label>'

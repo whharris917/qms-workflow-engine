@@ -309,8 +309,12 @@ class TextForm(Eigenform):
 class CheckboxForm(Eigenform):
     """Multi-select: a set of items, each independently selectable.
 
-    Incomplete until at least one item is checked. Include an "N/A" item
-    if it's valid for none of the others to apply.
+    Requires explicit confirmation via a "Done" action to be considered
+    complete. This prevents premature auto-advance in ChainForm when
+    the user has only checked one item but intends to check more.
+
+    Done with no items checked means "none of these apply."
+    Toggling any item after confirmation clears the confirmed state.
     """
     items: list[str] = field(default_factory=list)
 
@@ -321,14 +325,14 @@ class CheckboxForm(Eigenform):
         return {item: stored.get(item, False) for item in self.items}
 
     @property
-    def na(self) -> bool:
-        """Whether N/A has been selected."""
+    def confirmed(self) -> bool:
+        """Whether the selection has been explicitly confirmed."""
         stored = self.value or {}
-        return bool(stored.get("__na"))
+        return bool(stored.get("__confirmed"))
 
     @property
     def is_complete(self) -> bool:
-        return self.na or any(self.checked.values())
+        return self.confirmed
 
     def _serialize_state(self) -> dict:
         return {
@@ -337,21 +341,11 @@ class CheckboxForm(Eigenform):
             "label": self.label,
             "instruction": self.instruction,
             "items": self.checked,
-            "na": self.na,
+            "confirmed": self.confirmed,
         }
 
     def get_affordances(self) -> list[Affordance]:
-        if self.na:
-            return [
-                SimpleButtonAffordance(
-                    label="Clear N/A",
-                    method="POST",
-                    url=self.url,
-                    body={"action": "clear_na"},
-                    instruction="Clear N/A and allow item selection.",
-                )
-            ]
-        return [
+        affs = [
             CheckboxAffordance(
                 label=f"Set {self.label}",
                 method="POST",
@@ -360,30 +354,31 @@ class CheckboxForm(Eigenform):
                 instruction="Set one or more items. Omitted items are unchanged.",
                 items=self.checked,
             ),
-            SimpleButtonAffordance(
-                label="N/A",
+        ]
+        if not self.confirmed:
+            affs.append(SimpleButtonAffordance(
+                label="Done",
                 method="POST",
                 url=self.url,
-                body={"action": "na"},
-                instruction="Mark as not applicable. Clears all selections.",
-            ),
-        ]
+                body={"action": "done"},
+                instruction="Confirm the current selection (or none selected = none apply).",
+            ))
+        return affs
 
     def _handle(self, body: dict) -> dict:
         action = body.get("action")
-        if action == "na":
-            # Clear all items and set N/A
-            cleared = {item: False for item in self.items}
-            cleared["__na"] = True
-            self._store.set(self._scope, self.key, cleared)
-        elif action == "clear_na":
-            # Clear N/A, keep items at false
-            cleared = {item: False for item in self.items}
-            self._store.set(self._scope, self.key, cleared)
+        if action == "done":
+            stored = dict(self.value or {})
+            stored["__confirmed"] = True
+            self._store.set(self._scope, self.key, stored)
         else:
             current = self.checked
+            changed = False
             for item_key, value in body.items():
                 if item_key in current:
                     current[item_key] = value
+                    changed = True
+            if changed:
+                current["__confirmed"] = False
             self._store.set(self._scope, self.key, current)
         return self.serialize()

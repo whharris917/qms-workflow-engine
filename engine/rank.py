@@ -5,34 +5,41 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from html import escape
-from typing import Any
-
 from engine.affordances import Affordance, SimpleButtonAffordance
 from engine.eigenforms import Eigenform
 
 
-class SetRankAffordance(Affordance):
-    """An affordance to submit the full ordering at once (for agents)."""
-
-    def _render_hints(self) -> dict:
-        return {"type": "button"}
-
-
 @dataclass
 class RankForm(Eigenform):
-    """Rank a fixed set of items by reordering them."""
+    """Rank a fixed set of items by reordering them.
+
+    Requires explicit confirmation via "Done" to be considered complete.
+    This prevents premature auto-advance in ChainForm when the user
+    has only moved one item but intends to make more adjustments.
+    """
     items: list[str] = field(default_factory=list)
 
     @property
-    def current_order(self) -> list[str]:
+    def _state(self) -> dict:
         stored = self.value
-        if stored and isinstance(stored, list) and set(stored) == set(self.items):
+        if stored and isinstance(stored, dict):
             return stored
+        return {}
+
+    @property
+    def current_order(self) -> list[str]:
+        order = self._state.get("order")
+        if order and isinstance(order, list) and set(order) == set(self.items):
+            return order
         return list(self.items)
 
     @property
+    def confirmed(self) -> bool:
+        return bool(self._state.get("__confirmed"))
+
+    @property
     def is_complete(self) -> bool:
-        return self.value is not None
+        return self.confirmed
 
     def _serialize_state(self) -> dict:
         return {
@@ -41,8 +48,14 @@ class RankForm(Eigenform):
             "label": self.label,
             "instruction": self.instruction,
             "items": self.current_order,
-            "ranked": self.value is not None,
+            "confirmed": self.confirmed,
         }
+
+    def _save(self, order: list[str], confirmed: bool):
+        self._store.set(self._scope, self.key, {
+            "order": order,
+            "__confirmed": confirmed,
+        })
 
     def get_affordances(self) -> list[Affordance]:
         order = self.current_order
@@ -64,14 +77,14 @@ class RankForm(Eigenform):
                     body={"action": "move_down", "item": item},
                     instruction=f"Move '{item}' down one position.",
                 ))
-        items_str = ", ".join(f'"{item}"' for item in self.items)
-        affordances.append(SetRankAffordance(
-            label="Set Order",
-            method="POST",
-            url=self.url,
-            body={"action": "set_order", "order": f"<[{items_str}]>"},
-            instruction=f"Submit the full ordering as a JSON array. Must be a permutation of the items.",
-        ))
+        if not self.confirmed:
+            affordances.append(SimpleButtonAffordance(
+                label="Done",
+                method="POST",
+                url=self.url,
+                body={"action": "done"},
+                instruction="Confirm the current ordering.",
+            ))
         return affordances
 
     def render_from_data(self, data: dict) -> str:
@@ -93,12 +106,14 @@ class RankForm(Eigenform):
                     arrow = "&#9650;" if body["action"] == "move_up" else "&#9660;"
                     Eigenform.mark_rendered(aff)
                     body_js = json.dumps(body).replace('"', '&quot;')
+                    endpoint = f'{aff["method"]} {aff["url"]}'
+                    tooltip = f'{escape(endpoint)} {escape(json.dumps(body))}'
                     html += (
                         f'<button onclick="fetch(\'{aff["url"]}\','
                         f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
                         f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
                         f' style="cursor: pointer; font-size: 11px; width: 24px; height: 24px; margin: 0 1px;"'
-                        f' title="{escape(aff.get("instruction", ""))}">'
+                        f' title="{tooltip}">'
                         f'{arrow}</button>'
                     )
             html += '</li>'
@@ -115,13 +130,17 @@ class RankForm(Eigenform):
         action = body.get("action")
         order = self.current_order
 
-        if action == "move_up":
+        if action == "done":
+            self._save(order, confirmed=True)
+            return self.serialize()
+
+        elif action == "move_up":
             item = body.get("item")
             if item in order:
                 idx = order.index(item)
                 if idx > 0:
                     order[idx], order[idx - 1] = order[idx - 1], order[idx]
-            self._store.set(self._scope, self.key, order)
+            self._save(order, confirmed=False)
             return self.serialize()
 
         elif action == "move_down":
@@ -130,18 +149,8 @@ class RankForm(Eigenform):
                 idx = order.index(item)
                 if idx < len(order) - 1:
                     order[idx], order[idx + 1] = order[idx + 1], order[idx]
-            self._store.set(self._scope, self.key, order)
+            self._save(order, confirmed=False)
             return self.serialize()
-
-        elif action == "set_order":
-            new_order = body.get("order")
-            if isinstance(new_order, list) and set(new_order) == set(self.items):
-                self._store.set(self._scope, self.key, new_order)
-                return self.serialize()
-            result = self.serialize()
-            result["error"] = f"Order must be a permutation of {self.items}"
-            result["failed_action"] = body
-            return result
 
         result = self.serialize()
         result["error"] = f"Unknown action: {action}"
