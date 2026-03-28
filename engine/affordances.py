@@ -204,11 +204,21 @@ def _render_radio(url: str, endpoint: str, options: list, current: str | None) -
 
 def _render_multi_field(label: str, url: str, endpoint: str, fields: list, values: dict) -> str:
     js_keys = []
+
+    # Tooltip updater: rebuild body from all fields, update button title
+    def make_tooltip_js():
+        js = "var f=this.form;var b={};"
+        for k in js_keys:
+            js += f"b['{k}']=f.elements['{k}'].value;"
+        js += f"f.querySelector('button[type=submit]').title='{escape(endpoint)} '+JSON.stringify(b)"
+        return js
+
     inputs = ""
     for fd in fields:
         current = values.get(fd["key"])
         display = escape(str(current)) if current is not None else ""
         fd_type = fd.get("type", "text")
+        js_keys.append(fd["key"])
 
         if fd_type == "choice":
             options = fd.get("options", [])
@@ -235,11 +245,15 @@ def _render_multi_field(label: str, url: str, endpoint: str, fields: list, value
                 f'style="width: 200px;" /></label>'
                 f'</div>'
             )
-        js_keys.append(fd["key"])
 
     js_build = "var b={};"
     for k in js_keys:
         js_build += f"b['{k}']=this.elements['{k}'].value;"
+
+    # Add oninput/onchange to each input/select after we know all keys
+    tooltip_js = make_tooltip_js()
+    inputs = inputs.replace('<input name=', f'<input oninput="{tooltip_js}" name=')
+    inputs = inputs.replace('<select name=', f'<select onchange="{tooltip_js}" name=')
 
     return (
         f'<form onsubmit="'
@@ -247,7 +261,8 @@ def _render_multi_field(label: str, url: str, endpoint: str, fields: list, value
         f"fetch('{url}',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
         f"body:JSON.stringify(b)}}).then(()=>location.reload()); return false\">"
         f'{inputs}'
-        f'<button type="submit" title="{escape(endpoint)}">{escape(label)}</button>'
+        f'<button type="submit" title="{escape(endpoint)} {escape(json.dumps(values if values else {}))}">'
+        f'{escape(label)}</button>'
         f'</form>'
     )
 
@@ -267,12 +282,20 @@ def _render_text_input_add(label: str, url: str, endpoint: str, body: dict, plac
         js_build += f"b['{k}']='{v}';"
     js_build += f"b['{input_key}']=this.elements.v.value;"
 
+    # Build the oninput tooltip updater using the same body construction
+    js_tooltip = "var b={};"
+    for k, v in fixed_parts.items():
+        js_tooltip += f"b['{k}']='{v}';"
+    js_tooltip += f"b['{input_key}']=this.value;"
+    js_tooltip += f"this.form.querySelector('button[type=submit]').title='{escape(endpoint)} '+JSON.stringify(b)"
+
     return (
         f'<form style="display: inline" onsubmit="'
         f"{js_build}"
         f"fetch('{url}',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
         f"body:JSON.stringify(b)}}).then(()=>location.reload()); return false\">"
-        f'<input name="v" type="text" placeholder="{escape(placeholder or input_key)}" style="width: 160px;" />'
+        f'<input name="v" type="text" placeholder="{escape(placeholder or input_key)}" style="width: 160px;"'
+        f' oninput="{js_tooltip}" />'
         f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps(body))}">'
         f'{escape(label)}</button>'
         f'</form>'
@@ -289,9 +312,21 @@ def _render_parameterized(label: str, url: str, endpoint: str, body: dict, param
     for pk in param_keys:
         js_build += f"b['{pk}']=this.elements['{pk}'].value;"
 
+    # oninput: rebuild body from all form fields, update button title
+    js_tooltip = "var f=this.form;var b={};"
+    for k, v in fixed_parts.items():
+        js_tooltip += f"b['{k}']='{v}';"
+    for pk in param_keys:
+        js_tooltip += f"b['{pk}']=f.elements['{pk}'].value;"
+    js_tooltip += f"f.querySelector('button[type=submit]').title='{escape(endpoint)} '+JSON.stringify(b)"
+
     inputs = ""
     for pk in param_keys:
-        inputs += f'<input name="{escape(pk)}" type="text" placeholder="{escape(pk)}" style="width: 100px; margin-right: 4px;" />'
+        inputs += (
+            f'<input name="{escape(pk)}" type="text" placeholder="{escape(pk)}"'
+            f' style="width: 100px; margin-right: 4px;"'
+            f' oninput="{js_tooltip}" />'
+        )
 
     return (
         f'<div style="margin: 4px 0; padding: 4px 0; border-top: 1px solid #eee;">'
@@ -332,28 +367,32 @@ def _render_small_button(label: str, url: str, endpoint: str, body: dict) -> str
 
 
 def _render_number_input(label: str, url: str, endpoint: str, hints: dict) -> str:
-    # type="text" with inputmode="decimal" — gives numeric keyboard on mobile
-    # without any browser-side validation. Server validates and returns
-    # structured errors via the feedback banner.
     return (
         f'<form style="display: inline" onsubmit="fetch(\'{url}\','
         f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
         f'body:JSON.stringify({{value:this.elements.value.value}})}}).then(()=>location.reload()); return false">'
-        f'<input name="value" type="text" inputmode="decimal" style="width: 120px;" />'
-        f' <button type="submit" title="{escape(endpoint)}">{escape(label)}</button>'
+        f'<input name="value" type="text" inputmode="decimal" style="width: 120px;"'
+        f' oninput="this.nextElementSibling.title='
+        f"'{escape(endpoint)} '+JSON.stringify({{value:this.value}})"
+        f'" />'
+        f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps({"value": ""}))}">'
+        f'{escape(label)}</button>'
         f'</form>'
     )
 
 
 def _render_date_input(label: str, url: str, endpoint: str, hints: dict) -> str:
-    # No min/max HTML attributes — server validates and returns structured errors.
     input_type = "datetime-local" if hints.get("include_time") else "date"
     return (
         f'<form style="display: inline" onsubmit="fetch(\'{url}\','
         f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
         f'body:JSON.stringify({{value:this.elements.value.value}})}}).then(()=>location.reload()); return false">'
-        f'<input name="value" type="{input_type}" />'
-        f' <button type="submit" title="{escape(endpoint)}">{escape(label)}</button>'
+        f'<input name="value" type="{input_type}"'
+        f' onchange="this.nextElementSibling.title='
+        f"'{escape(endpoint)} '+JSON.stringify({{value:this.value}})"
+        f'" />'
+        f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps({"value": ""}))}">'
+        f'{escape(label)}</button>'
         f'</form>'
     )
 
@@ -393,9 +432,13 @@ def _render_range_input(label: str, url: str, endpoint: str, hints: dict) -> str
         f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
         f'body:JSON.stringify({{value:parseFloat(this.elements.value.value)}})}}).then(()=>location.reload()); return false">'
         f'<input name="value" type="range" min="{min_val}" max="{max_val}" step="{step}" value="{default}"'
-        f' oninput="this.nextElementSibling.textContent=this.value" style="width: 200px; vertical-align: middle;" />'
+        f' oninput="this.nextElementSibling.textContent=this.value;'
+        f"this.form.querySelector('button[type=submit]').title="
+        f"'{escape(endpoint)} '+JSON.stringify({{value:parseFloat(this.value)}})"
+        f'" style="width: 200px; vertical-align: middle;" />'
         f'<span style="margin-left: 8px;">{default}</span>'
-        f' <button type="submit" title="{escape(endpoint)}">{escape(label)}</button>'
+        f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps({"value": default}))}">'
+        f'{escape(label)}</button>'
         f'</form>'
     )
 
@@ -406,8 +449,12 @@ def _render_textarea(label: str, url: str, endpoint: str, hints: dict) -> str:
         f'<form onsubmit="fetch(\'{url}\','
         f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
         f'body:JSON.stringify({{value:this.elements.value.value}})}}).then(()=>location.reload()); return false">'
-        f'<textarea name="value" rows="5" style="width: 100%; box-sizing: border-box;"{max_attr}></textarea>'
-        f'<button type="submit" title="{escape(endpoint)}">{escape(label)}</button>'
+        f'<textarea name="value" rows="5" style="width: 100%; box-sizing: border-box;"{max_attr}'
+        f' oninput="this.form.querySelector(\'button[type=submit]\').title='
+        f"'{escape(endpoint)} '+JSON.stringify({{value:this.value}})"
+        f'"></textarea>'
+        f'<button type="submit" title="{escape(endpoint)} {escape(json.dumps({"value": ""}))}">'
+        f'{escape(label)}</button>'
         f'</form>'
     )
 
@@ -436,13 +483,21 @@ def _render_rating(label: str, url: str, endpoint: str, hints: dict) -> str:
 def _render_kv_add(label: str, url: str, endpoint: str, hints: dict) -> str:
     key_label = escape(hints.get("key_label", "Key"))
     value_label = escape(hints.get("value_label", "Value"))
+    tooltip_js = (
+        f"var f=this.form;"
+        f"f.querySelector('button[type=submit]').title="
+        f"'{escape(endpoint)} '+JSON.stringify({{action:'add',key:f.elements.k.value,value:f.elements.v.value}})"
+    )
     return (
         f'<form style="display: inline" onsubmit="'
         f"fetch('{url}',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
         f"body:JSON.stringify({{action:'add',key:this.elements.k.value,value:this.elements.v.value}})}}).then(()=>location.reload()); return false\">"
-        f'<input name="k" type="text" placeholder="{key_label}" style="width: 120px; margin-right: 4px;" />'
-        f'<input name="v" type="text" placeholder="{value_label}" style="width: 160px; margin-right: 4px;" />'
-        f' <button type="submit" title="{escape(endpoint)}">{escape(label)}</button>'
+        f'<input name="k" type="text" placeholder="{key_label}" style="width: 120px; margin-right: 4px;"'
+        f' oninput="{tooltip_js}" />'
+        f'<input name="v" type="text" placeholder="{value_label}" style="width: 160px; margin-right: 4px;"'
+        f' oninput="{tooltip_js}" />'
+        f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps({"action": "add", "key": "", "value": ""}))}">'
+        f'{escape(label)}</button>'
         f'</form>'
     )
 

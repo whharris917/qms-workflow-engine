@@ -152,66 +152,109 @@ class ListForm(Eigenform):
             return html
 
         items = data.get("items", [])
-        if items:
-            # Build lookup of move affordances per item, mark them as rendered
-            from engine.eigenforms import Eigenform
-            move_affs: dict[str, list[dict]] = {}
-            for aff in affs:
-                action = aff.get("body", {}).get("action")
-                if action == "move":
-                    item_id = aff["body"].get("id")
-                    move_affs.setdefault(item_id, []).append(aff)
-                    Eigenform.mark_rendered(aff)
-                elif action in ("edit", "remove"):
-                    Eigenform.mark_rendered(aff)
 
-            # Find the URL from any affordance (they all share it)
-            url = affs[0]["url"] if affs else ""
+        # Build lookups and mark agent-only affordances as rendered
+        from engine.eigenforms import Eigenform
+        move_affs: dict[str, list[dict]] = {}
+        add_aff = None
+        url = affs[0]["url"] if affs else ""
+        for aff in affs:
+            action = aff.get("body", {}).get("action")
+            if action == "move":
+                item_id = aff["body"].get("id")
+                move_affs.setdefault(item_id, []).append(aff)
+                Eigenform.mark_rendered(aff)
+            elif action in ("edit", "remove"):
+                Eigenform.mark_rendered(aff)
+            elif action == "add":
+                add_aff = aff
+                Eigenform.mark_rendered(aff)
 
-            html += '<ol style="margin: 4px 0; padding-left: 24px;">'
-            for idx, item in enumerate(items):
-                item_id = item["id"]
-                item_val = escape(str(item.get("value", "")))
-                html += (
-                    f'<li style="margin: 4px 0; display: flex; align-items: center; gap: 4px;">'
-                    f'<form style="display: inline; margin: 0;" onsubmit="fetch(\'{url}\','
-                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                    f"body:JSON.stringify({{action:'edit',id:'{item_id}',value:this.elements.v.value}})"
-                    f'}}).then(()=>location.reload()); return false">'
-                    f'<input name="v" type="text" value="{item_val}"'
-                    f' style="border: 1px solid #ddd; padding: 2px 4px; width: 200px;" />'
-                    f'</form>'
-                )
-                # Move up/down buttons inline
-                for maff in move_affs.get(item_id, []):
-                    direction = "up" if maff["body"].get("position", 0) < idx else "down"
-                    arrow = "&#9650;" if direction == "up" else "&#9660;"
-                    body_js = json.dumps(maff["body"]).replace('"', '&quot;')
-                    html += (
-                        f'<button onclick="fetch(\'{url}\','
-                        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                        f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
-                        f' style="cursor: pointer; border: 1px solid #ccc; background: #f8f8f8;'
-                        f' width: 24px; height: 24px; font-size: 10px; padding: 0;"'
-                        f' title="{escape(maff.get("instruction", ""))}">{arrow}</button>'
-                    )
-                # Remove button inline
-                body_js = json.dumps({"action": "remove", "id": item_id}).replace('"', '&quot;')
+        endpoint = f'POST {url}'
+        html += '<ol style="margin: 4px 0; padding-left: 24px;">'
+
+        # Existing items
+        for idx, item in enumerate(items):
+            item_id = item["id"]
+            item_val = escape(str(item.get("value", "")))
+            edit_tooltip_js = (
+                f"this.nextElementSibling.title="
+                f"'{escape(endpoint)} '+JSON.stringify({{action:'edit',id:'{item_id}',value:this.value}})"
+            )
+            edit_default = {"action": "edit", "id": item_id, "value": item.get("value", "")}
+            edit_tooltip = f'{escape(endpoint)} {escape(json.dumps(edit_default))}'
+            html += (
+                f'<li style="margin: 4px 0; display: flex; align-items: center; gap: 4px;">'
+                f'<form style="display: inline; margin: 0;" onsubmit="fetch(\'{url}\','
+                f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+                f"body:JSON.stringify({{action:'edit',id:'{item_id}',value:this.elements.v.value}})"
+                f'}}).then(()=>location.reload()); return false">'
+                f'<input name="v" type="text" value="{item_val}"'
+                f' style="border: 1px solid #ddd; padding: 2px 4px; width: 200px;"'
+                f' oninput="{edit_tooltip_js}" />'
+                f' <button type="submit"'
+                f' style="cursor: pointer; border: 1px solid #4a4; background: #efffef;'
+                f' width: 24px; height: 24px; font-size: 14px; padding: 0; color: #2a2;"'
+                f' title="{edit_tooltip}">&#10003;</button>'
+                f'</form>'
+            )
+            # Move up/down buttons inline
+            for maff in move_affs.get(item_id, []):
+                direction = "up" if maff["body"].get("position", 0) < idx else "down"
+                arrow = "&#9650;" if direction == "up" else "&#9660;"
+                body_js = json.dumps(maff["body"]).replace('"', '&quot;')
+                tooltip = f'{escape(endpoint)} {escape(json.dumps(maff["body"]))}'
                 html += (
                     f'<button onclick="fetch(\'{url}\','
                     f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
                     f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
                     f' style="cursor: pointer; border: 1px solid #ccc; background: #f8f8f8;'
-                    f' width: 24px; height: 24px; font-size: 12px; padding: 0; color: #c00;"'
-                    f' title="Remove {escape(item_id)}">x</button>'
+                    f' width: 24px; height: 24px; font-size: 10px; padding: 0;"'
+                    f' title="{tooltip}">{arrow}</button>'
                 )
-                html += f' <span style="font-size: 10px; color: #888;">{escape(item_id)}</span>'
-                html += '</li>'
-            html += '</ol>'
-        else:
-            html += '<p style="color: #888;">No items yet.</p>'
+            # Remove button inline
+            remove_body = {"action": "remove", "id": item_id}
+            body_js = json.dumps(remove_body).replace('"', '&quot;')
+            tooltip = f'{escape(endpoint)} {escape(json.dumps(remove_body))}'
+            html += (
+                f'<button onclick="fetch(\'{url}\','
+                f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+                f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
+                f' style="cursor: pointer; border: 1px solid #ccc; background: #f8f8f8;'
+                f' width: 24px; height: 24px; font-size: 12px; padding: 0; color: #c00;"'
+                f' title="{tooltip}">x</button>'
+            )
+            html += f' <span style="font-size: 10px; color: #888;">{escape(item_id)}</span>'
+            html += '</li>'
 
-        # Bottom controls: render remaining affordances (add, N/A)
+        # Add row — inline text field + green + button
+        if add_aff:
+            add_default = {"action": "add", "value": ""}
+            add_tooltip = f'{escape(endpoint)} {escape(json.dumps(add_default))}'
+            add_tooltip_js = (
+                f"this.nextElementSibling.title="
+                f"'{escape(endpoint)} '+JSON.stringify({{action:'add',value:this.value}})"
+            )
+            html += (
+                f'<li style="margin: 4px 0; display: flex; align-items: center; gap: 4px; list-style: none;">'
+                f'<form style="display: inline; margin: 0;" onsubmit="fetch(\'{url}\','
+                f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+                f"body:JSON.stringify({{action:'add',value:this.elements.v.value}})"
+                f'}}).then(()=>location.reload()); return false">'
+                f'<input name="v" type="text" placeholder="New item"'
+                f' style="border: 1px solid #ddd; padding: 2px 4px; width: 200px;"'
+                f' oninput="{add_tooltip_js}" />'
+                f' <button type="submit"'
+                f' style="cursor: pointer; border: 1px solid #4a4; background: #efffef;'
+                f' width: 24px; height: 24px; font-size: 14px; padding: 0; color: #2a2;"'
+                f' title="{add_tooltip}">+</button>'
+                f'</form>'
+                f'</li>'
+            )
+
+        html += '</ol>'
+
+        # Bottom controls: render remaining affordances (N/A, Clear, etc.)
         html += '<div style="margin-top: 8px;">'
         for aff in affs:
             if not aff.get("_rendered"):
