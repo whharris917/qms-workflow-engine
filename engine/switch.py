@@ -72,11 +72,7 @@ class SwitchForm(Eigenform):
         }
 
     def _serialize_state(self) -> dict:
-        return {
-            "form": self.form,
-            "key": self.key,
-            "label": self.label,
-            "instruction": self.instruction,
+        return self._base_state() | {
             "depends_on": self.depends_on,
             "active_case": self.active_case_key,
             "case_keys": list(self.cases.keys()),

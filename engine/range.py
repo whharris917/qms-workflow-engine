@@ -47,11 +47,7 @@ class RangeForm(Eigenform):
         return self.value is not None
 
     def _serialize_state(self) -> dict:
-        return {
-            "form": self.form,
-            "key": self.key,
-            "label": self.label,
-            "instruction": self.instruction,
+        return self._base_state() | {
             "value": self.value,
             "min": self.min_val,
             "max": self.max_val,
@@ -93,19 +89,10 @@ class RangeForm(Eigenform):
         try:
             val = float(body.get("value"))
         except (TypeError, ValueError):
-            result = self.serialize()
-            result["error"] = f"Invalid number: {body.get('value')}"
-            result["failed_action"] = body
-            return result
+            return self._error(f"Invalid number: {body.get('value')}", body=body)
         if val < self.min_val:
-            result = self.serialize()
-            result["error"] = f"Value {val} is below minimum {self.min_val}"
-            result["failed_action"] = body
-            return result
+            return self._error(f"Value {val} is below minimum {self.min_val}", body=body)
         if val > self.max_val:
-            result = self.serialize()
-            result["error"] = f"Value {val} is above maximum {self.max_val}"
-            result["failed_action"] = body
-            return result
+            return self._error(f"Value {val} is above maximum {self.max_val}", body=body)
         self._store.set(self._scope, self.key, val)
         return self.serialize()

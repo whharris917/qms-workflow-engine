@@ -54,11 +54,7 @@ class ComputedForm(Eigenform):
         computed = self._compute()
         if self.store_result and self._store:
             self._store.set(self._scope, self.key, computed)
-        return {
-            "form": self.form,
-            "key": self.key,
-            "label": self.label,
-            "instruction": self.instruction,
+        return self._base_state() | {
             "computed_value": computed,
             "depends_on": self.depends_on,
             "display_format": self.display_format,

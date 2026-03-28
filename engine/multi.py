@@ -102,11 +102,7 @@ class MultiForm(Eigenform):
             if fd.options:
                 f["options"] = fd.options
             serialized_fields.append(f)
-        return {
-            "form": self.form,
-            "key": self.key,
-            "label": self.label,
-            "instruction": self.instruction,
+        return self._base_state() | {
             "fields": serialized_fields,
         }
 

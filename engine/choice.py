@@ -35,11 +35,7 @@ class ChoiceForm(Eigenform):
         return self.value is not None and self.value in self.options
 
     def _serialize_state(self) -> dict:
-        return {
-            "form": self.form,
-            "key": self.key,
-            "label": self.label,
-            "instruction": self.instruction,
+        return self._base_state() | {
             "value": self.value,
             "options": self.options,
         }

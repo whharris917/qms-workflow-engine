@@ -49,11 +49,7 @@ class DateForm(Eigenform):
 
     def _serialize_state(self) -> dict:
         fmt = "YYYY-MM-DDTHH:MM" if self.include_time else "YYYY-MM-DD"
-        return {
-            "form": self.form,
-            "key": self.key,
-            "label": self.label,
-            "instruction": self.instruction,
+        return self._base_state() | {
             "value": self.value,
             "format": fmt,
             "min": self.min_date,
@@ -91,19 +87,10 @@ class DateForm(Eigenform):
         pattern = DATETIME_RE if self.include_time else DATE_RE
         if not pattern.match(raw):
             fmt = "YYYY-MM-DDTHH:MM" if self.include_time else "YYYY-MM-DD"
-            result = self.serialize()
-            result["error"] = f"Invalid date format. Expected {fmt}, got: {raw}"
-            result["failed_action"] = body
-            return result
+            return self._error(f"Invalid date format. Expected {fmt}, got: {raw}", body=body)
         if self.min_date and raw < self.min_date:
-            result = self.serialize()
-            result["error"] = f"Date {raw} is before minimum {self.min_date}"
-            result["failed_action"] = body
-            return result
+            return self._error(f"Date {raw} is before minimum {self.min_date}", body=body)
         if self.max_date and raw > self.max_date:
-            result = self.serialize()
-            result["error"] = f"Date {raw} is after maximum {self.max_date}"
-            result["failed_action"] = body
-            return result
+            return self._error(f"Date {raw} is after maximum {self.max_date}", body=body)
         self._store.set(self._scope, self.key, raw)
         return self.serialize()

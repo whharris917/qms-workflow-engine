@@ -58,11 +58,7 @@ class ScoreForm(Eigenform):
         answered = sum(1 for r in results if r["answered"])
         correct = sum(1 for r in results if r["correct"])
         pct = round(100 * correct / total) if total and answered == total else None
-        return {
-            "form": self.form,
-            "key": self.key,
-            "label": self.label,
-            "instruction": self.instruction,
+        return self._base_state() | {
             "total": total,
             "answered": answered,
             "correct": correct,

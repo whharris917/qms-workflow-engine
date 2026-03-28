@@ -150,9 +150,25 @@ class Eigenform:
             desc["config"] = config
         return desc
 
+    def _base_state(self) -> dict:
+        """Return the state fields common to all eigenforms."""
+        return {
+            "form": self.form,
+            "key": self.key,
+            "label": self.label,
+            "instruction": self.instruction,
+        }
+
     def _serialize_state(self) -> dict:
         """Serialize this eigenform's state fields. Subclasses implement this."""
         raise NotImplementedError
+
+    def _error(self, msg: str, *, action: str | None = None, body: dict | None = None) -> dict:
+        """Return an error response with the current serialized state plus error metadata."""
+        result = self.serialize()
+        result["error"] = msg
+        result["failed_action"] = action if action is not None else body
+        return result
 
     def get_affordances(self) -> list[Affordance]:
         """Produce the affordances available on this eigenform."""
@@ -271,11 +287,7 @@ class TextForm(Eigenform):
         return self.value is not None and self.value != ""
 
     def _serialize_state(self) -> dict:
-        return {
-            "form": self.form,
-            "key": self.key,
-            "label": self.label,
-            "instruction": self.instruction,
+        return self._base_state() | {
             "value": self.value if self.value is not None else self.default,
         }
 
@@ -335,11 +347,7 @@ class CheckboxForm(Eigenform):
         return self.confirmed
 
     def _serialize_state(self) -> dict:
-        return {
-            "form": self.form,
-            "key": self.key,
-            "label": self.label,
-            "instruction": self.instruction,
+        return self._base_state() | {
             "items": self.checked,
             "confirmed": self.confirmed,
         }

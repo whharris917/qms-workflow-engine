@@ -56,11 +56,7 @@ class DynamicChoiceForm(Eigenform):
         return self.value is not None and self.value in self.current_options
 
     def _serialize_state(self) -> dict:
-        state = {
-            "form": self.form,
-            "key": self.key,
-            "label": self.label,
-            "instruction": self.instruction,
+        state = self._base_state() | {
             "value": self.value,
             "options": self.current_options,
             "depends_on": self.depends_on,
@@ -130,8 +126,5 @@ class DynamicChoiceForm(Eigenform):
         if value in self.current_options:
             self._store.set(self._scope, self.key, value)
         else:
-            result = self.serialize()
-            result["error"] = f"'{value}' is not a valid option."
-            result["failed_action"] = "set"
-            return result
+            return self._error(f"'{value}' is not a valid option.", body=body)
         return self.serialize()

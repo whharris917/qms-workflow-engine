@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from html import escape
-from engine.affordances import Affordance, SimpleButtonAffordance
+from engine.affordances import Affordance, SimpleButtonAffordance, STYLE_ARROW, render_inline_button
 from engine.eigenforms import Eigenform
 
 
@@ -42,11 +42,7 @@ class RankForm(Eigenform):
         return self.confirmed
 
     def _serialize_state(self) -> dict:
-        return {
-            "form": self.form,
-            "key": self.key,
-            "label": self.label,
-            "instruction": self.instruction,
+        return self._base_state() | {
             "items": self.current_order,
             "confirmed": self.confirmed,
         }
@@ -105,7 +101,6 @@ class RankForm(Eigenform):
                 Eigenform.mark_rendered(aff)
 
         url = self.url
-        endpoint = f'POST {url}'
         num_items = len(items)
 
         html += '<ol style="margin: 4px 0; padding-left: 24px;">'
@@ -116,17 +111,7 @@ class RankForm(Eigenform):
                 ("move_down", "&#9660;", idx < num_items - 1),
             ]:
                 if can:
-                    move_body = {"action": direction, "item": item}
-                    body_js = json.dumps(move_body).replace('"', '&quot;')
-                    tooltip = f'{escape(endpoint)} {escape(json.dumps(move_body))}'
-                    html += (
-                        f'<button onclick="fetch(\'{url}\','
-                        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                        f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
-                        f' style="cursor: pointer; font-size: 11px; width: 24px; height: 24px; margin: 0 1px;"'
-                        f' title="{tooltip}">'
-                        f'{arrow}</button>'
-                    )
+                    html += render_inline_button(url, {"action": direction, "item": item}, arrow, STYLE_ARROW)
             html += '</li>'
         html += '</ol>'
 
@@ -163,7 +148,4 @@ class RankForm(Eigenform):
             self._save(order, confirmed=False)
             return self.serialize()
 
-        result = self.serialize()
-        result["error"] = f"Unknown action: {action}"
-        result["failed_action"] = body
-        return result
+        return self._error(f"Unknown action: {action}", body=body)

@@ -67,11 +67,7 @@ class ActionForm(Eigenform):
         return isinstance(val, dict) and val.get("status") == "armed"
 
     def _serialize_state(self) -> dict:
-        state = {
-            "form": self.form,
-            "key": self.key,
-            "label": self.label,
-            "instruction": self.instruction,
+        state = self._base_state() | {
             "enabled": self._enabled,
             "value": self.value,
         }

@@ -42,11 +42,7 @@ class MemoForm(Eigenform):
         return True
 
     def _serialize_state(self) -> dict:
-        return {
-            "form": self.form,
-            "key": self.key,
-            "label": self.label,
-            "instruction": self.instruction,
+        return self._base_state() | {
             "value": self.value,
             "min_length": self.min_length,
             "max_length": self.max_length,
@@ -88,14 +84,8 @@ class MemoForm(Eigenform):
     def _handle(self, body: dict) -> dict:
         val = body.get("value", "")
         if self.min_length is not None and len(val) < self.min_length:
-            result = self.serialize()
-            result["error"] = f"Text is too short ({len(val)} chars). Minimum: {self.min_length}"
-            result["failed_action"] = body
-            return result
+            return self._error(f"Text is too short ({len(val)} chars). Minimum: {self.min_length}", body=body)
         if self.max_length is not None and len(val) > self.max_length:
-            result = self.serialize()
-            result["error"] = f"Text is too long ({len(val)} chars). Maximum: {self.max_length}"
-            result["failed_action"] = body
-            return result
+            return self._error(f"Text is too long ({len(val)} chars). Maximum: {self.max_length}", body=body)
         self._store.set(self._scope, self.key, val)
         return self.serialize()

@@ -75,11 +75,7 @@ class ValidationForm(Eigenform):
 
     def _serialize_state(self) -> dict:
         results = self._validate()
-        return {
-            "form": self.form,
-            "key": self.key,
-            "label": self.label,
-            "instruction": self.instruction,
+        return self._base_state() | {
             "rules": results,
             "all_valid": all(r["status"] != "fail" for r in results),
         }

@@ -7,7 +7,9 @@ from dataclasses import dataclass
 from html import escape
 from typing import Any
 
-from engine.affordances import Affordance
+from engine.affordances import (
+    Affordance, STYLE_CONFIRM, STYLE_REMOVE, render_inline_button,
+)
 from engine.eigenforms import Eigenform
 
 
@@ -50,11 +52,7 @@ class KeyValueForm(Eigenform):
         return all(e.get("key") and e.get("value") for e in entries)
 
     def _serialize_state(self) -> dict:
-        return {
-            "form": self.form,
-            "key": self.key,
-            "label": self.label,
-            "instruction": self.instruction,
+        return self._base_state() | {
             "entries": self.entries,
             "key_label": self.key_label,
             "value_label": self.value_label,
@@ -126,9 +124,6 @@ class KeyValueForm(Eigenform):
             )
             edit_default = {"action": "edit", "id": eid, "key": entry.get("key", ""), "value": entry.get("value", "")}
             edit_tooltip = f'{escape(endpoint)} {escape(json.dumps(edit_default))}'
-            remove_body = {"action": "remove", "id": eid}
-            remove_js = json.dumps(remove_body).replace('"', '&quot;')
-            remove_tooltip = f'{escape(endpoint)} {escape(json.dumps(remove_body))}'
             html += (
                 f'<div style="display: flex; align-items: center; gap: 4px; margin: 2px 0;">'
                 f'<form style="display: contents; margin: 0;" onsubmit="fetch(\'{url}\','
@@ -139,19 +134,12 @@ class KeyValueForm(Eigenform):
                 f' oninput="{edit_tooltip_js}" />'
                 f'<input name="v" type="text" value="{eval_}" style="border: 1px solid #ddd; padding: 2px 4px; flex: 1;"'
                 f' oninput="{edit_tooltip_js}" />'
-                f'<button type="submit"'
-                f' style="cursor: pointer; border: 1px solid #4a4; background: #efffef;'
-                f' width: 24px; height: 24px; font-size: 14px; padding: 0; color: #2a2;"'
+                f'<button type="submit" style="{STYLE_CONFIRM}"'
                 f' title="{edit_tooltip}">&#10003;</button>'
                 f'</form>'
-                f'<button onclick="fetch(\'{url}\','
-                f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                f'body:JSON.stringify({remove_js})}}).then(()=>location.reload())"'
-                f' style="cursor: pointer; border: 1px solid #ccc; background: #f8f8f8;'
-                f' width: 24px; height: 24px; font-size: 12px; padding: 0; color: #c00;"'
-                f' title="{remove_tooltip}">x</button>'
-                f'</div>'
             )
+            html += render_inline_button(url, {"action": "remove", "id": eid}, "x", STYLE_REMOVE)
+            html += '</div>'
 
         # Add row — inline key + value fields + green + button
         add_default = {"action": "add", "key": "", "value": ""}
@@ -171,9 +159,7 @@ class KeyValueForm(Eigenform):
             f' oninput="{add_tooltip_js}" />'
             f'<input name="v" type="text" placeholder="{vl}" style="border: 1px solid #ddd; padding: 2px 4px; flex: 1;"'
             f' oninput="{add_tooltip_js}" />'
-            f'<button type="submit"'
-            f' style="cursor: pointer; border: 1px solid #4a4; background: #efffef;'
-            f' width: 24px; height: 24px; font-size: 14px; padding: 0; color: #2a2;"'
+            f'<button type="submit" style="{STYLE_CONFIRM}"'
             f' title="{add_tooltip}">+</button>'
             f'</form>'
             f'</div>'
@@ -196,10 +182,10 @@ class KeyValueForm(Eigenform):
             k = body.get("key", "")
             v = body.get("value", "")
             if not k or k.startswith("<"):
-                return self._error("add", "Key is required.")
+                return self._error("Key is required.", action=action)
             existing = {e["key"] for e in state["entries"]}
             if k in existing:
-                return self._error("add", f"Key '{k}' already exists.")
+                return self._error(f"Key '{k}' already exists.", action=action)
             eid = f"kv_{state.get('next_id', 0)}"
             state["entries"].append({"id": eid, "key": k, "value": v})
             state["next_id"] = state.get("next_id", 0) + 1
@@ -215,13 +201,13 @@ class KeyValueForm(Eigenform):
                     if k and not k.startswith("<"):
                         existing = {e["key"] for e in state["entries"] if e["id"] != eid}
                         if k in existing:
-                            return self._error("edit", f"Key '{k}' already exists on another entry.")
+                            return self._error(f"Key '{k}' already exists on another entry.", action=action)
                         entry["key"] = k
                     if v and not v.startswith("<"):
                         entry["value"] = v
                     self._store.set(self._scope, self.key, state)
                     return self.serialize()
-            return self._error("edit", f"Entry {eid} not found.")
+            return self._error(f"Entry {eid} not found.", action=action)
 
         elif action == "remove":
             eid = body.get("id")
@@ -229,10 +215,4 @@ class KeyValueForm(Eigenform):
             self._store.set(self._scope, self.key, state)
             return self.serialize()
 
-        return self._error(action, f"Unknown action: {action}")
-
-    def _error(self, action: str, msg: str) -> dict:
-        result = self.serialize()
-        result["error"] = msg
-        result["failed_action"] = action
-        return result
+        return self._error(f"Unknown action: {action}", action=action)

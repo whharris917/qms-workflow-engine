@@ -43,11 +43,7 @@ class RatingForm(Eigenform):
         return self.value is not None
 
     def _serialize_state(self) -> dict:
-        return {
-            "form": self.form,
-            "key": self.key,
-            "label": self.label,
-            "instruction": self.instruction,
+        return self._base_state() | {
             "value": self.value,
             "max_rating": self.max_rating,
             "labels": self.labels,
@@ -89,14 +85,8 @@ class RatingForm(Eigenform):
         try:
             val = int(body.get("value"))
         except (TypeError, ValueError):
-            result = self.serialize()
-            result["error"] = f"Invalid rating: {body.get('value')}"
-            result["failed_action"] = body
-            return result
+            return self._error(f"Invalid rating: {body.get('value')}", body=body)
         if val < 1 or val > self.max_rating:
-            result = self.serialize()
-            result["error"] = f"Rating must be between 1 and {self.max_rating}, got {val}"
-            result["failed_action"] = body
-            return result
+            return self._error(f"Rating must be between 1 and {self.max_rating}, got {val}", body=body)
         self._store.set(self._scope, self.key, val)
         return self.serialize()

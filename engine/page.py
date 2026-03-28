@@ -9,7 +9,12 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
-from engine.affordances import Affordance, SimpleButtonAffordance, SetValueAffordance
+from engine.affordances import (
+    Affordance,
+    SimpleButtonAffordance,
+    SetValueAffordance,
+    render_inline_button,
+)
 from engine.eigenforms import Eigenform
 from engine.store import Store
 
@@ -200,11 +205,7 @@ class PageForm(Eigenform):
         return all(ef.is_complete for ef in self.eigenforms)
 
     def _serialize_state(self) -> dict:
-        return {
-            "form": self.form,
-            "key": self.key,
-            "label": self.label,
-            "instruction": self.instruction,
+        return self._base_state() | {
             "mutable_structure": self.mutable_structure,
         }
 
@@ -326,6 +327,11 @@ class PageForm(Eigenform):
                     dismiss_affs[body.get("target", "")] = aff
 
             # Persistent errors (each with dismiss button from affordance)
+            STYLE_DISMISS = (
+                "cursor: pointer; font-size: 11px; padding: 1px 6px;"
+                " background: transparent; border: 1px solid #c88; color: #721c24;"
+                " border-radius: 3px;"
+            )
             for err in fb.get("errors", []):
                 target = err.get("target", "")
                 target_label = f' <span style="opacity: 0.7;">({escape(target)})</span>' if target else ""
@@ -333,16 +339,8 @@ class PageForm(Eigenform):
                 aff = dismiss_affs.get(target)
                 if aff:
                     Eigenform.mark_rendered(aff)
-                    dismiss_body = json.dumps(aff["body"])
-                    endpoint = f'{aff["method"]} {aff["url"]}'
-                    tooltip = f'{escape(endpoint)} {escape(dismiss_body)}'
-                    dismiss_html = (
-                        f'<button onclick="fetch(\'{aff["url"]}\','
-                        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                        f'body:JSON.stringify({escape(dismiss_body)})}}).then(()=>location.reload())"'
-                        f' style="cursor: pointer; font-size: 11px; padding: 1px 6px;'
-                        f' background: transparent; border: 1px solid #c88; color: #721c24;'
-                        f' border-radius: 3px;" title="{tooltip}">&#10005;</button>'
+                    dismiss_html = render_inline_button(
+                        aff["url"], aff["body"], "&#10005;", STYLE_DISMISS,
                     )
                 html += (
                     f'<div style="background: #fdecea; border: 1px solid #f5c6cb; color: #721c24;'
@@ -400,12 +398,6 @@ class PageForm(Eigenform):
 
     # --- Structural mutation helpers ---
 
-    def _error(self, action: str, msg: str) -> dict:
-        result = self.serialize()
-        result["error"] = msg
-        result["failed_action"] = action
-        return result
-
     def _get_structure(self) -> list[dict]:
         return list(self._store.get(self._scope, "__structure") or [])
 
@@ -432,7 +424,7 @@ class PageForm(Eigenform):
         if not self.mutable_structure and action in (
             "add_eigenform", "remove_eigenform", "move_eigenform", "rebuild_from_seed",
         ):
-            return self._error(action, "Structural mutations not enabled on this page.")
+            return self._error("Structural mutations not enabled on this page.", action=action)
 
         if action == "rebuild_from_seed":
             return self._rebuild_from_seed()
@@ -455,16 +447,17 @@ class PageForm(Eigenform):
         after = body.get("after")
 
         if not type_name or not key:
-            return self._error("add_eigenform", "Both 'type' and 'key' are required.")
+            return self._error("Both 'type' and 'key' are required.", action="add_eigenform")
 
         reg = get_registry()
         if type_name not in reg:
-            return self._error("add_eigenform",
-                               f"Unknown type: {type_name}. Available: {', '.join(reg.available())}")
+            return self._error(
+                               f"Unknown type: {type_name}. Available: {', '.join(reg.available())}",
+                               action="add_eigenform")
 
         existing_keys = {ef.key for ef in self.eigenforms}
         if key in existing_keys:
-            return self._error("add_eigenform", f"Key '{key}' already exists.")
+            return self._error(f"Key '{key}' already exists.", action="add_eigenform")
 
         # Build descriptor
         desc = {"type": type_name, "key": key, "label": label}
@@ -478,7 +471,7 @@ class PageForm(Eigenform):
         if after:
             idx = next((i for i, d in enumerate(structure) if d["key"] == after), None)
             if idx is None:
-                return self._error("add_eigenform", f"Sibling '{after}' not found.")
+                return self._error(f"Sibling '{after}' not found.", action="add_eigenform")
             structure.insert(idx + 1, desc)
         else:
             structure.append(desc)
@@ -506,12 +499,12 @@ class PageForm(Eigenform):
     def _remove_eigenform(self, body: dict) -> dict:
         key = body.get("key")
         if not key:
-            return self._error("remove_eigenform", "'key' is required.")
+            return self._error("'key' is required.", action="remove_eigenform")
 
         # Find the live eigenform to clear its data
         ef = next((e for e in self.eigenforms if e.key == key), None)
         if ef is None:
-            return self._error("remove_eigenform", f"Eigenform '{key}' not found.")
+            return self._error(f"Eigenform '{key}' not found.", action="remove_eigenform")
 
         # Surgically clear only this eigenform's data
         self._clear_eigenform_data(ef)
@@ -528,19 +521,19 @@ class PageForm(Eigenform):
         position = body.get("position")
 
         if not key:
-            return self._error("move_eigenform", "'key' is required.")
+            return self._error("'key' is required.", action="move_eigenform")
         if position is None:
-            return self._error("move_eigenform", "'position' is required.")
+            return self._error("'position' is required.", action="move_eigenform")
 
         try:
             position = int(position)
         except (TypeError, ValueError):
-            return self._error("move_eigenform", f"Invalid position: {position}")
+            return self._error(f"Invalid position: {position}", action="move_eigenform")
 
         structure = self._get_structure()
         idx = next((i for i, d in enumerate(structure) if d["key"] == key), None)
         if idx is None:
-            return self._error("move_eigenform", f"Eigenform '{key}' not found.")
+            return self._error(f"Eigenform '{key}' not found.", action="move_eigenform")
 
         # Remove and reinsert at new position
         desc = structure.pop(idx)

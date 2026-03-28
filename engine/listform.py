@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-import copy
 import json
 from dataclasses import dataclass, field
 from html import escape
 from typing import Any
 
-from engine.affordances import Affordance, SimpleButtonAffordance
-from engine.store import Store
+from engine.affordances import (
+    Affordance, SimpleButtonAffordance,
+    STYLE_CONFIRM, STYLE_REMOVE, STYLE_ARROW, render_inline_button,
+)
 from engine.eigenforms import Eigenform
 
 
@@ -57,11 +58,7 @@ class ListForm(Eigenform):
         })
 
     def _serialize_state(self) -> dict:
-        return {
-            "form": self.form,
-            "key": self.key,
-            "label": self.label,
-            "instruction": self.instruction,
+        return self._base_state() | {
             "items": self.items,
             "count": len(self.items),
             "na": self.na,
@@ -153,10 +150,10 @@ class ListForm(Eigenform):
 
         items = data.get("items", [])
 
-        # Build lookups and mark agent-only affordances as rendered
-        from engine.eigenforms import Eigenform
+        # Mark agent-only affordances as rendered (inline UI handles display)
         add_aff = None
         url = affs[0]["url"] if affs else ""
+        endpoint = f'POST {url}'
         for aff in affs:
             action = aff.get("body", {}).get("action")
             if action in ("move_up", "move_down", "edit", "remove"):
@@ -165,7 +162,6 @@ class ListForm(Eigenform):
                 add_aff = aff
                 Eigenform.mark_rendered(aff)
 
-        endpoint = f'POST {url}'
         html += '<ol style="margin: 4px 0; padding-left: 24px;">'
 
         # Existing items
@@ -187,9 +183,7 @@ class ListForm(Eigenform):
                 f'<input name="v" type="text" value="{item_val}"'
                 f' style="border: 1px solid #ddd; padding: 2px 4px; width: 200px;"'
                 f' oninput="{edit_tooltip_js}" />'
-                f' <button type="submit"'
-                f' style="cursor: pointer; border: 1px solid #4a4; background: #efffef;'
-                f' width: 24px; height: 24px; font-size: 14px; padding: 0; color: #2a2;"'
+                f' <button type="submit" style="{STYLE_CONFIRM}"'
                 f' title="{edit_tooltip}">&#10003;</button>'
                 f'</form>'
             )
@@ -200,29 +194,9 @@ class ListForm(Eigenform):
                 ("move_down", "&#9660;", idx < num_items - 1),
             ]:
                 if can:
-                    move_body = {"action": direction, "id": item_id}
-                    body_js = json.dumps(move_body).replace('"', '&quot;')
-                    tooltip = f'{escape(endpoint)} {escape(json.dumps(move_body))}'
-                    html += (
-                        f'<button onclick="fetch(\'{url}\','
-                        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                        f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
-                        f' style="cursor: pointer; border: 1px solid #ccc; background: #f8f8f8;'
-                        f' width: 24px; height: 24px; font-size: 10px; padding: 0;"'
-                        f' title="{tooltip}">{arrow}</button>'
-                    )
+                    html += render_inline_button(url, {"action": direction, "id": item_id}, arrow, STYLE_ARROW)
             # Remove button inline
-            remove_body = {"action": "remove", "id": item_id}
-            body_js = json.dumps(remove_body).replace('"', '&quot;')
-            tooltip = f'{escape(endpoint)} {escape(json.dumps(remove_body))}'
-            html += (
-                f'<button onclick="fetch(\'{url}\','
-                f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
-                f' style="cursor: pointer; border: 1px solid #ccc; background: #f8f8f8;'
-                f' width: 24px; height: 24px; font-size: 12px; padding: 0; color: #c00;"'
-                f' title="{tooltip}">x</button>'
-            )
+            html += render_inline_button(url, {"action": "remove", "id": item_id}, "x", STYLE_REMOVE)
             html += f' <span style="font-size: 10px; color: #888;">{escape(item_id)}</span>'
             html += '</li>'
 
@@ -243,9 +217,7 @@ class ListForm(Eigenform):
                 f'<input name="v" type="text" placeholder="New item"'
                 f' style="border: 1px solid #ddd; padding: 2px 4px; width: 200px;"'
                 f' oninput="{add_tooltip_js}" />'
-                f' <button type="submit"'
-                f' style="cursor: pointer; border: 1px solid #4a4; background: #efffef;'
-                f' width: 24px; height: 24px; font-size: 14px; padding: 0; color: #2a2;"'
+                f' <button type="submit" style="{STYLE_CONFIRM}"'
                 f' title="{add_tooltip}">+</button>'
                 f'</form>'
                 f'</li>'
@@ -262,12 +234,6 @@ class ListForm(Eigenform):
 
         return html
 
-    def _error(self, action: str, msg: str) -> dict:
-        result = self.serialize()
-        result["error"] = msg
-        result["failed_action"] = action
-        return result
-
     def _handle(self, body: dict) -> dict:
         action = body.get("action", "")
         items = [dict(i) for i in self.items]
@@ -277,7 +243,7 @@ class ListForm(Eigenform):
         if action == "add":
             value = body.get("value", "").strip()
             if not value:
-                return self._error(action, "Item value is required.")
+                return self._error("Item value is required.", action=action)
             item_id = f"item_{next_id}"
             next_id += 1
             items.append({"id": item_id, "value": value})
@@ -287,7 +253,7 @@ class ListForm(Eigenform):
             item_id = body.get("id", "")
             value = body.get("value", "")
             if item_id not in item_ids:
-                return self._error(action, f"Unknown item: {item_id}. Valid: {', '.join(item_ids)}")
+                return self._error(f"Unknown item: {item_id}. Valid: {', '.join(item_ids)}", action=action)
             for item in items:
                 if item["id"] == item_id:
                     item["value"] = value
@@ -297,14 +263,14 @@ class ListForm(Eigenform):
         elif action == "remove":
             item_id = body.get("id", "")
             if item_id not in item_ids:
-                return self._error(action, f"Unknown item: {item_id}. Valid: {', '.join(item_ids)}")
+                return self._error(f"Unknown item: {item_id}. Valid: {', '.join(item_ids)}", action=action)
             items = [i for i in items if i["id"] != item_id]
             self._save(items, next_id)
 
         elif action in ("move", "move_up", "move_down"):
             item_id = body.get("id", "")
             if item_id not in item_ids:
-                return self._error(action, f"Unknown item: {item_id}. Valid: {', '.join(item_ids)}")
+                return self._error(f"Unknown item: {item_id}. Valid: {', '.join(item_ids)}", action=action)
             idx = next(i for i, it in enumerate(items) if it["id"] == item_id)
             if action == "move_up":
                 position = idx - 1
@@ -315,7 +281,7 @@ class ListForm(Eigenform):
                 if isinstance(position, str) and position.isdigit():
                     position = int(position)
             if not isinstance(position, int) or position < 0 or position >= len(items):
-                return self._error(action, f"Invalid position: {position}. Valid: 0 to {len(items) - 1}")
+                return self._error(f"Invalid position: {position}. Valid: 0 to {len(items) - 1}", action=action)
             item = items.pop(idx)
             items.insert(position, item)
             self._save(items, next_id)
@@ -327,6 +293,6 @@ class ListForm(Eigenform):
             self._store.set(self._scope, self.key, {"items": [], "next_id": next_id})
 
         else:
-            return self._error(action, f"Unknown action: {action}")
+            return self._error(f"Unknown action: {action}", action=action)
 
         return self.serialize()

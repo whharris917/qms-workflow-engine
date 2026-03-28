@@ -43,11 +43,7 @@ class BooleanForm(Eigenform):
         return self.value is not None
 
     def _serialize_state(self) -> dict:
-        return {
-            "form": self.form,
-            "key": self.key,
-            "label": self.label,
-            "instruction": self.instruction,
+        return self._base_state() | {
             "value": self.value,
             "true_label": self.true_label,
             "false_label": self.false_label,

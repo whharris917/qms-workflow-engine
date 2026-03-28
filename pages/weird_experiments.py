@@ -28,7 +28,7 @@ def multiply_selected(siblings):
     checked = siblings.get("numbers")
     if not checked:
         return {"status": "incomplete", "message": "Select at least one number."}
-    selected = [int(k) for k, v in checked.items() if v]
+    selected = [int(k) for k, v in checked.items() if v and not k.startswith("__")]
     if not selected:
         return {"status": "incomplete", "message": "Select at least one number."}
     result = prod(selected)

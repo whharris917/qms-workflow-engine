@@ -16,6 +16,39 @@ import json
 from dataclasses import dataclass, field
 from html import escape
 
+# --- Inline button style constants ---
+STYLE_CONFIRM = (
+    "cursor: pointer; border: 1px solid #4a4; background: #efffef;"
+    " width: 24px; height: 24px; font-size: 14px; padding: 0; color: #2a2;"
+)
+STYLE_REMOVE = (
+    "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8;"
+    " width: 24px; height: 24px; font-size: 12px; padding: 0; color: #c00;"
+)
+STYLE_ARROW = (
+    "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8;"
+    " width: 24px; height: 24px; font-size: 10px; padding: 0;"
+)
+
+
+def render_inline_button(url: str, body: dict, content: str, style: str) -> str:
+    """Render a button that POSTs a JSON body and reloads the page.
+
+    Generates the fetch() JS, JSON-escaped body, and endpoint tooltip
+    automatically. Use for inline action buttons (remove, move, etc.).
+    """
+    body_js = json.dumps(body).replace('"', '&quot;')
+    endpoint = f'POST {url}'
+    tooltip = f'{escape(endpoint)} {escape(json.dumps(body))}'
+    return (
+        f'<button onclick="fetch(\'{url}\','
+        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+        f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
+        f' style="{style}"'
+        f' title="{tooltip}">'
+        f'{content}</button>'
+    )
+
 
 @dataclass
 class Affordance:

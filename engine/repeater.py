@@ -43,12 +43,10 @@ class EntryGroup(Eigenform):
         return all(ef.is_complete for ef in self.eigenforms)
 
     def _serialize_state(self) -> dict:
-        return {
-            "form": "entry",
-            "key": self.key,
-            "label": self.label,
-            "eigenforms": [s for ef in self.eigenforms if (s := ef.serialize()) is not None],
-        }
+        state = self._base_state()
+        state["form"] = "entry"
+        state["eigenforms"] = [s for ef in self.eigenforms if (s := ef.serialize()) is not None]
+        return state
 
     def render_from_data(self, data: dict) -> str:
         html = f'<h4 style="margin: 4px 0;">{escape(data["label"])}</h4>'
@@ -155,11 +153,7 @@ class RepeaterForm(Eigenform):
         })
 
     def _serialize_state(self) -> dict:
-        return {
-            "form": self.form,
-            "key": self.key,
-            "label": self.label,
-            "instruction": self.instruction,
+        return self._base_state() | {
             "entry_count": len(self._entry_ids),
             "min_entries": self.min_entries,
             "max_entries": self.max_entries,
@@ -243,12 +237,6 @@ class RepeaterForm(Eigenform):
 
         return html
 
-    def _error(self, action: str, msg: str) -> dict:
-        result = self.serialize()
-        result["error"] = msg
-        result["failed_action"] = action
-        return result
-
     def _handle(self, body: dict) -> dict:
         action = body.get("action", "")
         entries = list(self._entry_ids)
@@ -256,7 +244,7 @@ class RepeaterForm(Eigenform):
 
         if action == "add":
             if self.max_entries is not None and len(entries) >= self.max_entries:
-                return self._error(action, f"Maximum {self.max_entries} entries reached.")
+                return self._error(f"Maximum {self.max_entries} entries reached.", action=action)
             entry_id = f"entry_{next_id}"
             entries.append(entry_id)
             next_id += 1
@@ -266,7 +254,7 @@ class RepeaterForm(Eigenform):
         elif action == "remove":
             entry_id = body.get("id", "")
             if entry_id not in entries:
-                return self._error(action, f"Unknown entry: {entry_id}.")
+                return self._error(f"Unknown entry: {entry_id}.", action=action)
             # Clear the entry's scope
             entry_scope = f"{self.key}/{entry_id}"
             self._store.clear_scope(entry_scope)
@@ -275,6 +263,6 @@ class RepeaterForm(Eigenform):
             self._rebuild_entries()
 
         else:
-            return self._error(action, f"Unknown action: {action}")
+            return self._error(f"Unknown action: {action}", action=action)
 
         return self.serialize()

@@ -70,12 +70,7 @@ class GroupForm(Eigenform):
         ]
 
     def _serialize_state(self) -> dict:
-        return {
-            "form": self.form,
-            "key": self.key,
-            "label": self.label,
-            "instruction": self.instruction,
-        }
+        return self._base_state()
 
     def serialize(self) -> dict:
         state = self._serialize_state()

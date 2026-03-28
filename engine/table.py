@@ -17,7 +17,12 @@ from dataclasses import dataclass, field
 from html import escape
 from typing import Any
 
-from engine.affordances import Affordance, SimpleButtonAffordance
+from engine.affordances import (
+    Affordance,
+    SimpleButtonAffordance,
+    STYLE_REMOVE,
+    render_inline_button,
+)
 from engine.eigenforms import Eigenform
 from engine.store import Store
 
@@ -115,11 +120,7 @@ class TableForm(Eigenform):
         for row_id in self.row_order:
             row_data = self.rows.get(row_id, {})
             ordered_rows.append({"_id": row_id, **row_data})
-        return {
-            "form": self.form,
-            "key": self.key,
-            "label": self.label,
-            "instruction": self.instruction,
+        return self._base_state() | {
             "columns": self.columns,
             "rows": ordered_rows,
             "summary": f"{len(self.columns)} {'column' if len(self.columns) == 1 else 'columns'}, {len(self.row_order)} {'row' if len(self.row_order) == 1 else 'rows'}",
@@ -225,7 +226,8 @@ class TableForm(Eigenform):
             html += '<tr>'
             html += '<th style="border: 1px solid #ccc; padding: 4px 8px; background: #f0f0f0;">ID</th>'
             for col in columns:
-                rm_col_body = json.dumps({"action": "remove_column", "column": col["key"]})
+                rm_col_body = {"action": "remove_column", "column": col["key"]}
+                rm_col_btn = render_inline_button(url, rm_col_body, "\u2212", STYLE_REMOVE)
                 html += (
                     f'<th style="border: 1px solid #ccc; padding: 2px; background: #f0f0f0;">'
                     f'<form style="margin:0" onsubmit="fetch(\'{url}\','
@@ -241,12 +243,7 @@ class TableForm(Eigenform):
                     f'</form>'
                     f'<div style="display: flex; justify-content: space-between; align-items: center; padding: 0 4px;">'
                     f'<span style="font-size: 10px; color: #888;">{escape(col["key"])}</span>'
-                    f'<button onclick="fetch(\'{url}\','
-                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                    f'body:JSON.stringify({rm_col_body.replace(chr(34), "&quot;")})}}).then(()=>location.reload())"'
-                    f' style="cursor: pointer; border: none; background: none; color: #c00;'
-                    f' font-size: 14px; font-weight: bold; padding: 0 2px; line-height: 1;"'
-                    f' title="POST {url} {escape(rm_col_body)}">−</button>'
+                    f'{rm_col_btn}'
                     f'</div>'
                     f'</th>'
                 )
@@ -273,17 +270,13 @@ class TableForm(Eigenform):
             # Rows — each cell is an inline form, with a remove button at the end
             for row_data in rows:
                 row_id = row_data["_id"]
-                rm_row_body = json.dumps({"action": "remove_row", "row": row_id})
+                rm_row_body = {"action": "remove_row", "row": row_id}
+                rm_row_btn = render_inline_button(url, rm_row_body, "\u2212", STYLE_REMOVE)
                 html += '<tr>'
                 html += (
                     f'<td style="border: 1px solid #ccc; padding: 4px 8px; color: #888;'
                     f' font-size: 11px; white-space: nowrap;">'
-                    f'<button onclick="fetch(\'{url}\','
-                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                    f'body:JSON.stringify({rm_row_body.replace(chr(34), "&quot;")})}}).then(()=>location.reload())"'
-                    f' style="cursor: pointer; border: none; background: none; color: #c00;'
-                    f' font-size: 14px; font-weight: bold; padding: 0 2px; line-height: 1; vertical-align: middle;"'
-                    f' title="POST {url} {escape(rm_row_body)}">−</button>'
+                    f'{rm_row_btn}'
                     f' {escape(row_id)}'
                     f'</td>'
                 )
@@ -378,13 +371,6 @@ class TableForm(Eigenform):
 
         return html
 
-    def _error(self, action: str, msg: str) -> dict:
-        """Return an error response with the failed action."""
-        result = self.serialize()
-        result["error"] = msg
-        result["failed_action"] = action
-        return result
-
     def _handle(self, body: dict) -> dict:
         action = body.get("action", "")
         columns = list(self.columns)
@@ -396,7 +382,7 @@ class TableForm(Eigenform):
         if action == "add_column":
             label = body.get("label", "").strip()
             if not label:
-                return self._error(action, "Column label is required.")
+                return self._error("Column label is required.", action=action)
             key = f"col_{next_col_id}"
             next_col_id += 1
             columns.append({"key": key, "label": label})
@@ -409,9 +395,9 @@ class TableForm(Eigenform):
             new_label = body.get("label", "").strip()
             col_key = self._resolve_column(col_ref)
             if not col_key:
-                return self._error(action, f"Unknown column: {col_ref}. Valid: {', '.join(self.col_keys)}")
+                return self._error(f"Unknown column: {col_ref}. Valid: {', '.join(self.col_keys)}", action=action)
             if not new_label:
-                return self._error(action, "New label is required.")
+                return self._error("New label is required.", action=action)
             for c in columns:
                 if c["key"] == col_key:
                     c["label"] = new_label
@@ -436,17 +422,17 @@ class TableForm(Eigenform):
             col_ref = body.get("column", "")
             value = body.get("value")
             if row_id not in rows:
-                return self._error(action, f"Unknown row: {row_id}. Valid: {', '.join(row_order)}")
+                return self._error(f"Unknown row: {row_id}. Valid: {', '.join(row_order)}", action=action)
             col_key = self._resolve_column(col_ref)
             if not col_key:
-                return self._error(action, f"Unknown column: {col_ref}. Valid: {', '.join(self.col_keys)}")
+                return self._error(f"Unknown column: {col_ref}. Valid: {', '.join(self.col_keys)}", action=action)
             rows[row_id][col_key] = value
             self._save(columns, rows, row_order, next_row_id, next_col_id)
 
         elif action == "set_row":
             row_id = body.get("row", "")
             if row_id not in rows:
-                return self._error(action, f"Unknown row: {row_id}. Valid: {', '.join(row_order)}")
+                return self._error(f"Unknown row: {row_id}. Valid: {', '.join(row_order)}", action=action)
             for col in columns:
                 val = body.get(col["key"])
                 if val is None:
@@ -458,7 +444,7 @@ class TableForm(Eigenform):
         elif action == "remove_row":
             row_id = body.get("row", "")
             if row_id not in rows:
-                return self._error(action, f"Unknown row: {row_id}. Valid: {', '.join(row_order)}")
+                return self._error(f"Unknown row: {row_id}. Valid: {', '.join(row_order)}", action=action)
             del rows[row_id]
             row_order.remove(row_id)
             self._save(columns, rows, row_order, next_row_id, next_col_id)
@@ -467,13 +453,13 @@ class TableForm(Eigenform):
             col_ref = body.get("column", "")
             col_key = self._resolve_column(col_ref)
             if not col_key:
-                return self._error(action, f"Unknown column: {col_ref}. Valid: {', '.join(self.col_keys)}")
+                return self._error(f"Unknown column: {col_ref}. Valid: {', '.join(self.col_keys)}", action=action)
             columns = [c for c in columns if c["key"] != col_key]
             for row_id in row_order:
                 rows[row_id].pop(col_key, None)
             self._save(columns, rows, row_order, next_row_id, next_col_id)
 
         else:
-            return self._error(action, f"Unknown action: {action}")
+            return self._error(f"Unknown action: {action}", action=action)
 
         return self.serialize()
