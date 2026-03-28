@@ -129,6 +129,8 @@ def render_affordance_html(aff: dict) -> str:
         return _render_kv_add(label, url, endpoint, hints)
     elif aff_type == "accordion_toggle":
         return _render_accordion_toggle(label, url, endpoint, body, hints)
+    elif aff_type == "disabled_button":
+        return _render_disabled_button(label, hints.get("message", ""))
     else:
         # Fallback: check for fillable parameters in body
         param_keys = [k for k, v in body.items() if isinstance(v, str) and v.startswith("<")]
@@ -442,6 +444,18 @@ def _render_kv_add(label: str, url: str, endpoint: str, hints: dict) -> str:
         f' <button type="submit" title="{escape(endpoint)}">{escape(label)}</button>'
         f'</form>'
     )
+
+
+def _render_disabled_button(label: str, message: str) -> str:
+    html = (
+        f'<div style="margin: 4px 0;">'
+        f'<button disabled style="font-size: 12px; padding: 4px 10px; opacity: 0.5; cursor: not-allowed;">'
+        f'{escape(label)}</button>'
+    )
+    if message:
+        html += f' <span style="color: #888; font-size: 0.9em;">{escape(message)}</span>'
+    html += '</div>'
+    return html
 
 
 def _render_accordion_toggle(label: str, url: str, endpoint: str, body: dict, hints: dict) -> str:
