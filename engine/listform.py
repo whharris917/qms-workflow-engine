@@ -108,24 +108,24 @@ class ListForm(Eigenform):
             ))
 
         if len(self.items) > 1:
-            for item in self.items:
-                idx = next(i for i, it in enumerate(self.items) if it["id"] == item["id"])
-                if idx > 0:
-                    affordances.append(SimpleButtonAffordance(
-                        label=f"Move {item['id']} up",
-                        method="POST",
-                        url=self.url,
-                        body={"action": "move", "id": item["id"], "position": idx - 1},
-                        instruction=f"Move {item['id']} up one position.",
-                    ))
-                if idx < len(self.items) - 1:
-                    affordances.append(SimpleButtonAffordance(
-                        label=f"Move {item['id']} down",
-                        method="POST",
-                        url=self.url,
-                        body={"action": "move", "id": item["id"], "position": idx + 1},
-                        instruction=f"Move {item['id']} down one position.",
-                    ))
+            can_up = [item["id"] for i, item in enumerate(self.items) if i > 0]
+            can_down = [item["id"] for i, item in enumerate(self.items) if i < len(self.items) - 1]
+            if can_up:
+                affordances.append(Affordance(
+                    label="Move Up",
+                    method="POST",
+                    url=self.url,
+                    body={"action": "move_up", "id": f"<{' | '.join(can_up)}>"},
+                    instruction="Move an item up one position.",
+                ))
+            if can_down:
+                affordances.append(Affordance(
+                    label="Move Down",
+                    method="POST",
+                    url=self.url,
+                    body={"action": "move_down", "id": f"<{' | '.join(can_down)}>"},
+                    instruction="Move an item down one position.",
+                ))
 
         affordances.append(SimpleButtonAffordance(
             label="N/A",
@@ -155,16 +155,11 @@ class ListForm(Eigenform):
 
         # Build lookups and mark agent-only affordances as rendered
         from engine.eigenforms import Eigenform
-        move_affs: dict[str, list[dict]] = {}
         add_aff = None
         url = affs[0]["url"] if affs else ""
         for aff in affs:
             action = aff.get("body", {}).get("action")
-            if action == "move":
-                item_id = aff["body"].get("id")
-                move_affs.setdefault(item_id, []).append(aff)
-                Eigenform.mark_rendered(aff)
-            elif action in ("edit", "remove"):
+            if action in ("move_up", "move_down", "edit", "remove"):
                 Eigenform.mark_rendered(aff)
             elif action == "add":
                 add_aff = aff
@@ -199,19 +194,23 @@ class ListForm(Eigenform):
                 f'</form>'
             )
             # Move up/down buttons inline
-            for maff in move_affs.get(item_id, []):
-                direction = "up" if maff["body"].get("position", 0) < idx else "down"
-                arrow = "&#9650;" if direction == "up" else "&#9660;"
-                body_js = json.dumps(maff["body"]).replace('"', '&quot;')
-                tooltip = f'{escape(endpoint)} {escape(json.dumps(maff["body"]))}'
-                html += (
-                    f'<button onclick="fetch(\'{url}\','
-                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                    f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
-                    f' style="cursor: pointer; border: 1px solid #ccc; background: #f8f8f8;'
-                    f' width: 24px; height: 24px; font-size: 10px; padding: 0;"'
-                    f' title="{tooltip}">{arrow}</button>'
-                )
+            num_items = len(items)
+            for direction, arrow, can in [
+                ("move_up", "&#9650;", idx > 0),
+                ("move_down", "&#9660;", idx < num_items - 1),
+            ]:
+                if can:
+                    move_body = {"action": direction, "id": item_id}
+                    body_js = json.dumps(move_body).replace('"', '&quot;')
+                    tooltip = f'{escape(endpoint)} {escape(json.dumps(move_body))}'
+                    html += (
+                        f'<button onclick="fetch(\'{url}\','
+                        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+                        f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
+                        f' style="cursor: pointer; border: 1px solid #ccc; background: #f8f8f8;'
+                        f' width: 24px; height: 24px; font-size: 10px; padding: 0;"'
+                        f' title="{tooltip}">{arrow}</button>'
+                    )
             # Remove button inline
             remove_body = {"action": "remove", "id": item_id}
             body_js = json.dumps(remove_body).replace('"', '&quot;')
@@ -302,17 +301,22 @@ class ListForm(Eigenform):
             items = [i for i in items if i["id"] != item_id]
             self._save(items, next_id)
 
-        elif action == "move":
+        elif action in ("move", "move_up", "move_down"):
             item_id = body.get("id", "")
-            position = body.get("position")
-            if isinstance(position, str) and position.isdigit():
-                position = int(position)
             if item_id not in item_ids:
                 return self._error(action, f"Unknown item: {item_id}. Valid: {', '.join(item_ids)}")
+            idx = next(i for i, it in enumerate(items) if it["id"] == item_id)
+            if action == "move_up":
+                position = idx - 1
+            elif action == "move_down":
+                position = idx + 1
+            else:
+                position = body.get("position")
+                if isinstance(position, str) and position.isdigit():
+                    position = int(position)
             if not isinstance(position, int) or position < 0 or position >= len(items):
                 return self._error(action, f"Invalid position: {position}. Valid: 0 to {len(items) - 1}")
-            item = next(i for i in items if i["id"] == item_id)
-            items = [i for i in items if i["id"] != item_id]
+            item = items.pop(idx)
             items.insert(position, item)
             self._save(items, next_id)
 

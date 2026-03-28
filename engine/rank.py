@@ -58,24 +58,27 @@ class RankForm(Eigenform):
         })
 
     def get_affordances(self) -> list[Affordance]:
+        from engine.affordances import Affordance as BaseAffordance
         order = self.current_order
         affordances: list[Affordance] = []
-        for i, item in enumerate(order):
-            if i > 0:
-                affordances.append(SimpleButtonAffordance(
-                    label=f"Up",
+        if len(order) > 1:
+            can_up = [item for i, item in enumerate(order) if i > 0]
+            can_down = [item for i, item in enumerate(order) if i < len(order) - 1]
+            if can_up:
+                affordances.append(BaseAffordance(
+                    label="Move Up",
                     method="POST",
                     url=self.url,
-                    body={"action": "move_up", "item": item},
-                    instruction=f"Move '{item}' up one position.",
+                    body={"action": "move_up", "item": f"<{' | '.join(can_up)}>"},
+                    instruction="Move an item up one position.",
                 ))
-            if i < len(order) - 1:
-                affordances.append(SimpleButtonAffordance(
-                    label=f"Down",
+            if can_down:
+                affordances.append(BaseAffordance(
+                    label="Move Down",
                     method="POST",
                     url=self.url,
-                    body={"action": "move_down", "item": item},
-                    instruction=f"Move '{item}' down one position.",
+                    body={"action": "move_down", "item": f"<{' | '.join(can_down)}>"},
+                    instruction="Move an item down one position.",
                 ))
         if not self.confirmed:
             affordances.append(SimpleButtonAffordance(
@@ -96,20 +99,28 @@ class RankForm(Eigenform):
         items = data.get("items", [])
         affs = data.get("affordances", [])
 
+        # Mark condensed move affordances as rendered (arrows are built inline)
+        for aff in affs:
+            if aff.get("body", {}).get("action") in ("move_up", "move_down"):
+                Eigenform.mark_rendered(aff)
+
+        url = self.url
+        endpoint = f'POST {url}'
+        num_items = len(items)
+
         html += '<ol style="margin: 4px 0; padding-left: 24px;">'
-        for item in items:
+        for idx, item in enumerate(items):
             html += f'<li style="padding: 2px 0;">{escape(item)} '
-            # Find move affordances for this item
-            for aff in affs:
-                body = aff.get("body", {})
-                if body.get("item") == item and body.get("action") in ("move_up", "move_down"):
-                    arrow = "&#9650;" if body["action"] == "move_up" else "&#9660;"
-                    Eigenform.mark_rendered(aff)
-                    body_js = json.dumps(body).replace('"', '&quot;')
-                    endpoint = f'{aff["method"]} {aff["url"]}'
-                    tooltip = f'{escape(endpoint)} {escape(json.dumps(body))}'
+            for direction, arrow, can in [
+                ("move_up", "&#9650;", idx > 0),
+                ("move_down", "&#9660;", idx < num_items - 1),
+            ]:
+                if can:
+                    move_body = {"action": direction, "item": item}
+                    body_js = json.dumps(move_body).replace('"', '&quot;')
+                    tooltip = f'{escape(endpoint)} {escape(json.dumps(move_body))}'
                     html += (
-                        f'<button onclick="fetch(\'{aff["url"]}\','
+                        f'<button onclick="fetch(\'{url}\','
                         f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
                         f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
                         f' style="cursor: pointer; font-size: 11px; width: 24px; height: 24px; margin: 0 1px;"'
@@ -119,7 +130,7 @@ class RankForm(Eigenform):
             html += '</li>'
         html += '</ol>'
 
-        # Render remaining affordances (Set Order button)
+        # Render remaining affordances (Done button)
         for aff in affs:
             if not aff.get("_rendered"):
                 html += render_affordance_html(aff)
