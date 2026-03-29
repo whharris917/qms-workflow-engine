@@ -103,16 +103,19 @@ class RankForm(Eigenform):
         url = self.url
         num_items = len(items)
 
+        gap = '<span style="display: inline-block; width: 24px; height: 24px;"></span>'
         html += '<ol style="margin: 4px 0; padding-left: 24px;">'
         for idx, item in enumerate(items):
-            html += f'<li style="padding: 2px 0;">{escape(item)} '
+            html += f'<li style="padding: 2px 0; display: flex; align-items: center; gap: 4px;">'
             for direction, arrow, can in [
                 ("move_up", "&#9650;", idx > 0),
                 ("move_down", "&#9660;", idx < num_items - 1),
             ]:
                 if can:
                     html += render_inline_button(url, {"action": direction, "item": item}, arrow, STYLE_ARROW)
-            html += '</li>'
+                else:
+                    html += gap
+            html += f'{escape(item)}</li>'
         html += '</ol>'
 
         # Render remaining affordances (Done button)

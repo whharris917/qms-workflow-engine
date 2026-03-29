@@ -211,6 +211,16 @@ collection_forms = GroupForm(
                 "Item IDs are stable (item_0, item_1, ...) — removing item_1 doesn't renumber item_2."
             ),
         ),
+        ListForm(
+            key="fixed-list-demo",
+            label="ListForm (fixed items)",
+            instruction=(
+                "A list with fixed seed items that cannot be removed or renamed. "
+                "You can reorder them freely and add your own items alongside them. "
+                "Try moving a fixed item, then adding a new one."
+            ),
+            fixed_items=["Alpha", "Bravo", "Charlie"],
+        ),
         TableForm(
             key="table-demo",
             label="TableForm",

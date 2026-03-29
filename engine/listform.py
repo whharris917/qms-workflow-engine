@@ -23,14 +23,23 @@ class AddItemAffordance(Affordance):
 
 @dataclass
 class ListForm(Eigenform):
-    """An ordered list of string items with add, remove, edit, and reorder."""
+    """An ordered list of string items with add, remove, edit, and reorder.
+
+    If fixed_items is provided, those items are seeded into the list on
+    first access and cannot be removed or renamed. They can be freely
+    reordered alongside user-added items.
+    """
+    fixed_items: list[str] = field(default_factory=list)
 
     @property
     def items(self) -> list[dict]:
-        """List of items: [{"id": "item_0", "value": "..."}, ...]"""
+        """List of items: [{"id": "item_0", "value": "...", "fixed": bool}, ...]"""
         stored = self.value
         if stored and isinstance(stored, dict):
             return stored.get("items", [])
+        if self.fixed_items:
+            return [{"id": f"item_{i}", "value": v, "fixed": True}
+                    for i, v in enumerate(self.fixed_items)]
         return []
 
     @property
@@ -38,6 +47,8 @@ class ListForm(Eigenform):
         stored = self.value
         if stored and isinstance(stored, dict):
             return stored.get("next_id", 0)
+        if self.fixed_items:
+            return len(self.fixed_items)
         return 0
 
     @property
@@ -77,7 +88,8 @@ class ListForm(Eigenform):
             ]
 
         affordances: list[Affordance] = []
-        item_ids = " | ".join(i["id"] for i in self.items) if self.items else ""
+        editable = [i for i in self.items if not i.get("fixed")]
+        editable_ids = " | ".join(i["id"] for i in editable) if editable else ""
 
         affordances.append(AddItemAffordance(
             label="+ Add",
@@ -87,12 +99,12 @@ class ListForm(Eigenform):
             instruction=f"Add a new item to the {self.label} list.",
         ))
 
-        if self.items:
+        if editable:
             affordances.append(Affordance(
                 label="Edit Item",
                 method="POST",
                 url=self.url,
-                body={"action": "edit", "id": f"<{item_ids}>", "value": "<new value>"},
+                body={"action": "edit", "id": f"<{editable_ids}>", "value": "<new value>"},
                 instruction="Edit an existing item by ID.",
             ))
 
@@ -100,7 +112,7 @@ class ListForm(Eigenform):
                 label="Remove Item",
                 method="POST",
                 url=self.url,
-                body={"action": "remove", "id": f"<{item_ids}>"},
+                body={"action": "remove", "id": f"<{editable_ids}>"},
                 instruction="Remove an item by ID.",
             ))
 
@@ -162,41 +174,61 @@ class ListForm(Eigenform):
                 add_aff = aff
                 Eigenform.mark_rendered(aff)
 
+        gap = '<span style="display: inline-block; width: 24px; height: 24px;"></span>'
+        num_items = len(items)
         html += '<ol style="margin: 4px 0; padding-left: 24px;">'
 
         # Existing items
         for idx, item in enumerate(items):
             item_id = item["id"]
             item_val = escape(str(item.get("value", "")))
-            edit_tooltip_js = (
-                f"this.nextElementSibling.title="
-                f"'{escape(endpoint)} '+JSON.stringify({{action:'edit',id:'{item_id}',value:this.value}})"
-            )
-            edit_default = {"action": "edit", "id": item_id, "value": item.get("value", "")}
-            edit_tooltip = f'{escape(endpoint)} {escape(json.dumps(edit_default))}'
-            html += (
-                f'<li style="margin: 4px 0; display: flex; align-items: center; gap: 4px;">'
-                f'<form style="display: inline; margin: 0;" onsubmit="fetch(\'{url}\','
-                f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                f"body:JSON.stringify({{action:'edit',id:'{item_id}',value:this.elements.v.value}})"
-                f'}}).then(()=>location.reload()); return false">'
-                f'<input name="v" type="text" value="{item_val}"'
-                f' style="border: 1px solid #ddd; padding: 2px 4px; width: 200px;"'
-                f' oninput="{edit_tooltip_js}" />'
-                f' <button type="submit" style="{STYLE_CONFIRM}"'
-                f' title="{edit_tooltip}">&#10003;</button>'
-                f'</form>'
-            )
-            # Move up/down buttons inline
-            num_items = len(items)
+            is_fixed = item.get("fixed", False)
+            html += f'<li style="margin: 4px 0; display: flex; align-items: center; gap: 4px;">'
+
+            if is_fixed:
+                # Fixed items: plain text, no edit/remove
+                # Match input box: 200px width + 2*4px padding + 2*1px border = 210px total
+                html += (
+                    f'<span style="display: inline-block; width: 200px; padding: 2px 4px;'
+                    f' border: 1px solid transparent; box-sizing: content-box;'
+                    f' color: #555; background: #f0f0f0; border-radius: 3px;">{item_val}</span>'
+                    f'{gap}'
+                )
+            else:
+                # Editable items: input + confirm button
+                edit_tooltip_js = (
+                    f"this.nextElementSibling.title="
+                    f"'{escape(endpoint)} '+JSON.stringify({{action:'edit',id:'{item_id}',value:this.value}})"
+                )
+                edit_default = {"action": "edit", "id": item_id, "value": item.get("value", "")}
+                edit_tooltip = f'{escape(endpoint)} {escape(json.dumps(edit_default))}'
+                html += (
+                    f'<form style="display: inline; margin: 0;" onsubmit="fetch(\'{url}\','
+                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+                    f"body:JSON.stringify({{action:'edit',id:'{item_id}',value:this.elements.v.value}})"
+                    f'}}).then(()=>location.reload()); return false">'
+                    f'<input name="v" type="text" value="{item_val}"'
+                    f' style="border: 1px solid #ddd; padding: 2px 4px; width: 200px;"'
+                    f' oninput="{edit_tooltip_js}" />'
+                    f' <button type="submit" style="{STYLE_CONFIRM}"'
+                    f' title="{edit_tooltip}">&#10003;</button>'
+                    f'</form>'
+                )
+
+            # Move up/down buttons inline (all items, fixed or not)
             for direction, arrow, can in [
                 ("move_up", "&#9650;", idx > 0),
                 ("move_down", "&#9660;", idx < num_items - 1),
             ]:
                 if can:
                     html += render_inline_button(url, {"action": direction, "id": item_id}, arrow, STYLE_ARROW)
-            # Remove button inline
-            html += render_inline_button(url, {"action": "remove", "id": item_id}, "x", STYLE_REMOVE)
+                else:
+                    html += gap
+            # Remove button (editable items only)
+            if not is_fixed:
+                html += render_inline_button(url, {"action": "remove", "id": item_id}, "x", STYLE_REMOVE)
+            else:
+                html += gap
             html += f' <span style="font-size: 10px; color: #888;">{escape(item_id)}</span>'
             html += '</li>'
 
@@ -254,16 +286,19 @@ class ListForm(Eigenform):
             value = body.get("value", "")
             if item_id not in item_ids:
                 return self._error(f"Unknown item: {item_id}. Valid: {', '.join(item_ids)}", action=action)
-            for item in items:
-                if item["id"] == item_id:
-                    item["value"] = value
-                    break
+            target = next(i for i in items if i["id"] == item_id)
+            if target.get("fixed"):
+                return self._error(f"Item {item_id} is fixed and cannot be edited.", action=action)
+            target["value"] = value
             self._save(items, next_id)
 
         elif action == "remove":
             item_id = body.get("id", "")
             if item_id not in item_ids:
                 return self._error(f"Unknown item: {item_id}. Valid: {', '.join(item_ids)}", action=action)
+            target = next(i for i in items if i["id"] == item_id)
+            if target.get("fixed"):
+                return self._error(f"Item {item_id} is fixed and cannot be removed.", action=action)
             items = [i for i in items if i["id"] != item_id]
             self._save(items, next_id)
 
