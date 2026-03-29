@@ -2,12 +2,12 @@
 
 A table is a self-contained HATEOAS-compliant application. Its state is a
 2D grid of typed cells. Its affordances allow structural operations (add/remove
-rows and columns) and data operations (set cell values, set entire rows). The
-available affordances change based on state.
+rows and columns), data operations (set cell values, set entire rows), and
+ordering operations (move rows/columns, ordering constraints).
 
-Rows have stable IDs (row_0, row_1, ...) that do not change when other rows
-are removed. This prevents index-shifting bugs in concurrent or multi-step
-operations.
+Rows and columns are each managed by an OrderedCollection, giving them stable
+IDs, fixed-item support, ordering constraints, and reordering capabilities.
+Cell data is managed separately, keyed by stable row/column IDs.
 """
 
 from __future__ import annotations
@@ -18,13 +18,11 @@ from html import escape
 from typing import Any
 
 from engine.affordances import (
-    Affordance,
-    SimpleButtonAffordance,
-    STYLE_REMOVE,
-    render_inline_button,
+    Affordance, AddConstraintAffordance, SimpleButtonAffordance,
+    STYLE_REMOVE, STYLE_ARROW, render_inline_button,
 )
 from engine.eigenform import Eigenform
-from engine.store import Store
+from engine.ordered_collection import OrderedCollection
 
 
 class SetCellAffordance(Affordance):
@@ -43,95 +41,173 @@ class AddColumnAffordance(Affordance):
 
 @dataclass
 class TableForm(Eigenform):
-    """A table with dynamic columns, stable row IDs, and row-level operations."""
+    """A table with dynamic columns, stable row IDs, and row-level operations.
+
+    Both rows and columns are backed by OrderedCollection, providing:
+    - Stable IDs (row_0, col_0, ...)
+    - Fixed items (immutable rows/columns)
+    - Ordering constraints (must_follow)
+    - Constraint-aware move up/down (rows) and left/right (columns)
+    """
+    fixed_columns: list[str] = field(default_factory=list)
+    fixed_rows: list[dict] = field(default_factory=list)
+    row_must_follow: dict[str, list[str]] = field(default_factory=dict)
+    col_must_follow: dict[str, list[str]] = field(default_factory=dict)
+    allow_row_constraints: bool = False
+    allow_col_constraints: bool = False
+
+    # --- Internal state ---
 
     @property
-    def _state(self) -> dict:
+    def _raw_state(self) -> dict:
         stored = self.value
         if stored and isinstance(stored, dict):
+            # Detect legacy format: "row_order" is a flat list of strings
+            if "row_order" in stored and isinstance(stored.get("row_order"), list):
+                row_order = stored["row_order"]
+                if not row_order or isinstance(row_order[0], str):
+                    return self._migrate_legacy(stored)
             return stored
-        return {"columns": [], "rows": {}, "row_order": [], "next_row_id": 0}
+        return {}
+
+    def _migrate_legacy(self, old: dict) -> dict:
+        """Convert legacy TableForm state to new format."""
+        col_items = [{"id": c["key"], "value": c["label"]}
+                     for c in old.get("columns", [])]
+        row_items = [{"id": rid, "value": ""}
+                     for rid in old.get("row_order", [])]
+        new = {
+            "columns": {"items": col_items, "next_id": old.get("next_col_id", 0)},
+            "rows_meta": {"items": row_items, "next_id": old.get("next_row_id", 0)},
+            "cells": old.get("rows", {}),
+        }
+        self._store.set(self._scope, self.key, new)
+        return new
+
+    @property
+    def _col_collection(self) -> OrderedCollection:
+        oc = OrderedCollection(
+            id_prefix="col",
+            fixed_items=self.fixed_columns,
+            static_must_follow=self.col_must_follow,
+            allow_constraints=self.allow_col_constraints,
+        )
+        oc.load(self._raw_state.get("columns"))
+        return oc
+
+    @property
+    def _row_collection(self) -> OrderedCollection:
+        oc = OrderedCollection(
+            id_prefix="row",
+            fixed_items=[],  # fixed_rows handled specially (they carry cell data)
+            static_must_follow=self.row_must_follow,
+            allow_constraints=self.allow_row_constraints,
+        )
+        state = self._raw_state.get("rows_meta")
+        # Seed fixed rows on first access
+        if state is None and self.fixed_rows:
+            items = [{"id": f"row_{i}", "value": "", "fixed": True}
+                     for i in range(len(self.fixed_rows))]
+            state = {"items": items, "next_id": len(self.fixed_rows)}
+        oc.load(state)
+        return oc
+
+    @property
+    def _cells(self) -> dict[str, dict]:
+        """Cell data: {"row_0": {"col_0": "Alice", ...}, ...}"""
+        return self._raw_state.get("cells", {})
+
+    # --- Convenience properties ---
 
     @property
     def columns(self) -> list[dict]:
         """Column definitions: [{"key": "col_0", "label": "Name"}, ...]"""
-        return self._state.get("columns", [])
+        return [{"key": i["id"], "label": i["value"]} for i in self._col_collection.items]
 
     @property
     def col_keys(self) -> list[str]:
-        return [c["key"] for c in self.columns]
+        return [i["id"] for i in self._col_collection.items]
 
     @property
     def col_labels(self) -> dict[str, str]:
-        """Map of key -> label."""
-        return {c["key"]: c["label"] for c in self.columns}
-
-    @property
-    def rows(self) -> dict[str, dict]:
-        """Row data keyed by stable ID: {"row_0": {"col_0": "Alice", ...}, ...}"""
-        return self._state.get("rows", {})
+        return {i["id"]: i["value"] for i in self._col_collection.items}
 
     @property
     def row_order(self) -> list[str]:
-        """Ordered list of row IDs."""
-        return self._state.get("row_order", [])
+        return [i["id"] for i in self._row_collection.items]
 
     @property
-    def _next_row_id(self) -> int:
-        return self._state.get("next_row_id", 0)
+    def rows(self) -> dict[str, dict]:
+        return self._cells
 
-    @property
-    def _next_col_id(self) -> int:
-        return self._state.get("next_col_id", 0)
+    # --- Core ---
 
     @property
     def is_complete(self) -> bool:
-        if not self.columns or not self.rows:
+        cols = self._col_collection.items
+        rows_meta = self._row_collection.items
+        cells = self._cells
+        if not cols or not rows_meta:
             return False
-        for row_id in self.row_order:
-            row = self.rows.get(row_id, {})
-            for col in self.columns:
-                if row.get(col["key"]) is None:
+        for row_item in rows_meta:
+            row = cells.get(row_item["id"], {})
+            for col_item in cols:
+                if row.get(col_item["id"]) is None:
                     return False
         return True
 
-    def _save(self, columns, rows, row_order, next_row_id=None, next_col_id=None):
+    def _save(self, col_state: dict, row_state: dict, cells: dict):
         state = {
-            "columns": columns,
-            "rows": rows,
-            "row_order": row_order,
-            "next_row_id": next_row_id if next_row_id is not None else self._next_row_id,
-            "next_col_id": next_col_id if next_col_id is not None else self._next_col_id,
+            "columns": col_state,
+            "rows_meta": row_state,
+            "cells": cells,
         }
         self._store.set(self._scope, self.key, state)
 
+    def _current_states(self) -> tuple[dict, dict, dict]:
+        """Return current col_state, row_state, cells as mutable copies."""
+        raw = self._raw_state
+        col_state = dict(raw.get("columns") or {"items": [], "next_id": 0})
+        row_state = dict(raw.get("rows_meta") or {"items": [], "next_id": 0})
+        cells = {k: dict(v) for k, v in self._cells.items()}
+        return col_state, row_state, cells
+
     def _resolve_column(self, ref: str) -> str | None:
         """Resolve a column reference — accepts key or label."""
-        for c in self.columns:
-            if c["key"] == ref:
+        col_oc = self._col_collection
+        for item in col_oc.items:
+            if item["id"] == ref:
                 return ref
-        for c in self.columns:
-            if c["label"] == ref:
-                return c["key"]
+        for item in col_oc.items:
+            if item["value"] == ref:
+                return item["id"]
         return None
 
     def _serialize_state(self) -> dict:
+        row_oc = self._row_collection
+        col_oc = self._col_collection
+        cells = self._cells
         ordered_rows = []
-        for row_id in self.row_order:
-            row_data = self.rows.get(row_id, {})
-            ordered_rows.append({"_id": row_id, **row_data})
+        for row_item in row_oc.items:
+            row_data = cells.get(row_item["id"], {})
+            ordered_rows.append({"_id": row_item["id"], **row_data})
         return self._base_state() | {
             "columns": self.columns,
             "rows": ordered_rows,
-            "summary": f"{len(self.columns)} {'column' if len(self.columns) == 1 else 'columns'}, {len(self.row_order)} {'row' if len(self.row_order) == 1 else 'rows'}",
+            "summary": f"{len(col_oc.items)} {'column' if len(col_oc.items) == 1 else 'columns'}, {len(row_oc.items)} {'row' if len(row_oc.items) == 1 else 'rows'}",
         }
 
     def get_affordances(self) -> list[Affordance]:
         affordances: list[Affordance] = []
-        col_keys = " | ".join(c["key"] for c in self.columns) if self.columns else ""
-        row_ids = " | ".join(self.row_order) if self.row_order else ""
+        col_oc = self._col_collection
+        row_oc = self._row_collection
+        col_items = col_oc.items
+        row_items = row_oc.items
+        col_keys_str = " | ".join(i["id"] for i in col_items) if col_items else ""
+        row_ids_str = " | ".join(i["id"] for i in row_items) if row_items else ""
 
         # Add column
+        fixed_col_ids = {i["id"] for i in col_items if i.get("fixed")}
         affordances.append(AddColumnAffordance(
             label="+ Column",
             method="POST",
@@ -140,19 +216,21 @@ class TableForm(Eigenform):
             instruction="Add a new column. Provide the column label.",
         ))
 
-        # Rename column
-        if self.columns:
+        # Rename column (editable columns only)
+        editable_cols = [i for i in col_items if not i.get("fixed")]
+        if editable_cols:
+            editable_col_keys = " | ".join(i["id"] for i in editable_cols)
             affordances.append(Affordance(
                 label="Rename Column",
                 method="POST",
                 url=self.url,
-                body={"action": "rename_column", "column": f"<{col_keys}>", "label": "<new label>"},
+                body={"action": "rename_column", "column": f"<{editable_col_keys}>", "label": "<new label>"},
                 instruction="Rename a column. Accepts column key or current label.",
             ))
 
         # Add row (with optional initial values)
-        if self.columns:
-            col_desc = ", ".join(f"{c['key']} ({c['label']})" for c in self.columns)
+        if col_items:
+            col_desc = ", ".join(f"{i['id']} ({i['value']})" for i in col_items)
             affordances.append(Affordance(
                 label="+ Row",
                 method="POST",
@@ -162,20 +240,20 @@ class TableForm(Eigenform):
             ))
 
         # Set cell
-        if self.columns and self.row_order:
+        if col_items and row_items:
             affordances.append(SetCellAffordance(
                 label="Set Cell",
                 method="POST",
                 url=self.url,
-                body={"action": "set_cell", "row": f"<{row_ids}>", "column": f"<{col_keys}>", "value": "<value>"},
+                body={"action": "set_cell", "row": f"<{row_ids_str}>", "column": f"<{col_keys_str}>", "value": "<value>"},
                 instruction="Set a cell value. Row is a row ID. Column is a key or label.",
             ))
 
         # Set row
-        if self.columns and self.row_order:
-            body = {"action": "set_row", "row": f"<{row_ids}>"}
-            for c in self.columns:
-                body[c["key"]] = f"<{c['label']} value>"
+        if col_items and row_items:
+            body: dict[str, Any] = {"action": "set_row", "row": f"<{row_ids_str}>"}
+            for item in col_items:
+                body[item["id"]] = f"<{item['value']} value>"
             affordances.append(Affordance(
                 label="Set Row",
                 method="POST",
@@ -184,23 +262,120 @@ class TableForm(Eigenform):
                 instruction="Set multiple cells in a row at once. Omitted columns are unchanged.",
             ))
 
-        # Remove row
-        if self.row_order:
+        # Move row up/down
+        if len(row_items) > 1:
+            can_up = [row_items[i]["id"] for i in range(len(row_items))
+                      if row_oc.can_move_up(i, row_items)]
+            can_down = [row_items[i]["id"] for i in range(len(row_items))
+                        if row_oc.can_move_down(i, row_items)]
+            if can_up:
+                affordances.append(Affordance(
+                    label="Move Row Up",
+                    method="POST",
+                    url=self.url,
+                    body={"action": "move_row_up", "row": f"<{' | '.join(can_up)}>"},
+                    instruction="Move a row up one position.",
+                ))
+            if can_down:
+                affordances.append(Affordance(
+                    label="Move Row Down",
+                    method="POST",
+                    url=self.url,
+                    body={"action": "move_row_down", "row": f"<{' | '.join(can_down)}>"},
+                    instruction="Move a row down one position.",
+                ))
+
+        # Move column left/right
+        if len(col_items) > 1:
+            can_left = [col_items[i]["id"] for i in range(len(col_items))
+                        if col_oc.can_move_up(i, col_items)]
+            can_right = [col_items[i]["id"] for i in range(len(col_items))
+                         if col_oc.can_move_down(i, col_items)]
+            if can_left:
+                affordances.append(Affordance(
+                    label="Move Column Left",
+                    method="POST",
+                    url=self.url,
+                    body={"action": "move_col_left", "column": f"<{' | '.join(can_left)}>"},
+                    instruction="Move a column one position to the left.",
+                ))
+            if can_right:
+                affordances.append(Affordance(
+                    label="Move Column Right",
+                    method="POST",
+                    url=self.url,
+                    body={"action": "move_col_right", "column": f"<{' | '.join(can_right)}>"},
+                    instruction="Move a column one position to the right.",
+                ))
+
+        # Row constraints
+        if self.allow_row_constraints and len(row_items) > 1:
+            r_ids = [i["id"] for i in row_items]
+            r_labels = {i["id"]: i["value"] or i["id"] for i in row_items}
+            affordances.append(AddConstraintAffordance(
+                label="Add Row Constraint",
+                method="POST",
+                url=self.url,
+                body={"action": "add_row_constraint", "item": f"<{' | '.join(r_ids)}>", "after": f"<{' | '.join(r_ids)}>"},
+                instruction=f"Require that <item> row must appear after <after> row.",
+                item_values=r_ids,
+                item_labels=r_labels,
+            ))
+        row_dynamic = row_oc.stored_constraints
+        if row_dynamic:
+            pairs = " | ".join(f"{c['item']} after {c['after']}" for c in row_dynamic)
+            affordances.append(Affordance(
+                label="Remove Row Constraint",
+                method="POST",
+                url=self.url,
+                body={"action": "remove_row_constraint", "item": f"<{pairs}>", "after": f"<see pairs>"},
+                instruction=f"Remove a dynamic row ordering constraint. Active: {pairs}.",
+            ))
+
+        # Column constraints
+        if self.allow_col_constraints and len(col_items) > 1:
+            c_ids = [i["id"] for i in col_items]
+            c_labels = {i["id"]: i["value"] for i in col_items}
+            affordances.append(AddConstraintAffordance(
+                label="Add Column Constraint",
+                method="POST",
+                url=self.url,
+                body={"action": "add_col_constraint", "item": f"<{' | '.join(c_ids)}>", "after": f"<{' | '.join(c_ids)}>"},
+                instruction=f"Require that <item> column must appear after <after> column.",
+                item_values=c_ids,
+                item_labels=c_labels,
+            ))
+        col_dynamic = col_oc.stored_constraints
+        if col_dynamic:
+            pairs = " | ".join(f"{c['item']} after {c['after']}" for c in col_dynamic)
+            affordances.append(Affordance(
+                label="Remove Column Constraint",
+                method="POST",
+                url=self.url,
+                body={"action": "remove_col_constraint", "item": f"<{pairs}>", "after": f"<see pairs>"},
+                instruction=f"Remove a dynamic column ordering constraint. Active: {pairs}.",
+            ))
+
+        # Remove row (editable rows only)
+        editable_rows = [i for i in row_items if not i.get("fixed")]
+        if editable_rows:
+            editable_row_ids = " | ".join(i["id"] for i in editable_rows)
             affordances.append(Affordance(
                 label="Remove Row",
                 method="POST",
                 url=self.url,
-                body={"action": "remove_row", "row": f"<{row_ids}>"},
+                body={"action": "remove_row", "row": f"<{editable_row_ids}>"},
                 instruction="Remove a row by ID.",
             ))
 
-        # Remove column
-        if self.columns:
+        # Remove column (editable columns only)
+        if editable_cols:
+            editable_col_keys_str = " | ".join(i["id"] for i in editable_cols)
             affordances.append(Affordance(
                 label="Remove Column",
                 method="POST",
                 url=self.url,
-                body={"action": "remove_column", "column": f"<{col_keys}>"},
+                body={"action": "remove_column", "column": f"<{editable_col_keys_str}>"},
                 instruction="Remove a column by key or label.",
             ))
 
@@ -208,6 +383,11 @@ class TableForm(Eigenform):
 
     def render_from_data(self, data: dict) -> str:
         from engine.affordances import render_affordance_html
+        col_oc = self._col_collection
+        row_oc = self._row_collection
+        col_items = col_oc.items
+        row_items = row_oc.items
+
         html = f'<h3>{escape(data["label"])}</h3>'
         if data.get("instruction"):
             html += f'<p>{escape(data["instruction"])}</p>'
@@ -216,38 +396,75 @@ class TableForm(Eigenform):
         rows = data.get("rows", [])
         affs = data.get("affordances", [])
 
-        # Find the URL from any affordance
         url = affs[0]["url"] if affs else ""
+        gap = '<span style="display: inline-block; width: 24px; height: 24px;"></span>'
+        num_rows = len(row_items)
+        num_cols = len(col_items)
 
         if columns:
             html += '<table style="border-collapse: collapse; margin: 8px 0;">'
 
-            # Header — column labels are inline-editable
+            # Header row
             html += '<tr>'
+            # ID column header (with space for move buttons)
             html += '<th style="border: 1px solid #ccc; padding: 4px 8px; background: #f0f0f0;">ID</th>'
-            for col in columns:
-                rm_col_body = {"action": "remove_column", "column": col["key"]}
-                rm_col_btn = render_inline_button(url, rm_col_body, "\u2212", STYLE_REMOVE)
-                html += (
-                    f'<th style="border: 1px solid #ccc; padding: 2px; background: #f0f0f0;">'
-                    f'<form style="margin:0" onsubmit="fetch(\'{url}\','
-                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                    f'body:JSON.stringify({{action:\'rename_column\',column:\'{col["key"]}\','
-                    f'label:this.elements.v.value}})'
-                    f'}}).then(()=>location.reload()); return false">'
-                    f'<input name="v" type="text" value="{escape(col["label"])}"'
-                    f' style="border: none; width: 100%; box-sizing: border-box; padding: 2px 4px;'
-                    f' background: transparent; font-weight: bold; text-align: center;"'
-                    f' oninput="this.title=\'POST {url} \'+JSON.stringify({{action:\'rename_column\',column:\'{col["key"]}\',label:this.value}})"'
-                    f' title="POST {url} {escape(json.dumps({"action": "rename_column", "column": col["key"], "label": col["label"]}))}" />'
-                    f'</form>'
-                    f'<div style="display: flex; justify-content: space-between; align-items: center; padding: 0 4px;">'
-                    f'<span style="font-size: 10px; color: #888;">{escape(col["key"])}</span>'
-                    f'{rm_col_btn}'
-                    f'</div>'
-                    f'</th>'
-                )
-            # +Column as last header cell — inline input
+
+            for ci, col in enumerate(columns):
+                col_item = col_items[ci] if ci < len(col_items) else None
+                is_fixed_col = col_item.get("fixed", False) if col_item else False
+
+                # Column move buttons + remove button
+                move_btns = ''
+                if num_cols > 1:
+                    if col_oc.can_move_up(ci, col_items):
+                        move_btns += render_inline_button(url, {"action": "move_col_left", "column": col["key"]}, "&#9664;", STYLE_ARROW)
+                    else:
+                        move_btns += gap
+                    if col_oc.can_move_down(ci, col_items):
+                        move_btns += render_inline_button(url, {"action": "move_col_right", "column": col["key"]}, "&#9654;", STYLE_ARROW)
+                    else:
+                        move_btns += gap
+
+                rm_col_btn = ''
+                if not is_fixed_col:
+                    rm_col_body = {"action": "remove_column", "column": col["key"]}
+                    rm_col_btn = render_inline_button(url, rm_col_body, "\u2212", STYLE_REMOVE)
+
+                if is_fixed_col:
+                    # Fixed column: non-editable header
+                    html += (
+                        f'<th style="border: 1px solid #ccc; padding: 2px; background: #f0f0f0;">'
+                        f'<div style="padding: 2px 4px; font-weight: bold; text-align: center; color: #555;">'
+                        f'{escape(col["label"])}</div>'
+                        f'<div style="display: flex; justify-content: space-between; align-items: center; padding: 0 4px;">'
+                        f'<span style="font-size: 10px; color: #888;">{escape(col["key"])}</span>'
+                        f'{move_btns}'
+                        f'</div>'
+                        f'</th>'
+                    )
+                else:
+                    # Editable column header
+                    html += (
+                        f'<th style="border: 1px solid #ccc; padding: 2px; background: #f0f0f0;">'
+                        f'<form style="margin:0" onsubmit="fetch(\'{url}\','
+                        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+                        f'body:JSON.stringify({{action:\'rename_column\',column:\'{col["key"]}\','
+                        f'label:this.elements.v.value}})'
+                        f'}}).then(()=>location.reload()); return false">'
+                        f'<input name="v" type="text" value="{escape(col["label"])}"'
+                        f' style="border: none; width: 100%; box-sizing: border-box; padding: 2px 4px;'
+                        f' background: transparent; font-weight: bold; text-align: center;"'
+                        f' oninput="this.title=\'POST {url} \'+JSON.stringify({{action:\'rename_column\',column:\'{col["key"]}\',label:this.value}})"'
+                        f' title="POST {url} {escape(json.dumps({"action": "rename_column", "column": col["key"], "label": col["label"]}))}" />'
+                        f'</form>'
+                        f'<div style="display: flex; justify-content: space-between; align-items: center; padding: 0 4px;">'
+                        f'<span style="font-size: 10px; color: #888;">{escape(col["key"])}</span>'
+                        f'{move_btns}{rm_col_btn}'
+                        f'</div>'
+                        f'</th>'
+                    )
+
+            # +Column as last header cell
             add_col_aff = next((a for a in affs if a.get("body", {}).get("action") == "add_column"), None)
             if add_col_aff:
                 add_col_body_preview = json.dumps({"action": "add_column", "label": ""})
@@ -267,19 +484,34 @@ class TableForm(Eigenform):
                 )
             html += '</tr>'
 
-            # Rows — each cell is an inline form, with a remove button at the end
-            for row_data in rows:
+            # Data rows
+            for ri, row_data in enumerate(rows):
                 row_id = row_data["_id"]
-                rm_row_body = {"action": "remove_row", "row": row_id}
-                rm_row_btn = render_inline_button(url, rm_row_body, "\u2212", STYLE_REMOVE)
+                row_item = row_items[ri] if ri < len(row_items) else None
+                is_fixed_row = row_item.get("fixed", False) if row_item else False
+
                 html += '<tr>'
-                html += (
-                    f'<td style="border: 1px solid #ccc; padding: 4px 8px; color: #888;'
-                    f' font-size: 11px; white-space: nowrap;">'
-                    f'{rm_row_btn}'
-                    f' {escape(row_id)}'
-                    f'</td>'
-                )
+
+                # Row ID cell with remove + move buttons
+                html += '<td style="border: 1px solid #ccc; padding: 4px 8px; color: #888; font-size: 11px; white-space: nowrap;">'
+                if not is_fixed_row:
+                    rm_row_body = {"action": "remove_row", "row": row_id}
+                    html += render_inline_button(url, rm_row_body, "\u2212", STYLE_REMOVE)
+                else:
+                    html += gap
+                if num_rows > 1:
+                    if row_oc.can_move_up(ri, row_items):
+                        html += render_inline_button(url, {"action": "move_row_up", "row": row_id}, "&#9650;", STYLE_ARROW)
+                    else:
+                        html += gap
+                    if row_oc.can_move_down(ri, row_items):
+                        html += render_inline_button(url, {"action": "move_row_down", "row": row_id}, "&#9660;", STYLE_ARROW)
+                    else:
+                        html += gap
+                html += f' {escape(row_id)}'
+                html += '</td>'
+
+                # Data cells
                 for col in columns:
                     cell_value = row_data.get(col["key"])
                     display = escape(str(cell_value)) if cell_value is not None else ""
@@ -303,7 +535,7 @@ class TableForm(Eigenform):
                     html += '<td style="border: 1px solid #ccc;"></td>'
                 html += '</tr>'
 
-            # +Row button as a final row, aligned with the "−" buttons
+            # +Row button row
             add_row_aff = next((a for a in affs if a.get("body", {}).get("action") == "add_row"), None)
             if add_row_aff:
                 add_row_body = json.dumps({"action": "add_row"})
@@ -326,7 +558,7 @@ class TableForm(Eigenform):
 
             html += '</table>'
         else:
-            # Empty table — show just the +Column input to get started
+            # Empty table — show just the +Column input
             add_col_aff = next((a for a in affs if a.get("body", {}).get("action") == "add_column"), None)
             if add_col_aff:
                 add_col_body_preview = json.dumps({"action": "add_column", "label": ""})
@@ -355,11 +587,15 @@ class TableForm(Eigenform):
             html += '<p style="color: #888;">No rows yet. Add a row to start entering data.</p>'
 
         # Mark affordances rendered inline in the table
-        from engine.eigenform import Eigenform
         for aff in affs:
             hints_type = aff.get("render_hints", {}).get("type", "")
             action = aff.get("body", {}).get("action", "")
-            if hints_type == "inline_cell" or action in ("rename_column", "remove_column", "remove_row", "add_row", "add_column"):
+            if hints_type == "inline_cell" or action in (
+                "rename_column", "remove_column", "remove_row", "add_row", "add_column",
+                "move_row_up", "move_row_down", "move_col_left", "move_col_right",
+                "add_row_constraint", "remove_row_constraint",
+                "add_col_constraint", "remove_col_constraint",
+            ):
                 Eigenform.mark_rendered(aff)
 
         # Remaining affordance controls
@@ -373,22 +609,23 @@ class TableForm(Eigenform):
 
     def _handle(self, body: dict) -> dict:
         action = body.get("action", "")
-        columns = list(self.columns)
-        rows = dict(self.rows)
-        row_order = list(self.row_order)
-        next_row_id = self._next_row_id
-        next_col_id = self._next_col_id
+        col_oc = self._col_collection
+        row_oc = self._row_collection
+        col_state, row_state, cells = self._current_states()
 
         if action == "add_column":
             label = body.get("label", "").strip()
             if not label:
                 return self._error("Column label is required.", action=action)
-            key = f"col_{next_col_id}"
-            next_col_id += 1
-            columns.append({"key": key, "label": label})
-            for row_id in row_order:
-                rows[row_id][key] = None
-            self._save(columns, rows, row_order, next_row_id, next_col_id)
+            try:
+                col_state = col_oc.add(label)
+            except ValueError as e:
+                return self._error(str(e), action=action)
+            # Initialize cells for new column
+            new_col_id = col_state["items"][-1]["id"]
+            for row_id in [i["id"] for i in row_state.get("items", [])]:
+                cells.setdefault(row_id, {})[new_col_id] = None
+            self._save(col_state, row_state, cells)
 
         elif action == "rename_column":
             col_ref = body.get("column", "")
@@ -398,66 +635,149 @@ class TableForm(Eigenform):
                 return self._error(f"Unknown column: {col_ref}. Valid: {', '.join(self.col_keys)}", action=action)
             if not new_label:
                 return self._error("New label is required.", action=action)
-            for c in columns:
-                if c["key"] == col_key:
-                    c["label"] = new_label
-                    break
-            self._save(columns, rows, row_order, next_row_id, next_col_id)
+            try:
+                col_state = col_oc.edit(col_key, new_label)
+            except ValueError as e:
+                return self._error(str(e), action=action)
+            self._save(col_state, row_state, cells)
 
         elif action == "add_row":
-            row_id = f"row_{next_row_id}"
-            next_row_id += 1
+            try:
+                row_state = row_oc.add("")
+            except ValueError as e:
+                return self._error(str(e), action=action)
+            new_row_id = row_state["items"][-1]["id"]
             row = {}
-            for col in columns:
-                val = body.get(col["key"])
+            for col_item in col_state.get("items", []):
+                col_key = col_item["id"]
+                val = body.get(col_key)
                 if val is None:
-                    val = body.get(col["label"])
-                row[col["key"]] = val
-            rows[row_id] = row
-            row_order.append(row_id)
-            self._save(columns, rows, row_order, next_row_id, next_col_id)
+                    val = body.get(col_item.get("value", ""))
+                row[col_key] = val
+            cells[new_row_id] = row
+            self._save(col_state, row_state, cells)
 
         elif action == "set_cell":
             row_id = body.get("row", "")
             col_ref = body.get("column", "")
             value = body.get("value")
-            if row_id not in rows:
-                return self._error(f"Unknown row: {row_id}. Valid: {', '.join(row_order)}", action=action)
+            if row_id not in cells and row_id not in {i["id"] for i in row_state.get("items", [])}:
+                return self._error(f"Unknown row: {row_id}. Valid: {', '.join(i['id'] for i in row_state.get('items', []))}", action=action)
             col_key = self._resolve_column(col_ref)
             if not col_key:
                 return self._error(f"Unknown column: {col_ref}. Valid: {', '.join(self.col_keys)}", action=action)
-            rows[row_id][col_key] = value
-            self._save(columns, rows, row_order, next_row_id, next_col_id)
+            cells.setdefault(row_id, {})[col_key] = value
+            self._save(col_state, row_state, cells)
 
         elif action == "set_row":
             row_id = body.get("row", "")
-            if row_id not in rows:
-                return self._error(f"Unknown row: {row_id}. Valid: {', '.join(row_order)}", action=action)
-            for col in columns:
-                val = body.get(col["key"])
+            row_ids = {i["id"] for i in row_state.get("items", [])}
+            if row_id not in row_ids:
+                return self._error(f"Unknown row: {row_id}. Valid: {', '.join(row_ids)}", action=action)
+            for col_item in col_state.get("items", []):
+                col_key = col_item["id"]
+                val = body.get(col_key)
                 if val is None:
-                    val = body.get(col["label"])
+                    val = body.get(col_item.get("value", ""))
                 if val is not None:
-                    rows[row_id][col["key"]] = val
-            self._save(columns, rows, row_order, next_row_id, next_col_id)
+                    cells.setdefault(row_id, {})[col_key] = val
+            self._save(col_state, row_state, cells)
 
         elif action == "remove_row":
             row_id = body.get("row", "")
-            if row_id not in rows:
-                return self._error(f"Unknown row: {row_id}. Valid: {', '.join(row_order)}", action=action)
-            del rows[row_id]
-            row_order.remove(row_id)
-            self._save(columns, rows, row_order, next_row_id, next_col_id)
+            try:
+                row_state = row_oc.remove(row_id)
+            except ValueError as e:
+                return self._error(str(e), action=action)
+            cells.pop(row_id, None)
+            self._save(col_state, row_state, cells)
 
         elif action == "remove_column":
             col_ref = body.get("column", "")
             col_key = self._resolve_column(col_ref)
             if not col_key:
                 return self._error(f"Unknown column: {col_ref}. Valid: {', '.join(self.col_keys)}", action=action)
-            columns = [c for c in columns if c["key"] != col_key]
-            for row_id in row_order:
-                rows[row_id].pop(col_key, None)
-            self._save(columns, rows, row_order, next_row_id, next_col_id)
+            try:
+                col_state = col_oc.remove(col_key)
+            except ValueError as e:
+                return self._error(str(e), action=action)
+            for row_id in cells:
+                cells[row_id].pop(col_key, None)
+            self._save(col_state, row_state, cells)
+
+        elif action == "move_row_up":
+            row_id = body.get("row", "")
+            try:
+                row_state = row_oc.move_up(row_id)
+            except ValueError as e:
+                return self._error(str(e), action=action)
+            self._save(col_state, row_state, cells)
+
+        elif action == "move_row_down":
+            row_id = body.get("row", "")
+            try:
+                row_state = row_oc.move_down(row_id)
+            except ValueError as e:
+                return self._error(str(e), action=action)
+            self._save(col_state, row_state, cells)
+
+        elif action == "move_col_left":
+            col_ref = body.get("column", "")
+            col_key = self._resolve_column(col_ref)
+            if not col_key:
+                return self._error(f"Unknown column: {col_ref}. Valid: {', '.join(self.col_keys)}", action=action)
+            try:
+                col_state = col_oc.move_up(col_key)
+            except ValueError as e:
+                return self._error(str(e), action=action)
+            self._save(col_state, row_state, cells)
+
+        elif action == "move_col_right":
+            col_ref = body.get("column", "")
+            col_key = self._resolve_column(col_ref)
+            if not col_key:
+                return self._error(f"Unknown column: {col_ref}. Valid: {', '.join(self.col_keys)}", action=action)
+            try:
+                col_state = col_oc.move_down(col_key)
+            except ValueError as e:
+                return self._error(str(e), action=action)
+            self._save(col_state, row_state, cells)
+
+        elif action == "add_row_constraint":
+            item_id = body.get("item", "")
+            after_id = body.get("after", "")
+            try:
+                row_state = row_oc.add_constraint(item_id, after_id)
+            except ValueError as e:
+                return self._error(str(e), action=action)
+            self._save(col_state, row_state, cells)
+
+        elif action == "remove_row_constraint":
+            item_id = body.get("item", "")
+            after_id = body.get("after", "")
+            try:
+                row_state = row_oc.remove_constraint(item_id, after_id)
+            except ValueError as e:
+                return self._error(str(e), action=action)
+            self._save(col_state, row_state, cells)
+
+        elif action == "add_col_constraint":
+            item_id = body.get("item", "")
+            after_id = body.get("after", "")
+            try:
+                col_state = col_oc.add_constraint(item_id, after_id)
+            except ValueError as e:
+                return self._error(str(e), action=action)
+            self._save(col_state, row_state, cells)
+
+        elif action == "remove_col_constraint":
+            item_id = body.get("item", "")
+            after_id = body.get("after", "")
+            try:
+                col_state = col_oc.remove_constraint(item_id, after_id)
+            except ValueError as e:
+                return self._error(str(e), action=action)
+            self._save(col_state, row_state, cells)
 
         else:
             return self._error(f"Unknown action: {action}", action=action)

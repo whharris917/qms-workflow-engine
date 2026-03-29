@@ -101,6 +101,22 @@ class SimpleButtonAffordance(Affordance):
         return {"type": "button"}
 
 
+class AddConstraintAffordance(Affordance):
+    """An affordance that adds an ordering constraint between two items."""
+
+    def __init__(self, label: str, method: str, url: str, body: dict,
+                 instruction: str | None = None,
+                 item_values: list[str] | None = None,
+                 item_labels: dict[str, str] | None = None):
+        super().__init__(label=label, method=method, url=url, body=body, instruction=instruction)
+        self.item_values = item_values or []
+        self.item_labels = item_labels or {}
+
+    def _render_hints(self) -> dict:
+        return {"type": "constraint_picker", "options": self.item_values,
+                "labels": self.item_labels}
+
+
 class CheckboxAffordance(Affordance):
     def __init__(self, label: str, method: str, url: str, body: dict,
                  instruction: str | None = None, items: dict[str, bool] | None = None):
