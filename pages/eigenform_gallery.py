@@ -22,6 +22,7 @@ from engine.ratingform import RatingForm
 from engine.rankform import RankForm
 from engine.multiform import MultiForm
 from engine.listform import ListForm
+from engine.setform import SetForm
 from engine.tableform import TableForm
 from engine.keyvalueform import KeyValueForm
 from engine.visibilityform import VisibilityForm
@@ -201,6 +202,15 @@ collection_forms = GroupForm(
                 FieldDescriptor(key="role", label="Role", type="choice",
                                 options=["Engineer", "Designer", "Manager", "QA"]),
             ],
+        ),
+        SetForm(
+            key="set-demo",
+            label="SetForm",
+            instruction=(
+                "An unordered collection of unique items. Unlike ListForm, there is "
+                "no ordering and no duplicate values. Items are added and removed by "
+                "value. Try adding 'apple' twice — the duplicate is rejected."
+            ),
         ),
         TableForm(
             key="table-demo",

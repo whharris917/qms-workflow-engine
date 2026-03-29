@@ -52,8 +52,10 @@ class KeyValueForm(Eigenform):
         return all(e.get("key") and e.get("value") for e in entries)
 
     def _serialize_state(self) -> dict:
+        # Strip internal IDs from agent-facing output — keys are the identifier
+        clean_entries = [{"key": e["key"], "value": e["value"]} for e in self.entries]
         return self._base_state() | {
-            "entries": self.entries,
+            "entries": clean_entries,
             "key_label": self.key_label,
             "value_label": self.value_label,
         }
@@ -70,22 +72,23 @@ class KeyValueForm(Eigenform):
             value_label=self.value_label,
         ))
         if self.entries:
-            entry_ids = " | ".join(e["id"] for e in self.entries)
-            affordances.append(Affordance(
-                label="Edit Entry",
-                method="POST",
-                url=self.url,
-                body={"action": "edit", "id": f"<{entry_ids}>",
-                      "key": f"<{self.key_label}>", "value": f"<{self.value_label}>"},
-                instruction="Edit an entry by ID. Omit key or value to keep unchanged.",
-            ))
-            affordances.append(Affordance(
-                label="Remove Entry",
-                method="POST",
-                url=self.url,
-                body={"action": "remove", "id": f"<{entry_ids}>"},
-                instruction="Remove an entry by ID.",
-            ))
+            entry_keys = " | ".join(e["key"] for e in self.entries if e.get("key"))
+            if entry_keys:
+                affordances.append(Affordance(
+                    label="Edit Entry",
+                    method="POST",
+                    url=self.url,
+                    body={"action": "edit", "key": f"<{entry_keys}>",
+                          "new_key": f"<optional new key>", "value": f"<{self.value_label}>"},
+                    instruction="Edit an entry by key. Include new_key to rename. Omit new_key or value to keep unchanged.",
+                ))
+                affordances.append(Affordance(
+                    label="Remove Entry",
+                    method="POST",
+                    url=self.url,
+                    body={"action": "remove", "key": f"<{entry_keys}>"},
+                    instruction="Remove an entry by key.",
+                ))
         return affordances
 
     def render_from_data(self, data: dict) -> str:
@@ -108,28 +111,37 @@ class KeyValueForm(Eigenform):
                 Eigenform.mark_rendered(aff)
 
         html += f'<div style="display: flex; gap: 4px; margin: 4px 0; font-weight: bold; font-size: 0.9em;">'
+        html += f'<span style="display: inline-block; width: 24px;"></span>'
         html += f'<span style="width: 120px;">{kl}</span>'
         html += f'<span style="flex: 1;">{vl}</span>'
         html += f'</div>'
 
         # Existing entries — inline edit fields + ✓ + x
         for entry in entries:
-            eid = entry["id"]
             ekey = escape(str(entry.get("key", "")))
+            ekey_raw = entry.get("key", "")
+            ekey_js = ekey_raw.replace("\\", "\\\\").replace("'", "\\'")
             eval_ = escape(str(entry.get("value", "")))
             edit_tooltip_js = (
                 f"var f=this.form;"
+                f"var b={{action:'edit',key:'{ekey_js}'}};"
+                f"if(f.elements.k.value!=='{ekey_js}')b.new_key=f.elements.k.value;"
+                f"b.value=f.elements.v.value;"
                 f"f.querySelector('button[type=submit]').title="
-                f"'{escape(endpoint)} '+JSON.stringify({{action:'edit',id:'{eid}',key:f.elements.k.value,value:f.elements.v.value}})"
+                f"'{escape(endpoint)} '+JSON.stringify(b)"
             )
-            edit_default = {"action": "edit", "id": eid, "key": entry.get("key", ""), "value": entry.get("value", "")}
+            edit_default = {"action": "edit", "key": ekey_raw, "value": entry.get("value", "")}
             edit_tooltip = f'{escape(endpoint)} {escape(json.dumps(edit_default))}'
+            html += f'<div style="display: flex; align-items: center; gap: 4px; margin: 2px 0;">'
+            html += render_inline_button(url, {"action": "remove", "key": ekey_raw}, "x", STYLE_REMOVE)
             html += (
-                f'<div style="display: flex; align-items: center; gap: 4px; margin: 2px 0;">'
-                f'<form style="display: contents; margin: 0;" onsubmit="fetch(\'{url}\','
-                f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                f"body:JSON.stringify({{action:'edit',id:'{eid}',key:this.elements.k.value,value:this.elements.v.value}})"
-                f'}}).then(()=>location.reload()); return false">'
+                f'<form style="display: contents; margin: 0;" onsubmit="'
+                f"var b={{action:'edit',key:'{ekey_js}'}};"
+                f"if(this.elements.k.value!=='{ekey_js}')b.new_key=this.elements.k.value;"
+                f"b.value=this.elements.v.value;"
+                f"fetch('{url}',"
+                f"{{method:'POST',headers:{{'Content-Type':'application/json'}},"
+                f"body:JSON.stringify(b)}}).then(()=>location.reload()); return false\">"
                 f'<input name="k" type="text" value="{ekey}" style="border: 1px solid #ddd; padding: 2px 4px; width: 120px;"'
                 f' oninput="{edit_tooltip_js}" />'
                 f'<input name="v" type="text" value="{eval_}" style="border: 1px solid #ddd; padding: 2px 4px; flex: 1;"'
@@ -137,9 +149,8 @@ class KeyValueForm(Eigenform):
                 f'<button type="submit" style="{STYLE_CONFIRM}"'
                 f' title="{edit_tooltip}">&#10003;</button>'
                 f'</form>'
+                f'</div>'
             )
-            html += render_inline_button(url, {"action": "remove", "id": eid}, "x", STYLE_REMOVE)
-            html += '</div>'
 
         # Add row — inline key + value fields + green + button
         add_default = {"action": "add", "key": "", "value": ""}
@@ -149,8 +160,10 @@ class KeyValueForm(Eigenform):
             f"f.querySelector('button[type=submit]').title="
             f"'{escape(endpoint)} '+JSON.stringify({{action:'add',key:f.elements.k.value,value:f.elements.v.value}})"
         )
+        gap = '<span style="display: inline-block; width: 24px; height: 24px;"></span>'
         html += (
             f'<div style="display: flex; align-items: center; gap: 4px; margin: 2px 0;">'
+            f'{gap}'
             f'<form style="display: contents; margin: 0;" onsubmit="fetch(\'{url}\','
             f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
             f"body:JSON.stringify({{action:'add',key:this.elements.k.value,value:this.elements.v.value}})"
@@ -193,25 +206,30 @@ class KeyValueForm(Eigenform):
             return self.serialize()
 
         elif action == "edit":
-            eid = body.get("id")
-            for entry in state["entries"]:
-                if entry["id"] == eid:
-                    k = body.get("key")
-                    v = body.get("value")
-                    if k and not k.startswith("<"):
-                        existing = {e["key"] for e in state["entries"] if e["id"] != eid}
-                        if k in existing:
-                            return self._error(f"Key '{k}' already exists on another entry.", action=action)
-                        entry["key"] = k
-                    if v and not v.startswith("<"):
-                        entry["value"] = v
-                    self._store.set(self._scope, self.key, state)
-                    return self.serialize()
-            return self._error(f"Entry {eid} not found.", action=action)
+            target_key = body.get("key", "")
+            entry = next((e for e in state["entries"] if e["key"] == target_key), None)
+            if entry is None:
+                existing_keys = [e["key"] for e in state["entries"] if e.get("key")]
+                return self._error(f"No entry with key {target_key!r}. Valid: {', '.join(existing_keys)}", action=action)
+            new_key = body.get("new_key")
+            if new_key and not new_key.startswith("<"):
+                existing = {e["key"] for e in state["entries"] if e["key"] != target_key}
+                if new_key in existing:
+                    return self._error(f"Key '{new_key}' already exists on another entry.", action=action)
+                entry["key"] = new_key
+            v = body.get("value")
+            if v and not v.startswith("<"):
+                entry["value"] = v
+            self._store.set(self._scope, self.key, state)
+            return self.serialize()
 
         elif action == "remove":
-            eid = body.get("id")
-            state["entries"] = [e for e in state["entries"] if e["id"] != eid]
+            target_key = body.get("key", "")
+            before = len(state["entries"])
+            state["entries"] = [e for e in state["entries"] if e["key"] != target_key]
+            if len(state["entries"]) == before:
+                existing_keys = [e["key"] for e in state["entries"] if e.get("key")]
+                return self._error(f"No entry with key {target_key!r}. Valid: {', '.join(existing_keys)}", action=action)
             self._store.set(self._scope, self.key, state)
             return self.serialize()
 

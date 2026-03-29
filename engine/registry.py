@@ -109,10 +109,12 @@ def _build_default_registry() -> EigenformRegistry:
     from engine.validationform import ValidationForm
     from engine.actionform import ActionForm
     from engine.rubikscubeform import RubiksCubeForm
+    from engine.setform import SetForm
 
     r = EigenformRegistry()
     for cls in [
-        TextForm, CheckboxForm, ChoiceForm, MultiForm, ListForm, TableForm,
+        TextForm, CheckboxForm, ChoiceForm, MultiForm, ListForm, SetForm,
+        TableForm,
         NumberForm, DateForm, BooleanForm, MemoForm, RatingForm, RangeForm,
         RankForm, KeyValueForm,
         PageForm, TabForm, ChainForm, AccordionForm, GroupForm, RepeaterForm,
