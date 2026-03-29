@@ -41,7 +41,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from html import escape
 
-from engine.eigenforms import Eigenform
+from engine.eigenform import Eigenform
 from engine.store import Store
 
 
@@ -72,7 +72,7 @@ class GroupForm(Eigenform):
     def _serialize_state(self) -> dict:
         return self._base_state()
 
-    def serialize(self) -> dict:
+    def _serialize_full(self) -> dict:
         state = self._serialize_state()
         state["eigenforms"] = [s for ef in self.eigenforms if (s := ef.serialize()) is not None]
         state["complete"] = self.is_complete

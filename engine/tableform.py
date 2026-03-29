@@ -23,7 +23,7 @@ from engine.affordances import (
     STYLE_REMOVE,
     render_inline_button,
 )
-from engine.eigenforms import Eigenform
+from engine.eigenform import Eigenform
 from engine.store import Store
 
 
@@ -355,7 +355,7 @@ class TableForm(Eigenform):
             html += '<p style="color: #888;">No rows yet. Add a row to start entering data.</p>'
 
         # Mark affordances rendered inline in the table
-        from engine.eigenforms import Eigenform
+        from engine.eigenform import Eigenform
         for aff in affs:
             hints_type = aff.get("render_hints", {}).get("type", "")
             action = aff.get("body", {}).get("action", "")

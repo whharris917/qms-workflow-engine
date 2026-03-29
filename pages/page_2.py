@@ -1,8 +1,9 @@
 """Page 2 — TabForm with three tabs."""
 
-from engine.eigenforms import CheckboxForm, TextForm
-from engine.page import PageForm
-from engine.tab import TabForm
+from engine.checkboxform import CheckboxForm
+from engine.textform import TextForm
+from engine.pageform import PageForm
+from engine.tabform import TabForm
 
 
 definition = PageForm(key="page-2", label="Page 2", instruction="Fill out each tab to complete the change request.", eigenforms=[

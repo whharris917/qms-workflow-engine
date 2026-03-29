@@ -6,7 +6,7 @@ import json
 from dataclasses import dataclass, field
 from html import escape
 from engine.affordances import Affordance, SimpleButtonAffordance, STYLE_ARROW, render_inline_button
-from engine.eigenforms import Eigenform
+from engine.eigenform import Eigenform
 
 
 @dataclass

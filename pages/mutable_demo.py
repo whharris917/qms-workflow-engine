@@ -5,8 +5,8 @@ and reorder eigenforms using structural actions. This is Phase D
 of the fractal complexity plan.
 """
 
-from engine.eigenforms import TextForm
-from engine.page import PageForm
+from engine.textform import TextForm
+from engine.pageform import PageForm
 
 
 definition = PageForm(

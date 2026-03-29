@@ -17,7 +17,7 @@ from html import escape
 from typing import Any
 
 from engine.affordances import Affordance, SimpleButtonAffordance
-from engine.eigenforms import Eigenform
+from engine.eigenform import Eigenform
 from engine.store import Store
 
 

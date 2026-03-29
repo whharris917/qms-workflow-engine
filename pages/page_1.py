@@ -1,7 +1,8 @@
 """Page 1 — Basic eigenforms: TextForm + TextForm + CheckboxForm."""
 
-from engine.eigenforms import CheckboxForm, TextForm
-from engine.page import PageForm
+from engine.checkboxform import CheckboxForm
+from engine.textform import TextForm
+from engine.pageform import PageForm
 
 
 definition = PageForm(key="page-1", label="Page 1", eigenforms=[

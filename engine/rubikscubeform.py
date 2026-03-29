@@ -16,7 +16,7 @@ from html import escape
 from typing import Any
 
 from engine.affordances import Affordance, SimpleButtonAffordance
-from engine.eigenforms import Eigenform
+from engine.eigenform import Eigenform
 from engine.store import Store
 
 # Face indices in the state array
@@ -265,7 +265,7 @@ class RubiksCubeForm(Eigenform):
         html += '<div style="margin-top: 8px; font-size: 14px;">'
         rotate_aff = next((a for a in affs if a.get("body", {}).get("action") == "rotate"), None)
         if rotate_aff and not solved:
-            from engine.eigenforms import Eigenform
+            from engine.eigenform import Eigenform
             Eigenform.mark_rendered(rotate_aff)
             url = rotate_aff["url"]
             endpoint = f'POST {url}'

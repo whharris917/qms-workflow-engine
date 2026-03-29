@@ -1,7 +1,7 @@
 """Page 3 — RubiksCubeForm showcase."""
 
-from engine.page import PageForm
-from engine.rubiks import RubiksCubeForm
+from engine.pageform import PageForm
+from engine.rubikscubeform import RubiksCubeForm
 
 
 definition = PageForm(key="page-3", label="Page 3", eigenforms=[

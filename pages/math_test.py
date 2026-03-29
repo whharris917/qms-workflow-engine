@@ -1,10 +1,11 @@
 """Math Test — five questions testing arithmetic and instruction-following."""
 
-from engine.chain import ChainForm
-from engine.choice import ChoiceForm
-from engine.eigenforms import CheckboxForm, TextForm
-from engine.page import PageForm
-from engine.tab import TabForm
+from engine.chainform import ChainForm
+from engine.choiceform import ChoiceForm
+from engine.checkboxform import CheckboxForm
+from engine.textform import TextForm
+from engine.pageform import PageForm
+from engine.tabform import TabForm
 
 
 definition = PageForm(key="math-test", label="Math Test", instruction="Answer each question.", eigenforms=[

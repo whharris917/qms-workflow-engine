@@ -1,9 +1,10 @@
 """Visibility Experiments — exploring conditional visibility patterns."""
 
-from engine.choice import ChoiceForm
-from engine.eigenforms import CheckboxForm, TextForm
-from engine.page import PageForm
-from engine.visibility import VisibilityForm
+from engine.choiceform import ChoiceForm
+from engine.checkboxform import CheckboxForm
+from engine.textform import TextForm
+from engine.pageform import PageForm
+from engine.visibilityform import VisibilityForm
 
 
 definition = PageForm(key="visibility-experiments", label="Visibility Experiments", instruction="Experiments with conditional visibility.", eigenforms=[

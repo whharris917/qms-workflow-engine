@@ -6,24 +6,24 @@ ChoiceForm, CheckboxForm, DateForm, BooleanForm, MemoForm, RatingForm,
 RangeForm, NumberForm, RankForm, KeyValueForm, TableForm, ComputedForm.
 """
 
-from engine.accordion import AccordionForm
-from engine.boolean import BooleanForm
-from engine.chain import ChainForm
-from engine.choice import ChoiceForm
-from engine.computed import ComputedForm
-from engine.date import DateForm
-from engine.eigenforms import CheckboxForm
-from engine.keyvalue import KeyValueForm
-from engine.memo import MemoForm
-from engine.multi import FieldDescriptor, MultiForm
-from engine.number import NumberForm
-from engine.page import PageForm
-from engine.range import RangeForm
-from engine.rank import RankForm
-from engine.rating import RatingForm
-from engine.tab import TabForm
-from engine.table import TableForm
-from engine.visibility import VisibilityForm
+from engine.accordionform import AccordionForm
+from engine.booleanform import BooleanForm
+from engine.chainform import ChainForm
+from engine.choiceform import ChoiceForm
+from engine.computedform import ComputedForm
+from engine.dateform import DateForm
+from engine.checkboxform import CheckboxForm
+from engine.keyvalueform import KeyValueForm
+from engine.memoform import MemoForm
+from engine.multiform import FieldDescriptor, MultiForm
+from engine.numberform import NumberForm
+from engine.pageform import PageForm
+from engine.rangeform import RangeForm
+from engine.rankform import RankForm
+from engine.ratingform import RatingForm
+from engine.tabform import TabForm
+from engine.tableform import TableForm
+from engine.visibilityform import VisibilityForm
 
 
 def compute_vendor_score(siblings):

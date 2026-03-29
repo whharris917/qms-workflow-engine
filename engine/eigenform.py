@@ -19,11 +19,11 @@ from __future__ import annotations
 import copy
 import dataclasses
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from html import escape
 from typing import Any
 
-from engine.affordances import Affordance, CheckboxAffordance, SetValueAffordance, SimpleButtonAffordance
+from engine.affordances import Affordance, SimpleButtonAffordance
 from engine.store import Store
 
 # Fields that belong to the base protocol, not type-specific config
@@ -174,8 +174,12 @@ class Eigenform:
         """Produce the affordances available on this eigenform."""
         return []
 
-    def serialize(self) -> dict:
-        """Produce the complete canonical representation: state + affordances."""
+    def _serialize_full(self) -> dict:
+        """Produce the full internal representation including render-only fields.
+
+        Contains form, key, render_hints on affordances — everything the
+        HTML renderer needs. Not intended for agent consumption.
+        """
         state = self._serialize_state()
         state["complete"] = self.is_complete
         affordances = self.get_affordances()
@@ -188,6 +192,21 @@ class Eigenform:
                 instruction=f"Clear all data from this {self.label}.",
             ))
         state["affordances"] = [a.serialize() for a in affordances]
+        return state
+
+    def serialize(self) -> dict | None:
+        """Produce the agent-facing representation: clean, no render noise.
+
+        Strips form, key, and render_hints from affordances — fields that
+        exist only for HTML rendering and add noise for agents.
+        """
+        state = self._serialize_full()
+        if state is None:
+            return None
+        state.pop("form", None)
+        state.pop("key", None)
+        for aff in state.get("affordances", []):
+            aff.pop("render_hints", None)
         return state
 
     def render_from_data(self, data: dict) -> str:
@@ -215,12 +234,12 @@ class Eigenform:
     def render(self) -> str:
         """Render this eigenform as HTML, wrapped in a standard container.
 
-        Calls serialize() first, then render_from_data() on the result.
-        This guarantees HTML and JSON cannot diverge — both derive from
-        the same serialized dict. After rendering, checks that all
-        affordances were accounted for.
+        Uses _serialize_full() for HTML rendering (needs form, key,
+        render_hints). The "See JSON" button shows the clean agent-facing
+        serialize() output. After rendering, checks that all affordances
+        were accounted for.
         """
-        data = self.serialize()
+        data = self._serialize_full()
         for aff in data.get("affordances", []):
             aff["_rendered"] = False
         inner = self.render_from_data(data)
@@ -234,7 +253,7 @@ class Eigenform:
                 f"Use render_affordance_html() to render or Eigenform.mark_rendered() to skip."
             )
 
-        json_str = escape(json.dumps(data, indent=2))
+        json_str = escape(json.dumps(self.serialize(), indent=2))
         uid = self.uid
 
         complete_color = '#2a2' if self.is_complete else '#888'
@@ -275,118 +294,3 @@ class Eigenform:
     def _handle(self, body: dict) -> dict:
         """Handle a single action. Subclasses must implement."""
         raise NotImplementedError
-
-
-@dataclass
-class TextForm(Eigenform):
-    """Single free-form string input."""
-    default: str | None = None
-
-    @property
-    def is_complete(self) -> bool:
-        return self.value is not None and self.value != ""
-
-    def _serialize_state(self) -> dict:
-        return self._base_state() | {
-            "value": self.value if self.value is not None else self.default,
-        }
-
-    def render_from_data(self, data: dict) -> str:
-        from engine.affordances import render_affordance_html
-        html = f'<h3>{escape(data["label"])}</h3>'
-        if data.get("instruction"):
-            html += f'<p>{escape(data["instruction"])}</p>'
-        html += f'<p><strong>Value:</strong> {escape(str(data["value"]))}</p>'
-        for aff in data.get("affordances", []):
-            html += render_affordance_html(aff)
-        return html
-
-    def get_affordances(self) -> list[Affordance]:
-        return [
-            SetValueAffordance(
-                label=f"Set {self.label}",
-                method="POST",
-                url=self.url,
-                body={"value": "<value>"},
-                instruction=f"Replace <value> with the desired {self.label.lower()}.",
-            )
-        ]
-
-    def _handle(self, body: dict) -> dict:
-        self._store.set(self._scope, self.key, body.get("value"))
-        return self.serialize()
-
-
-@dataclass
-class CheckboxForm(Eigenform):
-    """Multi-select: a set of items, each independently selectable.
-
-    Requires explicit confirmation via a "Done" action to be considered
-    complete. This prevents premature auto-advance in ChainForm when
-    the user has only checked one item but intends to check more.
-
-    Done with no items checked means "none of these apply."
-    Toggling any item after confirmation clears the confirmed state.
-    """
-    items: list[str] = field(default_factory=list)
-
-    @property
-    def checked(self) -> dict[str, bool]:
-        """Current state: {item: bool} for each item."""
-        stored = self.value or {}
-        return {item: stored.get(item, False) for item in self.items}
-
-    @property
-    def confirmed(self) -> bool:
-        """Whether the selection has been explicitly confirmed."""
-        stored = self.value or {}
-        return bool(stored.get("__confirmed"))
-
-    @property
-    def is_complete(self) -> bool:
-        return self.confirmed
-
-    def _serialize_state(self) -> dict:
-        return self._base_state() | {
-            "items": self.checked,
-            "confirmed": self.confirmed,
-        }
-
-    def get_affordances(self) -> list[Affordance]:
-        affs = [
-            CheckboxAffordance(
-                label=f"Set {self.label}",
-                method="POST",
-                url=self.url,
-                body={item: "<true | false>" for item in self.items},
-                instruction="Set one or more items. Omitted items are unchanged.",
-                items=self.checked,
-            ),
-        ]
-        if not self.confirmed:
-            affs.append(SimpleButtonAffordance(
-                label="Done",
-                method="POST",
-                url=self.url,
-                body={"action": "done"},
-                instruction="Confirm the current selection (or none selected = none apply).",
-            ))
-        return affs
-
-    def _handle(self, body: dict) -> dict:
-        action = body.get("action")
-        if action == "done":
-            stored = dict(self.value or {})
-            stored["__confirmed"] = True
-            self._store.set(self._scope, self.key, stored)
-        else:
-            current = self.checked
-            changed = False
-            for item_key, value in body.items():
-                if item_key in current:
-                    current[item_key] = value
-                    changed = True
-            if changed:
-                current["__confirmed"] = False
-            self._store.set(self._scope, self.key, current)
-        return self.serialize()

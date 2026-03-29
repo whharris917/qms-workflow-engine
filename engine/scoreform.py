@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from html import escape
 from typing import Any
 
-from engine.eigenforms import Eigenform
+from engine.eigenform import Eigenform
 
 
 @dataclass

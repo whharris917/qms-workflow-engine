@@ -8,7 +8,7 @@ from html import escape
 from typing import Any
 
 from engine.affordances import Affordance
-from engine.eigenforms import Eigenform
+from engine.eigenform import Eigenform
 
 
 class NumberInputAffordance(Affordance):
@@ -50,6 +50,8 @@ class NumberForm(Eigenform):
 
     def get_affordances(self) -> list[Affordance]:
         parts = []
+        if self.integer:
+            parts.append("integer only")
         if self.min_val is not None:
             parts.append(f"min {self.min_val}")
         if self.max_val is not None:

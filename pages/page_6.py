@@ -1,10 +1,10 @@
 """Page 6 — Change request form (MultiForm + ChoiceForm + CheckboxForm + ListForm)."""
 
-from engine.choice import ChoiceForm
-from engine.eigenforms import CheckboxForm
+from engine.choiceform import ChoiceForm
+from engine.checkboxform import CheckboxForm
 from engine.listform import ListForm
-from engine.multi import FieldDescriptor, MultiForm
-from engine.page import PageForm
+from engine.multiform import FieldDescriptor, MultiForm
+from engine.pageform import PageForm
 
 
 definition = PageForm(key="page-6", label="Page 6", instruction="A change request form showcasing ChoiceForm, ListForm, and MultiForm.", eigenforms=[

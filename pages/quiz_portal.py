@@ -1,10 +1,11 @@
 """Quiz Portal — three quizzes (Geography, Science, History) in a TabForm, five questions each."""
 
-from engine.choice import ChoiceForm
-from engine.eigenforms import CheckboxForm, TextForm
-from engine.page import PageForm
-from engine.score import ScoreForm
-from engine.tab import TabForm
+from engine.choiceform import ChoiceForm
+from engine.checkboxform import CheckboxForm
+from engine.textform import TextForm
+from engine.pageform import PageForm
+from engine.scoreform import ScoreForm
+from engine.tabform import TabForm
 
 
 geography = TabForm(key="geography", label="Geography Quiz", instruction="Five geography questions.", tabs={

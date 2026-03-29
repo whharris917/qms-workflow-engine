@@ -1,8 +1,9 @@
 """Page 4 — ChainForm wizard (4-step sequential form)."""
 
-from engine.chain import ChainForm
-from engine.eigenforms import CheckboxForm, TextForm
-from engine.page import PageForm
+from engine.chainform import ChainForm
+from engine.checkboxform import CheckboxForm
+from engine.textform import TextForm
+from engine.pageform import PageForm
 
 
 definition = PageForm(key="page-4", label="Page 4", instruction="Complete each step in sequence.", eigenforms=[

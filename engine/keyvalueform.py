@@ -10,7 +10,7 @@ from typing import Any
 from engine.affordances import (
     Affordance, STYLE_CONFIRM, STYLE_REMOVE, render_inline_button,
 )
-from engine.eigenforms import Eigenform
+from engine.eigenform import Eigenform
 
 
 class KVAddAffordance(Affordance):

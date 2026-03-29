@@ -9,17 +9,18 @@ Exercises all four new eigenform capabilities:
 
 from math import prod
 
-from engine.action import ActionForm
-from engine.choice import ChoiceForm
-from engine.computed import ComputedForm
-from engine.date import DateForm
-from engine.dynamic_choice import DynamicChoiceForm
-from engine.eigenforms import CheckboxForm, TextForm
-from engine.number import NumberForm
-from engine.page import PageForm
-from engine.repeater import RepeaterForm
+from engine.actionform import ActionForm
+from engine.choiceform import ChoiceForm
+from engine.computedform import ComputedForm
+from engine.dateform import DateForm
+from engine.dynamicchoiceform import DynamicChoiceForm
+from engine.checkboxform import CheckboxForm
+from engine.textform import TextForm
+from engine.numberform import NumberForm
+from engine.pageform import PageForm
+from engine.repeaterform import RepeaterForm
 from engine.store import Store
-from engine.validation import ValidationForm, ValidationRule
+from engine.validationform import ValidationForm, ValidationRule
 
 
 # --- Experiment 1: Number multiplier (existing) ---

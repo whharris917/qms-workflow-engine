@@ -15,7 +15,7 @@ from engine.affordances import (
     SetValueAffordance,
     render_inline_button,
 )
-from engine.eigenforms import Eigenform
+from engine.eigenform import Eigenform
 from engine.store import Store
 
 
@@ -293,7 +293,7 @@ class PageForm(Eigenform):
 
         return affs
 
-    def serialize(self) -> dict:
+    def _serialize_full(self) -> dict:
         state = self._serialize_state()
         fb = self._get_feedback()
         if fb["errors"] or fb["success"]:

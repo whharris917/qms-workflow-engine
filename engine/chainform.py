@@ -12,7 +12,7 @@ from html import escape
 from typing import Any
 
 from engine.affordances import Affordance, SwitchTabAffordance
-from engine.eigenforms import Eigenform
+from engine.eigenform import Eigenform
 from engine.store import Store
 
 
@@ -79,7 +79,7 @@ class ChainForm(Eigenform):
             ],
         }
 
-    def serialize(self) -> dict:
+    def _serialize_full(self) -> dict:
         state = self._serialize_state()
         active = self.active_step
         state["eigenform"] = active.serialize() if active else None

@@ -130,8 +130,8 @@ Each `.py` file in `pages/` exports a `definition` — an unbound PageForm. The 
 
 ```python
 # pages/my_page.py
-from engine.eigenforms import TextForm
-from engine.page import PageForm
+from engine.textform import TextForm
+from engine.pageform import PageForm
 
 definition = PageForm(key="my-page", label="My Page", eigenforms=[
     TextForm(key="name", label="Your Name"),

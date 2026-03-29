@@ -6,13 +6,14 @@ Demonstrates:
 - State preservation across case switches
 """
 
-from engine.chain import ChainForm
-from engine.choice import ChoiceForm
-from engine.eigenforms import CheckboxForm, TextForm
-from engine.group import GroupForm
-from engine.number import NumberForm
-from engine.page import PageForm
-from engine.switch import SwitchForm
+from engine.chainform import ChainForm
+from engine.choiceform import ChoiceForm
+from engine.checkboxform import CheckboxForm
+from engine.textform import TextForm
+from engine.groupform import GroupForm
+from engine.numberform import NumberForm
+from engine.pageform import PageForm
+from engine.switchform import SwitchForm
 
 
 # --- Parameterized compositions for the cases ---

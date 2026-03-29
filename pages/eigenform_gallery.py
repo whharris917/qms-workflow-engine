@@ -5,35 +5,36 @@ Organized as a tabbed walkthrough from simple to complex. Each section contains
 working examples with instructive labels showing off each type's key features.
 """
 
-from engine.eigenforms import TextForm, CheckboxForm
-from engine.page import PageForm
-from engine.tab import TabForm
-from engine.chain import ChainForm
-from engine.accordion import AccordionForm
-from engine.group import GroupForm
-from engine.choice import ChoiceForm
-from engine.number import NumberForm
-from engine.date import DateForm
-from engine.boolean import BooleanForm
-from engine.range import RangeForm
-from engine.memo import MemoForm
-from engine.rating import RatingForm
-from engine.rank import RankForm
-from engine.multi import MultiForm
+from engine.textform import TextForm
+from engine.checkboxform import CheckboxForm
+from engine.pageform import PageForm
+from engine.tabform import TabForm
+from engine.chainform import ChainForm
+from engine.accordionform import AccordionForm
+from engine.groupform import GroupForm
+from engine.choiceform import ChoiceForm
+from engine.numberform import NumberForm
+from engine.dateform import DateForm
+from engine.booleanform import BooleanForm
+from engine.rangeform import RangeForm
+from engine.memoform import MemoForm
+from engine.ratingform import RatingForm
+from engine.rankform import RankForm
+from engine.multiform import MultiForm
 from engine.listform import ListForm
-from engine.table import TableForm
-from engine.keyvalue import KeyValueForm
-from engine.visibility import VisibilityForm
-from engine.switch import SwitchForm
-from engine.dynamic_choice import DynamicChoiceForm
-from engine.score import ScoreForm
-from engine.computed import ComputedForm
-from engine.validation import ValidationForm
-from engine.action import ActionForm
-from engine.repeater import RepeaterForm
-from engine.rubiks import RubiksCubeForm
-from engine.multi import FieldDescriptor
-from engine.validation import ValidationRule
+from engine.tableform import TableForm
+from engine.keyvalueform import KeyValueForm
+from engine.visibilityform import VisibilityForm
+from engine.switchform import SwitchForm
+from engine.dynamicchoiceform import DynamicChoiceForm
+from engine.scoreform import ScoreForm
+from engine.computedform import ComputedForm
+from engine.validationform import ValidationForm
+from engine.actionform import ActionForm
+from engine.repeaterform import RepeaterForm
+from engine.rubikscubeform import RubiksCubeForm
+from engine.multiform import FieldDescriptor
+from engine.validationform import ValidationRule
 
 
 # ---------------------------------------------------------------------------

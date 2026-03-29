@@ -8,7 +8,7 @@ from html import escape
 from typing import Any
 
 from engine.affordances import Affordance
-from engine.eigenforms import Eigenform
+from engine.eigenform import Eigenform
 
 
 class SelectAffordance(Affordance):

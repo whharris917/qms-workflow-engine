@@ -19,8 +19,8 @@ from html import escape
 from typing import Any, Callable
 
 from engine.affordances import Affordance, SimpleButtonAffordance
-from engine.choice import SelectAffordance
-from engine.eigenforms import Eigenform
+from engine.choiceform import SelectAffordance
+from engine.eigenform import Eigenform
 
 
 @dataclass

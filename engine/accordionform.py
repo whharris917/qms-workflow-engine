@@ -17,7 +17,7 @@ from html import escape
 from typing import Any
 
 from engine.affordances import Affordance
-from engine.eigenforms import Eigenform
+from engine.eigenform import Eigenform
 from engine.store import Store
 
 
@@ -76,7 +76,7 @@ class AccordionForm(Eigenform):
             "section_keys": list(self.sections.keys()),
         }
 
-    def serialize(self) -> dict:
+    def _serialize_full(self) -> dict:
         state = self._serialize_state()
         # Only expanded sections include their eigenform — faithful projection.
         # Collapsed sections are absent from both JSON and HTML.

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from html import escape
 from typing import Any
 
-from engine.eigenforms import Eigenform
+from engine.eigenform import Eigenform
 from engine.store import Store
 
 
@@ -70,7 +70,7 @@ class VisibilityForm(Eigenform):
             "visible": self.visible,
         }
 
-    def serialize(self) -> dict | None:
+    def _serialize_full(self) -> dict | None:
         if not self.visible:
             return None
         state = self._serialize_state()

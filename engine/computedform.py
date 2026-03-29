@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from html import escape
 from typing import Any, Callable
 
-from engine.eigenforms import Eigenform
+from engine.eigenform import Eigenform
 
 
 @dataclass

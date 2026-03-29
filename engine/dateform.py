@@ -9,7 +9,7 @@ from html import escape
 from typing import Any
 
 from engine.affordances import Affordance
-from engine.eigenforms import Eigenform
+from engine.eigenform import Eigenform
 
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DATETIME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$")

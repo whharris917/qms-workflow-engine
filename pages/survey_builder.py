@@ -6,10 +6,10 @@ from the registry. Each generation adds new eigenforms to the page.
 The structure persists across restarts.
 """
 
-from engine.action import ActionForm
-from engine.choice import ChoiceForm
-from engine.eigenforms import TextForm
-from engine.page import PageForm
+from engine.actionform import ActionForm
+from engine.choiceform import ChoiceForm
+from engine.textform import TextForm
+from engine.pageform import PageForm
 from engine.store import Store
 
 

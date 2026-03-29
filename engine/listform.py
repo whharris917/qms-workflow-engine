@@ -11,7 +11,7 @@ from engine.affordances import (
     Affordance, SimpleButtonAffordance,
     STYLE_CONFIRM, STYLE_REMOVE, STYLE_ARROW, render_inline_button,
 )
-from engine.eigenforms import Eigenform
+from engine.eigenform import Eigenform
 
 
 class AddItemAffordance(Affordance):
