@@ -12,6 +12,7 @@ Cell data is managed separately, keyed by stable row/column IDs.
 
 from __future__ import annotations
 
+import copy
 import json
 from dataclasses import dataclass, field
 from html import escape
@@ -37,6 +38,43 @@ class AddColumnAffordance(Affordance):
 
     def _render_hints(self) -> dict:
         return {"type": "text_input_add", "placeholder": "Column name"}
+
+
+@dataclass
+class RowGroup(Eigenform):
+    """Lightweight routing node for one row's typed cell eigenforms.
+
+    Created by TableForm._bind_children(). Enables find_eigenform to
+    traverse table_key -> row_id -> col_id for path-based access to
+    typed cell eigenforms.
+    """
+    cell_eigenforms: dict[str, Eigenform] = field(default_factory=dict)
+
+    @property
+    def has_data(self) -> bool:
+        return False  # Parent TableForm handles clearing
+
+    @property
+    def children(self) -> list[Eigenform]:
+        return list(self.cell_eigenforms.values())
+
+    @property
+    def is_complete(self) -> bool:
+        return all(ef.is_complete for ef in self.cell_eigenforms.values())
+
+    def _serialize_state(self) -> dict:
+        state = self._base_state()
+        state["form"] = "row"
+        return state
+
+    def render_from_data(self, data: dict) -> str:
+        return ""  # Never rendered standalone
+
+    def get_affordances(self) -> list[Affordance]:
+        return []
+
+    def _handle(self, body: dict) -> dict:
+        return self.serialize()
 
 
 @dataclass
@@ -85,10 +123,24 @@ class TableForm(Eigenform):
         return new
 
     @property
+    def _fixed_col_labels(self) -> list[str]:
+        """Extract string labels from fixed_columns, handling both str and Eigenform entries."""
+        return [c.label if isinstance(c, Eigenform) else c for c in self.fixed_columns]
+
+    @property
+    def _typed_column_templates(self) -> dict[str, Eigenform]:
+        """Map col_id -> unbound eigenform template for typed columns."""
+        return {
+            f"col_{i}": c
+            for i, c in enumerate(self.fixed_columns)
+            if isinstance(c, Eigenform)
+        }
+
+    @property
     def _col_collection(self) -> OrderedCollection:
         oc = OrderedCollection(
             id_prefix="col",
-            fixed_items=self.fixed_columns,
+            fixed_items=self._fixed_col_labels,
             static_must_follow=self.col_must_follow,
             allow_constraints=self.allow_col_constraints,
         )
@@ -120,6 +172,43 @@ class TableForm(Eigenform):
         """Cell data: {"row_0": {"col_0": "Alice", ...}, ...}"""
         return self._raw_state.get("cells", {})
 
+    # --- Typed column children ---
+
+    @property
+    def children(self) -> list[Eigenform]:
+        return list(getattr(self, '_row_groups', []))
+
+    def _bind_children(self, store, url_prefix: str):
+        """Create RowGroups with bound cell eigenforms for all typed columns."""
+        from engine.store import Store
+        self._row_groups: list[RowGroup] = []
+        templates = self._typed_column_templates
+        if not templates:
+            return
+        for row_item in self._row_collection.items:
+            row_id = row_item["id"]
+            row_scope = f"{self.key}/{row_id}"
+            row_url = f"{url_prefix}/{self.key}/{row_id}"
+            cells = {}
+            for col_id, template in templates.items():
+                ef = copy.deepcopy(template)
+                ef.key = col_id
+                bound_ef = ef.bind(store=store, scope=row_scope, url_prefix=row_url)
+                cells[col_id] = bound_ef
+            group = RowGroup(
+                key=row_id, label=row_id,
+                cell_eigenforms=cells,
+            )
+            group._store = store
+            group._scope = row_scope
+            group._url_prefix = f"{url_prefix}/{self.key}"
+            self._row_groups.append(group)
+
+    def _rebuild_rows(self):
+        """Rebuild RowGroups after structural mutations."""
+        if self._store is not None and self._typed_column_templates:
+            self._bind_children(self._store, self._url_prefix)
+
     # --- Convenience properties ---
 
     @property
@@ -145,18 +234,39 @@ class TableForm(Eigenform):
 
     # --- Core ---
 
+    def _clear_data(self):
+        """Clear all cell data, including typed cell compound scopes."""
+        if self._store is not None and self._typed_column_templates:
+            for row_item in self._row_collection.items:
+                self._store.clear_scope(f"{self.key}/{row_item['id']}")
+        super()._clear_data()
+        self._rebuild_rows()
+
     @property
     def is_complete(self) -> bool:
         cols = self._col_collection.items
         rows_meta = self._row_collection.items
         cells = self._cells
+        templates = self._typed_column_templates
+        row_groups_by_id = {rg.key: rg for rg in getattr(self, '_row_groups', [])}
         if not cols or not rows_meta:
             return False
         for row_item in rows_meta:
-            row = cells.get(row_item["id"], {})
+            row_id = row_item["id"]
+            row = cells.get(row_id, {})
+            rg = row_groups_by_id.get(row_id)
             for col_item in cols:
-                if row.get(col_item["id"]) is None:
-                    return False
+                col_id = col_item["id"]
+                if col_id in templates:
+                    if rg:
+                        ef = rg.cell_eigenforms.get(col_id)
+                        if ef is None or not ef.is_complete:
+                            return False
+                    else:
+                        return False
+                else:
+                    if row.get(col_id) is None:
+                        return False
         return True
 
     @property
@@ -222,12 +332,35 @@ class TableForm(Eigenform):
         row_oc = self._row_collection
         col_oc = self._col_collection
         cells = self._cells
+        templates = self._typed_column_templates
+        row_groups_by_id = {rg.key: rg for rg in getattr(self, '_row_groups', [])}
+
         ordered_rows = []
         for row_item in row_oc.items:
-            row_data = cells.get(row_item["id"], {})
-            ordered_rows.append({"_id": row_item["id"], **row_data})
+            row_id = row_item["id"]
+            row_data = {"_id": row_id}
+            cell_data = cells.get(row_id, {})
+            rg = row_groups_by_id.get(row_id)
+            for col_item in col_oc.items:
+                col_id = col_item["id"]
+                if col_id in templates and rg:
+                    ef = rg.cell_eigenforms.get(col_id)
+                    row_data[col_id] = ef.serialize() if ef else None
+                else:
+                    row_data[col_id] = cell_data.get(col_id)
+            ordered_rows.append(row_data)
+
+        # Mark typed columns in column list
+        columns = []
+        for item in col_oc.items:
+            col = {"key": item["id"], "label": item["value"]}
+            if item["id"] in templates:
+                col["typed"] = True
+                col["form"] = templates[item["id"]].form
+            columns.append(col)
+
         return self._base_state() | {
-            "columns": self.columns,
+            "columns": columns,
             "rows": ordered_rows,
             "summary": f"{len(col_oc.items)} {'column' if len(col_oc.items) == 1 else 'columns'}, {len(row_oc.items)} {'row' if len(row_oc.items) == 1 else 'rows'}",
         }
@@ -238,7 +371,9 @@ class TableForm(Eigenform):
         row_oc = self._row_collection
         col_items = col_oc.items
         row_items = row_oc.items
-        col_keys_str = " | ".join(i["id"] for i in col_items) if col_items else ""
+        templates = self._typed_column_templates
+        text_col_items = [i for i in col_items if i["id"] not in templates]
+        text_col_keys_str = " | ".join(i["id"] for i in text_col_items) if text_col_items else ""
         row_ids_str = " | ".join(i["id"] for i in row_items) if row_items else ""
 
         # Add column
@@ -263,34 +398,43 @@ class TableForm(Eigenform):
                 instruction="Rename a column. Accepts column key or current label.",
             ))
 
-        # Add row (with optional initial values)
+        # Add row (with optional initial values for text columns only)
         if col_items:
-            col_desc = ", ".join(f"{i['id']} ({i['value']})" for i in col_items)
+            text_desc = ", ".join(f"{i['id']} ({i['value']})" for i in text_col_items)
             add_row_body: dict[str, Any] = {"action": "add_row"}
-            for i in col_items:
+            for i in text_col_items:
                 add_row_body[i["id"]] = f"<{i['value']}>"
+            instruction = "Add a new row."
+            if text_col_items:
+                instruction += f" Optionally include text column keys with values: {text_desc}. Omitted columns default to empty."
+            if templates:
+                typed_desc = ", ".join(
+                    f"{cid} ({templates[cid].label} — {templates[cid].form})"
+                    for cid in sorted(templates)
+                )
+                instruction += f" Typed columns ({typed_desc}) are set via their own cell URLs after row creation."
             affordances.append(Affordance(
                 label="+ Row",
                 method="POST",
                 url=self.url,
                 body=add_row_body,
-                instruction=f"Add a new row. Optionally include column keys with values: {col_desc}. Omitted columns default to empty.",
+                instruction=instruction,
             ))
 
-        # Set cell
-        if col_items and row_items:
+        # Set cell (text columns only)
+        if text_col_items and row_items:
             affordances.append(SetCellAffordance(
                 label="Set Cell",
                 method="POST",
                 url=self.url,
-                body={"action": "set_cell", "row": f"<{row_ids_str}>", "column": f"<{col_keys_str}>", "value": "<value>"},
-                instruction="Set a cell value. Row is a row ID. Column is a key or label.",
+                body={"action": "set_cell", "row": f"<{row_ids_str}>", "column": f"<{text_col_keys_str}>", "value": "<value>"},
+                instruction="Set a text cell value. Row is a row ID. Column is a key or label. Typed columns are set via their own cell URLs.",
             ))
 
-        # Set row
-        if col_items and row_items:
+        # Set row (text columns only)
+        if text_col_items and row_items:
             body: dict[str, Any] = {"action": "set_row", "row": f"<{row_ids_str}>"}
-            for item in col_items:
+            for item in text_col_items:
                 body[item["id"]] = f"<{item['value']} value>"
             affordances.append(Affordance(
                 label="Set Row",
@@ -527,6 +671,8 @@ class TableForm(Eigenform):
         row_oc = self._row_collection
         col_items = col_oc.items
         row_items = row_oc.items
+        templates = self._typed_column_templates
+        row_groups_by_id = {rg.key: rg for rg in getattr(self, '_row_groups', [])}
 
         html = f'<h3>{escape(data["label"])}</h3>'
         if data.get("instruction"):
@@ -789,25 +935,40 @@ class TableForm(Eigenform):
                         f'</td>'
                     )
 
+                rg = row_groups_by_id.get(row_id)
                 for col in columns:
-                    cell_value = row_data.get(col["key"])
-                    display = escape(str(cell_value)) if cell_value is not None else ""
-                    cell_val_escaped = escape(str(cell_value)) if cell_value is not None else ""
+                    col_id = col["key"]
+                    if col_id in templates and rg:
+                        # Typed cell — render the eigenform inline
+                        ef = rg.cell_eigenforms.get(col_id)
+                        if ef:
+                            html += (
+                                f'<td style="border: 1px solid #ccc; padding: 4px; vertical-align: top;">'
+                                f'{ef.render()}'
+                                f'</td>'
+                            )
+                        else:
+                            html += '<td style="border: 1px solid #ccc; padding: 2px;"></td>'
+                    else:
+                        # Text cell — inline input
+                        cell_value = row_data.get(col_id)
+                        display = escape(str(cell_value)) if cell_value is not None else ""
+                        cell_val_escaped = escape(str(cell_value)) if cell_value is not None else ""
 
-                    html += (
-                        f'<td style="border: 1px solid #ccc; padding: 2px;">'
-                        f'<form style="margin:0" onsubmit="fetch(\'{url}\','
-                        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                        f'body:JSON.stringify({{action:\'set_cell\',row:\'{row_id}\','
-                        f'column:\'{col["key"]}\',value:this.elements.v.value}})'
-                        f'}}).then(()=>location.reload()); return false">'
-                        f'<input name="v" type="text" value="{display}"'
-                        f' style="border: none; width: 100%; box-sizing: border-box; padding: 2px 4px;"'
-                        f' oninput="this.title=\'POST {url} \'+JSON.stringify({{action:\'set_cell\',row:\'{row_id}\',column:\'{col["key"]}\',value:this.value}})"'
-                        f' title="POST {url} {escape(json.dumps({"action": "set_cell", "row": row_id, "column": col["key"], "value": cell_val_escaped}))}" />'
-                        f'</form>'
-                        f'</td>'
-                    )
+                        html += (
+                            f'<td style="border: 1px solid #ccc; padding: 2px;">'
+                            f'<form style="margin:0" onsubmit="fetch(\'{url}\','
+                            f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+                            f'body:JSON.stringify({{action:\'set_cell\',row:\'{row_id}\','
+                            f'column:\'{col_id}\',value:this.elements.v.value}})'
+                            f'}}).then(()=>location.reload()); return false">'
+                            f'<input name="v" type="text" value="{display}"'
+                            f' style="border: none; width: 100%; box-sizing: border-box; padding: 2px 4px;"'
+                            f' oninput="this.title=\'POST {url} \'+JSON.stringify({{action:\'set_cell\',row:\'{row_id}\',column:\'{col_id}\',value:this.value}})"'
+                            f' title="POST {url} {escape(json.dumps({"action": "set_cell", "row": row_id, "column": col_id, "value": cell_val_escaped}))}" />'
+                            f'</form>'
+                            f'</td>'
+                        )
                 if add_col_aff:
                     html += '<td style="border: 1px solid #ccc;"></td>'
                 html += '</tr>'
@@ -892,6 +1053,7 @@ class TableForm(Eigenform):
         col_oc = self._col_collection
         row_oc = self._row_collection
         col_state, row_state, cells = self._current_states()
+        templates = self._typed_column_templates
 
         if action == "add_column":
             label = body.get("label", "").strip()
@@ -904,7 +1066,7 @@ class TableForm(Eigenform):
             # Seed one empty row if this is the first column
             if not row_state.get("items"):
                 row_state = row_oc.add("")
-            # Initialize cells for new column
+            # Initialize cells for new column (text columns only)
             new_col_id = col_state["items"][-1]["id"]
             for row_id in [i["id"] for i in row_state.get("items", [])]:
                 cells.setdefault(row_id, {})[new_col_id] = None
@@ -934,6 +1096,8 @@ class TableForm(Eigenform):
             row = {}
             for col_item in col_state.get("items", []):
                 col_key = col_item["id"]
+                if col_key in templates:
+                    continue  # Typed columns managed via cell eigenform URLs
                 val = body.get(col_key)
                 if val is None:
                     val = body.get(col_item.get("value", ""))
@@ -941,6 +1105,7 @@ class TableForm(Eigenform):
             cells[new_row_id] = row
             row_state = self._apply_auto_chain(row_state, "auto_chain_rows")
             self._save(col_state, row_state, cells)
+            self._rebuild_rows()
 
         elif action == "set_cell":
             row_id = body.get("row", "")
@@ -951,6 +1116,12 @@ class TableForm(Eigenform):
             col_key = self._resolve_column(col_ref)
             if not col_key:
                 return self._error(f"Unknown column: {col_ref}. Valid: {', '.join(self.col_keys)}", action=action)
+            if col_key in templates:
+                return self._error(
+                    f"Column '{col_key}' is a typed column ({templates[col_key].form}). "
+                    f"Use its cell URL instead: {self.url}/<row_id>/{col_key}",
+                    action=action,
+                )
             cells.setdefault(row_id, {})[col_key] = value
             self._save(col_state, row_state, cells)
 
@@ -961,6 +1132,8 @@ class TableForm(Eigenform):
                 return self._error(f"Unknown row: {row_id}. Valid: {', '.join(row_ids)}", action=action)
             for col_item in col_state.get("items", []):
                 col_key = col_item["id"]
+                if col_key in templates:
+                    continue  # Typed columns managed via cell eigenform URLs
                 val = body.get(col_key)
                 if val is None:
                     val = body.get(col_item.get("value", ""))
@@ -970,6 +1143,9 @@ class TableForm(Eigenform):
 
         elif action == "remove_row":
             row_id = body.get("row", "")
+            # Clear typed cell compound scopes before removing
+            if templates and self._store:
+                self._store.clear_scope(f"{self.key}/{row_id}")
             try:
                 row_state = row_oc.remove(row_id)
             except ValueError as e:
@@ -977,6 +1153,7 @@ class TableForm(Eigenform):
             cells.pop(row_id, None)
             row_state = self._apply_auto_chain(row_state, "auto_chain_rows")
             self._save(col_state, row_state, cells)
+            self._rebuild_rows()
 
         elif action == "remove_column":
             col_ref = body.get("column", "")

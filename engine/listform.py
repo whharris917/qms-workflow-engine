@@ -282,34 +282,52 @@ class ListForm(Eigenform):
                     f'</form>'
                 )
 
-            # Inline add-constraint dropdown + prerequisite labels with remove buttons
+            # Inline add-constraint dropdown + prerequisite pills with remove buttons
             prereqs = mf.get(item_id, [])
             if prereqs or (self.allow_constraints and num_items > 1):
                 html += '<span style="color: #999; display: inline-flex; align-items: center; gap: 2px;">'
                 if self.allow_constraints:
                     available = [i for i in items if i["id"] != item_id and i["id"] not in prereqs]
                     if available:
-                        add_opts = "".join(
-                            f'<option value="{escape(i["id"])}">{escape(i["value"])} ({escape(i["id"])})</option>'
-                            for i in available
-                        )
+                        def _opt(i: dict) -> str:
+                            body = json.dumps({"action": "add_constraint", "item": item_id, "after": i["id"]})
+                            label = i["value"] + " (" + i["id"] + ")" if i["value"] else i["id"]
+                            return (
+                                f'<option value="{escape(i["id"])}"'
+                                f' title="POST {url} {escape(body)}">'
+                                f'{escape(label)}</option>'
+                            )
+                        add_opts = "".join(_opt(i) for i in available)
                         html += (
-                            f'<select style="width: 110px;" onchange="'
+                            f'<span style="position: relative; display: inline-block;'
+                            f' width: 24px; height: 24px; box-sizing: content-box;'
+                            f' border: 1px solid #ccc; background: #f8f8f8; vertical-align: middle;">'
+                            f'<span style="position: absolute; inset: 0; display: flex;'
+                            f' align-items: center; justify-content: center;'
+                            f' font-size: 18px; font-weight: normal; pointer-events: none;">&#9745;</span>'
+                            f'<select title="POST {url} {{&quot;action&quot;:&quot;add_constraint&quot;,&quot;item&quot;:&quot;{item_id}&quot;,&quot;after&quot;:&quot;...&quot;}}"'
+                            f' style="position: absolute; inset: 0; width: 100%; height: 100%;'
+                            f' opacity: 0; cursor: pointer;" onchange="'
                             f"if(this.value)fetch('{url}',"
                             f"{{method:'POST',headers:{{'Content-Type':'application/json'}},"
                             f"body:JSON.stringify({{action:'add_constraint',item:'{item_id}',after:this.value}})"
                             f"}}).then(()=>location.reload())"
                             f'">'
-                            f'<option value="">+ Prerequisite</option>'
+                            f'<option value="">&#8212;</option>'
                             f'{add_opts}'
                             f'</select>'
+                            f'</span>'
                         )
                 if prereqs:
-                    html += '<span style="font-style: italic;">after</span>'
                     for p_id in prereqs:
-                        p_name = escape(id_to_val.get(p_id, p_id))
+                        p_name = escape(id_to_val.get(p_id, p_id) or p_id)
                         is_static = (item_id, p_id) in static_pairs
-                        html += f'<span style="background: #f0f0f0; padding: 0 4px; border-radius: 2px;">{p_name}</span>'
+                        html += (
+                            f'<span style="display: inline-block; min-width: 52px; color: #666;'
+                            f' text-align: center; background: #e8e8e8; border-radius: 10px;'
+                            f' padding: 1px 6px; font-family: monospace; font-size: 0.85em;">'
+                            f'{p_name}</span>'
+                        )
                         if not is_static:
                             html += render_inline_button(
                                 url, {"action": "remove_constraint", "item": item_id, "after": p_id},

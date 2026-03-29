@@ -378,6 +378,29 @@ table_forms = GroupForm(
             allow_row_constraints=True,
             allow_col_constraints=True,
         ),
+        TableForm(
+            key="table-typed",
+            label="Typed Columns",
+            instruction=(
+                "Columns can contain eigenforms instead of plain text. Each "
+                "cell in a typed column is a bound eigenform instance with its "
+                "own state and affordances. Text columns (Task Name) use inline "
+                "inputs as usual. Typed columns (Status, Priority, Approved) "
+                "render their eigenform widgets inline."
+            ),
+            fixed_columns=[
+                "Task Name",
+                ChoiceForm(
+                    key="_tpl", label="Status",
+                    options=["Not Started", "In Progress", "Done"],
+                ),
+                ChoiceForm(
+                    key="_tpl", label="Priority",
+                    options=["Low", "Medium", "High", "Critical"],
+                ),
+                BooleanForm(key="_tpl", label="Approved"),
+            ],
+        ),
     ],
 )
 
