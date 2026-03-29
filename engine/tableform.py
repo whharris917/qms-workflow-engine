@@ -19,7 +19,7 @@ from typing import Any
 
 from engine.affordances import (
     Affordance, AddConstraintAffordance, SimpleButtonAffordance,
-    BUTTON_GAP, STYLE_REMOVE, STYLE_ARROW, render_inline_button,
+    BUTTON_GAP, STYLE_CONFIRM, STYLE_REMOVE, STYLE_ARROW, render_inline_button,
 )
 from engine.eigenform import Eigenform
 from engine.ordered_collection import OrderedCollection
@@ -492,17 +492,14 @@ class TableForm(Eigenform):
                 col_id = col["key"]
                 is_fixed_col = col_item.get("fixed", False) if col_item else False
 
-                # Column move buttons + remove button
-                move_btns = ''
+                # Column move arrows (separate left/right for flanking the pill)
+                left_arrow = gap
+                right_arrow = gap
                 if num_cols > 1:
                     if col_oc.can_move_up(ci, col_items):
-                        move_btns += render_inline_button(url, {"action": "move_col_left", "column": col_id}, "&#9664;", STYLE_ARROW)
-                    else:
-                        move_btns += gap
+                        left_arrow = render_inline_button(url, {"action": "move_col_left", "column": col_id}, "&#9664;", STYLE_ARROW)
                     if col_oc.can_move_down(ci, col_items):
-                        move_btns += render_inline_button(url, {"action": "move_col_right", "column": col_id}, "&#9654;", STYLE_ARROW)
-                    else:
-                        move_btns += gap
+                        right_arrow = render_inline_button(url, {"action": "move_col_right", "column": col_id}, "&#9654;", STYLE_ARROW)
 
                 rm_col_btn = ''
                 if not is_fixed_col:
@@ -522,35 +519,67 @@ class TableForm(Eigenform):
                             + '</div>'
                         )
 
+                # Pill badge style (matches ListForm id_style)
+                col_pill = (
+                    f'<span style="display: inline-block; min-width: 52px; color: #666;'
+                    f' text-align: center; background: #e8e8e8; border-radius: 10px;'
+                    f' padding: 1px 6px; font-family: monospace; font-size: 0.85em;">'
+                    f'{escape(col_id)}</span>'
+                )
+
+                # Remove row (centered, first in cell; gap for fixed columns)
+                rm_row = (
+                    f'<div style="text-align: center; padding: 1px 0;">'
+                    f'{rm_col_btn if rm_col_btn else gap}'
+                    f'</div>'
+                )
+
+                # ID row: 3-column grid — left arrow | centered pill | right arrow
+                id_row = (
+                    f'<div style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 2px 4px;">'
+                    f'<div style="text-align: left;">{left_arrow}</div>'
+                    f'<div>{col_pill}</div>'
+                    f'<div style="text-align: right;">{right_arrow}</div>'
+                    f'</div>'
+                )
+
+                th_style = 'border: 1px solid #ccc; padding: 2px; background: #f0f0f0; vertical-align: top;'
+
                 if is_fixed_col:
                     html += (
-                        f'<th style="border: 1px solid #ccc; padding: 2px; background: #f0f0f0;">'
+                        f'<th style="{th_style}">'
+                        f'{rm_row}'
+                        f'{id_row}'
                         f'<div style="padding: 2px 4px; font-weight: bold; text-align: center; color: #555;">'
                         f'{escape(col["label"])}</div>'
-                        f'<div style="display: flex; justify-content: space-between; align-items: center; padding: 0 4px;">'
-                        f'<span style="font-size: 10px; color: #888;">{escape(col_id)}</span>'
-                        f'{move_btns}'
-                        f'</div>'
                         f'{constraint_row}'
                         f'</th>'
                     )
                 else:
+                    rename_body = {"action": "rename_column", "column": col_id, "label": col["label"]}
+                    rename_tooltip = f'POST {url} {escape(json.dumps(rename_body))}'
                     html += (
-                        f'<th style="border: 1px solid #ccc; padding: 2px; background: #f0f0f0;">'
-                        f'<form style="margin:0" onsubmit="fetch(\'{url}\','
+                        f'<th style="{th_style}">'
+                        f'{rm_row}'
+                        f'{id_row}'
+                        f'<div style="display: flex; align-items: center; padding: 2px 4px;">'
+                        f'<form style="margin:0; flex: 1;" onsubmit="fetch(\'{url}\','
                         f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
                         f'body:JSON.stringify({{action:\'rename_column\',column:\'{col_id}\','
                         f'label:this.elements.v.value}})'
                         f'}}).then(()=>location.reload()); return false">'
                         f'<input name="v" type="text" value="{escape(col["label"])}"'
-                        f' style="border: none; width: 100%; box-sizing: border-box; padding: 2px 4px;'
-                        f' background: transparent; font-weight: bold; text-align: center;"'
-                        f' oninput="this.title=\'POST {url} \'+JSON.stringify({{action:\'rename_column\',column:\'{col_id}\',label:this.value}})"'
-                        f' title="POST {url} {escape(json.dumps({"action": "rename_column", "column": col_id, "label": col["label"]}))}" />'
+                        f' style="border: 1px solid #ddd; padding: 2px 4px; width: 100%; box-sizing: border-box;'
+                        f' font-family: inherit; font-size: inherit;'
+                        f' font-weight: bold; text-align: center; color: #555;"'
+                        f' oninput="this.nextElementSibling.title='
+                        f"'POST {url} '+JSON.stringify({{action:'rename_column',column:'{col_id}',label:this.value}})"
+                        f'" />'
                         f'</form>'
-                        f'<div style="display: flex; justify-content: space-between; align-items: center; padding: 0 4px;">'
-                        f'<span style="font-size: 10px; color: #888;">{escape(col_id)}</span>'
-                        f'{move_btns}{rm_col_btn}'
+                        f'<button style="{STYLE_CONFIRM} margin-left: 4px;"'
+                        f' title="{rename_tooltip}"'
+                        f' onclick="this.closest(\'th\').querySelector(\'form\').requestSubmit(); return false;"'
+                        f'>&#10003;</button>'
                         f'</div>'
                         f'{constraint_row}'
                         f'</th>'
@@ -559,18 +588,28 @@ class TableForm(Eigenform):
             # +Column as last header cell
             if add_col_aff:
                 add_col_body_preview = json.dumps({"action": "add_column", "label": ""})
+                add_col_tooltip = f'POST {url} {escape(add_col_body_preview)}'
                 html += (
-                    f'<th style="border: 1px solid #ccc; padding: 2px; background: #f0f0f0; vertical-align: middle;">'
-                    f'<form style="margin:0" onsubmit="fetch(\'{url}\','
+                    f'<th style="{th_style}">'
+                    f'<div style="padding: 1px 0;">{gap}</div>'
+                    f'<div style="padding: 2px 4px;">{gap}</div>'
+                    f'<div style="display: flex; align-items: center; padding: 2px 4px;">'
+                    f'<form style="margin:0; flex: 1;" onsubmit="fetch(\'{url}\','
                     f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
                     f'body:JSON.stringify({{action:\'add_column\',label:this.elements.v.value}})'
                     f'}}).then(()=>location.reload()); return false">'
-                    f'<input name="v" type="text" placeholder="+"'
-                    f' style="border: none; width: 60px; box-sizing: border-box; padding: 2px 4px;'
-                    f' background: transparent; text-align: center; color: #2a2; font-weight: bold;"'
+                    f'<input name="v" type="text" placeholder="Column name"'
+                    f' style="border: 1px solid #ddd; padding: 2px 4px; width: 100%; box-sizing: border-box;'
+                    f' font-family: inherit; font-size: inherit;'
+                    f' font-weight: bold; text-align: center; color: #555;"'
                     f' oninput="this.title=\'POST {url} \'+JSON.stringify({{action:\'add_column\',label:this.value}})"'
-                    f' title="POST {url} {escape(add_col_body_preview)}" />'
+                    f' title="{add_col_tooltip}" />'
                     f'</form>'
+                    f'<button style="{STYLE_CONFIRM} margin-left: 4px;"'
+                    f' title="{add_col_tooltip}"'
+                    f' onclick="this.closest(\'th\').querySelector(\'form\').requestSubmit(); return false;"'
+                    f'>+</button>'
+                    f'</div>'
                     f'</th>'
                 )
             html += '</tr>'
@@ -585,6 +624,7 @@ class TableForm(Eigenform):
 
                 # Control cell (borderless, outside the visual grid)
                 html += f'<td style="{ctrl_style}">'
+                html += '<div style="display: flex; align-items: center; gap: 4px;">'
                 if not is_fixed_row:
                     rm_row_body = {"action": "remove_row", "row": row_id}
                     html += render_inline_button(url, rm_row_body, "\u2212", STYLE_REMOVE)
@@ -607,13 +647,16 @@ class TableForm(Eigenform):
                             url, row_id, prereqs, row_id_to_val, row_static_pairs,
                             row_items, "add_row_constraint", "remove_row_constraint",
                             "#e8f4e8", "11px")
+                html += '</div>'
                 html += '</td>'
 
-                # ID cell
+                # ID cell (pill badge, matches ListForm id_style)
                 html += (
-                    f'<td style="border: 1px solid #ccc; padding: 4px 8px; color: #888;'
-                    f' font-size: 11px; white-space: nowrap;">'
-                    f'{escape(row_id)}'
+                    f'<td style="border: 1px solid #ccc; padding: 4px 8px; white-space: nowrap;">'
+                    f'<span style="display: inline-block; min-width: 52px; color: #666;'
+                    f' text-align: center; background: #e8e8e8; border-radius: 10px;'
+                    f' padding: 1px 6px; font-family: monospace; font-size: 0.85em;">'
+                    f'{escape(row_id)}</span>'
                     f'</td>'
                 )
 
@@ -646,7 +689,7 @@ class TableForm(Eigenform):
                 html += (
                     f'<tr>'
                     f'<td style="{ctrl_style}"></td>'
-                    f'<td style="border: 1px solid #ccc; padding: 4px 8px;">'
+                    f'<td style="border: 1px solid #ccc; padding: 4px 8px; text-align: center;">'
                     f'<button onclick="fetch(\'{url}\','
                     f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
                     f'body:JSON.stringify({add_row_body.replace(chr(34), "&quot;")})}}).then(()=>location.reload())"'
