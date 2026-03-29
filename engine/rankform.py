@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from html import escape
-from engine.affordances import Affordance, SimpleButtonAffordance, STYLE_ARROW, render_inline_button
+from engine.affordances import Affordance, SimpleButtonAffordance, BUTTON_GAP, STYLE_ARROW, render_inline_button
 from engine.eigenform import Eigenform
 
 
@@ -103,7 +103,7 @@ class RankForm(Eigenform):
         url = self.url
         num_items = len(items)
 
-        gap = '<span style="display: inline-block; width: 24px; height: 24px;"></span>'
+        gap = BUTTON_GAP
         html += '<ol style="margin: 4px 0; padding-left: 24px;">'
         for idx, item in enumerate(items):
             html += f'<li style="padding: 2px 0; display: flex; align-items: center; gap: 4px;">'

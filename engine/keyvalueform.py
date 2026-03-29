@@ -8,7 +8,7 @@ from html import escape
 from typing import Any
 
 from engine.affordances import (
-    Affordance, STYLE_CONFIRM, STYLE_REMOVE, render_inline_button,
+    Affordance, BUTTON_GAP, STYLE_CONFIRM, STYLE_REMOVE, render_inline_button,
 )
 from engine.eigenform import Eigenform
 
@@ -160,7 +160,7 @@ class KeyValueForm(Eigenform):
             f"f.querySelector('button[type=submit]').title="
             f"'{escape(endpoint)} '+JSON.stringify({{action:'add',key:f.elements.k.value,value:f.elements.v.value}})"
         )
-        gap = '<span style="display: inline-block; width: 24px; height: 24px;"></span>'
+        gap = BUTTON_GAP
         html += (
             f'<div style="display: flex; align-items: center; gap: 4px; margin: 2px 0;">'
             f'{gap}'

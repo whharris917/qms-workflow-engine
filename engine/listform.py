@@ -9,7 +9,7 @@ from typing import Any
 
 from engine.affordances import (
     Affordance, AddConstraintAffordance, SimpleButtonAffordance,
-    STYLE_CONFIRM, STYLE_REMOVE, STYLE_ARROW, render_inline_button,
+    BUTTON_GAP, STYLE_CONFIRM, STYLE_REMOVE, STYLE_ARROW, render_inline_button,
 )
 from engine.eigenform import Eigenform
 from engine.ordered_collection import OrderedCollection
@@ -213,7 +213,7 @@ class ListForm(Eigenform):
                 add_aff = aff
                 Eigenform.mark_rendered(aff)
 
-        gap = '<span style="display: inline-block; width: 24px; height: 24px;"></span>'
+        gap = BUTTON_GAP
         num_items = len(items)
         html += '<ol style="margin: 4px 0; padding-left: 24px;">'
 

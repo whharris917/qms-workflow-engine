@@ -310,6 +310,79 @@ list_forms = GroupForm(
 
 
 # ---------------------------------------------------------------------------
+# Section 3c: TableForm Showcase
+# ---------------------------------------------------------------------------
+
+table_forms = GroupForm(
+    key="table-forms",
+    label="TableForm Showcase",
+    instruction=(
+        "TableForm manages a 2D grid with dynamic columns and rows. Both axes "
+        "are backed by OrderedCollection, giving them stable IDs, fixed items, "
+        "ordering constraints, and reordering — the same capabilities as ListForm, "
+        "applied to rows and columns independently."
+    ),
+    eigenforms=[
+        TableForm(
+            key="table-basic",
+            label="Basic Table",
+            instruction=(
+                "Add columns first, then rows, then fill cells inline. "
+                "Rows and columns can be reordered with arrow buttons. "
+                "Try: add a few columns and rows, then drag data around "
+                "by moving rows up/down and columns left/right."
+            ),
+        ),
+        TableForm(
+            key="table-fixed-cols",
+            label="Fixed Columns",
+            instruction=(
+                "fixed_columns seeds immutable columns that cannot be renamed "
+                "or removed. They can still be reordered. Add rows and fill "
+                "in the cells — try removing a column (you can't)."
+            ),
+            fixed_columns=["Name", "Role", "Status"],
+        ),
+        TableForm(
+            key="table-row-constraints",
+            label="Row Ordering Constraints",
+            instruction=(
+                "allow_row_constraints=True enables per-row prerequisite "
+                "dropdowns. Add a constraint to require one row to always "
+                "appear after another. Green pills show active constraints. "
+                "Move arrows disappear where they would violate a constraint. "
+                "Cycles are detected and rejected."
+            ),
+            allow_row_constraints=True,
+        ),
+        TableForm(
+            key="table-col-constraints",
+            label="Column Ordering Constraints",
+            instruction=(
+                "allow_col_constraints=True enables per-column prerequisite "
+                "dropdowns in the header. Blue pills show active constraints. "
+                "Try requiring one column to always appear after another, "
+                "then try moving it — blocked moves have no arrow button."
+            ),
+            allow_col_constraints=True,
+        ),
+        TableForm(
+            key="table-full",
+            label="Full-Featured Table",
+            instruction=(
+                "All features enabled: fixed columns, row and column constraints. "
+                "The fixed columns (Phase, Owner, Status) cannot be renamed or "
+                "removed. Both axes support dynamic ordering constraints."
+            ),
+            fixed_columns=["Phase", "Owner", "Status"],
+            allow_row_constraints=True,
+            allow_col_constraints=True,
+        ),
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
 # Section 4: Container Forms
 # ---------------------------------------------------------------------------
 
@@ -738,7 +811,7 @@ definition = PageForm(
     key="eigenform-gallery",
     label="Eigenform Gallery",
     instruction=(
-        "Interactive reference for all 29 eigenform types. Each tab covers a category "
+        "Interactive reference for all 30 eigenform types. Each tab covers a category "
         "with working examples you can interact with. This page IS the documentation."
     ),
     eigenforms=[
@@ -750,6 +823,7 @@ definition = PageForm(
                 "selection": selection_forms,
                 "collections": collection_forms,
                 "lists": list_forms,
+                "tables": table_forms,
                 "containers": container_forms,
                 "conditional": conditional_forms,
                 "computed": computed_forms,

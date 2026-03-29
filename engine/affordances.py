@@ -20,14 +20,21 @@ from html import escape
 STYLE_CONFIRM = (
     "cursor: pointer; border: 1px solid #4a4; background: #efffef;"
     " width: 24px; height: 24px; font-size: 14px; padding: 0; color: #2a2;"
+    " vertical-align: middle;"
 )
 STYLE_REMOVE = (
     "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8;"
     " width: 24px; height: 24px; font-size: 12px; padding: 0; color: #c00;"
+    " vertical-align: middle;"
 )
 STYLE_ARROW = (
     "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8;"
     " width: 24px; height: 24px; font-size: 10px; padding: 0;"
+    " vertical-align: middle;"
+)
+BUTTON_GAP = (
+    '<span style="display: inline-block; width: 24px; height: 24px;'
+    ' border: 1px solid transparent; vertical-align: middle;"></span>'
 )
 
 

@@ -19,7 +19,7 @@ from typing import Any
 
 from engine.affordances import (
     Affordance, AddConstraintAffordance, SimpleButtonAffordance,
-    STYLE_REMOVE, STYLE_ARROW, render_inline_button,
+    BUTTON_GAP, STYLE_REMOVE, STYLE_ARROW, render_inline_button,
 )
 from engine.eigenform import Eigenform
 from engine.ordered_collection import OrderedCollection
@@ -165,10 +165,19 @@ class TableForm(Eigenform):
         self._store.set(self._scope, self.key, state)
 
     def _current_states(self) -> tuple[dict, dict, dict]:
-        """Return current col_state, row_state, cells as mutable copies."""
-        raw = self._raw_state
-        col_state = dict(raw.get("columns") or {"items": [], "next_id": 0})
-        row_state = dict(raw.get("rows_meta") or {"items": [], "next_id": 0})
+        """Return current col_state, row_state, cells as mutable copies.
+
+        Builds state from the collections (which handle seeding of
+        fixed items) rather than reading raw from the store.
+        """
+        col_oc = self._col_collection
+        row_oc = self._row_collection
+        col_state: dict = {"items": [dict(i) for i in col_oc.items], "next_id": col_oc.next_id}
+        if col_oc.stored_constraints:
+            col_state["constraints"] = list(col_oc.stored_constraints)
+        row_state: dict = {"items": [dict(i) for i in row_oc.items], "next_id": row_oc.next_id}
+        if row_oc.stored_constraints:
+            row_state["constraints"] = list(row_oc.stored_constraints)
         cells = {k: dict(v) for k, v in self._cells.items()}
         return col_state, row_state, cells
 
@@ -381,6 +390,50 @@ class TableForm(Eigenform):
 
         return affordances
 
+    @staticmethod
+    def _render_constraint_inline(
+        url: str, item_id: str, prereqs: list[str],
+        id_to_val: dict[str, str], static_pairs: set[tuple[str, str]],
+        all_items: list[dict], add_action: str, remove_action: str,
+        pill_bg: str, font_size: str,
+    ) -> str:
+        """Render inline constraint dropdown + prerequisite pills."""
+        html = '<span style="display: inline-flex; align-items: center; gap: 2px; flex-wrap: wrap;">'
+        available = [i for i in all_items if i["id"] != item_id and i["id"] not in prereqs]
+        if available:
+            add_opts = "".join(
+                f'<option value="{escape(i["id"])}">'
+                f'{escape(i["value"] or i["id"])} ({escape(i["id"])})</option>'
+                for i in available
+            )
+            html += (
+                f'<select style="width: 90px; font-size: {font_size};" onchange="'
+                f"if(this.value)fetch('{url}',"
+                f"{{method:'POST',headers:{{'Content-Type':'application/json'}},"
+                f"body:JSON.stringify({{action:'{add_action}',item:'{item_id}',after:this.value}})"
+                f"}}).then(()=>location.reload())"
+                f'">'
+                f'<option value="">+ prereq</option>'
+                f'{add_opts}'
+                f'</select>'
+            )
+        if prereqs:
+            html += f'<span style="font-style: italic; font-size: {font_size}; color: #999;">after</span>'
+            for p_id in prereqs:
+                p_name = escape(id_to_val.get(p_id, p_id))
+                is_static = (item_id, p_id) in static_pairs
+                html += (
+                    f'<span style="background: {pill_bg}; padding: 0 4px;'
+                    f' border-radius: 2px; font-size: {font_size};">{p_name}</span>'
+                )
+                if not is_static:
+                    html += render_inline_button(
+                        url, {"action": remove_action, "item": item_id, "after": p_id},
+                        "x", STYLE_REMOVE,
+                    )
+        html += '</span>'
+        return html
+
     def render_from_data(self, data: dict) -> str:
         from engine.affordances import render_affordance_html
         col_oc = self._col_collection
@@ -397,75 +450,110 @@ class TableForm(Eigenform):
         affs = data.get("affordances", [])
 
         url = affs[0]["url"] if affs else ""
-        gap = '<span style="display: inline-block; width: 24px; height: 24px;"></span>'
+        gap = BUTTON_GAP
         num_rows = len(row_items)
         num_cols = len(col_items)
 
+        # Constraint display data
+        show_row_constraints = self.allow_row_constraints and num_rows > 1
+        show_col_constraints = self.allow_col_constraints and num_cols > 1
+        row_mf = row_oc.effective_must_follow if show_row_constraints else {}
+        col_mf = col_oc.effective_must_follow if show_col_constraints else {}
+        row_id_to_val = row_oc.id_to_value
+        col_id_to_val = col_oc.id_to_value
+        row_static_pairs = {(iid, aid)
+                            for iid, aids in self.row_must_follow.items()
+                            for aid in aids} if show_row_constraints else set()
+        col_static_pairs = {(iid, aid)
+                            for iid, aids in self.col_must_follow.items()
+                            for aid in aids} if show_col_constraints else set()
+
         if columns:
+            add_col_aff = next((a for a in affs if a.get("body", {}).get("action") == "add_column"), None)
+            add_row_aff = next((a for a in affs if a.get("body", {}).get("action") == "add_row"), None)
+
+            # Row controls live in a borderless first column — structurally
+            # inside the <tr> (guaranteeing alignment), visually outside the
+            # data grid (no border, no background).
+            ctrl_style = 'border: none; padding: 2px 4px 2px 0; white-space: nowrap;'
+
             html += '<table style="border-collapse: collapse; margin: 8px 0;">'
 
-            # Header row
+            # Header row — empty control cell + ID + data columns
             html += '<tr>'
-            # ID column header (with space for move buttons)
+            html += f'<th style="{ctrl_style}"></th>'
             html += '<th style="border: 1px solid #ccc; padding: 4px 8px; background: #f0f0f0;">ID</th>'
 
             for ci, col in enumerate(columns):
                 col_item = col_items[ci] if ci < len(col_items) else None
+                col_id = col["key"]
                 is_fixed_col = col_item.get("fixed", False) if col_item else False
 
                 # Column move buttons + remove button
                 move_btns = ''
                 if num_cols > 1:
                     if col_oc.can_move_up(ci, col_items):
-                        move_btns += render_inline_button(url, {"action": "move_col_left", "column": col["key"]}, "&#9664;", STYLE_ARROW)
+                        move_btns += render_inline_button(url, {"action": "move_col_left", "column": col_id}, "&#9664;", STYLE_ARROW)
                     else:
                         move_btns += gap
                     if col_oc.can_move_down(ci, col_items):
-                        move_btns += render_inline_button(url, {"action": "move_col_right", "column": col["key"]}, "&#9654;", STYLE_ARROW)
+                        move_btns += render_inline_button(url, {"action": "move_col_right", "column": col_id}, "&#9654;", STYLE_ARROW)
                     else:
                         move_btns += gap
 
                 rm_col_btn = ''
                 if not is_fixed_col:
-                    rm_col_body = {"action": "remove_column", "column": col["key"]}
-                    rm_col_btn = render_inline_button(url, rm_col_body, "\u2212", STYLE_REMOVE)
+                    rm_col_btn = render_inline_button(url, {"action": "remove_column", "column": col_id}, "\u2212", STYLE_REMOVE)
+
+                # Column constraint row (if enabled)
+                constraint_row = ''
+                if show_col_constraints:
+                    prereqs = col_mf.get(col_id, [])
+                    if prereqs or len(col_items) > 1:
+                        constraint_row = (
+                            f'<div style="padding: 2px 4px; border-top: 1px solid #e0e0e0;">'
+                            + self._render_constraint_inline(
+                                url, col_id, prereqs, col_id_to_val, col_static_pairs,
+                                col_items, "add_col_constraint", "remove_col_constraint",
+                                "#e8e8f4", "10px")
+                            + '</div>'
+                        )
 
                 if is_fixed_col:
-                    # Fixed column: non-editable header
                     html += (
                         f'<th style="border: 1px solid #ccc; padding: 2px; background: #f0f0f0;">'
                         f'<div style="padding: 2px 4px; font-weight: bold; text-align: center; color: #555;">'
                         f'{escape(col["label"])}</div>'
                         f'<div style="display: flex; justify-content: space-between; align-items: center; padding: 0 4px;">'
-                        f'<span style="font-size: 10px; color: #888;">{escape(col["key"])}</span>'
+                        f'<span style="font-size: 10px; color: #888;">{escape(col_id)}</span>'
                         f'{move_btns}'
                         f'</div>'
+                        f'{constraint_row}'
                         f'</th>'
                     )
                 else:
-                    # Editable column header
                     html += (
                         f'<th style="border: 1px solid #ccc; padding: 2px; background: #f0f0f0;">'
                         f'<form style="margin:0" onsubmit="fetch(\'{url}\','
                         f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                        f'body:JSON.stringify({{action:\'rename_column\',column:\'{col["key"]}\','
+                        f'body:JSON.stringify({{action:\'rename_column\',column:\'{col_id}\','
                         f'label:this.elements.v.value}})'
                         f'}}).then(()=>location.reload()); return false">'
                         f'<input name="v" type="text" value="{escape(col["label"])}"'
                         f' style="border: none; width: 100%; box-sizing: border-box; padding: 2px 4px;'
                         f' background: transparent; font-weight: bold; text-align: center;"'
-                        f' oninput="this.title=\'POST {url} \'+JSON.stringify({{action:\'rename_column\',column:\'{col["key"]}\',label:this.value}})"'
-                        f' title="POST {url} {escape(json.dumps({"action": "rename_column", "column": col["key"], "label": col["label"]}))}" />'
+                        f' oninput="this.title=\'POST {url} \'+JSON.stringify({{action:\'rename_column\',column:\'{col_id}\',label:this.value}})"'
+                        f' title="POST {url} {escape(json.dumps({"action": "rename_column", "column": col_id, "label": col["label"]}))}" />'
                         f'</form>'
                         f'<div style="display: flex; justify-content: space-between; align-items: center; padding: 0 4px;">'
-                        f'<span style="font-size: 10px; color: #888;">{escape(col["key"])}</span>'
+                        f'<span style="font-size: 10px; color: #888;">{escape(col_id)}</span>'
                         f'{move_btns}{rm_col_btn}'
                         f'</div>'
+                        f'{constraint_row}'
                         f'</th>'
                     )
 
             # +Column as last header cell
-            add_col_aff = next((a for a in affs if a.get("body", {}).get("action") == "add_column"), None)
             if add_col_aff:
                 add_col_body_preview = json.dumps({"action": "add_column", "label": ""})
                 html += (
@@ -484,7 +572,7 @@ class TableForm(Eigenform):
                 )
             html += '</tr>'
 
-            # Data rows
+            # Data rows — control cell + ID cell + data cells
             for ri, row_data in enumerate(rows):
                 row_id = row_data["_id"]
                 row_item = row_items[ri] if ri < len(row_items) else None
@@ -492,8 +580,8 @@ class TableForm(Eigenform):
 
                 html += '<tr>'
 
-                # Row ID cell with remove + move buttons
-                html += '<td style="border: 1px solid #ccc; padding: 4px 8px; color: #888; font-size: 11px; white-space: nowrap;">'
+                # Control cell (borderless, outside the visual grid)
+                html += f'<td style="{ctrl_style}">'
                 if not is_fixed_row:
                     rm_row_body = {"action": "remove_row", "row": row_id}
                     html += render_inline_button(url, rm_row_body, "\u2212", STYLE_REMOVE)
@@ -508,10 +596,24 @@ class TableForm(Eigenform):
                         html += render_inline_button(url, {"action": "move_row_down", "row": row_id}, "&#9660;", STYLE_ARROW)
                     else:
                         html += gap
-                html += f' {escape(row_id)}'
+                # Row constraint controls (inline in control cell)
+                if show_row_constraints:
+                    prereqs = row_mf.get(row_id, [])
+                    if prereqs or num_rows > 1:
+                        html += self._render_constraint_inline(
+                            url, row_id, prereqs, row_id_to_val, row_static_pairs,
+                            row_items, "add_row_constraint", "remove_row_constraint",
+                            "#e8f4e8", "11px")
                 html += '</td>'
 
-                # Data cells
+                # ID cell
+                html += (
+                    f'<td style="border: 1px solid #ccc; padding: 4px 8px; color: #888;'
+                    f' font-size: 11px; white-space: nowrap;">'
+                    f'{escape(row_id)}'
+                    f'</td>'
+                )
+
                 for col in columns:
                     cell_value = row_data.get(col["key"])
                     display = escape(str(cell_value)) if cell_value is not None else ""
@@ -536,11 +638,11 @@ class TableForm(Eigenform):
                 html += '</tr>'
 
             # +Row button row
-            add_row_aff = next((a for a in affs if a.get("body", {}).get("action") == "add_row"), None)
             if add_row_aff:
                 add_row_body = json.dumps({"action": "add_row"})
                 html += (
                     f'<tr>'
+                    f'<td style="{ctrl_style}"></td>'
                     f'<td style="border: 1px solid #ccc; padding: 4px 8px;">'
                     f'<button onclick="fetch(\'{url}\','
                     f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
@@ -595,6 +697,7 @@ class TableForm(Eigenform):
                 "move_row_up", "move_row_down", "move_col_left", "move_col_right",
                 "add_row_constraint", "remove_row_constraint",
                 "add_col_constraint", "remove_col_constraint",
+                "set_row",
             ):
                 Eigenform.mark_rendered(aff)
 
