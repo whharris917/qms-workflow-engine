@@ -202,37 +202,6 @@ collection_forms = GroupForm(
                                 options=["Engineer", "Designer", "Manager", "QA"]),
             ],
         ),
-        ListForm(
-            key="list-demo",
-            label="ListForm",
-            instruction=(
-                "Ordered list with add/edit/remove/reorder. "
-                "Try adding items, then reordering with the arrow buttons. "
-                "Item IDs are stable (item_0, item_1, ...) — removing item_1 doesn't renumber item_2."
-            ),
-        ),
-        ListForm(
-            key="fixed-list-demo",
-            label="ListForm (fixed items)",
-            instruction=(
-                "A list with fixed seed items that cannot be removed or renamed. "
-                "You can reorder them freely and add your own items alongside them. "
-                "Try moving a fixed item, then adding a new one."
-            ),
-            fixed_items=["Alpha", "Bravo", "Charlie"],
-        ),
-        ListForm(
-            key="ordered-list-demo",
-            label="ListForm (ordering constraints)",
-            instruction=(
-                "Charlie has built-in constraints requiring it to follow Alpha and Bravo. "
-                "Try moving Charlie above Alpha — the up arrow will be absent. "
-                "Use 'Add Constraint' to create new ordering rules dynamically. "
-                "Dynamic constraints can be removed; built-in ones cannot."
-            ),
-            fixed_items=["Alpha", "Bravo", "Charlie"],
-            must_follow={"Charlie": ["Alpha", "Bravo"]},
-        ),
         TableForm(
             key="table-demo",
             label="TableForm",
@@ -252,6 +221,86 @@ collection_forms = GroupForm(
             ),
             key_label="Property",
             value_label="Setting",
+        ),
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
+# Section 3b: ListForm Showcase
+# ---------------------------------------------------------------------------
+
+list_forms = GroupForm(
+    key="list-forms",
+    label="ListForm Showcase",
+    instruction=(
+        "ListForm is a versatile ordered list with add/edit/remove/reorder. "
+        "It supports fixed seed items, ordering constraints, and several "
+        "configuration options. Each example below highlights a different use case."
+    ),
+    eigenforms=[
+        ListForm(
+            key="list-basic",
+            label="Basic List",
+            instruction=(
+                "A plain list with no constraints. Add items, edit them inline, "
+                "reorder with arrows, remove with x. "
+                "Item IDs are stable — removing item_1 doesn't renumber item_2."
+            ),
+            allow_constraints=False,
+        ),
+        ListForm(
+            key="list-fixed",
+            label="Fixed Seed Items",
+            instruction=(
+                "fixed_items seeds the list with immutable entries (gray background). "
+                "They can be reordered but not edited or removed. "
+                "User-added items coexist freely alongside them."
+            ),
+            fixed_items=["Requirements", "Design", "Implementation", "Testing", "Deployment"],
+            allow_constraints=False,
+        ),
+        ListForm(
+            key="list-static-constraints",
+            label="Static Ordering Constraints",
+            instruction=(
+                "must_follow defines ordering rules at definition time. Here, "
+                "Implementation must follow Design, Testing must follow Implementation, "
+                "and Deployment must follow Testing. "
+                "Move arrows are absent where a move would violate a constraint. "
+                "Constraints are not user-modifiable (allow_constraints=False)."
+            ),
+            fixed_items=["Requirements", "Design", "Implementation", "Testing", "Deployment"],
+            must_follow={
+                "Implementation": ["Design"],
+                "Testing": ["Implementation"],
+                "Deployment": ["Testing"],
+            },
+            allow_constraints=False,
+        ),
+        ListForm(
+            key="list-dynamic-constraints",
+            label="Dynamic Ordering Constraints",
+            instruction=(
+                "allow_constraints=True (the default) lets users add and remove "
+                "ordering constraints at runtime via the 'Add Constraint' dropdown. "
+                "Charlie has a built-in constraint (must follow Alpha and Bravo) shown "
+                "as '(built-in)'. Try adding a dynamic constraint, then removing it."
+            ),
+            fixed_items=["Alpha", "Bravo", "Charlie", "Delta", "Echo"],
+            must_follow={"Charlie": ["Alpha", "Bravo"]},
+        ),
+        ListForm(
+            key="list-mixed",
+            label="Mixed: Fixed + User + Constraints",
+            instruction=(
+                "Combines all features: fixed seed items, user-added items, "
+                "and ordering constraints. Add your own items, then try constraining "
+                "them relative to the fixed items. The topological sort ensures "
+                "all constraints are satisfied after every change."
+            ),
+            fixed_items=["Setup", "Teardown"],
+            must_follow={"Teardown": ["Setup"]},
         ),
     ],
 )
@@ -697,6 +746,7 @@ definition = PageForm(
                 "simple": simple_values,
                 "selection": selection_forms,
                 "collections": collection_forms,
+                "lists": list_forms,
                 "containers": container_forms,
                 "conditional": conditional_forms,
                 "computed": computed_forms,

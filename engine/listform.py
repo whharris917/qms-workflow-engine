@@ -48,6 +48,7 @@ class ListForm(Eigenform):
     """
     fixed_items: list[str] = field(default_factory=list)
     must_follow: dict[str, list[str]] = field(default_factory=dict)
+    allow_constraints: bool = True
 
     @property
     def items(self) -> list[dict]:
@@ -270,7 +271,7 @@ class ListForm(Eigenform):
                 ))
 
         # Ordering constraint affordances
-        if len(self.items) > 1:
+        if self.allow_constraints and len(self.items) > 1:
             item_vals = [i["value"] for i in self.items]
             affordances.append(AddConstraintAffordance(
                 label="Add Constraint",
@@ -515,6 +516,8 @@ class ListForm(Eigenform):
             self._save(items, next_id)
 
         elif action == "add_constraint":
+            if not self.allow_constraints:
+                return self._error("Ordering constraints are not allowed on this list.", action=action)
             item_val = body.get("item", "")
             after_val = body.get("after", "")
             item_values = {i["value"] for i in items}
