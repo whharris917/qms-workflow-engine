@@ -551,9 +551,11 @@ def _render_disabled_button(label: str, message: str) -> str:
 
 def _render_constraint_picker(label: str, url: str, endpoint: str, hints: dict) -> str:
     options = hints.get("options", [])
+    labels = hints.get("labels", {})
     opts_html = '<option value="">-- select --</option>'
     for opt in options:
-        opts_html += f'<option value="{escape(opt)}">{escape(opt)}</option>'
+        display = f'{escape(labels.get(opt, opt))} ({escape(opt)})' if opt in labels else escape(opt)
+        opts_html += f'<option value="{escape(opt)}">{display}</option>'
     tooltip_js = (
         f"var f=this.form;"
         f"f.querySelector('button[type=submit]').title="

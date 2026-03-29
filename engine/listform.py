@@ -25,12 +25,16 @@ class AddConstraintAffordance(Affordance):
     """An affordance that adds an ordering constraint between two items."""
 
     def __init__(self, label: str, method: str, url: str, body: dict,
-                 instruction: str | None = None, item_values: list[str] | None = None):
+                 instruction: str | None = None,
+                 item_values: list[str] | None = None,
+                 item_labels: dict[str, str] | None = None):
         super().__init__(label=label, method=method, url=url, body=body, instruction=instruction)
         self.item_values = item_values or []
+        self.item_labels = item_labels or {}
 
     def _render_hints(self) -> dict:
-        return {"type": "constraint_picker", "options": self.item_values}
+        return {"type": "constraint_picker", "options": self.item_values,
+                "labels": self.item_labels}
 
 
 @dataclass
@@ -41,10 +45,10 @@ class ListForm(Eigenform):
     first access and cannot be removed or renamed. They can be freely
     reordered alongside user-added items.
 
-    must_follow constrains item ordering: {"C": ["A", "B"]} means the
-    item with value "C" must appear after items "A" and "B". Moves that
-    would violate a constraint are excluded from affordances and rejected
-    by the handler. Constraints apply to both fixed and user-added items.
+    must_follow constrains item ordering by ID: {"item_2": ["item_0", "item_1"]}
+    means item_2 must appear after item_0 and item_1. Moves that would violate
+    a constraint are excluded from affordances and rejected by the handler.
+    Constraints are ID-based (not value-based) so they survive renames.
     """
     fixed_items: list[str] = field(default_factory=list)
     must_follow: dict[str, list[str]] = field(default_factory=dict)
@@ -115,11 +119,11 @@ class ListForm(Eigenform):
         if idx <= 0:
             return False
         mf = self._effective_must_follow
-        moved_val = items[idx]["value"]
-        displaced_val = items[idx - 1]["value"]
+        moved_id = items[idx]["id"]
+        displaced_id = items[idx - 1]["id"]
         # Moving up means the moved item would now be before the displaced item.
         # Violation if the moved item must follow the displaced item.
-        if displaced_val in mf.get(moved_val, []):
+        if displaced_id in mf.get(moved_id, []):
             return False
         return True
 
@@ -128,27 +132,27 @@ class ListForm(Eigenform):
         if idx >= len(items) - 1:
             return False
         mf = self._effective_must_follow
-        moved_val = items[idx]["value"]
-        displaced_val = items[idx + 1]["value"]
+        moved_id = items[idx]["id"]
+        displaced_id = items[idx + 1]["id"]
         # Moving down means the displaced item would now be before the moved item.
         # Violation if the displaced item must follow the moved item.
-        if moved_val in mf.get(displaced_val, []):
+        if moved_id in mf.get(displaced_id, []):
             return False
         return True
 
-    def _would_create_cycle(self, item_val: str, after_val: str,
+    def _would_create_cycle(self, item_id: str, after_id: str,
                             mf: dict[str, list[str]]) -> bool:
         """Check if adding 'item must follow after' would create a cycle.
 
-        Walks from after_val through its prerequisites (must_follow chains).
-        If item_val is reachable, then after_val transitively depends on
-        item_val, and adding 'item must follow after' closes a cycle.
+        Walks from after_id through its prerequisites (must_follow chains).
+        If item_id is reachable, then after_id transitively depends on
+        item_id, and adding 'item must follow after' closes a cycle.
         """
         visited = set()
-        stack = [after_val]
+        stack = [after_id]
         while stack:
             current = stack.pop()
-            if current == item_val:
+            if current == item_id:
                 return True
             if current in visited:
                 continue
@@ -171,19 +175,19 @@ class ListForm(Eigenform):
         deferred = []
         placed = set()
         for item in items:
-            prereqs = set(mf.get(item["value"], []))
+            prereqs = set(mf.get(item["id"], []))
             if prereqs <= placed:
                 result.append(item)
-                placed.add(item["value"])
+                placed.add(item["id"])
                 # Flush deferred items whose prerequisites are now met
                 changed = True
                 while changed:
                     changed = False
                     still_deferred = []
                     for d in deferred:
-                        if set(mf.get(d["value"], [])) <= placed:
+                        if set(mf.get(d["id"], [])) <= placed:
                             result.append(d)
-                            placed.add(d["value"])
+                            placed.add(d["id"])
                             changed = True
                         else:
                             still_deferred.append(d)
@@ -201,10 +205,12 @@ class ListForm(Eigenform):
         }
         mf = self._effective_must_follow
         if mf:
+            id_to_val = {i["id"]: i["value"] for i in self.items}
             state["constraints"] = [
-                {"item": item, "after": after}
-                for item, afters in mf.items()
-                for after in afters
+                {"item": item_id, "item_value": id_to_val.get(item_id, "?"),
+                 "after": after_id, "after_value": id_to_val.get(after_id, "?")}
+                for item_id, after_ids in mf.items()
+                for after_id in after_ids
             ]
         return state
 
@@ -272,14 +278,17 @@ class ListForm(Eigenform):
 
         # Ordering constraint affordances
         if self.allow_constraints and len(self.items) > 1:
-            item_vals = [i["value"] for i in self.items]
+            item_ids = [i["id"] for i in self.items]
+            item_labels = {i["id"]: i["value"] for i in self.items}
+            id_labels = [f"{i['id']} ({i['value']})" for i in self.items]
             affordances.append(AddConstraintAffordance(
                 label="Add Constraint",
                 method="POST",
                 url=self.url,
-                body={"action": "add_constraint", "item": f"<{' | '.join(item_vals)}>", "after": f"<{' | '.join(item_vals)}>"},
-                instruction="Require that <item> must always appear after <after> in the list.",
-                item_values=item_vals,
+                body={"action": "add_constraint", "item": f"<{' | '.join(item_ids)}>", "after": f"<{' | '.join(item_ids)}>"},
+                instruction=f"Require that <item> must always appear after <after>. Items: {', '.join(id_labels)}.",
+                item_values=item_ids,
+                item_labels=item_labels,
             ))
         dynamic = self._stored_constraints
         if dynamic:
@@ -324,7 +333,8 @@ class ListForm(Eigenform):
         endpoint = f'POST {url}'
         for aff in affs:
             action = aff.get("body", {}).get("action")
-            if action in ("move_up", "move_down", "edit", "remove"):
+            if action in ("move_up", "move_down", "edit", "remove",
+                          "add_constraint", "remove_constraint"):
                 Eigenform.mark_rendered(aff)
             elif action == "add":
                 add_aff = aff
@@ -334,6 +344,18 @@ class ListForm(Eigenform):
         num_items = len(items)
         html += '<ol style="margin: 4px 0; padding-left: 24px;">'
 
+        # Fixed-width ID label style (consistent column width)
+        id_style = ('display: inline-block; min-width: 52px; color: #666; text-align: center;'
+                    ' background: #e8e8e8; border-radius: 10px; padding: 1px 6px;'
+                    ' font-family: monospace; font-size: 0.85em;')
+
+        # Build prerequisite lookup for inline display
+        mf = self._effective_must_follow
+        id_to_val = {i["id"]: i["value"] for i in items}
+        static_pairs = {(item_id, after_id)
+                        for item_id, after_ids in self.must_follow.items()
+                        for after_id in after_ids}
+
         # Existing items
         for idx, item in enumerate(items):
             item_id = item["id"]
@@ -341,8 +363,27 @@ class ListForm(Eigenform):
             is_fixed = item.get("fixed", False)
             html += f'<li style="margin: 4px 0; display: flex; align-items: center; gap: 4px;">'
 
+            # Remove button (leftmost, editable items only)
+            if not is_fixed:
+                html += render_inline_button(url, {"action": "remove", "id": item_id}, "x", STYLE_REMOVE)
+            else:
+                html += gap
+
+            # ID label
+            html += f'<span style="{id_style}">{escape(item_id)}</span>'
+
+            # Move up/down buttons
+            for direction, arrow, can in [
+                ("move_up", "&#9650;", self._can_move_up(idx, items)),
+                ("move_down", "&#9660;", self._can_move_down(idx, items)),
+            ]:
+                if can:
+                    html += render_inline_button(url, {"action": direction, "id": item_id}, arrow, STYLE_ARROW)
+                else:
+                    html += gap
+
             if is_fixed:
-                # Fixed items: plain text, no edit/remove
+                # Fixed items: plain text + confirm placeholder, no edit/remove
                 # Match input box: 200px width + 2*4px padding + 2*1px border = 210px total
                 html += (
                     f'<span style="display: inline-block; width: 200px; padding: 2px 4px;'
@@ -371,24 +412,44 @@ class ListForm(Eigenform):
                     f'</form>'
                 )
 
-            # Move up/down buttons inline (all items, fixed or not)
-            for direction, arrow, can in [
-                ("move_up", "&#9650;", self._can_move_up(idx, items)),
-                ("move_down", "&#9660;", self._can_move_down(idx, items)),
-            ]:
-                if can:
-                    html += render_inline_button(url, {"action": direction, "id": item_id}, arrow, STYLE_ARROW)
-                else:
-                    html += gap
-            # Remove button (editable items only)
-            if not is_fixed:
-                html += render_inline_button(url, {"action": "remove", "id": item_id}, "x", STYLE_REMOVE)
-            else:
-                html += gap
-            html += f' <span style="font-size: 10px; color: #888;">{escape(item_id)}</span>'
+            # Inline add-constraint dropdown + prerequisite labels with remove buttons
+            prereqs = mf.get(item_id, [])
+            if prereqs or (self.allow_constraints and num_items > 1):
+                html += '<span style="color: #999; display: inline-flex; align-items: center; gap: 2px;">'
+                # Add constraint dropdown first (so + buttons align across rows)
+                if self.allow_constraints:
+                    available = [i for i in items if i["id"] != item_id and i["id"] not in prereqs]
+                    if available:
+                        add_opts = "".join(
+                            f'<option value="{escape(i["id"])}">{escape(i["value"])} ({escape(i["id"])})</option>'
+                            for i in available
+                        )
+                        html += (
+                            f'<select style="width: 110px;" onchange="'
+                            f"if(this.value)fetch('{url}',"
+                            f"{{method:'POST',headers:{{'Content-Type':'application/json'}},"
+                            f"body:JSON.stringify({{action:'add_constraint',item:'{item_id}',after:this.value}})"
+                            f"}}).then(()=>location.reload())"
+                            f'">'
+                            f'<option value="">+ Prerequisite</option>'
+                            f'{add_opts}'
+                            f'</select>'
+                        )
+                if prereqs:
+                    html += '<span style="font-style: italic;">after</span>'
+                    for p_id in prereqs:
+                        p_name = escape(id_to_val.get(p_id, p_id))
+                        is_static = (item_id, p_id) in static_pairs
+                        html += f'<span style="background: #f0f0f0; padding: 0 4px; border-radius: 2px;">{p_name}</span>'
+                        if not is_static:
+                            html += render_inline_button(
+                                url, {"action": "remove_constraint", "item": item_id, "after": p_id},
+                                "x", STYLE_REMOVE,
+                            )
+                html += '</span>'
             html += '</li>'
 
-        # Add row — inline text field + green + button
+        # Add row — spacer matches ID label + two arrow columns, then input
         if add_aff:
             add_default = {"action": "add", "value": ""}
             add_tooltip = f'{escape(endpoint)} {escape(json.dumps(add_default))}'
@@ -396,8 +457,12 @@ class ListForm(Eigenform):
                 f"this.nextElementSibling.title="
                 f"'{escape(endpoint)} '+JSON.stringify({{action:'add',value:this.value}})"
             )
+            # Spacer: remove gap + ID pill + two arrow gaps
             html += (
                 f'<li style="margin: 4px 0; display: flex; align-items: center; gap: 4px; list-style: none;">'
+                f'{gap}'
+                f'<span style="{id_style} visibility: hidden;">item_0</span>'
+                f'{gap}{gap}'
                 f'<form style="display: inline; margin: 0;" onsubmit="fetch(\'{url}\','
                 f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
                 f"body:JSON.stringify({{action:'add',value:this.elements.v.value}})"
@@ -412,36 +477,6 @@ class ListForm(Eigenform):
             )
 
         html += '</ol>'
-
-        # Constraints display
-        constraints = data.get("constraints", [])
-        if constraints:
-            # Determine which are static (from must_follow) vs dynamic (removable)
-            static_pairs = {(item, after)
-                            for item, afters in self.must_follow.items()
-                            for after in afters}
-            html += '<div style="margin-top: 6px; font-size: 0.9em; color: #666;">'
-            html += '<strong>Ordering constraints:</strong>'
-            for c in constraints:
-                pair = (c["item"], c["after"])
-                is_static = pair in static_pairs
-                html += (
-                    f'<div style="margin: 2px 0; padding: 2px 4px; display: flex; align-items: center; gap: 4px;">'
-                    f'<span>{escape(c["item"])} must follow {escape(c["after"])}</span>'
-                )
-                if is_static:
-                    html += '<span style="font-size: 0.85em; color: #999;">(built-in)</span>'
-                else:
-                    html += render_inline_button(
-                        url, {"action": "remove_constraint", "item": c["item"], "after": c["after"]},
-                        "x", STYLE_REMOVE,
-                    )
-                html += '</div>'
-            html += '</div>'
-        # Mark remove_constraint as rendered (inline buttons handle it)
-        for aff in affs:
-            if aff.get("body", {}).get("action") == "remove_constraint":
-                Eigenform.mark_rendered(aff)
 
         # Bottom controls: render remaining affordances (N/A, Clear, etc.)
         html += '<div style="margin-top: 8px;">'
@@ -485,11 +520,10 @@ class ListForm(Eigenform):
             target = next(i for i in items if i["id"] == item_id)
             if target.get("fixed"):
                 return self._error(f"Item {item_id} is fixed and cannot be removed.", action=action)
-            removed_val = target["value"]
             items = [i for i in items if i["id"] != item_id]
             # Remove dynamic constraints referencing the removed item
             constraints = [c for c in self._stored_constraints
-                           if c["item"] != removed_val and c["after"] != removed_val]
+                           if c["item"] != item_id and c["after"] != item_id]
             self._save(items, next_id, constraints=constraints)
 
         elif action in ("move", "move_up", "move_down"):
@@ -518,23 +552,22 @@ class ListForm(Eigenform):
         elif action == "add_constraint":
             if not self.allow_constraints:
                 return self._error("Ordering constraints are not allowed on this list.", action=action)
-            item_val = body.get("item", "")
-            after_val = body.get("after", "")
-            item_values = {i["value"] for i in items}
-            if item_val not in item_values:
-                return self._error(f"Unknown item value: {item_val!r}.", action=action)
-            if after_val not in item_values:
-                return self._error(f"Unknown item value: {after_val!r}.", action=action)
-            if item_val == after_val:
+            item_id = body.get("item", "")
+            after_id = body.get("after", "")
+            if item_id not in item_ids:
+                return self._error(f"Unknown item: {item_id!r}. Valid: {', '.join(item_ids)}", action=action)
+            if after_id not in item_ids:
+                return self._error(f"Unknown item: {after_id!r}. Valid: {', '.join(item_ids)}", action=action)
+            if item_id == after_id:
                 return self._error("An item cannot be constrained to follow itself.", action=action)
             # Check for duplicate (including static constraints)
             mf = self._effective_must_follow
-            if after_val in mf.get(item_val, []):
-                return self._error(f"Constraint already exists: {item_val!r} must follow {after_val!r}.", action=action)
+            if after_id in mf.get(item_id, []):
+                return self._error(f"Constraint already exists: {item_id!r} must follow {after_id!r}.", action=action)
             # Check it wouldn't create a cycle (transitive)
-            if self._would_create_cycle(item_val, after_val, mf):
-                return self._error(f"Would create a cycle: {after_val!r} transitively depends on {item_val!r}.", action=action)
-            constraints = list(self._stored_constraints) + [{"item": item_val, "after": after_val}]
+            if self._would_create_cycle(item_id, after_id, mf):
+                return self._error(f"Would create a cycle: {after_id!r} transitively depends on {item_id!r}.", action=action)
+            constraints = list(self._stored_constraints) + [{"item": item_id, "after": after_id}]
             self._save(items, next_id, constraints=constraints)
             # Re-read and enforce all constraints (new constraint may require cascading moves)
             items = [dict(i) for i in self.items]
@@ -542,14 +575,14 @@ class ListForm(Eigenform):
             self._save(items, next_id, constraints=constraints)
 
         elif action == "remove_constraint":
-            item_val = body.get("item", "")
-            after_val = body.get("after", "")
+            item_id = body.get("item", "")
+            after_id = body.get("after", "")
             # Can only remove dynamic constraints, not static must_follow
             constraints = self._stored_constraints
             new_constraints = [c for c in constraints
-                               if not (c["item"] == item_val and c["after"] == after_val)]
+                               if not (c["item"] == item_id and c["after"] == after_id)]
             if len(new_constraints) == len(constraints):
-                return self._error(f"No dynamic constraint: {item_val!r} after {after_val!r}.", action=action)
+                return self._error(f"No dynamic constraint: {item_id!r} after {after_id!r}.", action=action)
             self._save(items, next_id, constraints=new_constraints)
 
         elif action == "na":

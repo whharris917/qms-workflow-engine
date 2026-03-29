@@ -264,17 +264,20 @@ list_forms = GroupForm(
             key="list-static-constraints",
             label="Static Ordering Constraints",
             instruction=(
-                "must_follow defines ordering rules at definition time. Here, "
-                "Implementation must follow Design, Testing must follow Implementation, "
-                "and Deployment must follow Testing. "
+                "must_follow defines ordering rules by item ID. Here, "
+                "Implementation (item_2) must follow Design (item_1), "
+                "Testing (item_3) must follow Implementation (item_2), "
+                "and Deployment (item_4) must follow Testing (item_3). "
                 "Move arrows are absent where a move would violate a constraint. "
-                "Constraints are not user-modifiable (allow_constraints=False)."
+                "Constraints are ID-based so they survive renames."
             ),
+            # item_0=Requirements, item_1=Design, item_2=Implementation,
+            # item_3=Testing, item_4=Deployment
             fixed_items=["Requirements", "Design", "Implementation", "Testing", "Deployment"],
             must_follow={
-                "Implementation": ["Design"],
-                "Testing": ["Implementation"],
-                "Deployment": ["Testing"],
+                "item_2": ["item_1"],   # Implementation after Design
+                "item_3": ["item_2"],   # Testing after Implementation
+                "item_4": ["item_3"],   # Deployment after Testing
             },
             allow_constraints=False,
         ),
@@ -284,23 +287,13 @@ list_forms = GroupForm(
             instruction=(
                 "allow_constraints=True (the default) lets users add and remove "
                 "ordering constraints at runtime via the 'Add Constraint' dropdown. "
-                "Charlie has a built-in constraint (must follow Alpha and Bravo) shown "
-                "as '(built-in)'. Try adding a dynamic constraint, then removing it."
+                "Charlie (item_2) has a built-in constraint requiring it to follow "
+                "Alpha (item_0) and Bravo (item_1), shown as '(built-in)'. "
+                "Try adding a dynamic constraint, then removing it."
             ),
+            # item_0=Alpha, item_1=Bravo, item_2=Charlie, item_3=Delta, item_4=Echo
             fixed_items=["Alpha", "Bravo", "Charlie", "Delta", "Echo"],
-            must_follow={"Charlie": ["Alpha", "Bravo"]},
-        ),
-        ListForm(
-            key="list-mixed",
-            label="Mixed: Fixed + User + Constraints",
-            instruction=(
-                "Combines all features: fixed seed items, user-added items, "
-                "and ordering constraints. Add your own items, then try constraining "
-                "them relative to the fixed items. The topological sort ensures "
-                "all constraints are satisfied after every change."
-            ),
-            fixed_items=["Setup", "Teardown"],
-            must_follow={"Teardown": ["Setup"]},
+            must_follow={"item_2": ["item_0", "item_1"]},  # Charlie after Alpha & Bravo
         ),
     ],
 )
