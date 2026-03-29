@@ -159,13 +159,36 @@ class TableForm(Eigenform):
                     return False
         return True
 
-    def _save(self, col_state: dict, row_state: dict, cells: dict):
+    @property
+    def _config(self) -> dict:
+        return self._raw_state.get("config", {})
+
+    def _save(self, col_state: dict, row_state: dict, cells: dict,
+              config: dict | None = None):
         state = {
             "columns": col_state,
             "rows_meta": row_state,
             "cells": cells,
         }
+        cfg = config if config is not None else self._config
+        if cfg:
+            state["config"] = cfg
         self._store.set(self._scope, self.key, state)
+
+    def _apply_auto_chain(self, state: dict, key: str, config: dict | None = None) -> dict:
+        """If auto_chain is on for the given axis, rebuild constraints as a sequential chain."""
+        cfg = config if config is not None else self._config
+        if not cfg.get(key):
+            return state
+        items = state.get("items", [])
+        if len(items) < 2:
+            state.pop("constraints", None)
+            return state
+        constraints = []
+        for i in range(1, len(items)):
+            constraints.append({"item": items[i]["id"], "after": items[i - 1]["id"]})
+        state["constraints"] = constraints
+        return state
 
     def _current_states(self) -> tuple[dict, dict, dict]:
         """Return current col_state, row_state, cells as mutable copies.
@@ -394,6 +417,26 @@ class TableForm(Eigenform):
                 instruction="Remove a column by key or label.",
             ))
 
+        # Auto-chain toggles
+        if self.allow_row_constraints:
+            on = self._config.get("auto_chain_rows", False)
+            affordances.append(Affordance(
+                label="Toggle Auto-Chain Rows",
+                method="POST",
+                url=self.url,
+                body={"action": "toggle_auto_chain_rows"},
+                instruction=f"Toggle automatic sequential row chaining (currently {'on' if on else 'off'}). When on, each row automatically depends on the previous one.",
+            ))
+        if self.allow_col_constraints:
+            on = self._config.get("auto_chain_cols", False)
+            affordances.append(Affordance(
+                label="Toggle Auto-Chain Columns",
+                method="POST",
+                url=self.url,
+                body={"action": "toggle_auto_chain_cols"},
+                instruction=f"Toggle automatic sequential column chaining (currently {'on' if on else 'off'}). When on, each column automatically depends on the previous one.",
+            ))
+
         return affordances
 
     @staticmethod
@@ -405,11 +448,15 @@ class TableForm(Eigenform):
         available = [i for i in all_items if i["id"] != item_id and i["id"] not in prereqs]
         if not available:
             return ''
-        add_opts = "".join(
-            f'<option value="{escape(i["id"])}">'
-            f'{escape(i["value"] + " (" + i["id"] + ")" if i["value"] else i["id"])}</option>'
-            for i in available
-        )
+        def _opt(i: dict) -> str:
+            body = json.dumps({"action": add_action, "item": item_id, "after": i["id"]})
+            label = i["value"] + " (" + i["id"] + ")" if i["value"] else i["id"]
+            return (
+                f'<option value="{escape(i["id"])}"'
+                f' title="POST {url} {escape(body)}">'
+                f'{escape(label)}</option>'
+            )
+        add_opts = "".join(_opt(i) for i in available)
         return (
             f'<span style="position: relative; display: inline-block;'
             f' width: 24px; height: 24px; box-sizing: content-box;'
@@ -417,7 +464,8 @@ class TableForm(Eigenform):
             f'<span style="position: absolute; inset: 0; display: flex;'
             f' align-items: center; justify-content: center;'
             f' font-size: 18px; font-weight: normal; pointer-events: none;">☑</span>'
-            f'<select style="position: absolute; inset: 0; width: 100%; height: 100%;'
+            f'<select title="POST {url} {{&quot;action&quot;:&quot;{add_action}&quot;,&quot;item&quot;:&quot;{item_id}&quot;,&quot;after&quot;:&quot;...&quot;}}"'
+            f' style="position: absolute; inset: 0; width: 100%; height: 100%;'
             f' opacity: 0; cursor: pointer;" onchange="'
             f"if(this.value)fetch('{url}',"
             f"{{method:'POST',headers:{{'Content-Type':'application/json'}},"
@@ -467,7 +515,7 @@ class TableForm(Eigenform):
         pill_bg: str,
     ) -> str:
         """Render inline constraint dropdown + prerequisite pills (for column constraints)."""
-        html = '<span style="display: inline-flex; align-items: center; gap: 2px; flex-wrap: wrap;">'
+        html = '<span style="display: inline-flex; flex-direction: column; align-items: center; gap: 2px;">'
         html += TableForm._render_constraint_dropdown(url, item_id, prereqs, all_items, add_action)
         html += TableForm._render_constraint_pills(url, item_id, prereqs, id_to_val, static_pairs, remove_action, pill_bg)
         html += '</span>'
@@ -483,6 +531,34 @@ class TableForm(Eigenform):
         html = f'<h3>{escape(data["label"])}</h3>'
         if data.get("instruction"):
             html += f'<p>{escape(data["instruction"])}</p>'
+
+        # Configuration panel
+        config = self._config
+        config_toggles = []
+        url_for_config = data.get("affordances", [{}])[0].get("url", "")
+        if self.allow_row_constraints:
+            config_toggles.append(("auto_chain_rows", "toggle_auto_chain_rows", "Auto-chain rows"))
+        if self.allow_col_constraints:
+            config_toggles.append(("auto_chain_cols", "toggle_auto_chain_cols", "Auto-chain columns"))
+        if config_toggles:
+            html += (
+                f'<div style="background: #f8f8f8; border: 1px solid #ddd; border-radius: 4px;'
+                f' padding: 6px 10px; margin: 8px 0; display: inline-flex; align-items: center; gap: 12px;">'
+                f'<span style="font-weight: bold; font-size: 0.9em; color: #555;">Configuration</span>'
+            )
+            for cfg_key, action_name, label in config_toggles:
+                checked = ' checked' if config.get(cfg_key, False) else ''
+                toggle_body = json.dumps({"action": action_name})
+                html += (
+                    f'<label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">'
+                    f'<input type="checkbox"{checked} onchange="fetch(\'{url_for_config}\','
+                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+                    f'body:JSON.stringify({toggle_body.replace(chr(34), "&quot;")})}}).then(()=>location.reload())"'
+                    f' title="POST {url_for_config} {escape(toggle_body)}" />'
+                    f'<span>{label}</span>'
+                    f'</label>'
+                )
+            html += '</div>'
 
         columns = data.get("columns", [])
         rows = data.get("rows", [])
@@ -550,7 +626,7 @@ class TableForm(Eigenform):
                     prereqs = col_mf.get(col_id, [])
                     if prereqs or len(col_items) > 1:
                         constraint_row = (
-                            f'<div style="padding: 2px 4px; border-top: 1px solid #e0e0e0;">'
+                            f'<div style="display: flex; align-items: center; justify-content: center; padding: 2px 4px 0 4px; border-top: 1px solid #e0e0e0;">'
                             + self._render_constraint_inline(
                                 url, col_id, prereqs, col_id_to_val, col_static_pairs,
                                 col_items, "add_col_constraint", "remove_col_constraint",
@@ -605,7 +681,7 @@ class TableForm(Eigenform):
                         f'body:JSON.stringify({{action:\'rename_column\',column:\'{col_id}\','
                         f'label:this.elements.v.value}})'
                         f'}}).then(()=>location.reload()); return false">'
-                        f'<input name="v" type="text" value="{escape(col["label"])}"'
+                        f'<input name="v" type="text" value="{escape(col["label"])}" size="12"'
                         f' style="border: 1px solid #ddd; padding: 2px 4px; width: 100%; box-sizing: border-box;'
                         f' font-family: inherit; font-size: inherit;'
                         f' font-weight: bold; text-align: center; color: #555;"'
@@ -634,7 +710,7 @@ class TableForm(Eigenform):
                     f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
                     f'body:JSON.stringify({{action:\'add_column\',label:this.elements.v.value}})'
                     f'}}).then(()=>location.reload()); return false">'
-                    f'<input name="v" type="text" placeholder="Column name"'
+                    f'<input name="v" type="text" placeholder="Column name" size="12"'
                     f' style="border: 1px solid #ddd; padding: 2px 4px; width: 100%; box-sizing: border-box;'
                     f' font-family: inherit; font-size: inherit;'
                     f' font-weight: bold; text-align: center; color: #555;"'
@@ -773,7 +849,7 @@ class TableForm(Eigenform):
                     f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
                     f'body:JSON.stringify({{action:\'add_column\',label:this.elements.v.value}})'
                     f'}}).then(()=>location.reload()); return false">'
-                    f'<input name="v" type="text" placeholder="Column name"'
+                    f'<input name="v" type="text" placeholder="Column name" size="12"'
                     f' style="border: 1px solid #ddd; width: 100px; padding: 2px 4px;"'
                     f' oninput="this.title=\'POST {url} \'+JSON.stringify({{action:\'add_column\',label:this.value}})"'
                     f' title="POST {url} {escape(add_col_body_preview)}" />'
@@ -798,7 +874,7 @@ class TableForm(Eigenform):
                 "move_row_up", "move_row_down", "move_col_left", "move_col_right",
                 "add_row_constraint", "remove_row_constraint",
                 "add_col_constraint", "remove_col_constraint",
-                "set_row",
+                "set_row", "toggle_auto_chain_rows", "toggle_auto_chain_cols",
             ):
                 Eigenform.mark_rendered(aff)
 
@@ -832,6 +908,7 @@ class TableForm(Eigenform):
             new_col_id = col_state["items"][-1]["id"]
             for row_id in [i["id"] for i in row_state.get("items", [])]:
                 cells.setdefault(row_id, {})[new_col_id] = None
+            col_state = self._apply_auto_chain(col_state, "auto_chain_cols")
             self._save(col_state, row_state, cells)
 
         elif action == "rename_column":
@@ -862,6 +939,7 @@ class TableForm(Eigenform):
                     val = body.get(col_item.get("value", ""))
                 row[col_key] = val
             cells[new_row_id] = row
+            row_state = self._apply_auto_chain(row_state, "auto_chain_rows")
             self._save(col_state, row_state, cells)
 
         elif action == "set_cell":
@@ -897,6 +975,7 @@ class TableForm(Eigenform):
             except ValueError as e:
                 return self._error(str(e), action=action)
             cells.pop(row_id, None)
+            row_state = self._apply_auto_chain(row_state, "auto_chain_rows")
             self._save(col_state, row_state, cells)
 
         elif action == "remove_column":
@@ -910,6 +989,7 @@ class TableForm(Eigenform):
                 return self._error(str(e), action=action)
             for row_id in cells:
                 cells[row_id].pop(col_key, None)
+            col_state = self._apply_auto_chain(col_state, "auto_chain_cols")
             self._save(col_state, row_state, cells)
 
         elif action == "move_row_up":
@@ -918,6 +998,7 @@ class TableForm(Eigenform):
                 row_state = row_oc.move_up(row_id)
             except ValueError as e:
                 return self._error(str(e), action=action)
+            row_state = self._apply_auto_chain(row_state, "auto_chain_rows")
             self._save(col_state, row_state, cells)
 
         elif action == "move_row_down":
@@ -926,6 +1007,7 @@ class TableForm(Eigenform):
                 row_state = row_oc.move_down(row_id)
             except ValueError as e:
                 return self._error(str(e), action=action)
+            row_state = self._apply_auto_chain(row_state, "auto_chain_rows")
             self._save(col_state, row_state, cells)
 
         elif action == "move_col_left":
@@ -937,6 +1019,7 @@ class TableForm(Eigenform):
                 col_state = col_oc.move_up(col_key)
             except ValueError as e:
                 return self._error(str(e), action=action)
+            col_state = self._apply_auto_chain(col_state, "auto_chain_cols")
             self._save(col_state, row_state, cells)
 
         elif action == "move_col_right":
@@ -948,6 +1031,7 @@ class TableForm(Eigenform):
                 col_state = col_oc.move_down(col_key)
             except ValueError as e:
                 return self._error(str(e), action=action)
+            col_state = self._apply_auto_chain(col_state, "auto_chain_cols")
             self._save(col_state, row_state, cells)
 
         elif action == "add_row_constraint":
@@ -985,6 +1069,24 @@ class TableForm(Eigenform):
             except ValueError as e:
                 return self._error(str(e), action=action)
             self._save(col_state, row_state, cells)
+
+        elif action == "toggle_auto_chain_rows":
+            config = dict(self._config)
+            config["auto_chain_rows"] = not config.get("auto_chain_rows", False)
+            if config["auto_chain_rows"]:
+                row_state = self._apply_auto_chain(row_state, "auto_chain_rows", config)
+            else:
+                row_state.pop("constraints", None)
+            self._save(col_state, row_state, cells, config=config)
+
+        elif action == "toggle_auto_chain_cols":
+            config = dict(self._config)
+            config["auto_chain_cols"] = not config.get("auto_chain_cols", False)
+            if config["auto_chain_cols"]:
+                col_state = self._apply_auto_chain(col_state, "auto_chain_cols", config)
+            else:
+                col_state.pop("constraints", None)
+            self._save(col_state, row_state, cells, config=config)
 
         else:
             return self._error(f"Unknown action: {action}", action=action)
