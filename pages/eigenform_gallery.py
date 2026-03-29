@@ -221,6 +221,18 @@ collection_forms = GroupForm(
             ),
             fixed_items=["Alpha", "Bravo", "Charlie"],
         ),
+        ListForm(
+            key="ordered-list-demo",
+            label="ListForm (ordering constraints)",
+            instruction=(
+                "Charlie has built-in constraints requiring it to follow Alpha and Bravo. "
+                "Try moving Charlie above Alpha — the up arrow will be absent. "
+                "Use 'Add Constraint' to create new ordering rules dynamically. "
+                "Dynamic constraints can be removed; built-in ones cannot."
+            ),
+            fixed_items=["Alpha", "Bravo", "Charlie"],
+            must_follow={"Charlie": ["Alpha", "Bravo"]},
+        ),
         TableForm(
             key="table-demo",
             label="TableForm",

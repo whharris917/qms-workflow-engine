@@ -164,6 +164,8 @@ def render_affordance_html(aff: dict) -> str:
         return _render_accordion_toggle(label, url, endpoint, body, hints)
     elif aff_type == "disabled_button":
         return _render_disabled_button(label, hints.get("message", ""))
+    elif aff_type == "constraint_picker":
+        return _render_constraint_picker(label, url, endpoint, hints)
     else:
         # Fallback: check for fillable parameters in body
         param_keys = [k for k, v in body.items() if isinstance(v, str) and v.startswith("<")]
@@ -545,6 +547,35 @@ def _render_disabled_button(label: str, message: str) -> str:
         html += f' <span style="color: #888; font-size: 0.9em;">{escape(message)}</span>'
     html += '</div>'
     return html
+
+
+def _render_constraint_picker(label: str, url: str, endpoint: str, hints: dict) -> str:
+    options = hints.get("options", [])
+    opts_html = '<option value="">-- select --</option>'
+    for opt in options:
+        opts_html += f'<option value="{escape(opt)}">{escape(opt)}</option>'
+    tooltip_js = (
+        f"var f=this.form;"
+        f"f.querySelector('button[type=submit]').title="
+        f"'{escape(endpoint)} '+JSON.stringify({{action:'add_constraint',"
+        f"item:f.querySelector('[name=ci]').value,"
+        f"after:f.querySelector('[name=ca]').value}})"
+    )
+    return (
+        f'<div style="margin: 4px 0; padding: 4px 0; border-top: 1px solid #eee;">'
+        f'<form style="margin: 0;" onsubmit="'
+        f"var b={{action:'add_constraint',"
+        f"item:this.querySelector('[name=ci]').value,"
+        f"after:this.querySelector('[name=ca]').value}};"
+        f"fetch('{url}',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
+        f"body:JSON.stringify(b)}}).then(()=>location.reload()); return false\">"
+        f'<select name="ci" onchange="{tooltip_js}">{opts_html}</select>'
+        f' must follow '
+        f'<select name="ca" onchange="{tooltip_js}">{opts_html}</select>'
+        f' <button type="submit" title="{escape(endpoint)}">{escape(label)}</button>'
+        f'</form>'
+        f'</div>'
+    )
 
 
 def _render_accordion_toggle(label: str, url: str, endpoint: str, body: dict, hints: dict) -> str:
