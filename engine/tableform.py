@@ -240,11 +240,14 @@ class TableForm(Eigenform):
         # Add row (with optional initial values)
         if col_items:
             col_desc = ", ".join(f"{i['id']} ({i['value']})" for i in col_items)
+            add_row_body: dict[str, Any] = {"action": "add_row"}
+            for i in col_items:
+                add_row_body[i["id"]] = f"<{i['value']}>"
             affordances.append(Affordance(
                 label="+ Row",
                 method="POST",
                 url=self.url,
-                body={"action": "add_row"},
+                body=add_row_body,
                 instruction=f"Add a new row. Optionally include column keys with values: {col_desc}. Omitted columns default to empty.",
             ))
 
