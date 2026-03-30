@@ -156,11 +156,20 @@ class TableForm(Eigenform):
             allow_constraints=self.allow_row_constraints,
         )
         state = self._raw_state.get("rows_meta")
-        # Seed fixed rows on first access
+        # Seed fixed rows on first access, including cell data
         if state is None and self.fixed_rows:
             items = [{"id": f"row_{i}", "value": "", "fixed": True}
                      for i in range(len(self.fixed_rows))]
             state = {"items": items, "next_id": len(self.fixed_rows)}
+            if self._store is not None:
+                cells = {f"row_{i}": dict(rd) for i, rd in enumerate(self.fixed_rows)}
+                col_oc = self._col_collection
+                col_state = {"items": [dict(i) for i in col_oc.items], "next_id": col_oc.next_id}
+                self._store.set(self._scope, self.key, {
+                    "columns": col_state,
+                    "rows_meta": state,
+                    "cells": cells,
+                })
         # Seed one empty row when columns exist but no rows yet
         elif state is None and self.fixed_columns:
             state = {"items": [{"id": "row_0", "value": ""}], "next_id": 1}

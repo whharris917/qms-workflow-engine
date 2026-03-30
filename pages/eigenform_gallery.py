@@ -10,6 +10,7 @@ from engine.checkboxform import CheckboxForm
 from engine.pageform import PageForm
 from engine.tabform import TabForm
 from engine.chainform import ChainForm
+from engine.stepform import SequenceForm
 from engine.accordionform import AccordionForm
 from engine.groupform import GroupForm
 from engine.choiceform import ChoiceForm
@@ -24,6 +25,7 @@ from engine.multiform import MultiForm
 from engine.listform import ListForm
 from engine.setform import SetForm
 from engine.tableform import TableForm
+from engine.tablerunner import TableRunner
 from engine.keyvalueform import KeyValueForm
 from engine.visibilityform import VisibilityForm
 from engine.switchform import SwitchForm
@@ -54,7 +56,8 @@ simple_values = GroupForm(
         TextForm(
             key="text-demo",
             label="TextForm",
-            instruction="The simplest eigenform. Accepts any string. POST {\"value\": \"hello\"} to set it.",
+            instruction="The simplest eigenform. Accepts any string. POST {\"value\": \"hello\"} to set it. This one is editable — click the gear icon to rename it.",
+            editable=True,
         ),
         NumberForm(
             key="number-demo",
@@ -313,6 +316,35 @@ list_forms = GroupForm(
 # Section 3c: TableForm Showcase
 # ---------------------------------------------------------------------------
 
+# Defined here so the TableRunner demo can reference the same instance.
+_runner_source_table = TableForm(
+    key="table-runner-source",
+    label="Runner Source Table",
+    instruction=(
+        "This table defines a workflow for the TableRunner below. "
+        "1) Add rows and name them in the Stage column (authoring-only — not "
+        "shown in the runner). 2) Add row constraints to define execution "
+        "order. 3) Scroll down to the TableRunner to execute. Only typed "
+        "columns (Description, Gate, Complete) appear as interactive "
+        "eigenforms in the runner."
+    ),
+    fixed_columns=[
+        "Stage",
+        TextForm(key="_tpl", label="Description"),
+        ChoiceForm(
+            key="_tpl", label="Gate",
+            options=["Approval", "Checklist", "Review", "Auto-Pass"],
+        ),
+        BooleanForm(key="_tpl", label="Complete"),
+    ],
+    fixed_rows=[
+        {"col_0": "Design"},
+        {"col_0": "Build"},
+        {"col_0": "Test"},
+    ],
+    row_must_follow={"row_1": ["row_0"], "row_2": ["row_1"]},
+)
+
 table_forms = GroupForm(
     key="table-forms",
     label="TableForm Showcase",
@@ -401,6 +433,20 @@ table_forms = GroupForm(
                 BooleanForm(key="_tpl", label="Approved"),
             ],
         ),
+        _runner_source_table,
+        TableRunner(
+            key="table-runner-demo",
+            label="TableRunner",
+            instruction=(
+                "A Runner reads a sibling eigenform and presents an execution "
+                "interface derived from it. This TableRunner reads the table above "
+                "and presents its rows as a gated sequence. Complete each row's "
+                "cells to unlock the next. The table's ordering constraints become "
+                "execution gates. First, add rows and set constraints in the table "
+                "above, then use this runner to execute them sequentially."
+            ),
+            source=_runner_source_table,
+        ),
     ],
 )
 
@@ -414,7 +460,7 @@ container_forms = GroupForm(
     label="Container Forms",
     instruction=(
         "Containers organize eigenforms into navigable structures. "
-        "TabForm, ChainForm, and AccordionForm all implement faithful projection — "
+        "TabForm, SequenceForm, ChainForm, and AccordionForm all implement faithful projection — "
         "hidden content is absent from both JSON and HTML."
     ),
     eigenforms=[
@@ -469,6 +515,26 @@ container_forms = GroupForm(
                     options=["red", "green", "blue"],
                 ),
                 TextForm(key="step-3", label="Step 3: Summary", instruction="Last step. Fill to complete the chain."),
+            ],
+        ),
+        SequenceForm(
+            key="sequence-demo",
+            label="SequenceForm",
+            instruction=(
+                "Gated sequential container — like ChainForm but without auto-advance. "
+                "Complete each step to unlock the next. Use the Back/Next buttons or "
+                "click completed steps in the progress bar to navigate. "
+                "Locked steps show a lock icon."
+            ),
+            steps=[
+                TextForm(key="sf-1", label="Step 1: Project Name", instruction="Enter a name to unlock Step 2."),
+                ChoiceForm(
+                    key="sf-2",
+                    label="Step 2: Category",
+                    instruction="Select a category to unlock Step 3.",
+                    options=["Infrastructure", "Feature", "Bug Fix"],
+                ),
+                TextForm(key="sf-3", label="Step 3: Description", instruction="Describe the work to complete the sequence."),
             ],
         ),
         AccordionForm(

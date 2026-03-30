@@ -27,7 +27,7 @@ from engine.affordances import Affordance, SimpleButtonAffordance
 from engine.store import Store
 
 # Fields that belong to the base protocol, not type-specific config
-_BASE_FIELDS = frozenset({"key", "label", "instruction", "_store", "_scope", "_url_prefix"})
+_BASE_FIELDS = frozenset({"key", "label", "instruction", "editable", "_store", "_scope", "_url_prefix"})
 
 
 def _is_json_safe(val) -> bool:
@@ -47,6 +47,7 @@ class Eigenform:
     key: str
     label: str
     instruction: str | None = None
+    editable: bool = False
 
     # Binding — set via bind(), not at construction
     _store: Store | None = None
@@ -92,6 +93,36 @@ class Eigenform:
         """Remove this eigenform's data from the store."""
         if self._store is not None:
             self._store.delete(self._scope, self.key)
+
+    # --- Edit mode ---
+
+    @property
+    def edit_mode(self) -> bool:
+        """Whether this eigenform is currently in edit mode."""
+        if not self.editable or self._store is None:
+            return False
+        return bool(self._store.get(self._scope, f"{self.key}.__edit"))
+
+    @property
+    def effective_label(self) -> str:
+        """The label to display — store override if set, else Python default."""
+        if self._store is not None:
+            override = self._store.get(self._scope, f"{self.key}.__label")
+            if override is not None:
+                return override
+        return self.label
+
+    def _get_edit_affordances(self) -> list[Affordance]:
+        """Affordances shown in edit mode. Subclasses extend this."""
+        return [
+            Affordance(
+                label="Set Label",
+                method="POST",
+                url=self.url,
+                body={"action": "set_label", "label": "<new label>"},
+                instruction=f"Rename this eigenform. Current label: {self.effective_label}",
+            ),
+        ]
 
     @property
     def is_complete(self) -> bool:
@@ -155,7 +186,7 @@ class Eigenform:
         return {
             "form": self.form,
             "key": self.key,
-            "label": self.label,
+            "label": self.effective_label,
             "instruction": self.instruction,
         }
 
@@ -182,16 +213,38 @@ class Eigenform:
         """
         state = self._serialize_state()
         state["complete"] = self.is_complete
-        affordances = self.get_affordances()
+        if self.editable:
+            state["edit_mode"] = self.edit_mode
+        affordances = []
+        if self.edit_mode:
+            affordances.extend(self._get_edit_affordances())
+        else:
+            affordances.extend(self.get_affordances())
         if self.has_data:
             affordances.append(SimpleButtonAffordance(
                 label="Clear",
                 method="POST",
                 url=self.url,
                 body={"action": "clear"},
-                instruction=f"Clear all data from this {self.label}.",
+                instruction=f"Clear all data from this {self.effective_label}.",
+            ))
+        if self.editable:
+            # The gear icon in the chrome handles the toggle visually;
+            # this affordance exists for agent discoverability only.
+            toggle_label = "Done Editing" if self.edit_mode else "Edit"
+            affordances.append(Affordance(
+                label=toggle_label,
+                method="POST",
+                url=self.url,
+                body={"action": "toggle_edit"},
+                instruction="Toggle between edit mode and execution mode.",
             ))
         state["affordances"] = [a.serialize() for a in affordances]
+        # Mark the toggle_edit affordance as chrome-rendered (gear icon handles it)
+        if self.editable:
+            for aff in state["affordances"]:
+                if aff.get("body", {}).get("action") == "toggle_edit":
+                    aff["_chrome_rendered"] = True
         return state
 
     def serialize(self) -> dict | None:
@@ -241,7 +294,7 @@ class Eigenform:
         """
         data = self._serialize_full()
         for aff in data.get("affordances", []):
-            aff["_rendered"] = False
+            aff["_rendered"] = aff.pop("_chrome_rendered", False)
         inner = self.render_from_data(data)
 
         unrendered = [a for a in data.get("affordances", []) if not a.get("_rendered")]
@@ -257,10 +310,36 @@ class Eigenform:
         uid = self.uid
 
         complete_color = '#2a2' if self.is_complete else '#888'
+        edit_border = ' border-style: dashed;' if self.edit_mode else ''
+
+        # Edit toggle icon for editable eigenforms
+        gear_html = ''
+        if self.editable:
+            btn_bg = "#fff3cd" if self.edit_mode else "none"
+            btn_border = "#856404" if self.edit_mode else "#aaa"
+            icon_color = "#856404" if self.edit_mode else "#666"
+            toggle_body = json.dumps({"action": "toggle_edit"})
+            # Pencil SVG — clean and recognizable at small sizes
+            pencil_svg = (
+                f'<svg viewBox="0 0 16 16" width="14" height="14" style="display:block;margin:auto;">'
+                f'<path d="M11.5 1.5l3 3-9 9H2.5v-3z" fill="none" stroke="{icon_color}" stroke-width="1.5" stroke-linejoin="round"/>'
+                f'<path d="M9.5 3.5l3 3" fill="none" stroke="{icon_color}" stroke-width="1.5"/>'
+                f'</svg>'
+            )
+            gear_html = (
+                f'<button onclick="fetch(\'{self.url}\','
+                f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+                f'body:JSON.stringify({toggle_body.replace(chr(34), "&quot;")})}}).then(()=>location.reload())"'
+                f' style="position: absolute; top: 8px; left: 12px; cursor: pointer;'
+                f' background: {btn_bg}; border: 1px solid {btn_border}; width: 24px; height: 24px;'
+                f' border-radius: 3px; padding: 0; display: flex; align-items: center; justify-content: center;"'
+                f' title="POST {self.url} {escape(toggle_body)}">{pencil_svg}</button>'
+            )
 
         return (
             f'<div class="eigenform" data-form="{self.form}" data-key="{self.key}"'
-            f' style="border: 2px solid {complete_color}; padding: 30px 12px 12px 12px; margin: 8px 0; position: relative;">'
+            f' style="border: 2px solid {complete_color};{edit_border} padding: {"38px" if self.editable else "30px"} 12px 12px 12px; margin: 8px 0; position: relative;">'
+            f'{gear_html}'
             f'<button onclick="var h=document.getElementById(\'{uid}-human\'),j=document.getElementById(\'{uid}-json\'),'
             f'v=j.style.display===\'none\';j.style.display=v?\'block\':\'none\';h.style.display=v?\'none\':\'block\';'
             f'this.textContent=v?\'See HTML\':\'See JSON\'"'
@@ -278,7 +357,8 @@ class Eigenform:
         serialized state. If any action produces an error, execution
         stops and the error is returned.
         """
-        if body.get("action") == "batch":
+        action = body.get("action")
+        if action == "batch":
             actions = body.get("actions", [])
             result = self.serialize()
             for action_body in actions:
@@ -286,8 +366,18 @@ class Eigenform:
                 if "error" in result:
                     return result
             return result
-        if body.get("action") == "clear":
+        if action == "clear":
             self._clear_data()
+            return self.serialize()
+        if action == "toggle_edit" and self.editable:
+            current = self.edit_mode
+            self._store.set(self._scope, f"{self.key}.__edit", None if current else True)
+            return self.serialize()
+        if action == "set_label" and self.editable and self.edit_mode:
+            new_label = body.get("label", "").strip()
+            if not new_label:
+                return self._error("Label cannot be empty.", action=action)
+            self._store.set(self._scope, f"{self.key}.__label", new_label)
             return self.serialize()
         return self._handle(body)
 
