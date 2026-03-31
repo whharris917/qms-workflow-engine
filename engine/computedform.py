@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from html import escape
 from typing import Any, Callable
 
-from engine.eigenform import Eigenform
+from engine.eigenform import Eigenform, render_dependency_line
 
 
 @dataclass
@@ -67,6 +67,7 @@ class ComputedForm(Eigenform):
         html = f'<h3>{escape(data["label"])}</h3>'
         if data.get("instruction"):
             html += f'<p>{escape(data["instruction"])}</p>'
+        html += render_dependency_line(data.get("depends_on"), self._url_prefix)
         computed = data.get("computed_value")
         if isinstance(computed, dict):
             msg = computed.get("message")

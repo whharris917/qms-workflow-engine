@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from html import escape
 from typing import Any
 
-from engine.eigenform import Eigenform
+from engine.eigenform import Eigenform, render_dependency_line
 
 
 @dataclass
@@ -59,6 +59,7 @@ class ScoreForm(Eigenform):
         correct = sum(1 for r in results if r["correct"])
         pct = round(100 * correct / total) if total and answered == total else None
         return self._base_state() | {
+            "depends_on": list(self.answer_key.keys()),
             "total": total,
             "answered": answered,
             "correct": correct,
@@ -74,6 +75,7 @@ class ScoreForm(Eigenform):
         html = f'<h3>{escape(data["label"])}</h3>'
         if data.get("instruction"):
             html += f'<p>{escape(data["instruction"])}</p>'
+        html += render_dependency_line(data.get("depends_on"), self._url_prefix)
 
         if answered < total:
             html += f'<p><strong>{answered}/{total}</strong> questions answered.</p>'

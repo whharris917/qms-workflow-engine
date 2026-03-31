@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from html import escape
 from typing import Any, Callable
 
-from engine.eigenform import Eigenform
+from engine.eigenform import Eigenform, render_dependency_line
 
 
 @dataclass
@@ -113,6 +113,7 @@ class ValidationForm(Eigenform):
                 html += f' &mdash; {escape(r["message"])}'
             elif status == "pending":
                 html += f' &mdash; <em>waiting for input</em>'
+            html += f' {render_dependency_line(r.get("depends_on"), self._url_prefix)}'
             html += '</div>'
 
         return html

@@ -26,6 +26,23 @@ from typing import Any
 from engine.affordances import Affordance, SimpleButtonAffordance
 from engine.store import Store
 
+
+def render_dependency_line(depends_on, url_prefix: str = "") -> str:
+    """Render a 'Depends on:' indicator for sibling-reading eigenforms."""
+    if not depends_on:
+        return ""
+    deps = [depends_on] if isinstance(depends_on, str) else list(depends_on)
+    parts = []
+    for d in deps:
+        path = f"{url_prefix}/{d}" if url_prefix else d
+        parts.append(f'<code>{escape(path)}</code>')
+    dep_html = ", ".join(parts)
+    return (
+        f'<div style="font-size: 11px; color: #999; margin-bottom: 4px;">'
+        f'Depends on: {dep_html}'
+        f'</div>'
+    )
+
 # Fields that belong to the base protocol, not type-specific config
 _BASE_FIELDS = frozenset({"key", "label", "instruction", "editable", "_store", "_scope", "_url_prefix"})
 

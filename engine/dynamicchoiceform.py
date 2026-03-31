@@ -20,7 +20,7 @@ from typing import Any, Callable
 
 from engine.affordances import Affordance, SimpleButtonAffordance
 from engine.choiceform import SelectAffordance
-from engine.eigenform import Eigenform
+from engine.eigenform import Eigenform, render_dependency_line
 
 
 @dataclass
@@ -99,6 +99,7 @@ class DynamicChoiceForm(Eigenform):
         html = f'<h3>{escape(data["label"])}</h3>'
         if data.get("instruction"):
             html += f'<p>{escape(data["instruction"])}</p>'
+        html += render_dependency_line(data.get("depends_on"), self._url_prefix)
 
         if not data.get("options"):
             html += '<p style="color: #888;"><em>Waiting for dependency to be set.</em></p>'
