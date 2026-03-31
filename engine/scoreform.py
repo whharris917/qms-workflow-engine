@@ -10,11 +10,12 @@ from dataclasses import dataclass, field
 from html import escape
 from typing import Any
 
-from engine.eigenform import Eigenform, render_dependency_line
+from engine.bases import DependentForm
+from engine.eigenform import render_dependency_line
 
 
 @dataclass
-class ScoreForm(Eigenform):
+class ScoreForm(DependentForm):
     """Grades sibling eigenforms by comparing stored values to an answer key.
 
     answer_key maps sibling eigenform keys to their expected values:
@@ -23,10 +24,6 @@ class ScoreForm(Eigenform):
       - callable: receives the stored value, returns bool
     """
     answer_key: dict[str, Any] = field(default_factory=dict)
-
-    @property
-    def is_complete(self) -> bool:
-        return True
 
     def _grade(self) -> list[dict]:
         """Grade each question. Returns list of {key, answer, expected, correct, answered}."""
@@ -103,11 +100,7 @@ class ScoreForm(Eigenform):
         html += '</table>'
         return html
 
-    def get_affordances(self):
-        return []
 
-    def _handle(self, body: dict) -> dict:
-        return self.serialize()
 
 
 def _format_answer(val) -> str:

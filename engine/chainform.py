@@ -13,26 +13,13 @@ from typing import Any
 
 from engine.affordances import Affordance, SwitchTabAffordance
 from engine.eigenform import Eigenform
-from engine.store import Store
+from engine.bases import SequentialContainer
 
 
 @dataclass
-class ChainForm(Eigenform):
+class ChainForm(SequentialContainer):
     """A sequence of eigenforms, auto-advancing through them one at a time."""
-    steps: list[Eigenform] = field(default_factory=list)
 
-    def to_descriptor(self) -> dict:
-        desc = super().to_descriptor()
-        desc["steps"] = [ef.to_descriptor() for ef in self.steps]
-        return desc
-
-    @property
-    def children(self) -> list[Eigenform]:
-        return self.steps
-
-    @property
-    def is_complete(self) -> bool:
-        return all(ef.is_complete for ef in self.steps)
 
     @property
     def _focused_key(self) -> str | None:
@@ -60,12 +47,6 @@ class ChainForm(Eigenform):
         active = self.active_step
         return active.key if active else None
 
-    def _bind_children(self, store: Store, url_prefix: str):
-        self.steps = [
-            ef.bind(store=store, scope=self.key, url_prefix=f"{url_prefix}/{self.key}")
-            for ef in self.steps
-        ]
-
     def _serialize_state(self) -> dict:
         return {
             "form": self.form,
@@ -79,13 +60,8 @@ class ChainForm(Eigenform):
             ],
         }
 
-    def _serialize_full(self) -> dict:
-        state = self._serialize_state()
-        active = self.active_step
-        state["eigenform"] = active.serialize() if active else None
-        state["complete"] = self.is_complete
-        state["affordances"] = [a.serialize() for a in self.get_affordances()]
-        return state
+    def _active_child(self) -> Eigenform | None:
+        return self.active_step
 
     def get_affordances(self) -> list[Affordance]:
         from engine.affordances import SimpleButtonAffordance

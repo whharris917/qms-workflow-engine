@@ -6,12 +6,13 @@ from dataclasses import dataclass, field
 from html import escape
 from typing import Any
 
+from engine.bases import WrapperForm
 from engine.eigenform import Eigenform, render_dependency_line
 from engine.store import Store
 
 
 @dataclass
-class SwitchForm(Eigenform):
+class SwitchForm(WrapperForm):
     """Container that swaps between pre-defined eigenform subtrees
     based on a sibling eigenform's current value.
 
@@ -29,6 +30,10 @@ class SwitchForm(Eigenform):
         desc = super().to_descriptor()
         desc["cases"] = {k: v.to_descriptor() for k, v in self.cases.items()}
         return desc
+
+    @property
+    def _wrapped_child(self) -> Eigenform | None:
+        return self.active_case
 
     @property
     def children(self) -> list[Eigenform]:
@@ -55,13 +60,6 @@ class SwitchForm(Eigenform):
         if key is None:
             return None
         return self.cases[key]
-
-    @property
-    def is_complete(self) -> bool:
-        active = self.active_case
-        if active is None:
-            return True
-        return active.is_complete
 
     def _bind_children(self, store: Store, url_prefix: str):
         self.cases = {

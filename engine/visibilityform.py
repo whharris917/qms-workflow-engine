@@ -7,12 +7,13 @@ from dataclasses import dataclass, field
 from html import escape
 from typing import Any
 
+from engine.bases import WrapperForm
 from engine.eigenform import Eigenform
 from engine.store import Store
 
 
 @dataclass
-class VisibilityForm(Eigenform):
+class VisibilityForm(WrapperForm):
     """Wraps an eigenform with a visibility condition.
 
     The wrapped eigenform is only visible (serialized, rendered, and
@@ -29,6 +30,12 @@ class VisibilityForm(Eigenform):
         if self.eigenform:
             desc["eigenform"] = self.eigenform.to_descriptor()
         return desc
+
+    @property
+    def _wrapped_child(self) -> Eigenform | None:
+        if not self.visible:
+            return None
+        return self.eigenform
 
     @property
     def children(self) -> list:

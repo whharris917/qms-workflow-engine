@@ -5,10 +5,9 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from html import escape
-from typing import Any
 
 from engine.affordances import Affordance
-from engine.eigenform import Eigenform
+from engine.bases import SelectionForm
 
 
 class SelectAffordance(Affordance):
@@ -26,13 +25,13 @@ class SelectAffordance(Affordance):
 
 
 @dataclass
-class ChoiceForm(Eigenform):
+class ChoiceForm(SelectionForm):
     """Single selection from a fixed set of options."""
     options: list[str] = field(default_factory=list)
 
     @property
-    def is_complete(self) -> bool:
-        return self.value is not None and self.value in self.options
+    def current_options(self) -> list[str]:
+        return self.options
 
     def _serialize_state(self) -> dict:
         return self._base_state() | {
@@ -64,8 +63,4 @@ class ChoiceForm(Eigenform):
             html += render_affordance_html(aff)
         return html
 
-    def _handle(self, body: dict) -> dict:
-        value = body.get("value")
-        if value in self.options:
-            self._store.set(self._scope, self.key, value)
-        return self.serialize()
+

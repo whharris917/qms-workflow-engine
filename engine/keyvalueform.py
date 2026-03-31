@@ -10,6 +10,7 @@ from typing import Any
 from engine.affordances import (
     Affordance, BUTTON_GAP, STYLE_CONFIRM, STYLE_REMOVE, render_inline_button,
 )
+from engine.bases import CollectionForm
 from engine.eigenform import Eigenform
 
 
@@ -28,7 +29,7 @@ class KVAddAffordance(Affordance):
 
 
 @dataclass
-class KeyValueForm(Eigenform):
+class KeyValueForm(CollectionForm):
     """A dynamic set of key-value pairs with stable IDs."""
     key_label: str = "Key"
     value_label: str = "Value"

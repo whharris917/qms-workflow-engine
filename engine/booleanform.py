@@ -5,10 +5,9 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from html import escape
-from typing import Any
 
 from engine.affordances import Affordance
-from engine.eigenform import Eigenform
+from engine.bases import ScalarForm
 
 
 class ToggleAffordance(Affordance):
@@ -33,14 +32,10 @@ class ToggleAffordance(Affordance):
 
 
 @dataclass
-class BooleanForm(Eigenform):
+class BooleanForm(ScalarForm):
     """Binary yes/no toggle. Distinct from CheckboxForm (multi-select)."""
     true_label: str = "Yes"
     false_label: str = "No"
-
-    @property
-    def is_complete(self) -> bool:
-        return self.value is not None
 
     def _serialize_state(self) -> dict:
         return self._base_state() | {
@@ -80,13 +75,10 @@ class BooleanForm(Eigenform):
             html += render_affordance_html(aff)
         return html
 
-    def _handle(self, body: dict) -> dict:
+    def _parse(self, body: dict):
         raw = body.get("value")
         if isinstance(raw, bool):
-            val = raw
-        elif isinstance(raw, str):
-            val = raw.lower() in ("true", "yes", "1")
-        else:
-            val = bool(raw)
-        self._store.set(self._scope, self.key, val)
-        return self.serialize()
+            return raw
+        if isinstance(raw, str):
+            return raw.lower() in ("true", "yes", "1")
+        return bool(raw)

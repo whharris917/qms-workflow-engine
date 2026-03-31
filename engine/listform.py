@@ -11,6 +11,7 @@ from engine.affordances import (
     Affordance, AddConstraintAffordance, SimpleButtonAffordance,
     BUTTON_GAP, STYLE_CONFIRM, STYLE_REMOVE, STYLE_ARROW, render_inline_button,
 )
+from engine.bases import CollectionForm
 from engine.eigenform import Eigenform
 from engine.ordered_collection import OrderedCollection
 
@@ -23,7 +24,7 @@ class AddItemAffordance(Affordance):
 
 
 @dataclass
-class ListForm(Eigenform):
+class ListForm(CollectionForm):
     """An ordered list of string items with add, remove, edit, and reorder.
 
     If fixed_items is provided, those items are seeded into the list on

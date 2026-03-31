@@ -20,11 +20,12 @@ from typing import Any, Callable
 
 from engine.affordances import Affordance, SimpleButtonAffordance
 from engine.choiceform import SelectAffordance
-from engine.eigenform import Eigenform, render_dependency_line
+from engine.bases import SelectionForm
+from engine.eigenform import render_dependency_line
 
 
 @dataclass
-class DynamicChoiceForm(Eigenform):
+class DynamicChoiceForm(SelectionForm):
     """Single selection from a dynamically computed set of options."""
     depends_on: str = ""
     options_fn: Callable[[Any], list[str]] | None = None
@@ -50,10 +51,6 @@ class DynamicChoiceForm(Eigenform):
     @property
     def stale(self) -> bool:
         return self.value is not None and self.value not in self.current_options
-
-    @property
-    def is_complete(self) -> bool:
-        return self.value is not None and self.value in self.current_options
 
     def _serialize_state(self) -> dict:
         state = self._base_state() | {
@@ -122,10 +119,4 @@ class DynamicChoiceForm(Eigenform):
         if action == "clear":
             self._store.set(self._scope, self.key, None)
             return self.serialize()
-
-        value = body.get("value")
-        if value in self.current_options:
-            self._store.set(self._scope, self.key, value)
-        else:
-            return self._error(f"'{value}' is not a valid option.", body=body)
-        return self.serialize()
+        return super()._handle(body)

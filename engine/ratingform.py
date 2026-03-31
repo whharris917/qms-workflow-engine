@@ -5,10 +5,9 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from html import escape
-from typing import Any
 
 from engine.affordances import Affordance
-from engine.eigenform import Eigenform
+from engine.bases import ScalarForm
 
 
 class RatingAffordance(Affordance):
@@ -33,14 +32,10 @@ class RatingAffordance(Affordance):
 
 
 @dataclass
-class RatingForm(Eigenform):
+class RatingForm(ScalarForm):
     """Ordinal rating from 1 to max_rating."""
     max_rating: int = 5
     labels: dict[int, str] | None = None
-
-    @property
-    def is_complete(self) -> bool:
-        return self.value is not None
 
     def _serialize_state(self) -> dict:
         return self._base_state() | {
@@ -81,12 +76,11 @@ class RatingForm(Eigenform):
             html += render_affordance_html(aff)
         return html
 
-    def _handle(self, body: dict) -> dict:
+    def _parse(self, body: dict):
         try:
             val = int(body.get("value"))
         except (TypeError, ValueError):
-            return self._error(f"Invalid rating: {body.get('value')}", body=body)
+            raise ValueError(f"Invalid rating: {body.get('value')}")
         if val < 1 or val > self.max_rating:
-            return self._error(f"Rating must be between 1 and {self.max_rating}, got {val}", body=body)
-        self._store.set(self._scope, self.key, val)
-        return self.serialize()
+            raise ValueError(f"Rating must be between 1 and {self.max_rating}, got {val}")
+        return val

@@ -10,6 +10,7 @@ from engine.affordances import (
     Affordance, SimpleButtonAffordance,
     STYLE_REMOVE, render_inline_button,
 )
+from engine.bases import CollectionForm
 from engine.eigenform import Eigenform
 
 
@@ -21,7 +22,7 @@ class AddToSetAffordance(Affordance):
 
 
 @dataclass
-class SetForm(Eigenform):
+class SetForm(CollectionForm):
     """An unordered collection of unique string items.
 
     Unlike ListForm, items have no order, no stable IDs, and no

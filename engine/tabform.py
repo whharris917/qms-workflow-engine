@@ -7,12 +7,13 @@ from html import escape
 from typing import Any
 
 from engine.affordances import Affordance, SwitchTabAffordance
+from engine.bases import NavigableContainer
 from engine.eigenform import Eigenform
 from engine.store import Store
 
 
 @dataclass
-class TabForm(Eigenform):
+class TabForm(NavigableContainer):
     """An eigenform with multiple tabs. Only the active tab is visible.
 
     The active tab is persisted state. Switching tabs is an affordance.
@@ -65,10 +66,6 @@ class TabForm(Eigenform):
         state["eigenform"] = active.serialize() if active else None
         state["affordances"] = [a.serialize() for a in self.get_affordances()]
         return state
-
-    @property
-    def is_complete(self) -> bool:
-        return all(ef.is_complete for ef in self.tabs.values())
 
     def get_affordances(self) -> list[Affordance]:
         affordances: list[Affordance] = []

@@ -17,6 +17,7 @@ from html import escape
 from typing import Any
 
 from engine.affordances import Affordance
+from engine.bases import NavigableContainer
 from engine.eigenform import Eigenform
 from engine.store import Store
 
@@ -34,7 +35,7 @@ class ToggleSectionAffordance(Affordance):
 
 
 @dataclass
-class AccordionForm(Eigenform):
+class AccordionForm(NavigableContainer):
     """A container with collapsible sections."""
     sections: dict[str, Eigenform] = field(default_factory=dict)
 
@@ -56,10 +57,6 @@ class AccordionForm(Eigenform):
 
     def _is_expanded(self, section_key: str) -> bool:
         return self._expanded_state.get(section_key, True)
-
-    @property
-    def is_complete(self) -> bool:
-        return all(ef.is_complete for ef in self.sections.values())
 
     def _bind_children(self, store: Store, url_prefix: str):
         self.sections = {
