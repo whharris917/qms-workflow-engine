@@ -112,11 +112,12 @@ def _build_default_registry() -> EigenformRegistry:
     from engine.setform import SetForm
     from engine.stepform import SequenceForm
     from engine.tablerunner import TableRunner
+    from engine.historyform import HistoryForm
 
     r = EigenformRegistry()
     for cls in [
         TextForm, CheckboxForm, ChoiceForm, MultiForm, ListForm, SetForm,
-        TableForm, SequenceForm, TableRunner,
+        TableForm, SequenceForm, TableRunner, HistoryForm,
         NumberForm, DateForm, BooleanForm, MemoForm, RatingForm, RangeForm,
         RankForm, KeyValueForm,
         PageForm, TabForm, ChainForm, AccordionForm, GroupForm, RepeaterForm,

@@ -35,6 +35,7 @@ from engine.computedform import ComputedForm
 from engine.validationform import ValidationForm
 from engine.actionform import ActionForm
 from engine.repeaterform import RepeaterForm
+from engine.historyform import HistoryForm
 from engine.rubikscubeform import RubiksCubeForm
 from engine.multiform import FieldDescriptor
 from engine.validationform import ValidationRule
@@ -655,6 +656,21 @@ conditional_forms = GroupForm(
                 "Asia": ["Japan", "India", "China", "Thailand"],
                 "Americas": ["Brazil", "Canada", "Mexico", "USA"],
             },
+        ),
+        # HistoryForm demo
+        HistoryForm(
+            key="history-demo",
+            label="HistoryForm",
+            instruction=(
+                "Wraps any eigenform with append-only change history. Every change "
+                "is recorded with a timestamp. Click 'View History' to browse "
+                "previous versions read-only. The history can never be edited or deleted."
+            ),
+            eigenform=TextForm(
+                key="tracked-text",
+                label="Tracked Text",
+                instruction="Edit this value several times, then view the history to see every change recorded.",
+            ),
         ),
     ],
 )
