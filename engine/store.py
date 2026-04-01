@@ -65,6 +65,19 @@ class Store:
             del self._data[scope]
             self._save()
 
+    def snapshot_scope(self, scope: str) -> dict:
+        """Return a deep copy of all data for a scope."""
+        import copy
+        self._sync()
+        return copy.deepcopy(self._data.get(scope, {}))
+
+    def restore_scope(self, scope: str, data: dict):
+        """Replace all data for a scope with a deep copy of the given data."""
+        import copy
+        self._sync()
+        self._data[scope] = copy.deepcopy(data)
+        self._save()
+
     def _save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(self._data, indent=2))

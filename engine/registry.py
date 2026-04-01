@@ -210,6 +210,8 @@ def from_descriptor(desc: dict, reg: EigenformRegistry | None = None,
     kwargs = {"key": key, "label": desc.get("label", key)}
     if desc.get("instruction"):
         kwargs["instruction"] = desc["instruction"]
+    if desc.get("editable"):
+        kwargs["editable"] = True
 
     # Scalar config
     kwargs.update(desc.get("config", {}))

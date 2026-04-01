@@ -470,10 +470,13 @@ container_forms = GroupForm(
         GroupForm(
             key="group-demo",
             label="GroupForm",
+            editable=True,
             instruction=(
                 "The simplest container — just a named group. No tabs, no collapse, "
                 "no sequencing. Useful for reusable compositions: define once as a "
-                "GroupForm subclass, use in multiple pages."
+                "GroupForm subclass, use in multiple pages. "
+                "Edit mode (pencil icon) enables adding, removing, and reordering "
+                "eigenforms within the group."
             ),
             eigenforms=[
                 TextForm(key="group-child-1", label="Child 1"),
@@ -483,10 +486,12 @@ container_forms = GroupForm(
         TabForm(
             key="tab-demo",
             label="TabForm",
+            editable=True,
             instruction=(
                 "Tabbed container. Only the active tab appears in JSON and HTML. "
                 "Switch tabs with POST {\"tab\": \"second\"}. "
-                "Complete when ALL tabs are complete (not just the visible one)."
+                "Complete when ALL tabs are complete (not just the visible one). "
+                "Edit mode (pencil icon) enables adding, removing, and reordering tabs."
             ),
             tabs={
                 "first": TextForm(
@@ -504,10 +509,12 @@ container_forms = GroupForm(
         ChainForm(
             key="chain-demo",
             label="ChainForm",
+            editable=True,
             instruction=(
                 "Sequential wizard. Auto-advances to the first incomplete step. "
                 "You can jump back to completed steps and use 'Continue' to resume. "
-                "Only the active step is in the output."
+                "Only the active step is in the output. "
+                "Edit mode (pencil icon) enables adding, removing, and reordering steps."
             ),
             steps=[
                 TextForm(key="step-1", label="Step 1: Your Name", instruction="Fill this to advance."),
@@ -523,11 +530,13 @@ container_forms = GroupForm(
         SequenceForm(
             key="sequence-demo",
             label="SequenceForm",
+            editable=True,
             instruction=(
                 "Gated sequential container — like ChainForm but without auto-advance. "
                 "Complete each step to unlock the next. Use the Back/Next buttons or "
                 "click completed steps in the progress bar to navigate. "
-                "Locked steps show a lock icon."
+                "Locked steps show a lock icon. "
+                "Edit mode (pencil icon) enables adding, removing, and reordering steps."
             ),
             steps=[
                 TextForm(key="sf-1", label="Step 1: Project Name", instruction="Enter a name to unlock Step 2."),
@@ -543,9 +552,11 @@ container_forms = GroupForm(
         AccordionForm(
             key="accordion-demo",
             label="AccordionForm",
+            editable=True,
             instruction=(
                 "Collapsible sections. Collapsed sections are omitted from JSON and HTML "
-                "(faithful projection). Toggle with POST {\"action\": \"toggle\", \"section\": \"basics\"}."
+                "(faithful projection). Toggle with POST {\"action\": \"toggle\", \"section\": \"basics\"}. "
+                "Edit mode (pencil icon) enables adding, removing, and reordering sections."
             ),
             sections={
                 "basics": TextForm(
