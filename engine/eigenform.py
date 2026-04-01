@@ -129,9 +129,18 @@ class Eigenform:
                 return override
         return self.label
 
+    @property
+    def effective_instruction(self) -> str | None:
+        """The instruction to display — store override if set, else Python default."""
+        if self._store is not None:
+            override = self._store.get(self._scope, f"{self.key}.__instruction")
+            if override is not None:
+                return override
+        return self.instruction
+
     def _get_edit_affordances(self) -> list[Affordance]:
         """Affordances shown in edit mode. Subclasses extend this."""
-        return [
+        affs = [
             Affordance(
                 label="Set Label",
                 method="POST",
@@ -140,6 +149,17 @@ class Eigenform:
                 instruction=f"Rename this eigenform. Current label: {self.effective_label}",
             ),
         ]
+        current_instr = self.effective_instruction or ""
+        affs.append(
+            Affordance(
+                label="Set Instruction",
+                method="POST",
+                url=self.url,
+                body={"action": "set_instruction", "instruction": "<new instruction>"},
+                instruction=f"Change the instruction text. Current: {current_instr}" if current_instr else "Set instruction text for this eigenform.",
+            ),
+        )
+        return affs
 
     @property
     def is_complete(self) -> bool:
@@ -204,7 +224,7 @@ class Eigenform:
             "form": self.form,
             "key": self.key,
             "label": self.effective_label,
-            "instruction": self.instruction,
+            "instruction": self.effective_instruction,
         }
 
     def _serialize_state(self) -> dict:
@@ -246,21 +266,29 @@ class Eigenform:
                 instruction=f"Clear all data from this {self.effective_label}.",
             ))
         if self.editable:
-            # The gear icon in the chrome handles the toggle visually;
+            # The chrome icon handles the mode switch visually;
             # this affordance exists for agent discoverability only.
-            toggle_label = "Done Editing" if self.edit_mode else "Edit"
-            affordances.append(Affordance(
-                label=toggle_label,
-                method="POST",
-                url=self.url,
-                body={"action": "toggle_edit"},
-                instruction="Toggle between edit mode and execution mode.",
-            ))
+            if self.edit_mode:
+                affordances.append(Affordance(
+                    label="Execute",
+                    method="POST",
+                    url=self.url,
+                    body={"action": "set_mode", "mode": "execute"},
+                    instruction="Switch to execution mode.",
+                ))
+            else:
+                affordances.append(Affordance(
+                    label="Edit",
+                    method="POST",
+                    url=self.url,
+                    body={"action": "set_mode", "mode": "edit"},
+                    instruction="Switch to edit mode.",
+                ))
         state["affordances"] = [a.serialize() for a in affordances]
-        # Mark the toggle_edit affordance as chrome-rendered (gear icon handles it)
+        # Mark the set_mode affordance as chrome-rendered (icon handles it)
         if self.editable:
             for aff in state["affordances"]:
-                if aff.get("body", {}).get("action") == "toggle_edit":
+                if aff.get("body", {}).get("action") == "set_mode":
                     aff["_chrome_rendered"] = True
         return state
 
@@ -329,34 +357,46 @@ class Eigenform:
         complete_color = '#2a2' if self.is_complete else '#888'
         edit_border = ' border-style: dashed;' if self.edit_mode else ''
 
-        # Edit toggle icon for editable eigenforms
-        gear_html = ''
+        # Mode switch icon for editable eigenforms
+        mode_html = ''
         if self.editable:
-            btn_bg = "#fff3cd" if self.edit_mode else "none"
-            btn_border = "#856404" if self.edit_mode else "#aaa"
-            icon_color = "#856404" if self.edit_mode else "#666"
-            toggle_body = json.dumps({"action": "toggle_edit"})
-            # Pencil SVG — clean and recognizable at small sizes
-            pencil_svg = (
-                f'<svg viewBox="0 0 16 16" width="14" height="14" style="display:block;margin:auto;">'
-                f'<path d="M11.5 1.5l3 3-9 9H2.5v-3z" fill="none" stroke="{icon_color}" stroke-width="1.5" stroke-linejoin="round"/>'
-                f'<path d="M9.5 3.5l3 3" fill="none" stroke="{icon_color}" stroke-width="1.5"/>'
-                f'</svg>'
-            )
-            gear_html = (
+            if self.edit_mode:
+                # In edit mode: show play icon to return to execution mode
+                btn_bg = "#fff3cd"
+                btn_border = "#856404"
+                icon_color = "#856404"
+                mode_body = json.dumps({"action": "set_mode", "mode": "execute"})
+                icon_svg = (
+                    f'<svg viewBox="0 0 16 16" width="14" height="14" style="display:block;margin:auto;">'
+                    f'<path d="M4 2.5l10 5.5-10 5.5z" fill="{icon_color}" stroke="none"/>'
+                    f'</svg>'
+                )
+            else:
+                # In execution mode: show pencil icon to enter edit mode
+                btn_bg = "none"
+                btn_border = "#aaa"
+                icon_color = "#666"
+                mode_body = json.dumps({"action": "set_mode", "mode": "edit"})
+                icon_svg = (
+                    f'<svg viewBox="0 0 16 16" width="14" height="14" style="display:block;margin:auto;">'
+                    f'<path d="M11.5 1.5l3 3-9 9H2.5v-3z" fill="none" stroke="{icon_color}" stroke-width="1.5" stroke-linejoin="round"/>'
+                    f'<path d="M9.5 3.5l3 3" fill="none" stroke="{icon_color}" stroke-width="1.5"/>'
+                    f'</svg>'
+                )
+            mode_html = (
                 f'<button onclick="fetch(\'{self.url}\','
                 f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                f'body:JSON.stringify({toggle_body.replace(chr(34), "&quot;")})}}).then(()=>location.reload())"'
+                f'body:JSON.stringify({mode_body.replace(chr(34), "&quot;")})}}).then(()=>location.reload())"'
                 f' style="position: absolute; top: 8px; left: 12px; cursor: pointer;'
                 f' background: {btn_bg}; border: 1px solid {btn_border}; width: 24px; height: 24px;'
                 f' border-radius: 3px; padding: 0; display: flex; align-items: center; justify-content: center;"'
-                f' title="POST {self.url} {escape(toggle_body)}">{pencil_svg}</button>'
+                f' title="POST {self.url} {escape(mode_body)}">{icon_svg}</button>'
             )
 
         return (
             f'<div class="eigenform" data-form="{self.form}" data-key="{self.key}"'
             f' style="border: 2px solid {complete_color};{edit_border} padding: {"38px" if self.editable else "30px"} 12px 12px 12px; margin: 8px 0; position: relative;">'
-            f'{gear_html}'
+            f'{mode_html}'
             f'<button onclick="var h=document.getElementById(\'{uid}-human\'),j=document.getElementById(\'{uid}-json\'),'
             f'v=j.style.display===\'none\';j.style.display=v?\'block\':\'none\';h.style.display=v?\'none\':\'block\';'
             f'this.textContent=v?\'See HTML\':\'See JSON\'"'
@@ -386,15 +426,23 @@ class Eigenform:
         if action == "clear":
             self._clear_data()
             return self.serialize()
-        if action == "toggle_edit" and self.editable:
-            current = self.edit_mode
-            self._store.set(self._scope, f"{self.key}.__edit", None if current else True)
+        if action == "set_mode" and self.editable:
+            mode = body.get("mode")
+            if mode == "edit":
+                self._store.set(self._scope, f"{self.key}.__edit", True)
+            elif mode == "execute":
+                self._store.set(self._scope, f"{self.key}.__edit", None)
             return self.serialize()
         if action == "set_label" and self.editable and self.edit_mode:
             new_label = body.get("label", "").strip()
             if not new_label:
                 return self._error("Label cannot be empty.", action=action)
             self._store.set(self._scope, f"{self.key}.__label", new_label)
+            return self.serialize()
+        if action == "set_instruction" and self.editable and self.edit_mode:
+            new_instr = body.get("instruction", "").strip()
+            # Empty string clears the override (reverts to Python default)
+            self._store.set(self._scope, f"{self.key}.__instruction", new_instr if new_instr else None)
             return self.serialize()
         return self._handle(body)
 

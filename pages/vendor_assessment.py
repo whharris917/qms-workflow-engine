@@ -2,7 +2,7 @@
 realistic regulated-industry business workflow.
 
 Exercises: AccordionForm, ChainForm, TabForm, VisibilityForm, MultiForm,
-ChoiceForm, CheckboxForm, DateForm, BooleanForm, MemoForm, RatingForm,
+ChoiceForm, CheckboxForm, DateForm, BooleanForm, MemoForm,
 RangeForm, NumberForm, RankForm, KeyValueForm, TableForm, ComputedForm.
 """
 
@@ -20,7 +20,6 @@ from engine.numberform import NumberForm
 from engine.pageform import PageForm
 from engine.rangeform import RangeForm
 from engine.rankform import RankForm
-from engine.ratingform import RatingForm
 from engine.tabform import TabForm
 from engine.tableform import TableForm
 from engine.visibilityform import VisibilityForm
@@ -109,16 +108,15 @@ definition = PageForm(
         }),
 
         # === Section 2: Performance ratings ===
-        RatingForm(key="quality_rating", label="Quality Rating",
-                   instruction="Rate the vendor's quality system.",
-                   max_rating=5,
-                   labels={1: "Poor", 2: "Below Average", 3: "Average", 4: "Good", 5: "Excellent"}),
-        RatingForm(key="delivery_rating", label="Delivery Reliability Rating",
-                   instruction="Rate the vendor's delivery track record.",
-                   max_rating=5),
-        RatingForm(key="pricing_rating", label="Pricing Competitiveness Rating",
-                   instruction="Rate the vendor's pricing relative to market.",
-                   max_rating=5),
+        NumberForm(key="quality_rating", label="Quality Rating",
+                   instruction="Rate the vendor's quality system (1-5).",
+                   min_val=1, max_val=5, integer=True),
+        NumberForm(key="delivery_rating", label="Delivery Reliability Rating",
+                   instruction="Rate the vendor's delivery track record (1-5).",
+                   min_val=1, max_val=5, integer=True),
+        NumberForm(key="pricing_rating", label="Pricing Competitiveness Rating",
+                   instruction="Rate the vendor's pricing relative to market (1-5).",
+                   min_val=1, max_val=5, integer=True),
         RangeForm(key="confidence_level", label="Assessment Confidence",
                   instruction="How confident are you in the accuracy of this assessment?",
                   min_val=0, max_val=100, step=5, unit="%"),

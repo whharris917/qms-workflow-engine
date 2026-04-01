@@ -75,7 +75,6 @@ Affordances are HATEOAS links: each carries `label`, `method`, `url`, `body` tem
 | **DateForm** | `engine/date.py` | ISO 8601 date or datetime with optional bounds | Value is not None |
 | **BooleanForm** | `engine/boolean.py` | Binary yes/no toggle with custom labels | Value is not None |
 | **MemoForm** | `engine/memo.py` | Multi-line textarea with min/max length | Non-empty and meets min_length |
-| **RatingForm** | `engine/rating.py` | Ordinal 1-N rating with optional per-value labels | Value is not None |
 | **RangeForm** | `engine/range.py` | Slider over continuous range with optional unit | Value is not None |
 | **ChoiceForm** | `engine/choice.py` | Single selection via radio buttons from fixed options | Valid option selected |
 | **CheckboxForm** | `engine/eigenforms.py` | Multi-select with N/A mode | Any item checked or N/A |

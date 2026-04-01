@@ -19,7 +19,6 @@ from engine.dateform import DateForm
 from engine.booleanform import BooleanForm
 from engine.rangeform import RangeForm
 from engine.memoform import MemoForm
-from engine.ratingform import RatingForm
 from engine.rankform import RankForm
 from engine.multiform import MultiForm
 from engine.listform import ListForm
@@ -71,6 +70,7 @@ simple_values = GroupForm(
             min_val=1,
             max_val=100,
             step=0.5,
+            editable=True,
         ),
         NumberForm(
             key="integer-demo",
@@ -79,11 +79,13 @@ simple_values = GroupForm(
             min_val=0,
             max_val=10,
             integer=True,
+            editable=True,
         ),
         BooleanForm(
             key="boolean-demo",
             label="BooleanForm",
             instruction="Binary toggle. POST {\"value\": \"true\"} or {\"value\": \"false\"}.",
+            editable=True,
         ),
         BooleanForm(
             key="boolean-custom-demo",
@@ -91,6 +93,7 @@ simple_values = GroupForm(
             instruction="Same toggle, custom display labels.",
             true_label="Approve",
             false_label="Reject",
+            editable=True,
         ),
         MemoForm(
             key="memo-demo",
@@ -112,13 +115,6 @@ simple_values = GroupForm(
             label="DateForm (with time)",
             instruction="With include_time=True, accepts YYYY-MM-DDTHH:MM format.",
             include_time=True,
-        ),
-        RatingForm(
-            key="rating-demo",
-            label="RatingForm",
-            instruction="Ordinal 1-5 rating with custom labels. POST {\"value\": \"4\"} to rate.",
-            max_rating=5,
-            labels={1: "Terrible", 2: "Poor", 3: "OK", 4: "Good", 5: "Excellent"},
         ),
         RangeForm(
             key="range-demo",
@@ -154,6 +150,7 @@ selection_forms = GroupForm(
                 "Invalid options are rejected."
             ),
             options=["python", "javascript", "rust", "go"],
+            editable=True,
         ),
         CheckboxForm(
             key="checkbox-demo",
@@ -165,6 +162,7 @@ selection_forms = GroupForm(
                 "This prevents premature auto-advance in ChainForm."
             ),
             items=["Unit Tests", "Integration Tests", "Load Tests", "Manual QA"],
+            editable=True,
         ),
         RankForm(
             key="rank-demo",
@@ -871,8 +869,6 @@ action_forms = GroupForm(
             template=[
                 TextForm(key="item-name", label="Item Name"),
                 NumberForm(key="item-qty", label="Quantity", min_val=1, max_val=999, integer=True),
-                RatingForm(key="item-priority", label="Priority", max_rating=3,
-                           labels={1: "Low", 2: "Medium", 3: "High"}),
             ],
             min_entries=1,
             max_entries=5,

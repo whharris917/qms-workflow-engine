@@ -41,31 +41,57 @@ class TextForm(Eigenform):
         from engine.affordances import render_affordance_html
         url = self.url
         label = data["label"]
+        instruction = data.get("instruction") or ""
 
-        # Label as editable input — matches ListForm inline edit style
-        set_label_body = json.dumps({"action": "set_label", "label": label})
-        edit_tooltip = f'POST {url} {escape(set_label_body)}'
+        # Same shape as normal mode, but label and instruction are editable inputs.
+        # Inputs use font:inherit and match the margins of the <h3>/<p> they replace.
+
+        # Label — replaces <h3> (browser default: margin ~0.83em 0, font-size 1.17em, bold)
+        label_body = json.dumps({"action": "set_label", "label": label})
+        label_tooltip = f'POST {url} {escape(label_body)}'
         html = (
-            f'<form style="display: inline; margin: 0 0 4px 0;" onsubmit="fetch(\'{url}\','
+            f'<form style="display: flex; align-items: center; gap: 4px;'
+            f' margin: 0.83em 0;" onsubmit="fetch(\'{url}\','
             f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
             f'body:JSON.stringify({{action:\'set_label\',label:this.elements.v.value}})'
             f'}}).then(()=>location.reload()); return false">'
             f'<input name="v" type="text" value="{escape(label)}"'
-            f' style="border: 1px solid #ddd; padding: 2px 4px; width: 200px;"'
-            f' title="{edit_tooltip}" />'
+            f' style="font: inherit; font-size: 1.17em; font-weight: bold;'
+            f' border: 1px solid #ddd; padding: 1px 3px; margin: 0;"'
+            f' title="{label_tooltip}" />'
             f' <button type="submit" style="{STYLE_CONFIRM}"'
-            f' title="{edit_tooltip}">&#10003;</button>'
+            f' title="{label_tooltip}">&#10003;</button>'
             f'</form>'
         )
-        if data.get("instruction"):
-            html += f'<p>{escape(data["instruction"])}</p>'
 
-        # Mark "Set Label" as rendered (the inline form above handles it);
-        # skip affordances already rendered by chrome (gear icon)
+        # Instruction — replaces <p> (browser default: margin 1em 0)
+        instr_body = json.dumps({"action": "set_instruction", "instruction": instruction})
+        instr_tooltip = f'POST {url} {escape(instr_body)}'
+        html += (
+            f'<form style="display: flex; align-items: center; gap: 4px;'
+            f' margin: 1em 0;" onsubmit="fetch(\'{url}\','
+            f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+            f'body:JSON.stringify({{action:\'set_instruction\',instruction:this.elements.v.value}})'
+            f'}}).then(()=>location.reload()); return false">'
+            f'<input name="v" type="text" value="{escape(instruction)}"'
+            f' placeholder="Instruction text"'
+            f' style="font: inherit; border: 1px solid #ddd; padding: 1px 3px;'
+            f' margin: 0; width: 100%;"'
+            f' title="{instr_tooltip}" />'
+            f' <button type="submit" style="{STYLE_CONFIRM}"'
+            f' title="{instr_tooltip}">&#10003;</button>'
+            f'</form>'
+        )
+
+        # Value — same as normal mode
+        html += f'<p><strong>Value:</strong> {escape(str(data["value"]))}</p>'
+
+        # Mark edit affordances as rendered (inline forms handle them)
         for aff in data.get("affordances", []):
             if aff.get("_rendered"):
                 continue
-            if aff.get("body", {}).get("action") == "set_label":
+            action = aff.get("body", {}).get("action")
+            if action in ("set_label", "set_instruction"):
                 aff["_rendered"] = True
             else:
                 html += render_affordance_html(aff)

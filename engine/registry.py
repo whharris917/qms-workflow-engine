@@ -91,7 +91,6 @@ def _build_default_registry() -> EigenformRegistry:
     from engine.dateform import DateForm
     from engine.booleanform import BooleanForm
     from engine.memoform import MemoForm
-    from engine.ratingform import RatingForm
     from engine.rangeform import RangeForm
     from engine.rankform import RankForm
     from engine.keyvalueform import KeyValueForm
@@ -118,7 +117,7 @@ def _build_default_registry() -> EigenformRegistry:
     for cls in [
         TextForm, CheckboxForm, ChoiceForm, MultiForm, ListForm, SetForm,
         TableForm, SequenceForm, TableRunner, HistoryForm,
-        NumberForm, DateForm, BooleanForm, MemoForm, RatingForm, RangeForm,
+        NumberForm, DateForm, BooleanForm, MemoForm, RangeForm,
         RankForm, KeyValueForm,
         PageForm, TabForm, ChainForm, AccordionForm, GroupForm, RepeaterForm,
         SwitchForm,
