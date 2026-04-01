@@ -23,14 +23,13 @@ from html import escape
 from typing import Any
 
 from engine.affordances import Affordance, SimpleButtonAffordance, SwitchTabAffordance
-from engine.bases import SequentialContainer
 from engine.eigenform import Eigenform
 from engine.ordered_collection import OrderedCollection
 from engine.store import Store
 
 
 @dataclass
-class TableRunner(SequentialContainer):
+class TableRunner(Eigenform):
     """Execute a TableForm as a gated sequential workflow.
 
     The source TableForm defines the schema (columns, typed columns),

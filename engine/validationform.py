@@ -15,8 +15,7 @@ from dataclasses import dataclass, field
 from html import escape
 from typing import Any, Callable
 
-from engine.bases import DependentForm
-from engine.eigenform import render_dependency_line
+from engine.eigenform import Eigenform, render_dependency_line
 
 
 @dataclass
@@ -29,7 +28,7 @@ class ValidationRule:
 
 
 @dataclass
-class ValidationForm(DependentForm):
+class ValidationForm(Eigenform):
     """Evaluates validation rules across sibling eigenform values.
 
     Rules are evaluated live on every serialize. Each rule reads its
@@ -81,6 +80,9 @@ class ValidationForm(DependentForm):
             "all_valid": all(r["status"] != "fail" for r in results),
         }
 
+    def get_affordances(self):
+        return []
+
     def render_from_data(self, data: dict) -> str:
         html = f'<h3>{escape(data["label"])}</h3>'
         if data.get("instruction"):
@@ -116,4 +118,5 @@ class ValidationForm(DependentForm):
 
         return html
 
-
+    def _handle(self, body: dict) -> dict:
+        return self.serialize()

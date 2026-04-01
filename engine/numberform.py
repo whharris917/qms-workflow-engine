@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from html import escape
+from typing import Any
 
 from engine.affordances import Affordance
-from engine.bases import ScalarForm
+from engine.eigenform import Eigenform
 
 
 class NumberInputAffordance(Affordance):
@@ -27,12 +28,16 @@ class NumberInputAffordance(Affordance):
 
 
 @dataclass
-class NumberForm(ScalarForm):
+class NumberForm(Eigenform):
     """Numeric input with optional bounds and step."""
     min_val: float | None = None
     max_val: float | None = None
     step: float | None = None
     integer: bool = False
+
+    @property
+    def is_complete(self) -> bool:
+        return self.value is not None
 
     def _serialize_state(self) -> dict:
         return self._base_state() | {
@@ -93,19 +98,20 @@ class NumberForm(ScalarForm):
             html += render_affordance_html(aff)
         return html
 
-    def _parse(self, body: dict):
+    def _handle(self, body: dict) -> dict:
         raw = body.get("value")
         try:
             val = int(raw) if self.integer else float(raw)
         except (TypeError, ValueError):
-            raise ValueError(f"Invalid number: {raw}")
+            return self._error(f"Invalid number: {raw}", body=body)
         if self.min_val is not None and val < self.min_val:
-            raise ValueError(f"Value {val} is below minimum {self.min_val}")
+            return self._error(f"Value {val} is below minimum {self.min_val}", body=body)
         if self.max_val is not None and val > self.max_val:
-            raise ValueError(f"Value {val} is above maximum {self.max_val}")
+            return self._error(f"Value {val} is above maximum {self.max_val}", body=body)
         if self.step is not None:
             base = self.min_val if self.min_val is not None else 0
             remainder = abs((val - base) % self.step)
             if min(remainder, self.step - remainder) > 1e-9:
-                raise ValueError(f"Value {val} is not a valid step (step {self.step} from {base})")
-        return val
+                return self._error(f"Value {val} is not a valid step (step {self.step} from {base})", body=body)
+        self._store.set(self._scope, self.key, val)
+        return self.serialize()

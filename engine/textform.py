@@ -5,11 +5,11 @@ from dataclasses import dataclass
 from html import escape
 
 from engine.affordances import Affordance, SetValueAffordance, STYLE_CONFIRM
-from engine.bases import ScalarForm
+from engine.eigenform import Eigenform
 
 
 @dataclass
-class TextForm(ScalarForm):
+class TextForm(Eigenform):
     """Single free-form string input."""
     default: str | None = None
 
@@ -82,5 +82,6 @@ class TextForm(ScalarForm):
             )
         ]
 
-    def _parse(self, body: dict):
-        return body.get("value")
+    def _handle(self, body: dict) -> dict:
+        self._store.set(self._scope, self.key, body.get("value"))
+        return self.serialize()

@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from html import escape
+from typing import Any
 
 from engine.affordances import Affordance
-from engine.bases import ScalarForm
+from engine.eigenform import Eigenform
 
 
 class MemoAffordance(Affordance):
@@ -25,7 +26,7 @@ class MemoAffordance(Affordance):
 
 
 @dataclass
-class MemoForm(ScalarForm):
+class MemoForm(Eigenform):
     """Multi-line text input. TextForm is single-line; MemoForm handles paragraphs."""
     max_length: int | None = None
     min_length: int | None = None
@@ -80,10 +81,11 @@ class MemoForm(ScalarForm):
             html += render_affordance_html(aff)
         return html
 
-    def _parse(self, body: dict):
+    def _handle(self, body: dict) -> dict:
         val = body.get("value", "")
         if self.min_length is not None and len(val) < self.min_length:
-            raise ValueError(f"Text is too short ({len(val)} chars). Minimum: {self.min_length}")
+            return self._error(f"Text is too short ({len(val)} chars). Minimum: {self.min_length}", body=body)
         if self.max_length is not None and len(val) > self.max_length:
-            raise ValueError(f"Text is too long ({len(val)} chars). Maximum: {self.max_length}")
-        return val
+            return self._error(f"Text is too long ({len(val)} chars). Maximum: {self.max_length}", body=body)
+        self._store.set(self._scope, self.key, val)
+        return self.serialize()

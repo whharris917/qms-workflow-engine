@@ -193,8 +193,6 @@ class Eigenform:
         desc = {"type": self.form, "key": self.key, "label": self.label}
         if self.instruction:
             desc["instruction"] = self.instruction
-        if self.editable:
-            desc["editable"] = True
         config = self._descriptor_config()
         if config:
             desc["config"] = config

@@ -6,9 +6,10 @@ import json
 import re
 from dataclasses import dataclass
 from html import escape
+from typing import Any
 
 from engine.affordances import Affordance
-from engine.bases import ScalarForm
+from engine.eigenform import Eigenform
 
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DATETIME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$")
@@ -36,11 +37,15 @@ class DateInputAffordance(Affordance):
 
 
 @dataclass
-class DateForm(ScalarForm):
+class DateForm(Eigenform):
     """Date or datetime input, stored as ISO 8601 string."""
     include_time: bool = False
     min_date: str | None = None
     max_date: str | None = None
+
+    @property
+    def is_complete(self) -> bool:
+        return self.value is not None
 
     def _serialize_state(self) -> dict:
         fmt = "YYYY-MM-DDTHH:MM" if self.include_time else "YYYY-MM-DD"
@@ -77,14 +82,15 @@ class DateForm(ScalarForm):
             html += render_affordance_html(aff)
         return html
 
-    def _parse(self, body: dict):
+    def _handle(self, body: dict) -> dict:
         raw = body.get("value", "")
         pattern = DATETIME_RE if self.include_time else DATE_RE
         if not pattern.match(raw):
             fmt = "YYYY-MM-DDTHH:MM" if self.include_time else "YYYY-MM-DD"
-            raise ValueError(f"Invalid date format. Expected {fmt}, got: {raw}")
+            return self._error(f"Invalid date format. Expected {fmt}, got: {raw}", body=body)
         if self.min_date and raw < self.min_date:
-            raise ValueError(f"Date {raw} is before minimum {self.min_date}")
+            return self._error(f"Date {raw} is before minimum {self.min_date}", body=body)
         if self.max_date and raw > self.max_date:
-            raise ValueError(f"Date {raw} is after maximum {self.max_date}")
-        return raw
+            return self._error(f"Date {raw} is after maximum {self.max_date}", body=body)
+        self._store.set(self._scope, self.key, raw)
+        return self.serialize()

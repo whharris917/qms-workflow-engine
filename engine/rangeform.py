@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from html import escape
+from typing import Any
 
 from engine.affordances import Affordance
-from engine.bases import ScalarForm
+from engine.eigenform import Eigenform
 
 
 class RangeAffordance(Affordance):
@@ -34,12 +35,16 @@ class RangeAffordance(Affordance):
 
 
 @dataclass
-class RangeForm(ScalarForm):
+class RangeForm(Eigenform):
     """Select a numeric value from a continuous range via slider."""
     min_val: float = 0
     max_val: float = 100
     step: float = 1
     unit: str | None = None
+
+    @property
+    def is_complete(self) -> bool:
+        return self.value is not None
 
     def _serialize_state(self) -> dict:
         return self._base_state() | {
@@ -80,13 +85,14 @@ class RangeForm(ScalarForm):
             html += render_affordance_html(aff)
         return html
 
-    def _parse(self, body: dict):
+    def _handle(self, body: dict) -> dict:
         try:
             val = float(body.get("value"))
         except (TypeError, ValueError):
-            raise ValueError(f"Invalid number: {body.get('value')}")
+            return self._error(f"Invalid number: {body.get('value')}", body=body)
         if val < self.min_val:
-            raise ValueError(f"Value {val} is below minimum {self.min_val}")
+            return self._error(f"Value {val} is below minimum {self.min_val}", body=body)
         if val > self.max_val:
-            raise ValueError(f"Value {val} is above maximum {self.max_val}")
-        return val
+            return self._error(f"Value {val} is above maximum {self.max_val}", body=body)
+        self._store.set(self._scope, self.key, val)
+        return self.serialize()

@@ -19,17 +19,24 @@ from dataclasses import dataclass, field
 from html import escape
 from typing import Any, Callable
 
-from engine.bases import DependentForm
-from engine.eigenform import render_dependency_line
+from engine.eigenform import Eigenform, render_dependency_line
 
 
 @dataclass
-class ComputedForm(DependentForm):
+class ComputedForm(Eigenform):
     """Read-only eigenform that computes a value from sibling state."""
     depends_on: list[str] = field(default_factory=list)
     compute_fn: Callable[[dict], Any] | None = None
     store_result: bool = False
     display_format: str | None = None
+
+    @property
+    def has_data(self) -> bool:
+        return False  # Computed, not user-entered
+
+    @property
+    def is_complete(self) -> bool:
+        return True
 
     def _gather_siblings(self) -> dict:
         values = {}
@@ -53,6 +60,9 @@ class ComputedForm(DependentForm):
             "display_format": self.display_format,
         }
 
+    def get_affordances(self):
+        return []
+
     def render_from_data(self, data: dict) -> str:
         html = f'<h3>{escape(data["label"])}</h3>'
         if data.get("instruction"):
@@ -74,4 +84,5 @@ class ComputedForm(DependentForm):
             html += '<p style="color: #888;">Not yet computed.</p>'
         return html
 
-
+    def _handle(self, body: dict) -> dict:
+        return self.serialize()

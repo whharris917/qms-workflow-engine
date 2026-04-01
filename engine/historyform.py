@@ -22,13 +22,12 @@ from html import escape
 from typing import Any
 
 from engine.affordances import Affordance, SimpleButtonAffordance, SwitchTabAffordance
-from engine.bases import WrapperForm
 from engine.eigenform import Eigenform
 from engine.store import Store
 
 
 @dataclass
-class HistoryForm(WrapperForm):
+class HistoryForm(Eigenform):
     """Wraps an eigenform with append-only change history."""
     eigenform: Eigenform = None
 
@@ -37,10 +36,6 @@ class HistoryForm(WrapperForm):
         if self.eigenform:
             desc["eigenform"] = self.eigenform.to_descriptor()
         return desc
-
-    @property
-    def _wrapped_child(self) -> Eigenform | None:
-        return self.eigenform
 
     @property
     def children(self) -> list[Eigenform]:
