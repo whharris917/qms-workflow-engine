@@ -102,6 +102,19 @@ class OrderedCollection:
                 result[c["item"]].append(c["after"])
         return result
 
+    @property
+    def all_must_follow(self) -> dict[str, list[str]]:
+        """All constraints including demoted ones. Used for edit-mode display."""
+        result: dict[str, list[str]] = {}
+        for item_id, after_ids in self.static_must_follow.items():
+            for after_id in after_ids:
+                result.setdefault(item_id, []).append(after_id)
+        for c in self.stored_constraints:
+            result.setdefault(c["item"], [])
+            if c["after"] not in result[c["item"]]:
+                result[c["item"]].append(c["after"])
+        return result
+
     # --- Query methods ---
 
     def can_move_up(self, idx: int, items: list[dict]) -> bool:
@@ -341,21 +354,31 @@ class OrderedCollection:
         """Remove an ordering constraint. Returns new state.
 
         For dynamic constraints: removes the stored entry.
-        For static constraints (when relax_fixed): demotes by storing
-        a fixed=False entry so effective_must_follow excludes it.
+        For static constraints: demotes by storing a fixed=False entry
+        so effective_must_follow excludes it. If already demoted, no-op.
         """
         items, next_id, constraints = self._items_copy()
         is_static = after_id in self.static_must_follow.get(item_id, [])
 
-        # Try removing from stored constraints
+        if is_static:
+            # Static constraint — demote (store fixed=False) or no-op if already demoted
+            existing = next((c for c in constraints
+                             if c["item"] == item_id and c["after"] == after_id), None)
+            if existing:
+                if existing.get("fixed") is False:
+                    # Already demoted — no-op, return current state
+                    return self._build_state(items, next_id, constraints)
+                # Stored entry exists (e.g. pinned override) — demote it
+                existing["fixed"] = False
+            else:
+                # No stored entry yet — create demotion entry
+                constraints.append({"item": item_id, "after": after_id, "fixed": False})
+            return self._build_state(items, next_id, constraints)
+
+        # Dynamic constraint — remove the stored entry
         new_constraints = [c for c in constraints
                            if not (c["item"] == item_id and c["after"] == after_id)]
         if len(new_constraints) < len(constraints):
             return self._build_state(items, next_id, new_constraints)
-
-        # Static constraint — demote if relax_fixed
-        if is_static and self.relax_fixed:
-            constraints.append({"item": item_id, "after": after_id, "fixed": False})
-            return self._build_state(items, next_id, constraints)
 
         raise ValueError(f"No removable constraint: {item_id!r} after {after_id!r}.")

@@ -111,13 +111,15 @@ class ListForm(Eigenform):
             "count": len(oc.items),
             "na": self.na,
         }
-        mf = oc.effective_must_follow
-        if mf:
+        all_mf = oc.all_must_follow
+        if all_mf:
+            eff_mf = oc.effective_must_follow
             id_to_val = oc.id_to_value
             state["constraints"] = [
                 {"item": item_id, "item_value": id_to_val.get(item_id, "?"),
-                 "after": after_id, "after_value": id_to_val.get(after_id, "?")}
-                for item_id, after_ids in mf.items()
+                 "after": after_id, "after_value": id_to_val.get(after_id, "?"),
+                 **({} if after_id in eff_mf.get(item_id, []) else {"active": False})}
+                for item_id, after_ids in all_mf.items()
                 for after_id in after_ids
             ]
         return state
@@ -334,8 +336,10 @@ class ListForm(Eigenform):
                     ' background: #e8e8e8; border-radius: 10px; padding: 1px 6px;'
                     ' font-family: monospace; font-size: 0.85em;')
 
-        # Build prerequisite lookup for inline display
-        mf = oc.effective_must_follow
+        # Build prerequisite lookup for inline display — show ALL constraints
+        # (including demoted/unpinned) so they remain visible in both modes.
+        # Enforcement (move restrictions, topological sort) uses effective_must_follow internally.
+        mf = oc.all_must_follow
         id_to_val = oc.id_to_value
         static_pairs = {(item_id, after_id)
                         for item_id, after_ids in self.must_follow.items()
@@ -482,7 +486,7 @@ class ListForm(Eigenform):
                                 url, {"action": "remove_constraint", "item": item_id, "after": p_id},
                                 "x", STYLE_REMOVE,
                             )
-                        elif not is_static:
+                        elif not is_effectively_fixed:
                             html += render_inline_button(
                                 url, {"action": "remove_constraint", "item": item_id, "after": p_id},
                                 "x", STYLE_REMOVE,
