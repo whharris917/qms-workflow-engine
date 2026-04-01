@@ -33,6 +33,7 @@ class OrderedCollection:
     fixed_items: list[str] = field(default_factory=list)
     static_must_follow: dict[str, list[str]] = field(default_factory=dict)
     allow_constraints: bool = True
+    relax_fixed: bool = False
 
     def __post_init__(self):
         self._state: dict | None = None
@@ -78,9 +79,24 @@ class OrderedCollection:
 
     @property
     def effective_must_follow(self) -> dict[str, list[str]]:
-        """Merge static must_follow with dynamic stored constraints."""
-        result = {k: list(v) for k, v in self.static_must_follow.items()}
+        """Merge static must_follow with stored constraints.
+
+        Stored constraints with fixed=False override (demote) static
+        constraints with the same item/after pair.
+        """
+        # Collect demoted pairs (static constraints explicitly unfixed)
+        demoted = {(c["item"], c["after"]) for c in self.stored_constraints
+                   if c.get("fixed") is False}
+        # Start with static constraints, excluding demoted ones
+        result: dict[str, list[str]] = {}
+        for item_id, after_ids in self.static_must_follow.items():
+            for after_id in after_ids:
+                if (item_id, after_id) not in demoted:
+                    result.setdefault(item_id, []).append(after_id)
+        # Add stored constraints (skip demoted-only entries)
         for c in self.stored_constraints:
+            if c.get("fixed") is False:
+                continue  # demoted static — already excluded above
             result.setdefault(c["item"], [])
             if c["after"] not in result[c["item"]]:
                 result[c["item"]].append(c["after"])
@@ -176,12 +192,28 @@ class OrderedCollection:
 
     # --- Mutation methods (raise ValueError on failure) ---
 
-    def add(self, value: str) -> dict:
+    def add(self, value: str, fixed: bool = False) -> dict:
         """Add a new item. Returns new state."""
         items, next_id, constraints = self._items_copy()
         item_id = f"{self.id_prefix}_{next_id}"
         next_id += 1
-        items.append({"id": item_id, "value": value})
+        item = {"id": item_id, "value": value}
+        if fixed:
+            item["fixed"] = True
+        items.append(item)
+        return self._build_state(items, next_id, constraints)
+
+    def set_fixed(self, item_id: str, fixed: bool) -> dict:
+        """Set or clear the fixed flag on an item. Returns new state."""
+        items, next_id, constraints = self._items_copy()
+        ids = {i["id"] for i in items}
+        if item_id not in ids:
+            raise ValueError(f"Unknown item: {item_id}. Valid: {', '.join(ids)}")
+        target = next(i for i in items if i["id"] == item_id)
+        if fixed:
+            target["fixed"] = True
+        else:
+            target.pop("fixed", None)
         return self._build_state(items, next_id, constraints)
 
     def edit(self, item_id: str, value: str) -> dict:
@@ -191,7 +223,7 @@ class OrderedCollection:
         if item_id not in ids:
             raise ValueError(f"Unknown item: {item_id}. Valid: {', '.join(ids)}")
         target = next(i for i in items if i["id"] == item_id)
-        if target.get("fixed"):
+        if target.get("fixed") and not self.relax_fixed:
             raise ValueError(f"Item {item_id} is fixed and cannot be edited.")
         target["value"] = value
         return self._build_state(items, next_id, constraints)
@@ -203,7 +235,7 @@ class OrderedCollection:
         if item_id not in ids:
             raise ValueError(f"Unknown item: {item_id}. Valid: {', '.join(ids)}")
         target = next(i for i in items if i["id"] == item_id)
-        if target.get("fixed"):
+        if target.get("fixed") and not self.relax_fixed:
             raise ValueError(f"Item {item_id} is fixed and cannot be removed.")
         items = [i for i in items if i["id"] != item_id]
         constraints = [c for c in constraints
@@ -270,11 +302,60 @@ class OrderedCollection:
         items = self.enforce_constraints([dict(i) for i in self.items])
         return self._build_state(items, next_id, constraints)
 
-    def remove_constraint(self, item_id: str, after_id: str) -> dict:
-        """Remove a dynamic ordering constraint. Returns new state."""
+    def set_constraint_fixed(self, item_id: str, after_id: str, fixed: bool) -> dict:
+        """Set or clear the fixed flag on a constraint. Returns new state.
+
+        For static constraints: setting fixed=False demotes them by
+        storing a {"item": ..., "after": ..., "fixed": false} entry.
+        For dynamic constraints: setting fixed=True pins them.
+        """
         items, next_id, constraints = self._items_copy()
+        # Check if it's a stored constraint
+        existing = next((c for c in constraints
+                         if c["item"] == item_id and c["after"] == after_id), None)
+        is_static = after_id in self.static_must_follow.get(item_id, [])
+
+        if existing:
+            if fixed:
+                existing["fixed"] = True
+            else:
+                if is_static:
+                    existing["fixed"] = False
+                else:
+                    existing.pop("fixed", None)
+        elif is_static and not fixed:
+            # Demote a static constraint by storing a fixed=False entry
+            constraints.append({"item": item_id, "after": after_id, "fixed": False})
+        elif not is_static and fixed:
+            # Can't pin a constraint that doesn't exist
+            raise ValueError(f"No constraint: {item_id!r} after {after_id!r}.")
+        elif is_static and fixed:
+            # Already static/fixed, nothing to do
+            pass
+        else:
+            raise ValueError(f"No constraint: {item_id!r} after {after_id!r}.")
+
+        return self._build_state(items, next_id, constraints)
+
+    def remove_constraint(self, item_id: str, after_id: str) -> dict:
+        """Remove an ordering constraint. Returns new state.
+
+        For dynamic constraints: removes the stored entry.
+        For static constraints (when relax_fixed): demotes by storing
+        a fixed=False entry so effective_must_follow excludes it.
+        """
+        items, next_id, constraints = self._items_copy()
+        is_static = after_id in self.static_must_follow.get(item_id, [])
+
+        # Try removing from stored constraints
         new_constraints = [c for c in constraints
                            if not (c["item"] == item_id and c["after"] == after_id)]
-        if len(new_constraints) == len(constraints):
-            raise ValueError(f"No dynamic constraint: {item_id!r} after {after_id!r}.")
-        return self._build_state(items, next_id, new_constraints)
+        if len(new_constraints) < len(constraints):
+            return self._build_state(items, next_id, new_constraints)
+
+        # Static constraint — demote if relax_fixed
+        if is_static and self.relax_fixed:
+            constraints.append({"item": item_id, "after": after_id, "fixed": False})
+            return self._build_state(items, next_id, constraints)
+
+        raise ValueError(f"No removable constraint: {item_id!r} after {after_id!r}.")

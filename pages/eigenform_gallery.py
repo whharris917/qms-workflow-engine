@@ -260,6 +260,7 @@ list_forms = GroupForm(
                 "Item IDs are stable — removing item_1 doesn't renumber item_2."
             ),
             allow_constraints=False,
+            editable=True,
         ),
         ListForm(
             key="list-fixed",
@@ -271,6 +272,7 @@ list_forms = GroupForm(
             ),
             fixed_items=["Requirements", "Design", "Implementation", "Testing", "Deployment"],
             allow_constraints=False,
+            editable=True,
         ),
         ListForm(
             key="list-static-constraints",
@@ -292,6 +294,7 @@ list_forms = GroupForm(
                 "item_4": ["item_3"],   # Deployment after Testing
             },
             allow_constraints=False,
+            editable=True,
         ),
         ListForm(
             key="list-dynamic-constraints",
@@ -306,6 +309,7 @@ list_forms = GroupForm(
             # item_0=Alpha, item_1=Bravo, item_2=Charlie, item_3=Delta, item_4=Echo
             fixed_items=["Alpha", "Bravo", "Charlie", "Delta", "Echo"],
             must_follow={"item_2": ["item_0", "item_1"]},  # Charlie after Alpha & Bravo
+            editable=True,
         ),
     ],
 )

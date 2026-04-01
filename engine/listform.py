@@ -40,12 +40,50 @@ class ListForm(Eigenform):
     allow_constraints: bool = True
 
     @property
+    def _effective_allow_constraints(self) -> bool:
+        """allow_constraints from store override if set, else Python default."""
+        if self._store is not None:
+            override = self._store.get(self._scope, f"{self.key}.__config")
+            if override is not None:
+                return override.get("allow_constraints", self.allow_constraints)
+        return self.allow_constraints
+
+    def _snapshot_edit_state(self) -> dict:
+        state = super()._snapshot_edit_state()
+        state["__config"] = self._store.get(self._scope, f"{self.key}.__config")
+        state["__value"] = self._store.get(self._scope, self.key)
+        return state
+
+    def _restore_edit_state(self, state: dict):
+        super()._restore_edit_state(state)
+        self._store.set(self._scope, f"{self.key}.__config", state.get("__config"))
+        self._store.set(self._scope, self.key, state.get("__value"))
+
+    def _get_edit_affordances(self) -> list[Affordance]:
+        affs = super()._get_edit_affordances()
+        item_ids = [i["id"] for i in self.items]
+        if item_ids:
+            ids_str = " | ".join(item_ids)
+            affs.append(Affordance(
+                label="Toggle Fixed", method="POST", url=self.url,
+                body={"action": "toggle_fixed", "id": f"<{ids_str}>"},
+                instruction="Toggle whether an item is fixed (immutable in execution mode).",
+            ))
+        affs.append(Affordance(
+            label="Toggle Constraints", method="POST", url=self.url,
+            body={"action": "toggle_constraints"},
+            instruction=f"Toggle whether ordering constraints are allowed. Currently: {self._effective_allow_constraints}",
+        ))
+        return affs
+
+    @property
     def _collection(self) -> OrderedCollection:
         oc = OrderedCollection(
             id_prefix="item",
             fixed_items=self.fixed_items,
             static_must_follow=self.must_follow,
-            allow_constraints=self.allow_constraints,
+            allow_constraints=self._effective_allow_constraints,
+            relax_fixed=self.edit_mode,
         )
         oc.load(self.value)
         return oc
@@ -100,7 +138,7 @@ class ListForm(Eigenform):
 
         affordances: list[Affordance] = []
         items = oc.items
-        editable = [i for i in items if not i.get("fixed")]
+        editable = items if self.edit_mode else [i for i in items if not i.get("fixed")]
         editable_ids = " | ".join(i["id"] for i in editable) if editable else ""
 
         affordances.append(AddItemAffordance(
@@ -149,7 +187,7 @@ class ListForm(Eigenform):
                 ))
 
         # Ordering constraint affordances
-        if self.allow_constraints and len(items) > 1:
+        if self._effective_allow_constraints and len(items) > 1:
             item_ids = [i["id"] for i in items]
             item_labels = {i["id"]: i["value"] for i in items}
             id_labels = [f"{i['id']} ({i['value']})" for i in items]
@@ -183,19 +221,92 @@ class ListForm(Eigenform):
 
         return affordances
 
+    def _render_edit_header(self, data: dict) -> str:
+        """Render editable label, instruction, and config controls."""
+        url = self.url
+        label = data["label"]
+        instruction = data.get("instruction") or ""
+
+        # Label
+        label_body = json.dumps({"action": "set_label", "label": label})
+        label_tooltip = f'POST {url} {escape(label_body)}'
+        html = (
+            f'<form style="display: flex; align-items: center; gap: 4px;'
+            f' margin: 0.83em 0;" onsubmit="fetch(\'{url}\','
+            f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+            f'body:JSON.stringify({{action:\'set_label\',label:this.elements.v.value}})'
+            f'}}).then(()=>location.reload()); return false">'
+            f'<input name="v" type="text" value="{escape(label)}"'
+            f' style="font: inherit; font-size: 1.17em; font-weight: bold;'
+            f' border: 1px solid #ddd; padding: 1px 3px; margin: 0;"'
+            f' title="{label_tooltip}" />'
+            f' <button type="submit" style="{STYLE_CONFIRM}"'
+            f' title="{label_tooltip}">&#10003;</button>'
+            f'</form>'
+        )
+
+        # Instruction
+        instr_body = json.dumps({"action": "set_instruction", "instruction": instruction})
+        instr_tooltip = f'POST {url} {escape(instr_body)}'
+        html += (
+            f'<form style="display: flex; align-items: center; gap: 4px;'
+            f' margin: 1em 0;" onsubmit="fetch(\'{url}\','
+            f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+            f'body:JSON.stringify({{action:\'set_instruction\',instruction:this.elements.v.value}})'
+            f'}}).then(()=>location.reload()); return false">'
+            f'<input name="v" type="text" value="{escape(instruction)}"'
+            f' placeholder="Instruction text"'
+            f' style="font: inherit; border: 1px solid #ddd; padding: 1px 3px;'
+            f' margin: 0; width: 100%;"'
+            f' title="{instr_tooltip}" />'
+            f' <button type="submit" style="{STYLE_CONFIRM}"'
+            f' title="{instr_tooltip}">&#10003;</button>'
+            f'</form>'
+        )
+
+        # Allow constraints toggle
+        ac = self._effective_allow_constraints
+        ac_body = json.dumps({"action": "toggle_constraints"})
+        ac_tooltip = f'POST {url} {escape(ac_body)}'
+        ac_bg = "#efffef" if ac else "#f8f8f8"
+        ac_border = "#4a4" if ac else "#ccc"
+        html += (
+            f'<div style="margin: 4px 0; font-size: 0.9em; color: #666;">'
+            f'<button onclick="fetch(\'{url}\','
+            f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+            f'body:JSON.stringify({ac_body.replace(chr(34), "&quot;")})}}).then(()=>location.reload())"'
+            f' style="cursor: pointer; font: inherit; font-size: 0.9em; border: 1px solid {ac_border};'
+            f' background: {ac_bg}; padding: 1px 8px; border-radius: 3px;"'
+            f' title="{ac_tooltip}">constraints: {"on" if ac else "off"}</button>'
+            f'</div>'
+        )
+
+        # Mark edit-specific affordances as rendered
+        for aff in data.get("affordances", []):
+            action = aff.get("body", {}).get("action")
+            if action in ("set_label", "set_instruction", "toggle_constraints"):
+                Eigenform.mark_rendered(aff)
+
+        return html
+
     def render_from_data(self, data: dict) -> str:
         from engine.affordances import render_affordance_html
         oc = self._collection
-        html = f'<h3>{escape(data["label"])}</h3>'
-        if data.get("instruction"):
-            html += f'<p>{escape(data["instruction"])}</p>'
+
+        if data.get("edit_mode"):
+            html = self._render_edit_header(data)
+        else:
+            html = f'<h3>{escape(data["label"])}</h3>'
+            if data.get("instruction"):
+                html += f'<p>{escape(data["instruction"])}</p>'
 
         affs = data.get("affordances", [])
 
         if data.get("na"):
             html += '<p style="color: #888; font-style: italic;">N/A</p>'
             for aff in affs:
-                html += render_affordance_html(aff)
+                if not aff.get("_rendered"):
+                    html += render_affordance_html(aff)
             return html
 
         items = data.get("items", [])
@@ -207,7 +318,8 @@ class ListForm(Eigenform):
         for aff in affs:
             action = aff.get("body", {}).get("action")
             if action in ("move_up", "move_down", "edit", "remove",
-                          "add_constraint", "remove_constraint"):
+                          "add_constraint", "remove_constraint",
+                          "toggle_fixed", "toggle_constraint_fixed"):
                 Eigenform.mark_rendered(aff)
             elif action == "add":
                 add_aff = aff
@@ -233,7 +345,7 @@ class ListForm(Eigenform):
         for idx, item in enumerate(items):
             item_id = item["id"]
             item_val = escape(str(item.get("value", "")))
-            is_fixed = item.get("fixed", False)
+            is_fixed = item.get("fixed", False) and not data.get("edit_mode")
             html += f'<li style="margin: 4px 0; display: flex; align-items: center; gap: 4px;">'
 
             # Remove button (leftmost, editable items only)
@@ -255,6 +367,7 @@ class ListForm(Eigenform):
                 else:
                     html += gap
 
+            is_item_fixed = item.get("fixed", False)
             if is_fixed:
                 html += (
                     f'<span style="display: inline-block; width: 200px; padding: 2px 4px;'
@@ -282,11 +395,24 @@ class ListForm(Eigenform):
                     f'</form>'
                 )
 
+            # Fixed toggle (edit mode only) — pin icon
+            if data.get("edit_mode"):
+                pin_color = "#856404" if is_item_fixed else "#ccc"
+                pin_bg = "#fff3cd" if is_item_fixed else "none"
+                pin_label = "fixed" if is_item_fixed else "unfixed"
+                html += render_inline_button(
+                    url, {"action": "toggle_fixed", "id": item_id},
+                    f'<span style="font-size: 14px;">&#128204;</span>',
+                    f'cursor: pointer; border: 1px solid {pin_color}; background: {pin_bg};'
+                    f' width: 24px; height: 24px; font-size: 10px; padding: 0;'
+                    f' vertical-align: middle; box-sizing: content-box;',
+                )
+
             # Inline add-constraint dropdown + prerequisite pills with remove buttons
             prereqs = mf.get(item_id, [])
-            if prereqs or (self.allow_constraints and num_items > 1):
+            if prereqs or (self._effective_allow_constraints and num_items > 1):
                 html += '<span style="color: #999; display: inline-flex; align-items: center; gap: 2px;">'
-                if self.allow_constraints:
+                if self._effective_allow_constraints:
                     available = [i for i in items if i["id"] != item_id and i["id"] not in prereqs]
                     if available:
                         def _opt(i: dict) -> str:
@@ -319,16 +445,44 @@ class ListForm(Eigenform):
                             f'</span>'
                         )
                 if prereqs:
+                    in_edit = data.get("edit_mode", False)
+                    stored_cs = oc.stored_constraints
                     for p_id in prereqs:
                         p_name = escape(id_to_val.get(p_id, p_id) or p_id)
                         is_static = (item_id, p_id) in static_pairs
+                        # Check if a stored entry overrides this constraint's fixed state
+                        stored_c = next((c for c in stored_cs
+                                         if c["item"] == item_id and c["after"] == p_id), None)
+                        is_effectively_fixed = is_static and (not stored_c or stored_c.get("fixed") is not False)
+                        if not is_static and stored_c:
+                            is_effectively_fixed = bool(stored_c.get("fixed"))
+                        pill_bg = "#fff3cd" if is_effectively_fixed else "#e8e8e8"
+                        pill_border = "1px solid #856404" if is_effectively_fixed else "none"
                         html += (
                             f'<span style="display: inline-block; min-width: 52px; color: #666;'
-                            f' text-align: center; background: #e8e8e8; border-radius: 10px;'
+                            f' text-align: center; background: {pill_bg}; border: {pill_border}; border-radius: 10px;'
                             f' padding: 1px 6px; font-family: monospace; font-size: 0.85em;">'
                             f'{p_name}</span>'
                         )
-                        if not is_static:
+                        if in_edit:
+                            # Pin/unpin toggle for constraint
+                            pin_icon = "&#128204;" if is_effectively_fixed else "&#128204;"
+                            pin_style = (
+                                f'cursor: pointer; border: 1px solid {"#856404" if is_effectively_fixed else "#ccc"};'
+                                f' background: {"#fff3cd" if is_effectively_fixed else "none"};'
+                                f' width: 18px; height: 18px; font-size: 10px; padding: 0;'
+                                f' vertical-align: middle; box-sizing: content-box;'
+                            )
+                            html += render_inline_button(
+                                url, {"action": "toggle_constraint_fixed", "item": item_id, "after": p_id},
+                                f'<span style="font-size: 11px;">{pin_icon}</span>', pin_style,
+                            )
+                            # Remove button (available for all constraints in edit mode)
+                            html += render_inline_button(
+                                url, {"action": "remove_constraint", "item": item_id, "after": p_id},
+                                "x", STYLE_REMOVE,
+                            )
+                        elif not is_static:
                             html += render_inline_button(
                                 url, {"action": "remove_constraint", "item": item_id, "after": p_id},
                                 "x", STYLE_REMOVE,
@@ -375,6 +529,50 @@ class ListForm(Eigenform):
 
     def _handle(self, body: dict) -> dict:
         action = body.get("action", "")
+
+        if action == "toggle_constraints" and self.editable and self.edit_mode:
+            self._push_undo()
+            cfg = self._store.get(self._scope, f"{self.key}.__config") or {}
+            cfg["allow_constraints"] = not self._effective_allow_constraints
+            self._store.set(self._scope, f"{self.key}.__config", cfg)
+            return self.serialize()
+
+        # Edit-mode only actions
+        if action == "toggle_fixed" and self.editable and self.edit_mode:
+            self._push_undo()
+            item_id = body.get("id", "")
+            item = next((i for i in self._collection.items if i["id"] == item_id), None)
+            if not item:
+                return self._error(f"Unknown item: {item_id}", action=action)
+            oc = self._collection
+            state = oc.set_fixed(item_id, not item.get("fixed", False))
+            self._store.set(self._scope, self.key, state)
+            return self.serialize()
+
+        if action == "toggle_constraint_fixed" and self.editable and self.edit_mode:
+            self._push_undo()
+            item_id = body.get("item", "")
+            after_id = body.get("after", "")
+            # Determine current fixed state
+            is_static = after_id in self.must_follow.get(item_id, [])
+            stored = next((c for c in self._collection.stored_constraints
+                           if c["item"] == item_id and c["after"] == after_id), None)
+            currently_fixed = is_static and (not stored or stored.get("fixed") is not False)
+            if not is_static and stored:
+                currently_fixed = bool(stored.get("fixed"))
+            oc = self._collection
+            try:
+                state = oc.set_constraint_fixed(item_id, after_id, not currently_fixed)
+            except ValueError as e:
+                return self._error(str(e), action=action)
+            self._store.set(self._scope, self.key, state)
+            return self.serialize()
+
+        # Push undo before any item mutation in edit mode
+        if self.edit_mode and action in ("add", "edit", "remove", "move", "move_up", "move_down",
+                                          "add_constraint", "remove_constraint", "na", "clear_na"):
+            self._push_undo()
+
         oc = self._collection
 
         if action == "add":
