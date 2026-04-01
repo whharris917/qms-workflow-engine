@@ -35,6 +35,15 @@ class NumberForm(Eigenform):
     step: float | None = None
     integer: bool = False
 
+    def _snapshot_edit_state(self) -> dict:
+        state = super()._snapshot_edit_state()
+        state["__config"] = self._store.get(self._scope, f"{self.key}.__config")
+        return state
+
+    def _restore_edit_state(self, state: dict):
+        super()._restore_edit_state(state)
+        self._store.set(self._scope, f"{self.key}.__config", state.get("__config"))
+
     @property
     def _effective_config(self) -> dict:
         """Config from store override if set, else Python defaults."""
@@ -244,6 +253,7 @@ class NumberForm(Eigenform):
 
         # Edit-mode config actions
         if action in ("set_min", "set_max", "set_step") and self.editable and self.edit_mode:
+            self._push_undo()
             raw = body.get("value")
             if raw is None or raw == "" or raw == "null":
                 val = None
@@ -259,6 +269,7 @@ class NumberForm(Eigenform):
             return self.serialize()
 
         if action == "toggle_integer" and self.editable and self.edit_mode:
+            self._push_undo()
             cfg = dict(self._effective_config)
             cfg["integer"] = not cfg.get("integer", False)
             self._store.set(self._scope, f"{self.key}.__config", cfg)

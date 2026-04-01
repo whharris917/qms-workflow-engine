@@ -52,6 +52,23 @@ class ChoiceForm(Eigenform):
         if not self._options_form.value:
             for opt in self.options:
                 self._options_form.handle({"action": "add", "value": opt})
+        # Wrap child handle so ChoiceForm pushes undo before ListForm changes
+        original_handle = self._options_form.handle
+        parent = self
+        def _handle_with_undo(body):
+            if parent.edit_mode:
+                parent._push_undo()
+            return original_handle(body)
+        self._options_form.handle = _handle_with_undo
+
+    def _snapshot_edit_state(self) -> dict:
+        state = super()._snapshot_edit_state()
+        state["__options"] = self._store.get(self.key, "__options")
+        return state
+
+    def _restore_edit_state(self, state: dict):
+        super()._restore_edit_state(state)
+        self._store.set(self.key, "__options", state.get("__options"))
 
     @property
     def _effective_options(self) -> list[str]:

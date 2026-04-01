@@ -44,6 +44,23 @@ class CheckboxForm(Eigenform):
         if not self._items_form.value:
             for item in self.items:
                 self._items_form.handle({"action": "add", "value": item})
+        # Wrap child handle so CheckboxForm pushes undo before ListForm changes
+        original_handle = self._items_form.handle
+        parent = self
+        def _handle_with_undo(body):
+            if parent.edit_mode:
+                parent._push_undo()
+            return original_handle(body)
+        self._items_form.handle = _handle_with_undo
+
+    def _snapshot_edit_state(self) -> dict:
+        state = super()._snapshot_edit_state()
+        state["__items"] = self._store.get(self.key, "__items")
+        return state
+
+    def _restore_edit_state(self, state: dict):
+        super()._restore_edit_state(state)
+        self._store.set(self.key, "__items", state.get("__items"))
 
     @property
     def _effective_items(self) -> list[str]:

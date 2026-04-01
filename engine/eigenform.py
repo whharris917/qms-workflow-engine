@@ -138,6 +138,31 @@ class Eigenform:
                 return override
         return self.instruction
 
+    def _snapshot_edit_state(self) -> dict:
+        """Capture current edit state. Subclasses extend to include config/children."""
+        return {
+            "__label": self._store.get(self._scope, f"{self.key}.__label"),
+            "__instruction": self._store.get(self._scope, f"{self.key}.__instruction"),
+        }
+
+    def _restore_edit_state(self, state: dict):
+        """Restore edit state from snapshot. Subclasses extend."""
+        self._store.set(self._scope, f"{self.key}.__label", state.get("__label"))
+        self._store.set(self._scope, f"{self.key}.__instruction", state.get("__instruction"))
+
+    def _push_undo(self):
+        """Snapshot current edit state and push to undo stack."""
+        snapshot = self._snapshot_edit_state()
+        stack = self._store.get(self._scope, f"{self.key}.__undo") or []
+        stack.append(snapshot)
+        self._store.set(self._scope, f"{self.key}.__undo", stack)
+
+    @property
+    def _undo_depth(self) -> int:
+        """Number of undo steps available."""
+        stack = self._store.get(self._scope, f"{self.key}.__undo") or []
+        return len(stack)
+
     def _get_edit_affordances(self) -> list[Affordance]:
         """Affordances shown in edit mode. Subclasses extend this."""
         affs = [
@@ -266,8 +291,7 @@ class Eigenform:
                 instruction=f"Clear all data from this {self.effective_label}.",
             ))
         if self.editable:
-            # The chrome icon handles the mode switch visually;
-            # this affordance exists for agent discoverability only.
+            # Chrome icons handle these visually; affordances exist for agent discoverability.
             if self.edit_mode:
                 affordances.append(Affordance(
                     label="Execute",
@@ -275,6 +299,21 @@ class Eigenform:
                     url=self.url,
                     body={"action": "set_mode", "mode": "execute"},
                     instruction="Switch to execution mode.",
+                ))
+                if self._undo_depth > 0:
+                    affordances.append(Affordance(
+                        label="Undo",
+                        method="POST",
+                        url=self.url,
+                        body={"action": "undo"},
+                        instruction=f"Undo the last edit-mode change ({self._undo_depth} available).",
+                    ))
+                affordances.append(Affordance(
+                    label="Discard",
+                    method="POST",
+                    url=self.url,
+                    body={"action": "discard"},
+                    instruction="Discard all edit-mode changes and return to execution mode.",
                 ))
             else:
                 affordances.append(Affordance(
@@ -285,10 +324,11 @@ class Eigenform:
                     instruction="Switch to edit mode.",
                 ))
         state["affordances"] = [a.serialize() for a in affordances]
-        # Mark the set_mode affordance as chrome-rendered (icon handles it)
+        # Mark chrome-rendered affordances (icons handle them visually)
         if self.editable:
+            chrome_actions = {"set_mode", "undo", "discard"}
             for aff in state["affordances"]:
-                if aff.get("body", {}).get("action") == "set_mode":
+                if aff.get("body", {}).get("action") in chrome_actions:
                     aff["_chrome_rendered"] = True
         return state
 
@@ -357,46 +397,80 @@ class Eigenform:
         complete_color = '#2a2' if self.is_complete else '#888'
         edit_border = ' border-style: dashed;' if self.edit_mode else ''
 
-        # Mode switch icon for editable eigenforms
-        mode_html = ''
+        # Chrome buttons for editable eigenforms
+        chrome_html = ''
         if self.editable:
+            btn_style = (
+                'cursor: pointer; width: 24px; height: 24px;'
+                ' border-radius: 3px; padding: 0; display: flex;'
+                ' align-items: center; justify-content: center;'
+            )
+
+            def _chrome_btn(body_dict, bg, border, icon, title=None):
+                body_json = json.dumps(body_dict)
+                t = title or f'POST {self.url} {escape(body_json)}'
+                return (
+                    f'<button onclick="fetch(\'{self.url}\','
+                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
+                    f'body:JSON.stringify({body_json.replace(chr(34), "&quot;")})}}).then(()=>location.reload())"'
+                    f' style="{btn_style} background: {bg}; border: 1px solid {border};"'
+                    f' title="{t}">{icon}</button>'
+                )
+
             if self.edit_mode:
-                # In edit mode: show play icon to return to execution mode
-                btn_bg = "#fff3cd"
-                btn_border = "#856404"
-                icon_color = "#856404"
-                mode_body = json.dumps({"action": "set_mode", "mode": "execute"})
-                icon_svg = (
-                    f'<svg viewBox="0 0 16 16" width="14" height="14" style="display:block;margin:auto;">'
-                    f'<path d="M4 2.5l10 5.5-10 5.5z" fill="{icon_color}" stroke="none"/>'
-                    f'</svg>'
+                # Play icon — return to execution mode
+                play_svg = (
+                    '<svg viewBox="0 0 16 16" width="14" height="14" style="display:block;margin:auto;">'
+                    '<path d="M4 2.5l10 5.5-10 5.5z" fill="#856404" stroke="none"/>'
+                    '</svg>'
                 )
+                chrome_html = _chrome_btn(
+                    {"action": "set_mode", "mode": "execute"},
+                    "#fff3cd", "#856404", play_svg)
+
+                # Undo icon — curved arrow
+                undo_count = self._undo_depth
+                if undo_count > 0:
+                    undo_svg = (
+                        '<svg viewBox="0 0 16 16" width="14" height="14" style="display:block;margin:auto;">'
+                        '<path d="M2 6h8a3 3 0 0 1 0 6H7" fill="none" stroke="#666" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+                        '<path d="M5 3L2 6l3 3" fill="none" stroke="#666" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+                        '</svg>'
+                    )
+                    chrome_html += _chrome_btn(
+                        {"action": "undo"}, "none", "#aaa", undo_svg,
+                        title=f"Undo ({undo_count})")
+
+                # Discard icon — red X
+                discard_svg = (
+                    '<svg viewBox="0 0 16 16" width="14" height="14" style="display:block;margin:auto;">'
+                    '<path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="#c00" stroke-width="2" stroke-linecap="round"/>'
+                    '</svg>'
+                )
+                chrome_html += _chrome_btn(
+                    {"action": "discard"}, "#fff0f0", "#c00", discard_svg,
+                    title="Discard all changes")
             else:
-                # In execution mode: show pencil icon to enter edit mode
-                btn_bg = "none"
-                btn_border = "#aaa"
-                icon_color = "#666"
-                mode_body = json.dumps({"action": "set_mode", "mode": "edit"})
-                icon_svg = (
-                    f'<svg viewBox="0 0 16 16" width="14" height="14" style="display:block;margin:auto;">'
-                    f'<path d="M11.5 1.5l3 3-9 9H2.5v-3z" fill="none" stroke="{icon_color}" stroke-width="1.5" stroke-linejoin="round"/>'
-                    f'<path d="M9.5 3.5l3 3" fill="none" stroke="{icon_color}" stroke-width="1.5"/>'
-                    f'</svg>'
+                # Pencil icon — enter edit mode
+                pencil_svg = (
+                    '<svg viewBox="0 0 16 16" width="14" height="14" style="display:block;margin:auto;">'
+                    '<path d="M11.5 1.5l3 3-9 9H2.5v-3z" fill="none" stroke="#666" stroke-width="1.5" stroke-linejoin="round"/>'
+                    '<path d="M9.5 3.5l3 3" fill="none" stroke="#666" stroke-width="1.5"/>'
+                    '</svg>'
                 )
-            mode_html = (
-                f'<button onclick="fetch(\'{self.url}\','
-                f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                f'body:JSON.stringify({mode_body.replace(chr(34), "&quot;")})}}).then(()=>location.reload())"'
-                f' style="position: absolute; top: 8px; left: 12px; cursor: pointer;'
-                f' background: {btn_bg}; border: 1px solid {btn_border}; width: 24px; height: 24px;'
-                f' border-radius: 3px; padding: 0; display: flex; align-items: center; justify-content: center;"'
-                f' title="POST {self.url} {escape(mode_body)}">{icon_svg}</button>'
+                chrome_html = _chrome_btn(
+                    {"action": "set_mode", "mode": "edit"}, "none", "#aaa", pencil_svg)
+
+            # Wrap in a flex row positioned at top-left
+            chrome_html = (
+                f'<div style="position: absolute; top: 8px; left: 12px;'
+                f' display: flex; gap: 4px;">{chrome_html}</div>'
             )
 
         return (
             f'<div class="eigenform" data-form="{self.form}" data-key="{self.key}"'
             f' style="border: 2px solid {complete_color};{edit_border} padding: {"38px" if self.editable else "30px"} 12px 12px 12px; margin: 8px 0; position: relative;">'
-            f'{mode_html}'
+            f'{chrome_html}'
             f'<button onclick="var h=document.getElementById(\'{uid}-human\'),j=document.getElementById(\'{uid}-json\'),'
             f'v=j.style.display===\'none\';j.style.display=v?\'block\':\'none\';h.style.display=v?\'none\':\'block\';'
             f'this.textContent=v?\'See HTML\':\'See JSON\'"'
@@ -430,16 +504,38 @@ class Eigenform:
             mode = body.get("mode")
             if mode == "edit":
                 self._store.set(self._scope, f"{self.key}.__edit", True)
+                # Snapshot initial state for discard
+                self._store.set(self._scope, f"{self.key}.__snapshot", self._snapshot_edit_state())
+                self._store.set(self._scope, f"{self.key}.__undo", [])
             elif mode == "execute":
                 self._store.set(self._scope, f"{self.key}.__edit", None)
+                self._store.set(self._scope, f"{self.key}.__snapshot", None)
+                self._store.set(self._scope, f"{self.key}.__undo", None)
+            return self.serialize()
+        if action == "undo" and self.editable and self.edit_mode:
+            stack = self._store.get(self._scope, f"{self.key}.__undo") or []
+            if stack:
+                state = stack.pop()
+                self._store.set(self._scope, f"{self.key}.__undo", stack)
+                self._restore_edit_state(state)
+            return self.serialize()
+        if action == "discard" and self.editable and self.edit_mode:
+            snapshot = self._store.get(self._scope, f"{self.key}.__snapshot")
+            if snapshot:
+                self._restore_edit_state(snapshot)
+            self._store.set(self._scope, f"{self.key}.__edit", None)
+            self._store.set(self._scope, f"{self.key}.__snapshot", None)
+            self._store.set(self._scope, f"{self.key}.__undo", None)
             return self.serialize()
         if action == "set_label" and self.editable and self.edit_mode:
+            self._push_undo()
             new_label = body.get("label", "").strip()
             if not new_label:
                 return self._error("Label cannot be empty.", action=action)
             self._store.set(self._scope, f"{self.key}.__label", new_label)
             return self.serialize()
         if action == "set_instruction" and self.editable and self.edit_mode:
+            self._push_undo()
             new_instr = body.get("instruction", "").strip()
             # Empty string clears the override (reverts to Python default)
             self._store.set(self._scope, f"{self.key}.__instruction", new_instr if new_instr else None)

@@ -38,6 +38,15 @@ class BooleanForm(Eigenform):
     true_label: str = "Yes"
     false_label: str = "No"
 
+    def _snapshot_edit_state(self) -> dict:
+        state = super()._snapshot_edit_state()
+        state["__config"] = self._store.get(self._scope, f"{self.key}.__config")
+        return state
+
+    def _restore_edit_state(self, state: dict):
+        super()._restore_edit_state(state)
+        self._store.set(self._scope, f"{self.key}.__config", state.get("__config"))
+
     @property
     def _effective_config(self) -> dict:
         """Config from store override if set, else Python defaults."""
@@ -198,8 +207,8 @@ class BooleanForm(Eigenform):
     def _handle(self, body: dict) -> dict:
         action = body.get("action")
 
-        # Edit-mode config actions
         if action in ("set_true_label", "set_false_label") and self.editable and self.edit_mode:
+            self._push_undo()
             new_label = body.get("label", "").strip()
             if not new_label:
                 return self._error("Label cannot be empty.", action=action)
