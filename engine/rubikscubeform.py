@@ -12,11 +12,11 @@ import copy
 import json
 import random
 from dataclasses import dataclass
-from html import escape
 from typing import Any
 
 from engine.affordances import Affordance, SimpleButtonAffordance
 from engine.eigenform import Eigenform
+from engine.templates import render_template
 from engine.store import Store
 
 # Face indices in the state array
@@ -225,70 +225,13 @@ class RubiksCubeForm(Eigenform):
         ]
 
     def render_from_data(self, data: dict) -> str:
-        from engine.affordances import render_affordance_html
         faces = data.get("faces", {})
         solved = data.get("solved", False)
-        affs = data.get("affordances", [])
-
         sz = 30
         gap = 1
         face_w = sz * 3 + gap * 2 + 4
-
-        html = f'<h3>{escape(data["label"])}</h3>'
-        if data.get("instruction"):
-            html += f'<p>{escape(data["instruction"])}</p>'
-
-        # Unfolded cube layout:
-        #       U
-        #     L F R B
-        #       D
-        html += '<div style="display: inline-block; font-size: 0;">'
-
-        html += f'<div style="padding-left: {face_w}px;">'
-        html += _render_face(faces.get(U, []), 'U')
-        html += '</div>'
-
-        html += '<div>'
-        html += _render_face(faces.get(L, []), 'L')
-        html += _render_face(faces.get(F, []), 'F')
-        html += _render_face(faces.get(R, []), 'R')
-        html += _render_face(faces.get(B, []), 'B')
-        html += '</div>'
-
-        html += f'<div style="padding-left: {face_w}px;">'
-        html += _render_face(faces.get(D, []), 'D')
-        html += '</div>'
-
-        html += '</div>'
-
-        # Controls — expand the Rotate affordance into 12 concrete buttons
-        html += '<div style="margin-top: 8px; font-size: 14px;">'
-        rotate_aff = next((a for a in affs if a.get("body", {}).get("action") == "rotate"), None)
-        if rotate_aff and not solved:
-            from engine.eigenform import Eigenform
-            Eigenform.mark_rendered(rotate_aff)
-            url = rotate_aff["url"]
-            endpoint = f'POST {url}'
-            for direction, arrow in [("cw", "↻"), ("ccw", "↺")]:
-                for face in [U, D, L, R, F, B]:
-                    body = {"action": "rotate", "face": face, "direction": direction}
-                    body_js = json.dumps(body).replace('"', '&quot;')
-                    html += (
-                        f'<button onclick="fetch(\'{url}\','
-                        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                        f'body:JSON.stringify({body_js})}})"'
-                        f' style="margin: 1px; cursor: pointer; width: 36px; height: 28px; font-size: 11px;"'
-                        f' title="{escape(endpoint)} {escape(json.dumps(body))}">'
-                        f'{face} {arrow}</button>'
-                    )
-                html += '<br>'
-        # Remaining affordances (Shuffle/Restart)
-        for aff in affs:
-            if not aff.get("_rendered"):
-                html += render_affordance_html(aff)
-        html += '</div>'
-
-        return html
+        face_html = {fk: _render_face(faces.get(fk, []), fk) for fk in [U, D, L, R, F, B]}
+        return render_template("rubikscube.html", data=data, ef=self, faces=faces, solved=solved, face_w=face_w, face_html=face_html, url=self.url)
 
     def _handle(self, body: dict) -> dict:
         action = body.get("action", "rotate")

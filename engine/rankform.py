@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
-from html import escape
-from engine.affordances import Affordance, SimpleButtonAffordance, BUTTON_GAP, STYLE_ARROW, render_inline_button
+
+from engine.affordances import Affordance, SimpleButtonAffordance
 from engine.eigenform import Eigenform
+from engine.templates import render_template
 
 
 @dataclass
@@ -87,43 +87,8 @@ class RankForm(Eigenform):
         return affordances
 
     def render_from_data(self, data: dict) -> str:
-        from engine.affordances import render_affordance_html
-        html = f'<h3>{escape(data["label"])}</h3>'
-        if data.get("instruction"):
-            html += f'<p>{escape(data["instruction"])}</p>'
-
-        items = data.get("items", [])
-        affs = data.get("affordances", [])
-
-        # Mark condensed move affordances as rendered (arrows are built inline)
-        for aff in affs:
-            if aff.get("body", {}).get("action") in ("move_up", "move_down"):
-                Eigenform.mark_rendered(aff)
-
-        url = self.url
-        num_items = len(items)
-
-        gap = BUTTON_GAP
-        html += '<ol style="margin: 4px 0; padding-left: 24px;">'
-        for idx, item in enumerate(items):
-            html += f'<li style="padding: 2px 0; display: flex; align-items: center; gap: 4px;">'
-            for direction, arrow, can in [
-                ("move_up", "&#9650;", idx > 0),
-                ("move_down", "&#9660;", idx < num_items - 1),
-            ]:
-                if can:
-                    html += render_inline_button(url, {"action": direction, "item": item}, arrow, STYLE_ARROW)
-                else:
-                    html += gap
-            html += f'{escape(item)}</li>'
-        html += '</ol>'
-
-        # Render remaining affordances (Done button)
-        for aff in affs:
-            if not aff.get("_rendered"):
-                html += render_affordance_html(aff)
-
-        return html
+        return render_template("rank.html", data=data, ef=self,
+                               url=self.url)
 
     def _handle(self, body: dict) -> dict:
         action = body.get("action")

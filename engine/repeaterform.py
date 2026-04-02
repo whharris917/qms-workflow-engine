@@ -11,13 +11,12 @@ repeater_key -> entry_0 -> field_name naturally via the children property.
 from __future__ import annotations
 
 import copy
-import json
 from dataclasses import dataclass, field
-from html import escape
 from typing import Any
 
 from engine.affordances import Affordance, SimpleButtonAffordance
 from engine.eigenform import Eigenform
+from engine.templates import render_template
 from engine.store import Store
 
 
@@ -49,7 +48,8 @@ class EntryGroup(Eigenform):
         return state
 
     def render_from_data(self, data: dict) -> str:
-        html = f'<h4 style="margin: 4px 0;">{escape(data["label"])}</h4>'
+        from markupsafe import escape as _esc
+        html = f'<h4 style="margin: 4px 0;">{_esc(data["label"])}</h4>'
         html += "".join(ef.render() for ef in self.eigenforms)
         return html
 
@@ -185,57 +185,16 @@ class RepeaterForm(Eigenform):
         return affs
 
     def render_from_data(self, data: dict) -> str:
-        from engine.affordances import render_affordance_html
-        html = f'<h3>{escape(data["label"])}</h3>'
-        if data.get("instruction"):
-            html += f'<p>{escape(data["instruction"])}</p>'
-
-        html += f'<p><strong>{data["entry_count"]}</strong> {escape(self.entry_label.lower())}(s)'
-        if self.min_entries > 0:
-            html += f' (min: {self.min_entries})'
-        if self.max_entries is not None:
-            html += f' (max: {self.max_entries})'
-        html += '</p>'
-
-        # Render each entry group with its remove button
         affs = data.get("affordances", [])
         remove_affs = {}
         for aff in affs:
             if aff.get("body", {}).get("action") == "remove":
                 remove_affs[aff["body"]["id"]] = aff
-                Eigenform.mark_rendered(aff)
-
+        entry_items = []
         for idx, eg in enumerate(self._entry_groups):
             entry_id = eg.key
-            html += (
-                f'<div style="border: 1px solid #ddd; padding: 8px; margin: 8px 0;'
-                f' border-radius: 4px; position: relative;">'
-                f'<div style="display: flex; justify-content: space-between; align-items: center;">'
-                f'<strong>{escape(self.entry_label)} {idx + 1}</strong>'
-            )
-            # Inline remove button
-            if entry_id in remove_affs:
-                body_js = json.dumps(remove_affs[entry_id]["body"]).replace('"', '&quot;')
-                html += (
-                    f'<button onclick="fetch(\'{self.url}\','
-                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                    f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
-                    f' style="cursor: pointer; font-size: 11px; padding: 2px 8px;'
-                    f' color: #c00; border: 1px solid #ccc; background: #f8f8f8;"'
-                    f' title="Remove {escape(entry_id)}">Remove</button>'
-                )
-            html += '</div>'
-            html += "".join(ef.render() for ef in eg.eigenforms)
-            html += '</div>'
-
-        # Remaining affordances (add button)
-        html += '<div style="margin-top: 8px;">'
-        for aff in affs:
-            if not aff.get("_rendered"):
-                html += render_affordance_html(aff)
-        html += '</div>'
-
-        return html
+            entry_items.append({"id": entry_id, "index": idx, "label": f"{self.entry_label} {idx + 1}", "html": "".join(ef.render() for ef in eg.eigenforms), "remove_body": remove_affs.get(entry_id, {}).get("body")})
+        return render_template("repeater.html", data=data, ef=self, url=self.url, entry_label=self.entry_label, entry_count=data.get("entry_count", 0), min_entries=self.min_entries, max_entries=self.max_entries, entry_items=entry_items)
 
     def _handle(self, body: dict) -> dict:
         action = body.get("action", "")

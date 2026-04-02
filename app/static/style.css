@@ -1,0 +1,590 @@
+/* ===================================================================
+   Eigenform Styles
+   Extracted from inline style= attributes across 30 engine modules.
+   =================================================================== */
+
+/* --- Eigenform wrapper (eigenform.py render()) --- */
+.ef-wrap {
+    border: 2px solid #888;
+    padding: 30px 12px 12px 12px;
+    margin: 8px 0;
+    position: relative;
+}
+.ef-wrap--complete { border-color: #2a2; }
+.ef-wrap--editing  { border-style: dashed; }
+.ef-wrap--editable { padding-top: 38px; }
+
+/* Chrome button row (edit/undo/discard, pencil) */
+.ef-chrome {
+    position: absolute;
+    top: 8px;
+    left: 12px;
+    display: flex;
+    gap: 4px;
+}
+.ef-chrome-btn {
+    cursor: pointer;
+    width: 24px;
+    height: 24px;
+    border-radius: 3px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* "See JSON" toggle */
+.ef-json-toggle {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    background: #7b2d8b;
+    color: white;
+    border: none;
+    padding: 2px 8px;
+    border-radius: 3px;
+}
+
+/* JSON pre block */
+.ef-json-pre {
+    display: none;
+    margin: 0;
+    white-space: pre-wrap;
+}
+
+/* --- Inline action buttons (render_inline_button, 43+ call sites) --- */
+.ef-btn-confirm {
+    cursor: pointer;
+    border: 1px solid #4a4;
+    background: #efffef;
+    width: 24px;
+    height: 24px;
+    font-size: 14px;
+    padding: 0;
+    color: #2a2;
+    vertical-align: middle;
+    box-sizing: content-box;
+}
+.ef-btn-remove {
+    cursor: pointer;
+    border: 1px solid #ccc;
+    background: #f8f8f8;
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+    padding: 0;
+    color: #c00;
+    vertical-align: middle;
+    box-sizing: content-box;
+}
+.ef-btn-arrow {
+    cursor: pointer;
+    border: 1px solid #ccc;
+    background: #f8f8f8;
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
+    padding: 0;
+    vertical-align: middle;
+    box-sizing: content-box;
+}
+.ef-btn-gap {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border: 1px solid transparent;
+    vertical-align: middle;
+}
+
+/* --- Affordance renderers (affordances.py) --- */
+
+/* Standard affordance button */
+.ef-aff-btn {
+    cursor: pointer;
+    font-size: 12px;
+    padding: 4px 10px;
+}
+.ef-aff-row {
+    margin: 4px 0;
+}
+
+/* Tab button */
+.ef-aff-btn--tab {
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 8px;
+}
+
+/* Small button (table column headers, etc.) */
+.ef-aff-btn--small {
+    margin: 1px;
+    cursor: pointer;
+    width: 28px;
+    height: 28px;
+    font-size: 11px;
+}
+
+/* Disabled button */
+.ef-aff-btn--disabled {
+    font-size: 12px;
+    padding: 4px 10px;
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.ef-aff-disabled-msg {
+    color: #888;
+    font-size: 0.9em;
+}
+
+/* Toggle button pair */
+.ef-aff-toggle-group {
+    display: flex;
+    gap: 4px;
+    margin: 4px 0;
+}
+.ef-aff-toggle-btn {
+    cursor: pointer;
+    padding: 4px 12px;
+}
+.ef-aff-toggle-btn--true  { background: #2a2; color: white; }
+.ef-aff-toggle-btn--false { background: #c22; color: white; }
+
+/* Rating button group */
+.ef-aff-rating-group {
+    display: flex;
+    gap: 4px;
+    margin: 4px 0;
+}
+.ef-aff-rating-btn {
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+}
+.ef-aff-rating-btn--active {
+    background: #f0a020;
+    color: white;
+    font-weight: bold;
+}
+
+/* Accordion toggle header */
+.ef-aff-accordion {
+    cursor: pointer;
+    padding: 6px 8px;
+    background: #eee;
+    margin: 4px 0;
+    border-radius: 4px;
+    font-weight: bold;
+    user-select: none;
+}
+
+/* Separator row (parameterized, constraint picker) */
+.ef-aff-separator {
+    margin: 4px 0;
+    padding: 4px 0;
+    border-top: 1px solid #eee;
+}
+
+/* --- Form styles --- */
+.ef-form-inline { display: inline; }
+.ef-form-nomargin { margin: 0; }
+.ef-form-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Inputs */
+.ef-input--narrow { width: 100px; margin-right: 4px; }
+.ef-input--medium { width: 160px; }
+.ef-input--wide   { width: 200px; }
+.ef-input--number { width: 120px; }
+.ef-input--kv-key   { width: 120px; margin-right: 4px; }
+.ef-input--kv-value { width: 160px; margin-right: 4px; }
+.ef-input--range {
+    width: 200px;
+    vertical-align: middle;
+}
+.ef-input--textarea {
+    width: 100%;
+    box-sizing: border-box;
+}
+.ef-range-display { margin-left: 8px; }
+
+/* --- Checkbox / radio labels --- */
+.ef-label-block {
+    display: block;
+    cursor: pointer;
+}
+.ef-label-radio {
+    display: block;
+    cursor: pointer;
+    padding: 2px 0;
+}
+
+/* --- Edit mode shared styles --- */
+.ef-edit-label-form {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0.83em 0;
+}
+.ef-edit-instr-form {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 1em 0;
+}
+.ef-edit-label-input {
+    font: inherit;
+    font-size: 1.17em;
+    font-weight: bold;
+    border: 1px solid #ddd;
+    padding: 1px 3px;
+    margin: 0;
+}
+.ef-edit-instr-input {
+    font: inherit;
+    border: 1px solid #ddd;
+    padding: 1px 3px;
+    margin: 0;
+    width: 100%;
+}
+.ef-edit-input {
+    font: inherit;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    padding: 2px 6px;
+    background: #fefefe;
+}
+
+/* --- List / collection styles --- */
+.ef-list {
+    margin: 4px 0;
+    padding-left: 24px;
+}
+.ef-list-item {
+    margin: 4px 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.ef-list-item--add {
+    margin: 4px 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    list-style: none;
+}
+.ef-id-pill {
+    display: inline-block;
+    min-width: 52px;
+    color: #666;
+    text-align: center;
+    background: #e8e8e8;
+    border-radius: 10px;
+    padding: 1px 6px;
+    font-family: monospace;
+    font-size: 0.85em;
+}
+.ef-id-pill--hidden { visibility: hidden; }
+.ef-fixed-value {
+    display: inline-block;
+    width: 200px;
+    padding: 2px 4px;
+    border: 1px solid transparent;
+    box-sizing: content-box;
+    color: #555;
+    background: #f0f0f0;
+    border-radius: 3px;
+}
+.ef-item-input {
+    border: 1px solid #ddd;
+    padding: 2px 4px;
+    width: 200px;
+}
+
+/* Constraint pills */
+.ef-constraint-wrap {
+    color: #999;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+.ef-constraint-pill {
+    display: inline-block;
+    min-width: 52px;
+    color: #666;
+    text-align: center;
+    background: #e8e8e8;
+    border: none;
+    border-radius: 10px;
+    padding: 1px 6px;
+    font-family: monospace;
+    font-size: 0.85em;
+}
+.ef-constraint-pill--fixed {
+    background: #fff3cd;
+    border: 1px solid #856404;
+}
+
+/* Constraint dropdown overlay */
+.ef-constraint-dropdown {
+    position: relative;
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    box-sizing: content-box;
+    border: 1px solid #ccc;
+    background: #f8f8f8;
+    vertical-align: middle;
+}
+.ef-constraint-dropdown-icon {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: normal;
+    pointer-events: none;
+}
+.ef-constraint-dropdown select {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+/* Pin toggle */
+.ef-pin-btn {
+    cursor: pointer;
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
+    padding: 0;
+    vertical-align: middle;
+    box-sizing: content-box;
+}
+.ef-pin-btn--pinned {
+    border: 1px solid #856404;
+    background: #fff3cd;
+}
+.ef-pin-btn--unpinned {
+    border: 1px solid #ccc;
+    background: none;
+}
+/* Small pin for constraints */
+.ef-pin-btn--small {
+    width: 18px;
+    height: 18px;
+}
+
+/* --- Container edit mode --- */
+.ef-toolbar {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    margin: 8px 0;
+    padding: 4px;
+    background: #f8f8f8;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+.ef-ctrl-bar {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    margin: 2px 0;
+    padding: 2px 4px;
+    background: #f0f0f0;
+    border-radius: 3px;
+}
+
+/* --- Feedback banners --- */
+.ef-feedback--error {
+    background: #fff0f0;
+    border: 1px solid #c00;
+    padding: 4px 8px;
+    margin: 4px 0;
+    border-radius: 3px;
+    color: #c00;
+}
+.ef-feedback--success {
+    background: #efffef;
+    border: 1px solid #4a4;
+    padding: 4px 8px;
+    margin: 4px 0;
+    border-radius: 3px;
+    color: #2a2;
+}
+
+/* N/A text */
+.ef-na-text {
+    color: #888;
+    font-style: italic;
+}
+
+/* Muted text */
+.ef-muted {
+    color: #888;
+    font-size: 0.9em;
+}
+
+/* Config row (NumberForm constraints, etc.) */
+.ef-config-row {
+    margin: 2px 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    font-size: 0.9em;
+    color: #666;
+}
+.ef-config-toggle {
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.9em;
+    padding: 1px 8px;
+    border-radius: 3px;
+}
+.ef-config-toggle--on {
+    border: 1px solid #4a4;
+    background: #efffef;
+    color: #2a2;
+}
+.ef-config-toggle--off {
+    border: 1px solid #ccc;
+    background: none;
+}
+.ef-config-input {
+    width: 60px;
+    font: inherit;
+    font-size: 0.9em;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    padding: 1px 4px;
+}
+
+/* --- Container add-eigenform toolbar --- */
+.ef-add-toolbar {
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    padding: 10px;
+    margin-bottom: 12px;
+    border-radius: 4px;
+}
+.ef-add-toolbar-form {
+    display: flex;
+    gap: 8px;
+    align-items: end;
+    flex-wrap: wrap;
+}
+.ef-add-toolbar-label {
+    font-size: 11px;
+    color: #666;
+    display: block;
+}
+.ef-add-toolbar-input {
+    padding: 4px;
+}
+.ef-add-toolbar-submit {
+    padding: 4px 14px;
+    cursor: pointer;
+    background: #4a7;
+    color: white;
+    border: 1px solid #396;
+    border-radius: 3px;
+}
+
+/* --- Container edit-mode per-item control bar --- */
+.ef-item-ctrl-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: #fafafa;
+    border: 1px solid #e0e0e0;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    font-size: 11px;
+    color: #666;
+}
+.ef-item-ctrl-key {
+    font-family: monospace;
+    background: #eee;
+    padding: 1px 5px;
+    border-radius: 2px;
+}
+.ef-item-ctrl-spacer {
+    flex: 1;
+}
+.ef-item-ctrl-placeholder {
+    display: inline-block;
+    width: 22px;
+    height: 22px;
+    border: 1px solid transparent;
+}
+.ef-item-content {
+    border: 1px solid #e0e0e0;
+    border-radius: 0 0 4px 4px;
+    padding: 8px;
+}
+
+/* --- Container empty state --- */
+.ef-empty-state {
+    padding: 24px;
+    text-align: center;
+    color: #999;
+    border: 2px dashed #ddd;
+    border-radius: 4px;
+    margin-bottom: 8px;
+}
+
+/* --- Container tab/step bar --- */
+.ef-tab-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    margin-bottom: 8px;
+    align-items: center;
+}
+
+/* --- Remaining affordances wrapper --- */
+.ef-remaining-affs {
+    margin-top: 12px;
+}
+
+/* --- Section expand/collapse --- */
+.ef-section-content {
+    padding-left: 12px;
+    border-left: 2px solid #ddd;
+    margin-bottom: 8px;
+}
+.ef-section-content--edit {
+    border: 1px solid #e0e0e0;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    padding: 8px;
+    margin-bottom: 4px;
+}
+
+/* --- Accordion section header --- */
+.ef-section-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: #fafafa;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+/* --- Table-specific --- */
+.ef-table-shaded {
+    background: #f0f0f0;
+}

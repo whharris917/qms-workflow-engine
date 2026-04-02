@@ -24,6 +24,7 @@ from engine.affordances import (
 )
 from engine.eigenform import Eigenform
 from engine.ordered_collection import OrderedCollection
+from engine.templates import render_template
 
 
 class SetCellAffordance(Affordance):
@@ -619,12 +620,10 @@ class TableForm(Eigenform):
             f' font-size: 18px; font-weight: normal; pointer-events: none;">☑</span>'
             f'<select title="POST {url} {{&quot;action&quot;:&quot;{add_action}&quot;,&quot;item&quot;:&quot;{item_id}&quot;,&quot;after&quot;:&quot;...&quot;}}"'
             f' style="position: absolute; inset: 0; width: 100%; height: 100%;'
-            f' opacity: 0; cursor: pointer;" onchange="'
-            f"if(this.value)fetch('{url}',"
-            f"{{method:'POST',headers:{{'Content-Type':'application/json'}},"
-            f"body:JSON.stringify({{action:'{add_action}',item:'{item_id}',after:this.value}})"
-            f"}}).then(()=>location.reload())"
-            f'">'
+            f' opacity: 0; cursor: pointer;"'
+            f' data-ef-change="{escape(url)}"'
+            f' data-ef-template="{escape(json.dumps({"action": add_action, "item": item_id, "after": "__VALUE"}))}"'
+            f'>'
             f'<option value="">—</option>'
             f'{add_opts}'
             f'</select>'
@@ -675,7 +674,6 @@ class TableForm(Eigenform):
         return html
 
     def render_from_data(self, data: dict) -> str:
-        from engine.affordances import render_affordance_html
         col_oc = self._col_collection
         row_oc = self._row_collection
         col_items = col_oc.items
@@ -683,46 +681,21 @@ class TableForm(Eigenform):
         templates = self._typed_column_templates
         row_groups_by_id = {rg.key: rg for rg in getattr(self, '_row_groups', [])}
 
-        html = f'<h3>{escape(data["label"])}</h3>'
-        if data.get("instruction"):
-            html += f'<p>{escape(data["instruction"])}</p>'
-
-        # Configuration panel
-        config = self._config
-        config_toggles = []
-        url_for_config = data.get("affordances", [{}])[0].get("url", "")
-        if self.allow_row_constraints:
-            config_toggles.append(("auto_chain_rows", "toggle_auto_chain_rows", "Auto-chain rows"))
-        if self.allow_col_constraints:
-            config_toggles.append(("auto_chain_cols", "toggle_auto_chain_cols", "Auto-chain columns"))
-        if config_toggles:
-            html += (
-                f'<div style="background: #f8f8f8; border: 1px solid #ddd; border-radius: 4px;'
-                f' padding: 6px 10px; margin: 8px 0; display: inline-flex; align-items: center; gap: 12px;">'
-                f'<span style="font-weight: bold; font-size: 0.9em; color: #555;">Configuration</span>'
-            )
-            for cfg_key, action_name, label in config_toggles:
-                checked = ' checked' if config.get(cfg_key, False) else ''
-                toggle_body = json.dumps({"action": action_name})
-                html += (
-                    f'<label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">'
-                    f'<input type="checkbox"{checked} onchange="fetch(\'{url_for_config}\','
-                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                    f'body:JSON.stringify({toggle_body.replace(chr(34), "&quot;")})}}).then(()=>location.reload())"'
-                    f' title="POST {url_for_config} {escape(toggle_body)}" />'
-                    f'<span>{label}</span>'
-                    f'</label>'
-                )
-            html += '</div>'
-
         columns = data.get("columns", [])
         rows = data.get("rows", [])
         affs = data.get("affordances", [])
-
         url = affs[0]["url"] if affs else ""
         gap = BUTTON_GAP
         num_rows = len(row_items)
         num_cols = len(col_items)
+
+        # Config toggles
+        config = self._config
+        config_toggles = []
+        if self.allow_row_constraints:
+            config_toggles.append(("auto_chain_rows", "toggle_auto_chain_rows", "Auto-chain rows"))
+        if self.allow_col_constraints:
+            config_toggles.append(("auto_chain_cols", "toggle_auto_chain_cols", "Auto-chain columns"))
 
         # Constraint display data
         show_row_constraints = self.allow_row_constraints and num_rows > 0
@@ -739,323 +712,249 @@ class TableForm(Eigenform):
                             for iid, aids in self.col_must_follow.items()
                             for aid in aids} if show_col_constraints else set()
 
-        if columns:
-            add_col_aff = next((a for a in affs if a.get("body", {}).get("action") == "add_column"), None)
-            add_row_aff = next((a for a in affs if a.get("body", {}).get("action") == "add_row"), None)
+        add_col_aff = next((a for a in affs if a.get("body", {}).get("action") == "add_column"), None)
+        add_row_aff = next((a for a in affs if a.get("body", {}).get("action") == "add_row"), None)
 
-            html += '<div style="overflow-x: auto; margin: 8px 0;"><table style="border-collapse: collapse; white-space: nowrap; width: max-content;">'
+        # Build column headers
+        col_headers = []
+        for ci, col in enumerate(columns):
+            col_item = col_items[ci] if ci < len(col_items) else None
+            col_id = col["key"]
+            is_fixed_col = col_item.get("fixed", False) if col_item else False
 
-            # Header row — empty control cell + ID + data columns
-            html += '<tr>'
-            ctrl_th = '<th style="border: 1px solid #ccc; padding: 2px 4px; background: #f0f0f0;"></th>'
-            html += ctrl_th  # remove column
-            if num_rows > 1:
-                html += ctrl_th + ctrl_th  # up / down columns
-            if show_row_constraints:
-                html += ctrl_th  # + Prerequisite column
-            html += '<th style="border: 1px solid #ccc; padding: 4px 8px; background: #f0f0f0;">ID</th>'
-            if any_row_prereqs:
-                html += '<th style="border: 1px solid #ccc; padding: 4px 8px; background: #f0f0f0;">Prerequisites</th>'
+            left_arrow = gap
+            right_arrow = gap
+            if num_cols > 1:
+                if col_oc.can_move_up(ci, col_items):
+                    left_arrow = render_inline_button(url, {"action": "move_col_left", "column": col_id}, "&#9664;", STYLE_ARROW)
+                if col_oc.can_move_down(ci, col_items):
+                    right_arrow = render_inline_button(url, {"action": "move_col_right", "column": col_id}, "&#9654;", STYLE_ARROW)
 
-            for ci, col in enumerate(columns):
-                col_item = col_items[ci] if ci < len(col_items) else None
-                col_id = col["key"]
-                is_fixed_col = col_item.get("fixed", False) if col_item else False
+            rm_col_btn = ''
+            if not is_fixed_col:
+                rm_col_btn = render_inline_button(url, {"action": "remove_column", "column": col_id}, "\u2212", STYLE_REMOVE)
 
-                # Column move arrows (separate left/right for flanking the pill)
-                left_arrow = gap
-                right_arrow = gap
-                if num_cols > 1:
-                    if col_oc.can_move_up(ci, col_items):
-                        left_arrow = render_inline_button(url, {"action": "move_col_left", "column": col_id}, "&#9664;", STYLE_ARROW)
-                    if col_oc.can_move_down(ci, col_items):
-                        right_arrow = render_inline_button(url, {"action": "move_col_right", "column": col_id}, "&#9654;", STYLE_ARROW)
+            constraint_html = ''
+            if show_col_constraints:
+                prereqs = col_mf.get(col_id, [])
+                if prereqs or len(col_items) > 1:
+                    constraint_html = (
+                        f'<div style="display: flex; align-items: center; justify-content: center; padding: 2px 4px 0 4px; border-top: 1px solid #e0e0e0;">'
+                        + self._render_constraint_inline(
+                            url, col_id, prereqs, col_id_to_val, col_static_pairs,
+                            col_items, "add_col_constraint", "remove_col_constraint",
+                            "#e8e8f4")
+                        + '</div>'
+                    )
 
-                rm_col_btn = ''
-                if not is_fixed_col:
-                    rm_col_btn = render_inline_button(url, {"action": "remove_column", "column": col_id}, "\u2212", STYLE_REMOVE)
+            col_pill = (
+                f'<span style="display: inline-block; min-width: 52px; color: #666;'
+                f' text-align: center; background: #e8e8e8; border-radius: 10px;'
+                f' padding: 1px 6px; font-family: monospace; font-size: 0.85em;">'
+                f'{escape(col_id)}</span>'
+            )
+            rm_or_gap = rm_col_btn if rm_col_btn else gap
 
-                # Column constraint row (if enabled)
-                constraint_row = ''
-                if show_col_constraints:
-                    prereqs = col_mf.get(col_id, [])
-                    if prereqs or len(col_items) > 1:
-                        constraint_row = (
-                            f'<div style="display: flex; align-items: center; justify-content: center; padding: 2px 4px 0 4px; border-top: 1px solid #e0e0e0;">'
-                            + self._render_constraint_inline(
-                                url, col_id, prereqs, col_id_to_val, col_static_pairs,
-                                col_items, "add_col_constraint", "remove_col_constraint",
-                                "#e8e8f4")
-                            + '</div>'
-                        )
+            id_row_html = (
+                f'<div style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 2px 4px;">'
+                f'<div style="text-align: left;">{left_arrow}</div>'
+                f'<div>{col_pill}</div>'
+                f'<div style="text-align: right;">{right_arrow}</div>'
+                f'</div>'
+            )
 
-                # Pill badge style (matches ListForm id_style)
-                col_pill = (
-                    f'<span style="display: inline-block; min-width: 52px; color: #666;'
-                    f' text-align: center; background: #e8e8e8; border-radius: 10px;'
-                    f' padding: 1px 6px; font-family: monospace; font-size: 0.85em;">'
-                    f'{escape(col_id)}</span>'
-                )
-
-                rm_or_gap = rm_col_btn if rm_col_btn else gap
-
-                # ID row: 3-column grid — left arrow | centered pill | right arrow
-                id_row = (
-                    f'<div style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 2px 4px;">'
-                    f'<div style="text-align: left;">{left_arrow}</div>'
-                    f'<div>{col_pill}</div>'
-                    f'<div style="text-align: right;">{right_arrow}</div>'
+            if is_fixed_col:
+                rename_html = (
+                    f'<div style="display: flex; align-items: center; padding: 2px 4px; gap: 4px;">'
+                    f'{rm_or_gap}'
+                    f'<span style="flex: 1; font-weight: bold; text-align: center; color: #555;">'
+                    f'{escape(col["label"])}</span>'
+                    f'{gap}'
                     f'</div>'
                 )
-
-                th_style = 'border: 1px solid #ccc; padding: 2px; background: #f0f0f0; vertical-align: top;'
-
-                if is_fixed_col:
-                    html += (
-                        f'<th style="{th_style}">'
-                        f'{id_row}'
-                        f'<div style="display: flex; align-items: center; padding: 2px 4px; gap: 4px;">'
-                        f'{rm_or_gap}'
-                        f'<span style="flex: 1; font-weight: bold; text-align: center; color: #555;">'
-                        f'{escape(col["label"])}</span>'
-                        f'{gap}'
-                        f'</div>'
-                        f'{constraint_row}'
-                        f'</th>'
-                    )
-                else:
-                    rename_body = {"action": "rename_column", "column": col_id, "label": col["label"]}
-                    rename_tooltip = f'POST {url} {escape(json.dumps(rename_body))}'
-                    html += (
-                        f'<th style="{th_style}">'
-                        f'{id_row}'
-                        f'<div style="display: flex; align-items: center; padding: 2px 4px; gap: 4px;">'
-                        f'{rm_or_gap}'
-                        f'<form style="margin:0; flex: 1;" onsubmit="fetch(\'{url}\','
-                        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                        f'body:JSON.stringify({{action:\'rename_column\',column:\'{col_id}\','
-                        f'label:this.elements.v.value}})'
-                        f'}}).then(()=>location.reload()); return false">'
-                        f'<input name="v" type="text" value="{escape(col["label"])}" size="12"'
-                        f' style="border: 1px solid #ddd; padding: 2px 4px; width: 100%; box-sizing: border-box;'
-                        f' font-family: inherit; font-size: inherit;'
-                        f' font-weight: bold; text-align: center; color: #555;"'
-                        f' oninput="this.nextElementSibling.title='
-                        f"'POST {url} '+JSON.stringify({{action:'rename_column',column:'{col_id}',label:this.value}})"
-                        f'" />'
-                        f'</form>'
-                        f'<button style="{STYLE_CONFIRM}"'
-                        f' title="{rename_tooltip}"'
-                        f' onclick="this.closest(\'th\').querySelector(\'form\').requestSubmit(); return false;"'
-                        f'>&#10003;</button>'
-                        f'</div>'
-                        f'{constraint_row}'
-                        f'</th>'
-                    )
-
-            # +Column as last header cell
-            if add_col_aff:
-                add_col_body_preview = json.dumps({"action": "add_column", "label": ""})
-                add_col_tooltip = f'POST {url} {escape(add_col_body_preview)}'
-                html += (
-                    f'<th style="{th_style}">'
-                    f'<div style="padding: 2px 4px;">{gap}</div>'
+            else:
+                rename_body = {"action": "rename_column", "column": col_id, "label": col["label"]}
+                rename_tooltip = f'POST {url} {escape(json.dumps(rename_body))}'
+                rename_html = (
                     f'<div style="display: flex; align-items: center; padding: 2px 4px; gap: 4px;">'
-                    f'<form style="margin:0; flex: 1;" onsubmit="fetch(\'{url}\','
-                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                    f'body:JSON.stringify({{action:\'add_column\',label:this.elements.v.value}})'
-                    f'}}).then(()=>location.reload()); return false">'
-                    f'<input name="v" type="text" placeholder="Column name" size="12"'
+                    f'{rm_or_gap}'
+                    f'<form style="margin:0; flex: 1;" data-ef-submit="{escape(url)}">'
+                    f'<input type="hidden" name="action" value="rename_column" />'
+                    f'<input type="hidden" name="column" value="{escape(col_id)}" />'
+                    f'<input name="label" type="text" value="{escape(col["label"])}" size="12"'
                     f' style="border: 1px solid #ddd; padding: 2px 4px; width: 100%; box-sizing: border-box;'
                     f' font-family: inherit; font-size: inherit;'
                     f' font-weight: bold; text-align: center; color: #555;"'
-                    f' oninput="this.title=\'POST {url} \'+JSON.stringify({{action:\'add_column\',label:this.value}})"'
-                    f' title="{add_col_tooltip}" />'
+                    f' title="{rename_tooltip}" />'
                     f'</form>'
                     f'<button style="{STYLE_CONFIRM}"'
-                    f' title="{add_col_tooltip}"'
+                    f' title="{rename_tooltip}"'
                     f' onclick="this.closest(\'th\').querySelector(\'form\').requestSubmit(); return false;"'
-                    f'>+</button>'
+                    f'>&#10003;</button>'
                     f'</div>'
-                    f'</th>'
                 )
-            html += '</tr>'
 
-            # Data rows — control cell + ID cell + data cells
-            for ri, row_data in enumerate(rows):
-                row_id = row_data["_id"]
-                row_item = row_items[ri] if ri < len(row_items) else None
-                is_fixed_row = row_item.get("fixed", False) if row_item else False
+            col_headers.append({
+                "col_id": col_id, "label": col["label"], "is_fixed": is_fixed_col,
+                "id_row_html": id_row_html, "rename_html": rename_html,
+                "rm_html": rm_col_btn, "constraint_html": constraint_html,
+            })
 
-                html += '<tr>'
+        # Build add column HTML
+        add_col_html = ""
+        if add_col_aff:
+            add_col_body_preview = json.dumps({"action": "add_column", "label": ""})
+            add_col_tooltip = f'POST {url} {escape(add_col_body_preview)}'
+            add_col_html = (
+                f'<div style="padding: 2px 4px;">{gap}</div>'
+                f'<div style="display: flex; align-items: center; padding: 2px 4px; gap: 4px;">'
+                f'<form style="margin:0; flex: 1;" data-ef-submit="{escape(url)}">'
+                f'<input type="hidden" name="action" value="add_column" />'
+                f'<input name="label" type="text" placeholder="Column name" size="12"'
+                f' style="border: 1px solid #ddd; padding: 2px 4px; width: 100%; box-sizing: border-box;'
+                f' font-family: inherit; font-size: inherit;'
+                f' font-weight: bold; text-align: center; color: #555;"'
+                f' title="{add_col_tooltip}" />'
+                f'</form>'
+                f'<button style="{STYLE_CONFIRM}"'
+                f' title="{add_col_tooltip}"'
+                f' onclick="this.closest(\'th\').querySelector(\'form\').requestSubmit(); return false;"'
+                f'>+</button>'
+                f'</div>'
+            )
 
-                # Remove cell (left of grid)
-                html += '<td style="border: 1px solid #ccc; padding: 2px 4px; text-align: center; background: #f0f0f0;">'
-                if not is_fixed_row:
-                    rm_row_body = {"action": "remove_row", "row": row_id}
-                    html += render_inline_button(url, rm_row_body, "\u2212", STYLE_REMOVE)
+        # Build row data items
+        row_data_items = []
+        for ri, row_data in enumerate(rows):
+            row_id = row_data["_id"]
+            row_item = row_items[ri] if ri < len(row_items) else None
+            is_fixed_row = row_item.get("fixed", False) if row_item else False
+
+            rm_html = gap
+            if not is_fixed_row:
+                rm_html = render_inline_button(url, {"action": "remove_row", "row": row_id}, "\u2212", STYLE_REMOVE)
+
+            up_html = gap
+            down_html = gap
+            if num_rows > 1:
+                if row_oc.can_move_up(ri, row_items):
+                    up_html = render_inline_button(url, {"action": "move_row_up", "row": row_id}, "&#9650;", STYLE_ARROW)
+                if row_oc.can_move_down(ri, row_items):
+                    down_html = render_inline_button(url, {"action": "move_row_down", "row": row_id}, "&#9660;", STYLE_ARROW)
+
+            prereq_dropdown_html = ""
+            if show_row_constraints:
+                prereqs = row_mf.get(row_id, [])
+                prereq_dropdown_html = self._render_constraint_dropdown(
+                    url, row_id, prereqs, row_items, "add_row_constraint")
+
+            id_pill_html = (
+                f'<span style="display: inline-block; min-width: 52px; color: #666;'
+                f' text-align: center; background: #e8e8e8; border-radius: 10px;'
+                f' padding: 1px 6px; font-family: monospace; font-size: 0.85em;">'
+                f'{escape(row_id)}</span>'
+            )
+
+            prereq_pills_html = ""
+            if any_row_prereqs:
+                prereqs = row_mf.get(row_id, [])
+                prereq_pills_html = self._render_constraint_pills(
+                    url, row_id, prereqs, row_id_to_val, row_static_pairs,
+                    "remove_row_constraint", "#e8f4e8")
+
+            cells = []
+            rg = row_groups_by_id.get(row_id)
+            for col in columns:
+                col_id = col["key"]
+                if col_id in templates and rg:
+                    ef = rg.cell_eigenforms.get(col_id)
+                    if ef:
+                        cells.append({"html": f'<td style="border: 1px solid #ccc; padding: 4px; vertical-align: top;">{ef.render()}</td>'})
+                    else:
+                        cells.append({"html": '<td style="border: 1px solid #ccc; padding: 2px;"></td>'})
                 else:
-                    html += gap
-                html += '</td>'
-
-                # Up / down arrow columns
-                ctrl_td = 'border: 1px solid #ccc; padding: 2px 4px; text-align: center; background: #f0f0f0;'
-                if num_rows > 1:
-                    if row_oc.can_move_up(ri, row_items):
-                        html += f'<td style="{ctrl_td}">' + render_inline_button(url, {"action": "move_row_up", "row": row_id}, "&#9650;", STYLE_ARROW) + '</td>'
-                    else:
-                        html += f'<td style="{ctrl_td}">{gap}</td>'
-                    if row_oc.can_move_down(ri, row_items):
-                        html += f'<td style="{ctrl_td}">' + render_inline_button(url, {"action": "move_row_down", "row": row_id}, "&#9660;", STYLE_ARROW) + '</td>'
-                    else:
-                        html += f'<td style="{ctrl_td}">{gap}</td>'
-
-                # + Prerequisite dropdown column
-                if show_row_constraints:
-                    prereqs = row_mf.get(row_id, [])
-                    dropdown_html = self._render_constraint_dropdown(
-                        url, row_id, prereqs, row_items, "add_row_constraint")
-                    html += (
-                        f'<td style="border: 1px solid #ccc; padding: 4px 8px; white-space: nowrap; background: #f0f0f0;">'
-                        f'{dropdown_html}'
+                    cell_value = row_data.get(col_id)
+                    display = escape(str(cell_value)) if cell_value is not None else ""
+                    cell_val_escaped = escape(str(cell_value)) if cell_value is not None else ""
+                    cell_tooltip = f'POST {url} {escape(json.dumps({"action": "set_cell", "row": row_id, "column": col_id, "value": str(cell_val_escaped)}))}'
+                    cells.append({"html": (
+                        f'<td style="border: 1px solid #ccc; padding: 2px;">'
+                        f'<form style="margin:0" data-ef-submit="{escape(url)}">'
+                        f'<input type="hidden" name="action" value="set_cell" />'
+                        f'<input type="hidden" name="row" value="{escape(row_id)}" />'
+                        f'<input type="hidden" name="column" value="{escape(col_id)}" />'
+                        f'<input name="value" type="text" value="{display}"'
+                        f' style="border: none; width: 100%; box-sizing: border-box; padding: 2px 4px;"'
+                        f' title="{cell_tooltip}" />'
+                        f'</form>'
                         f'</td>'
-                    )
+                    )})
 
-                # ID cell
-                row_pill = (
-                    f'<span style="display: inline-block; min-width: 52px; color: #666;'
-                    f' text-align: center; background: #e8e8e8; border-radius: 10px;'
-                    f' padding: 1px 6px; font-family: monospace; font-size: 0.85em;">'
-                    f'{escape(row_id)}</span>'
-                )
-                html += (
-                    f'<td style="border: 1px solid #ccc; padding: 4px 8px; white-space: nowrap; text-align: center;">'
-                    f'{row_pill}'
-                    f'</td>'
-                )
-                if any_row_prereqs:
-                    prereqs = row_mf.get(row_id, [])
-                    pills_html = self._render_constraint_pills(
-                        url, row_id, prereqs, row_id_to_val, row_static_pairs,
-                        "remove_row_constraint", "#e8f4e8")
-                    html += (
-                        f'<td style="border: 1px solid #ccc; padding: 4px 8px; white-space: nowrap;">'
-                        f'{pills_html}'
-                        f'</td>'
-                    )
+            row_data_items.append({
+                "row_id": row_id, "is_fixed": is_fixed_row,
+                "rm_html": rm_html, "up_html": up_html, "down_html": down_html,
+                "prereq_dropdown_html": prereq_dropdown_html,
+                "id_pill_html": id_pill_html, "prereq_pills_html": prereq_pills_html,
+                "cells": cells,
+            })
 
-                rg = row_groups_by_id.get(row_id)
-                for col in columns:
-                    col_id = col["key"]
-                    if col_id in templates and rg:
-                        # Typed cell — render the eigenform inline
-                        ef = rg.cell_eigenforms.get(col_id)
-                        if ef:
-                            html += (
-                                f'<td style="border: 1px solid #ccc; padding: 4px; vertical-align: top;">'
-                                f'{ef.render()}'
-                                f'</td>'
-                            )
-                        else:
-                            html += '<td style="border: 1px solid #ccc; padding: 2px;"></td>'
-                    else:
-                        # Text cell — inline input
-                        cell_value = row_data.get(col_id)
-                        display = escape(str(cell_value)) if cell_value is not None else ""
-                        cell_val_escaped = escape(str(cell_value)) if cell_value is not None else ""
+        # Build add row HTML
+        add_row_html = ""
+        if add_row_aff and columns:
+            add_row_body = json.dumps({"action": "add_row"})
+            empty_td = '<td style="border: 1px solid #ccc; background: #f0f0f0;"></td>'
+            add_row_html = (
+                f'<tr>'
+                f'<td style="border: 1px solid #ccc; padding: 2px 4px; text-align: center; background: #f0f0f0;">'
+                f'<button data-ef-post="{escape(url)}" data-ef-body="{escape(add_row_body)}"'
+                f' style="{STYLE_CONFIRM}"'
+                f' title="POST {url} {escape(add_row_body)}">+</button>'
+                f'</td>'
+                + (empty_td * 2 if num_rows > 1 else '')
+                + (empty_td if show_row_constraints else '')
+                + empty_td
+                + (empty_td if any_row_prereqs else '')
+                + empty_td * len(columns)
+                + (empty_td if add_col_aff else '')
+                + '</tr>'
+            )
 
-                        html += (
-                            f'<td style="border: 1px solid #ccc; padding: 2px;">'
-                            f'<form style="margin:0" onsubmit="fetch(\'{url}\','
-                            f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                            f'body:JSON.stringify({{action:\'set_cell\',row:\'{row_id}\','
-                            f'column:\'{col_id}\',value:this.elements.v.value}})'
-                            f'}}).then(()=>location.reload()); return false">'
-                            f'<input name="v" type="text" value="{display}"'
-                            f' style="border: none; width: 100%; box-sizing: border-box; padding: 2px 4px;"'
-                            f' oninput="this.title=\'POST {url} \'+JSON.stringify({{action:\'set_cell\',row:\'{row_id}\',column:\'{col_id}\',value:this.value}})"'
-                            f' title="POST {url} {escape(json.dumps({"action": "set_cell", "row": row_id, "column": col_id, "value": cell_val_escaped}))}" />'
-                            f'</form>'
-                            f'</td>'
-                        )
-                if add_col_aff:
-                    html += '<td style="border: 1px solid #ccc;"></td>'
-                html += '</tr>'
+        # Build empty-table column add HTML
+        empty_col_html = ""
+        if not columns and add_col_aff:
+            add_col_body_preview = json.dumps({"action": "add_column", "label": ""})
+            empty_col_html = (
+                f'<table style="border-collapse: collapse; margin: 8px 0;">'
+                f'<tr>'
+                f'<th style="border: 1px solid #ccc; padding: 2px; background: #f0f0f0;">'
+                f'<form style="margin:0; display: flex; align-items: center;"'
+                f' data-ef-submit="{escape(url)}">'
+                f'<input type="hidden" name="action" value="add_column" />'
+                f'<input name="label" type="text" placeholder="Column name" size="12"'
+                f' style="border: 1px solid #ddd; width: 100px; padding: 2px 4px;"'
+                f' title="POST {url} {escape(add_col_body_preview)}" />'
+                f' <button type="submit" style="cursor: pointer; border: none; background: none; color: #2a2;'
+                f' font-size: 14px; font-weight: bold; padding: 0 4px; line-height: 1;"'
+                f' title="POST {url} {escape(add_col_body_preview)}">+</button>'
+                f'</form>'
+                f'</th>'
+                f'</tr>'
+                f'</table></div>'
+            )
 
-            # +Row button row
-            if add_row_aff:
-                add_row_body = json.dumps({"action": "add_row"})
-                html += (
-                    f'<tr>'
-                    f'<td style="border: 1px solid #ccc; padding: 2px 4px; text-align: center; background: #f0f0f0;">'
-                    f'<button onclick="fetch(\'{url}\','
-                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                    f'body:JSON.stringify({add_row_body.replace(chr(34), "&quot;")})}}).then(()=>location.reload())"'
-                    f' style="{STYLE_CONFIRM}"'
-                    f' title="POST {url} {escape(add_row_body)}">+</button>'
-                    f'</td>'
-                    + (f'<td style="border: 1px solid #ccc; background: #f0f0f0;"></td><td style="border: 1px solid #ccc; background: #f0f0f0;"></td>' if num_rows > 1 else '')
-                    + (f'<td style="border: 1px solid #ccc; background: #f0f0f0;"></td>' if show_row_constraints else '')
-                    + f'<td style="border: 1px solid #ccc; background: #f0f0f0;"></td>'
-                    + (f'<td style="border: 1px solid #ccc; background: #f0f0f0;"></td>' if any_row_prereqs else '')
-                )
-                for _ in columns:
-                    html += '<td style="border: 1px solid #ccc; background: #f0f0f0;"></td>'
-                if add_col_aff:
-                    html += '<td style="border: 1px solid #ccc; background: #f0f0f0;"></td>'
-                html += '</tr>'
-
-            html += '</table></div>'
-        else:
-            # Empty table — show just the +Column input
-            add_col_aff = next((a for a in affs if a.get("body", {}).get("action") == "add_column"), None)
-            if add_col_aff:
-                add_col_body_preview = json.dumps({"action": "add_column", "label": ""})
-                html += (
-                    f'<table style="border-collapse: collapse; margin: 8px 0;">'
-                    f'<tr>'
-                    f'<th style="border: 1px solid #ccc; padding: 2px; background: #f0f0f0;">'
-                    f'<form style="margin:0; display: flex; align-items: center;" onsubmit="fetch(\'{url}\','
-                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                    f'body:JSON.stringify({{action:\'add_column\',label:this.elements.v.value}})'
-                    f'}}).then(()=>location.reload()); return false">'
-                    f'<input name="v" type="text" placeholder="Column name" size="12"'
-                    f' style="border: 1px solid #ddd; width: 100px; padding: 2px 4px;"'
-                    f' oninput="this.title=\'POST {url} \'+JSON.stringify({{action:\'add_column\',label:this.value}})"'
-                    f' title="POST {url} {escape(add_col_body_preview)}" />'
-                    f' <button type="submit" style="cursor: pointer; border: none; background: none; color: #2a2;'
-                    f' font-size: 14px; font-weight: bold; padding: 0 4px; line-height: 1;"'
-                    f' title="POST {url} {escape(add_col_body_preview)}">+</button>'
-                    f'</form>'
-                    f'</th>'
-                    f'</tr>'
-                    f'</table></div>'
-                )
-
-        if columns and not rows:
-            html += '<p style="color: #888;">No rows yet. Add a row to start entering data.</p>'
-
-        # Mark affordances rendered inline in the table
-        for aff in affs:
-            hints_type = aff.get("render_hints", {}).get("type", "")
-            action = aff.get("body", {}).get("action", "")
-            if hints_type == "inline_cell" or action in (
-                "rename_column", "remove_column", "remove_row", "add_row", "add_column",
-                "move_row_up", "move_row_down", "move_col_left", "move_col_right",
-                "add_row_constraint", "remove_row_constraint",
-                "add_col_constraint", "remove_col_constraint",
-                "set_row", "toggle_auto_chain_rows", "toggle_auto_chain_cols",
-            ):
-                Eigenform.mark_rendered(aff)
-
-        # Remaining affordance controls
-        html += '<div style="margin-top: 8px;">'
-        for aff in affs:
-            if not aff.get("_rendered"):
-                html += render_affordance_html(aff)
-        html += '</div>'
-
-        return html
+        return render_template("table.html", data=data, ef=self, url=url,
+                               columns=columns, rows=rows,
+                               config_toggles=config_toggles, config=config,
+                               col_headers=col_headers,
+                               row_data_items=row_data_items,
+                               add_col_html=add_col_html,
+                               add_row_html=add_row_html,
+                               has_columns=bool(columns),
+                               has_rows=bool(rows),
+                               num_rows=num_rows,
+                               show_row_constraints=show_row_constraints,
+                               any_row_prereqs=any_row_prereqs,
+                               empty_col_html=empty_col_html)
 
     def _handle(self, body: dict) -> dict:
         action = body.get("action", "")

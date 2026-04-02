@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field
-from html import escape
 from typing import Any
 
 from engine.eigenform import Eigenform
+from engine.templates import render_template
 from engine.store import Store
 
 
@@ -85,7 +85,7 @@ class VisibilityForm(Eigenform):
         return self.eigenform.render()
 
     def render_from_data(self, data: dict) -> str:
-        return self.eigenform.render()
+        return render_template("visibility.html", child_html=self.eigenform.render())
 
     def handle(self, body: dict) -> dict:
         if self.visible:

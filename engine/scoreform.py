@@ -7,10 +7,10 @@ live on every serialize/render — no grading action needed.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from html import escape
 from typing import Any
 
-from engine.eigenform import Eigenform, render_dependency_line
+from engine.eigenform import Eigenform
+from engine.templates import render_template
 
 
 @dataclass
@@ -68,40 +68,9 @@ class ScoreForm(Eigenform):
         }
 
     def render_from_data(self, data: dict) -> str:
-        total = data["total"]
-        answered = data["answered"]
-        correct = data["correct"]
-
-        html = f'<h3>{escape(data["label"])}</h3>'
-        if data.get("instruction"):
-            html += f'<p>{escape(data["instruction"])}</p>'
-        html += render_dependency_line(data.get("depends_on"), self._url_prefix)
-
-        if answered < total:
-            html += f'<p><strong>{answered}/{total}</strong> questions answered.</p>'
-        else:
-            html += f'<p><strong>Score: {correct}/{total} ({data["percent"]}%)</strong></p>'
-
-        html += '<table style="border-collapse: collapse; width: 100%;">'
-        html += ('<tr><th style="text-align: left; padding: 4px; border-bottom: 1px solid #ccc;">Q</th>'
-                 '<th style="text-align: left; padding: 4px; border-bottom: 1px solid #ccc;">Your Answer</th>'
-                 '<th style="text-align: left; padding: 4px; border-bottom: 1px solid #ccc;">Result</th></tr>')
-
-        for r in data["results"]:
-            answer_display = _format_answer(r["answer"])
-            if not r["answered"]:
-                result = '<span style="color: #888;">--</span>'
-            elif r["correct"]:
-                result = '<span style="color: #2a2;">Correct</span>'
-            else:
-                expected_display = _format_answer(r["expected"])
-                result = f'<span style="color: #c22;">Incorrect</span> <span style="color: #888; font-size: 0.9em;">(expected: {expected_display})</span>'
-            html += (f'<tr><td style="padding: 4px; border-bottom: 1px solid #eee;">{escape(r["key"])}</td>'
-                     f'<td style="padding: 4px; border-bottom: 1px solid #eee;">{answer_display}</td>'
-                     f'<td style="padding: 4px; border-bottom: 1px solid #eee;">{result}</td></tr>')
-
-        html += '</table>'
-        return html
+        return render_template("score.html", data=data, ef=self,
+                               url_prefix=self._url_prefix,
+                               format_answer=_format_answer)
 
     def get_affordances(self):
         return []
@@ -111,9 +80,10 @@ class ScoreForm(Eigenform):
 
 
 def _format_answer(val) -> str:
+    from markupsafe import escape as _esc
     if val is None:
         return '<span style="color: #888;">--</span>'
     if isinstance(val, dict):
         selected = [k for k, v in val.items() if v and not k.startswith("__")]
-        return escape(", ".join(selected)) if selected else '<span style="color: #888;">none</span>'
-    return escape(str(val))
+        return str(_esc(", ".join(selected))) if selected else '<span style="color: #888;">none</span>'
+    return str(_esc(str(val)))

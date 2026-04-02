@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from html import escape
-from typing import Any
 
 from engine.affordances import Affordance
 from engine.eigenform import Eigenform
+from engine.templates import render_template
 
 
 class MemoAffordance(Affordance):
@@ -68,18 +66,7 @@ class MemoForm(Eigenform):
         ]
 
     def render_from_data(self, data: dict) -> str:
-        from engine.affordances import render_affordance_html
-        html = f'<h3>{escape(data["label"])}</h3>'
-        if data.get("instruction"):
-            html += f'<p>{escape(data["instruction"])}</p>'
-        val = data["value"]
-        if val:
-            html += f'<div style="white-space: pre-wrap; background: #f5f5f5; padding: 8px; margin: 4px 0; border-radius: 4px;">{escape(val)}</div>'
-        else:
-            html += '<p style="color: #888;">No text entered.</p>'
-        for aff in data.get("affordances", []):
-            html += render_affordance_html(aff)
-        return html
+        return render_template("memo.html", data=data, ef=self)
 
     def _handle(self, body: dict) -> dict:
         val = body.get("value", "")

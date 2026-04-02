@@ -1,0 +1,40 @@
+{# ScoreForm template.
+
+   Context:
+     data       — the serialized eigenform dict
+     ef         — the ScoreForm instance
+     url_prefix — the eigenform's URL prefix for dependency links
+     format_answer — callable to format an answer value
+#}
+<h3>{{ data.label }}</h3>
+{% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
+{{ render_dep_line(data.depends_on, url_prefix) }}
+
+{% if data.answered < data.total %}
+  <p><strong>{{ data.answered }}/{{ data.total }}</strong> questions answered.</p>
+{% else %}
+  <p><strong>Score: {{ data.correct }}/{{ data.total }} ({{ data.percent }}%)</strong></p>
+{% endif %}
+
+<table style="border-collapse: collapse; width: 100%;">
+  <tr>
+    <th style="text-align: left; padding: 4px; border-bottom: 1px solid #ccc;">Q</th>
+    <th style="text-align: left; padding: 4px; border-bottom: 1px solid #ccc;">Your Answer</th>
+    <th style="text-align: left; padding: 4px; border-bottom: 1px solid #ccc;">Result</th>
+  </tr>
+{% for r in data.results %}
+  <tr>
+    <td style="padding: 4px; border-bottom: 1px solid #eee;">{{ r.key }}</td>
+    <td style="padding: 4px; border-bottom: 1px solid #eee;">{{ format_answer(r.answer)|safe }}</td>
+    <td style="padding: 4px; border-bottom: 1px solid #eee;">
+      {% if not r.answered %}
+        <span style="color: #888;">--</span>
+      {% elif r.correct %}
+        <span style="color: #2a2;">Correct</span>
+      {% else %}
+        <span style="color: #c22;">Incorrect</span> <span style="color: #888; font-size: 0.9em;">(expected: {{ format_answer(r.expected)|safe }})</span>
+      {% endif %}
+    </td>
+  </tr>
+{% endfor %}
+</table>

@@ -1,0 +1,98 @@
+{# GroupForm template.
+
+   Context:
+     data            — serialized eigenform dict
+     ef              — the GroupForm instance
+     url             — eigenform POST URL
+     label           — current label text
+     instruction     — current instruction text
+     children_html   — list of rendered child HTML strings (safe)
+     child_items     — list of {key, editable, index, html} dicts (edit mode)
+     available_types — sorted list of available eigenform types (edit mode)
+#}
+{% if data.edit_mode %}
+  {% include "_edit_header.html" with context %}
+
+  {# Mark structural affordances as rendered #}
+  {% for aff in data.affordances %}
+    {% set action = aff.body.action|default("") %}
+    {% if action in ("set_label", "set_instruction", "add_eigenform", "remove_eigenform",
+                      "move_eigenform", "toggle_editable") %}
+      {% set _ = aff.update({"_rendered": true}) %}
+    {% endif %}
+  {% endfor %}
+
+  {# Add Eigenform toolbar #}
+  <div class="ef-add-toolbar">
+  <form class="ef-add-toolbar-form" data-ef-submit="{{ url }}">
+    <input type="hidden" name="action" value="add_eigenform" />
+    <div><label class="ef-add-toolbar-label">Type</label>
+    <select name="type" class="ef-add-toolbar-input">
+      <option value="">-- select type --</option>
+      {% for t in available_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+    </select></div>
+    <div><label class="ef-add-toolbar-label">Key</label>
+    <input name="key" type="text" placeholder="unique-key"
+      class="ef-add-toolbar-input" style="width: 140px;" /></div>
+    <div><label class="ef-add-toolbar-label">Label</label>
+    <input name="label" type="text" placeholder="Display Label"
+      class="ef-add-toolbar-input" style="width: 160px;" /></div>
+    <button type="submit" class="ef-add-toolbar-submit">+ Add</button>
+  </form></div>
+
+  {# Eigenforms with inline controls #}
+  {% for item in child_items %}
+    <div style="margin-bottom: 8px;">
+      <div class="ef-item-ctrl-bar">
+        <span class="ef-item-ctrl-key">{{ item.key }}</span>
+        <span class="ef-item-ctrl-spacer"></span>
+        {% if item.index > 0 %}
+          {{ render_btn(url, {"action": "move_eigenform", "key": item.key, "position": item.index - 1},
+              "&#9650;",
+              "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 22px; height: 22px; font-size: 9px; padding: 0;") }}
+        {% else %}
+          <span class="ef-item-ctrl-placeholder"></span>
+        {% endif %}
+        {% if item.index < child_items|length - 1 %}
+          {{ render_btn(url, {"action": "move_eigenform", "key": item.key, "position": item.index + 1},
+              "&#9660;",
+              "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 22px; height: 22px; font-size: 9px; padding: 0;") }}
+        {% else %}
+          <span class="ef-item-ctrl-placeholder"></span>
+        {% endif %}
+        {# Editable toggle #}
+        {% if item.editable %}
+          {{ render_btn(url, {"action": "toggle_editable", "key": item.key},
+              "&#9998;",
+              "cursor: pointer; border: 1px solid #86c; background: #f3eaff; width: 22px; height: 22px; font-size: 11px; padding: 0; color: #639;") }}
+        {% else %}
+          {{ render_btn(url, {"action": "toggle_editable", "key": item.key},
+              "&#9998;",
+              "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 22px; height: 22px; font-size: 11px; padding: 0; color: #aaa;") }}
+        {% endif %}
+        {{ render_btn(url, {"action": "remove_eigenform", "key": item.key},
+            "&#10005;",
+            "cursor: pointer; border: 1px solid #dcc; background: #fef8f8; width: 22px; height: 22px; font-size: 10px; padding: 0; color: #c00; margin-left: 4px;") }}
+      </div>
+      <div class="ef-item-content">{{ item.html|safe }}</div>
+    </div>
+  {% endfor %}
+
+  {% if not child_items %}
+    <div class="ef-empty-state">No eigenforms yet. Use the toolbar above to add one.</div>
+  {% endif %}
+
+{% else %}
+  <h3>{{ data.label }}</h3>
+  {% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
+  {% for html in children_html %}{{ html|safe }}{% endfor %}
+{% endif %}
+
+{# Remaining affordances #}
+<div class="ef-remaining-affs">
+{% for aff in data.affordances %}
+  {% if not aff._rendered %}
+    {{ render_aff(aff) }}
+  {% endif %}
+{% endfor %}
+</div>

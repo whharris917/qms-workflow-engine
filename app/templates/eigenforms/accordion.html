@@ -1,0 +1,124 @@
+{# AccordionForm template.
+
+   Context:
+     data            — serialized eigenform dict
+     ef              — the AccordionForm instance
+     url             — eigenform POST URL
+     label           — current label text
+     instruction     — current instruction text
+     section_items   — list of {key, label, expanded, editable, index} dicts
+     section_html    — dict mapping section_key -> rendered HTML (safe)
+     available_types — sorted list of available eigenform types (edit mode)
+#}
+{% if data.edit_mode %}
+  {% include "_edit_header.html" with context %}
+
+  {# Mark structural + toggle affordances as rendered #}
+  {% for aff in data.affordances %}
+    {% set action = aff.body.action|default("") %}
+    {% if action in ("set_label", "set_instruction", "add_section", "remove_section",
+                      "move_section", "toggle_editable", "toggle") %}
+      {% set _ = aff.update({"_rendered": true}) %}
+    {% endif %}
+  {% endfor %}
+
+  {# Add Section toolbar #}
+  <div class="ef-add-toolbar">
+  <form class="ef-add-toolbar-form" data-ef-submit="{{ url }}">
+    <input type="hidden" name="action" value="add_section" />
+    <div><label class="ef-add-toolbar-label">Section Key</label>
+    <input name="section_key" type="text" placeholder="section-key"
+      class="ef-add-toolbar-input" style="width: 100px;" /></div>
+    <div><label class="ef-add-toolbar-label">Type</label>
+    <select name="type" class="ef-add-toolbar-input">
+      <option value="">-- type --</option>
+      {% for t in available_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+    </select></div>
+    <div><label class="ef-add-toolbar-label">Key</label>
+    <input name="key" type="text" placeholder="eigenform-key"
+      class="ef-add-toolbar-input" style="width: 120px;" /></div>
+    <div><label class="ef-add-toolbar-label">Label</label>
+    <input name="label" type="text" placeholder="Section Label"
+      class="ef-add-toolbar-input" style="width: 140px;" /></div>
+    <button type="submit" class="ef-add-toolbar-submit">+ Add</button>
+  </form></div>
+
+  {# Sections with controls #}
+  {% for sec in section_items %}
+    {% set arrow = "&#9660;" if sec.expanded else "&#9654;" %}
+    <div style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; background: #fafafa; border: 1px solid #e0e0e0; border-radius: 4px; margin-bottom: {{ '0' if sec.expanded else '4' }}px;{{ ' border-bottom-left-radius: 0; border-bottom-right-radius: 0;' if sec.expanded else '' }} font-size: 12px;">
+
+      {# Toggle expand/collapse #}
+      {{ render_btn(url, {"action": "toggle", "section": sec.key},
+          arrow,
+          "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 22px; height: 22px; font-size: 10px; padding: 0;") }}
+
+      {# Section label #}
+      <span style="font-weight: bold; flex: 1;">{{ sec.label }}<span style="font-family: monospace; font-weight: normal; font-size: 10px; color: #999; margin-left: 6px;">{{ sec.key }}</span></span>
+
+      {# Move up/down #}
+      {% if sec.index > 0 %}
+        {{ render_btn(url, {"action": "move_section", "section_key": sec.key, "position": sec.index - 1},
+            "&#9650;",
+            "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 18px; height: 18px; font-size: 8px; padding: 0;") }}
+      {% endif %}
+      {% if sec.index < section_items|length - 1 %}
+        {{ render_btn(url, {"action": "move_section", "section_key": sec.key, "position": sec.index + 1},
+            "&#9660;",
+            "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 18px; height: 18px; font-size: 8px; padding: 0;") }}
+      {% endif %}
+
+      {# Toggle editable #}
+      {% if sec.editable %}
+        {{ render_btn(url, {"action": "toggle_editable", "section_key": sec.key},
+            "&#9998;",
+            "cursor: pointer; border: 1px solid #86c; background: #f3eaff; width: 18px; height: 18px; font-size: 10px; padding: 0; color: #639;") }}
+      {% else %}
+        {{ render_btn(url, {"action": "toggle_editable", "section_key": sec.key},
+            "&#9998;",
+            "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 18px; height: 18px; font-size: 10px; padding: 0; color: #aaa;") }}
+      {% endif %}
+
+      {# Remove #}
+      {{ render_btn(url, {"action": "remove_section", "section_key": sec.key},
+          "&#10005;",
+          "cursor: pointer; border: 1px solid #dcc; background: #fef8f8; width: 18px; height: 18px; font-size: 9px; padding: 0; color: #c00;") }}
+
+    </div>
+
+    {# Section content if expanded #}
+    {% if sec.expanded %}
+      <div class="ef-section-content--edit">{{ section_html[sec.key]|safe }}</div>
+    {% endif %}
+  {% endfor %}
+
+  {% if not section_items %}
+    <div class="ef-empty-state">No sections yet. Use the toolbar above to add one.</div>
+  {% endif %}
+
+{% else %}
+  <h3>{{ data.label }}</h3>
+  {% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
+
+  {# Standard sections with toggle headers #}
+  {% for sec in section_items %}
+    {% for aff in data.affordances %}
+      {% if aff.body.section == sec.key %}
+        {{ render_aff(aff) }}
+      {% endif %}
+    {% endfor %}
+
+    {% if sec.expanded %}
+      <div class="ef-section-content">{{ section_html[sec.key]|safe }}</div>
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+{# Remaining affordances #}
+<div class="ef-remaining-affs">
+{% for aff in data.affordances %}
+  {% if not aff._rendered %}
+    {{ render_aff(aff) }}
+  {% endif %}
+{% endfor %}
+</div>

@@ -1,0 +1,34 @@
+{# ValidationForm template.
+
+   Context:
+     data       — the serialized eigenform dict
+     ef         — the ValidationForm instance
+     url_prefix — the eigenform's URL prefix for dependency links
+#}
+<h3>{{ data.label }}</h3>
+{% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
+
+{% set rules = data.rules or [] %}
+{% if not rules %}
+  <p class="ef-na-text">No validation rules defined.</p>
+{% else %}
+  {% for r in rules %}
+    {% if r.status == "pass" %}
+      {% set icon = '<span style="color: #2a2;">&#10004;</span>' %}
+      {% set style = "color: #2a2;" %}
+    {% elif r.status == "fail" %}
+      {% set icon = '<span style="color: #c22;">&#10008;</span>' %}
+      {% set style = "color: #c22;" %}
+    {% else %}
+      {% set icon = '<span style="color: #888;">&#9679;</span>' %}
+      {% set style = "color: #888;" %}
+    {% endif %}
+    <div style="margin: 4px 0; {{ style }}">
+      {{ icon|safe }} <strong>{{ r.name }}</strong>
+      {%- if r.status == "fail" %} &mdash; {{ r.message }}
+      {%- elif r.status == "pending" %} &mdash; <em>waiting for input</em>
+      {%- endif %}
+      {{ render_dep_line(r.depends_on, url_prefix) }}
+    </div>
+  {% endfor %}
+{% endif %}

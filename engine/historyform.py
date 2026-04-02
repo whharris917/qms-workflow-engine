@@ -18,11 +18,11 @@ from __future__ import annotations
 import copy
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from html import escape
 from typing import Any
 
 from engine.affordances import Affordance, SimpleButtonAffordance, SwitchTabAffordance
 from engine.eigenform import Eigenform
+from engine.templates import render_template
 from engine.store import Store
 
 
@@ -181,105 +181,34 @@ class HistoryForm(Eigenform):
     # --- Rendering ---
 
     def render_from_data(self, data: dict) -> str:
-        from engine.affordances import render_affordance_html
-        html = f'<h3>{escape(data["label"])}</h3>'
-        if data.get("instruction"):
-            html += f'<p>{escape(data["instruction"])}</p>'
-
         viewing = data.get("viewing_version")
         read_only = data.get("read_only", False)
         timeline = data.get("timeline", [])
-        affs = data.get("affordances", [])
-
-        # Timeline bar
-        if timeline:
-            history_len = len(timeline)
-            html += '<div style="margin-bottom: 12px;">'
-            html += (
-                f'<div style="font-size: 11px; color: #888; margin-bottom: 6px;">'
-                f'{history_len} version{"s" if history_len != 1 else ""} recorded</div>'
-            )
-            html += '<div style="display: flex; align-items: center; gap: 3px; flex-wrap: wrap;">'
-            for entry in timeline:
-                v = entry["version"]
-                is_viewing = v == viewing
-                is_latest = v == history_len - 1
-                if is_viewing:
-                    style = (
-                        "width: 10px; height: 10px; border-radius: 50%;"
-                        " background: #6c5ce7; border: 2px solid #6c5ce7;"
-                    )
-                elif is_latest and viewing is None:
-                    style = (
-                        "width: 10px; height: 10px; border-radius: 50%;"
-                        " background: #2a2; border: 2px solid #2a2;"
-                    )
-                else:
-                    style = (
-                        "width: 8px; height: 8px; border-radius: 50%;"
-                        " background: #ddd; border: 2px solid #ddd;"
-                    )
-                ts = entry["timestamp"]
-                # Show just time portion for compact display
-                time_display = ts.split("T")[1] if "T" in ts else ts
-                html += f'<span style="{style}" title="v{v}: {escape(ts)}"></span>'
-            html += '</div>'
-            html += '</div>'
-
+        child_html = None
+        snapshot_html = ""
         if read_only:
-            # Historical view — render snapshot as read-only
-            ts = data.get("viewing_timestamp", "")
-            html += (
-                f'<div style="background: #f8f0ff; border: 1px solid #d4b8e8;'
-                f' border-radius: 8px; padding: 12px; margin-bottom: 8px;">'
-                f'<div style="font-size: 11px; color: #7b2d8b; margin-bottom: 8px;'
-                f' font-weight: 600;">HISTORICAL VERSION {viewing} &mdash; {escape(ts)}'
-                f' &mdash; READ ONLY</div>'
-            )
             snapshot = data.get("eigenform", {})
             if snapshot:
-                html += self._render_snapshot(snapshot)
-            html += '</div>'
-
-            # Navigation
-            for aff in affs:
-                html += render_affordance_html(aff)
+                snapshot_html = self._render_snapshot(snapshot)
         else:
-            # Current live view — render the actual eigenform
             if self.eigenform:
-                html += self.eigenform.render()
-
-            # History affordance (view history button)
-            for aff in affs:
-                html += render_affordance_html(aff)
-
-        return html
+                child_html = self.eigenform.render()
+        return render_template("history.html", data=data, ef=self, child_html=child_html, viewing=viewing, read_only=read_only, timeline=timeline, viewing_ts=data.get("viewing_timestamp", ""), snapshot_html=snapshot_html)
 
     @staticmethod
     def _render_snapshot(snapshot: dict) -> str:
-        """Render a historical snapshot as a read-only display."""
-        html = ''
+        from markupsafe import escape
+        html = ""
         label = snapshot.get("label", "")
         if label:
             html += f'<div style="font-weight: 600; margin-bottom: 4px;">{escape(label)}</div>'
-
-        # Show key-value pairs from the snapshot, skipping metadata
         skip = {"label", "instruction", "complete", "edit_mode"}
         for k, v in snapshot.items():
-            if k in skip:
+            if k in skip or v is None:
                 continue
-            if v is None:
+            if isinstance(v, (list, dict)) and not v:
                 continue
-            if isinstance(v, list) and not v:
-                continue
-            if isinstance(v, dict) and not v:
-                continue
-            html += (
-                f'<div style="font-size: 13px; margin: 2px 0;">'
-                f'<span style="color: #888;">{escape(k)}:</span> '
-                f'<span style="color: #333;">{escape(str(v))}</span>'
-                f'</div>'
-            )
+            html += f'<div style="font-size: 13px; margin: 2px 0;"><span style="color: #888;">{escape(k)}:</span> <span style="color: #333;">{escape(str(v))}</span></div>'
         return html
 
     # --- Action handling ---

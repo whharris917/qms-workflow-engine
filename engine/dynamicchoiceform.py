@@ -15,12 +15,12 @@ parent's children list, since options are computed from the live store.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from html import escape
 from typing import Any, Callable
 
 from engine.affordances import Affordance, SimpleButtonAffordance
 from engine.choiceform import SelectAffordance
-from engine.eigenform import Eigenform, render_dependency_line
+from engine.eigenform import Eigenform
+from engine.templates import render_template
 
 
 @dataclass
@@ -95,27 +95,8 @@ class DynamicChoiceForm(Eigenform):
         return affs
 
     def render_from_data(self, data: dict) -> str:
-        from engine.affordances import render_affordance_html
-        html = f'<h3>{escape(data["label"])}</h3>'
-        if data.get("instruction"):
-            html += f'<p>{escape(data["instruction"])}</p>'
-        html += render_dependency_line(data.get("depends_on"), self._url_prefix)
-
-        if not data.get("options"):
-            html += '<p style="color: #888;"><em>Waiting for dependency to be set.</em></p>'
-        else:
-            val = data.get("value")
-            if data.get("stale"):
-                html += (
-                    f'<p style="color: #c22;"><strong>Stale selection:</strong> '
-                    f'"{escape(str(val))}" is no longer a valid option. Please re-select.</p>'
-                )
-            else:
-                html += f'<p><strong>Selected:</strong> {escape(str(val or "None"))}</p>'
-
-        for aff in data.get("affordances", []):
-            html += render_affordance_html(aff)
-        return html
+        return render_template("dynamicchoice.html", data=data, ef=self,
+                               url_prefix=self._url_prefix)
 
     def _handle(self, body: dict) -> dict:
         action = body.get("action")

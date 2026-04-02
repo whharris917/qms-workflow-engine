@@ -1,0 +1,43 @@
+{# RankForm template.
+
+   Context:
+     data  — the serialized eigenform dict
+     ef    — the RankForm instance
+     url   — the eigenform's POST URL
+#}
+<h3>{{ data.label }}</h3>
+{% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
+
+{# Mark move affordances as rendered (arrows are built inline) #}
+{% for aff in data.affordances %}
+  {% if aff.body.action in ("move_up", "move_down") %}
+    {% set _ = aff.update({"_rendered": true}) %}
+  {% endif %}
+{% endfor %}
+
+{% set items = data["items"] or [] %}
+{% set num_items = items|length %}
+
+<ol style="margin: 4px 0; padding-left: 24px;">
+{% for item in items %}
+  <li style="padding: 2px 0; display: flex; align-items: center; gap: 4px;">
+  {% for direction, arrow, can in [
+      ("move_up", "&#9650;", loop.index0 > 0),
+      ("move_down", "&#9660;", loop.index0 < num_items - 1),
+  ] %}
+    {% if can %}
+      {{ render_btn(url, {"action": direction, "item": item}, arrow, CSS_ARROW) }}
+    {% else %}
+      {{ BUTTON_GAP|safe }}
+    {% endif %}
+  {% endfor %}
+  {{ item }}</li>
+{% endfor %}
+</ol>
+
+{# Render remaining affordances (Done button) #}
+{% for aff in data.affordances %}
+  {% if not aff._rendered %}
+    {{ render_aff(aff) }}
+  {% endif %}
+{% endfor %}

@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
-from html import escape
-from typing import Any
 
-from engine.affordances import Affordance, STYLE_CONFIRM
+from engine.affordances import Affordance
 from engine.eigenform import Eigenform
+from engine.templates import render_template
 
 
 class SelectAffordance(Affordance):
@@ -101,79 +99,11 @@ class ChoiceForm(Eigenform):
         ]
 
     def render_from_data(self, data: dict) -> str:
-        from engine.affordances import render_affordance_html
-
-        if data.get("edit_mode"):
-            return self._render_edit_mode(data)
-
-        html = f'<h3>{escape(data["label"])}</h3>'
-        if data.get("instruction"):
-            html += f'<p>{escape(data["instruction"])}</p>'
-        html += f'<p><strong>Selected:</strong> {escape(str(data["value"] or "None"))}</p>'
-        for aff in data.get("affordances", []):
-            if not aff.get("_rendered"):
-                html += render_affordance_html(aff)
-        return html
-
-    def _render_edit_mode(self, data: dict) -> str:
-        from engine.affordances import render_affordance_html
-        url = self.url
-        label = data["label"]
-        instruction = data.get("instruction") or ""
-
-        # Label
-        label_body = json.dumps({"action": "set_label", "label": label})
-        label_tooltip = f'POST {url} {escape(label_body)}'
-        html = (
-            f'<form style="display: flex; align-items: center; gap: 4px;'
-            f' margin: 0.83em 0;" onsubmit="fetch(\'{url}\','
-            f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-            f'body:JSON.stringify({{action:\'set_label\',label:this.elements.v.value}})'
-            f'}}).then(()=>location.reload()); return false">'
-            f'<input name="v" type="text" value="{escape(label)}"'
-            f' style="font: inherit; font-size: 1.17em; font-weight: bold;'
-            f' border: 1px solid #ddd; padding: 1px 3px; margin: 0;"'
-            f' title="{label_tooltip}" />'
-            f' <button type="submit" style="{STYLE_CONFIRM}"'
-            f' title="{label_tooltip}">&#10003;</button>'
-            f'</form>'
-        )
-
-        # Instruction
-        instr_body = json.dumps({"action": "set_instruction", "instruction": instruction})
-        instr_tooltip = f'POST {url} {escape(instr_body)}'
-        html += (
-            f'<form style="display: flex; align-items: center; gap: 4px;'
-            f' margin: 1em 0;" onsubmit="fetch(\'{url}\','
-            f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-            f'body:JSON.stringify({{action:\'set_instruction\',instruction:this.elements.v.value}})'
-            f'}}).then(()=>location.reload()); return false">'
-            f'<input name="v" type="text" value="{escape(instruction)}"'
-            f' placeholder="Instruction text"'
-            f' style="font: inherit; border: 1px solid #ddd; padding: 1px 3px;'
-            f' margin: 0; width: 100%;"'
-            f' title="{instr_tooltip}" />'
-            f' <button type="submit" style="{STYLE_CONFIRM}"'
-            f' title="{instr_tooltip}">&#10003;</button>'
-            f'</form>'
-        )
-
-        # Options — render the child ListForm
-        html += self._options_form.render()
-
-        # Value — same as normal mode
-        html += f'<p><strong>Selected:</strong> {escape(str(data["value"] or "None"))}</p>'
-
-        # Mark edit affordances as rendered (label/instruction handled by inline forms)
-        edit_actions = {"set_label", "set_instruction"}
-        for aff in data.get("affordances", []):
-            if aff.get("_rendered"):
-                continue
-            if aff.get("body", {}).get("action") in edit_actions:
-                aff["_rendered"] = True
-            else:
-                html += render_affordance_html(aff)
-        return html
+        options_html = self._options_form.render() if data.get("edit_mode") else ""
+        return render_template("choice.html", data=data, ef=self,
+                               url=self.url, label=data["label"],
+                               instruction=data.get("instruction") or "",
+                               options_html=options_html)
 
     def _handle(self, body: dict) -> dict:
         # Normal value setting

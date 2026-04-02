@@ -2,17 +2,13 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
-from html import escape
 from typing import Any
 
-from engine.affordances import (
-    Affordance, AddConstraintAffordance, SimpleButtonAffordance,
-    BUTTON_GAP, STYLE_CONFIRM, STYLE_REMOVE, STYLE_ARROW, render_inline_button,
-)
+from engine.affordances import Affordance, AddConstraintAffordance, SimpleButtonAffordance
 from engine.eigenform import Eigenform
 from engine.ordered_collection import OrderedCollection
+from engine.templates import render_template
 
 
 class AddItemAffordance(Affordance):
@@ -223,313 +219,20 @@ class ListForm(Eigenform):
 
         return affordances
 
-    def _render_edit_header(self, data: dict) -> str:
-        """Render editable label, instruction, and config controls."""
-        url = self.url
-        label = data["label"]
-        instruction = data.get("instruction") or ""
-
-        # Label
-        label_body = json.dumps({"action": "set_label", "label": label})
-        label_tooltip = f'POST {url} {escape(label_body)}'
-        html = (
-            f'<form style="display: flex; align-items: center; gap: 4px;'
-            f' margin: 0.83em 0;" onsubmit="fetch(\'{url}\','
-            f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-            f'body:JSON.stringify({{action:\'set_label\',label:this.elements.v.value}})'
-            f'}}).then(()=>location.reload()); return false">'
-            f'<input name="v" type="text" value="{escape(label)}"'
-            f' style="font: inherit; font-size: 1.17em; font-weight: bold;'
-            f' border: 1px solid #ddd; padding: 1px 3px; margin: 0;"'
-            f' title="{label_tooltip}" />'
-            f' <button type="submit" style="{STYLE_CONFIRM}"'
-            f' title="{label_tooltip}">&#10003;</button>'
-            f'</form>'
-        )
-
-        # Instruction
-        instr_body = json.dumps({"action": "set_instruction", "instruction": instruction})
-        instr_tooltip = f'POST {url} {escape(instr_body)}'
-        html += (
-            f'<form style="display: flex; align-items: center; gap: 4px;'
-            f' margin: 1em 0;" onsubmit="fetch(\'{url}\','
-            f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-            f'body:JSON.stringify({{action:\'set_instruction\',instruction:this.elements.v.value}})'
-            f'}}).then(()=>location.reload()); return false">'
-            f'<input name="v" type="text" value="{escape(instruction)}"'
-            f' placeholder="Instruction text"'
-            f' style="font: inherit; border: 1px solid #ddd; padding: 1px 3px;'
-            f' margin: 0; width: 100%;"'
-            f' title="{instr_tooltip}" />'
-            f' <button type="submit" style="{STYLE_CONFIRM}"'
-            f' title="{instr_tooltip}">&#10003;</button>'
-            f'</form>'
-        )
-
-        # Allow constraints toggle
-        ac = self._effective_allow_constraints
-        ac_body = json.dumps({"action": "toggle_constraints"})
-        ac_tooltip = f'POST {url} {escape(ac_body)}'
-        ac_bg = "#efffef" if ac else "#f8f8f8"
-        ac_border = "#4a4" if ac else "#ccc"
-        html += (
-            f'<div style="margin: 4px 0; font-size: 0.9em; color: #666;">'
-            f'<button onclick="fetch(\'{url}\','
-            f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-            f'body:JSON.stringify({ac_body.replace(chr(34), "&quot;")})}}).then(()=>location.reload())"'
-            f' style="cursor: pointer; font: inherit; font-size: 0.9em; border: 1px solid {ac_border};'
-            f' background: {ac_bg}; padding: 1px 8px; border-radius: 3px;"'
-            f' title="{ac_tooltip}">constraints: {"on" if ac else "off"}</button>'
-            f'</div>'
-        )
-
-        # Mark edit-specific affordances as rendered
-        for aff in data.get("affordances", []):
-            action = aff.get("body", {}).get("action")
-            if action in ("set_label", "set_instruction", "toggle_constraints"):
-                Eigenform.mark_rendered(aff)
-
-        return html
-
     def render_from_data(self, data: dict) -> str:
-        from engine.affordances import render_affordance_html
         oc = self._collection
-
-        if data.get("edit_mode"):
-            html = self._render_edit_header(data)
-        else:
-            html = f'<h3>{escape(data["label"])}</h3>'
-            if data.get("instruction"):
-                html += f'<p>{escape(data["instruction"])}</p>'
-
-        affs = data.get("affordances", [])
-
-        if data.get("na"):
-            html += '<p style="color: #888; font-style: italic;">N/A</p>'
-            for aff in affs:
-                if not aff.get("_rendered"):
-                    html += render_affordance_html(aff)
-            return html
-
-        items = data.get("items", [])
-
-        # Mark agent-only affordances as rendered (inline UI handles display)
-        add_aff = None
-        url = affs[0]["url"] if affs else ""
-        endpoint = f'POST {url}'
-        for aff in affs:
-            action = aff.get("body", {}).get("action")
-            if action in ("move_up", "move_down", "edit", "remove",
-                          "add_constraint", "remove_constraint",
-                          "toggle_fixed", "toggle_constraint_fixed"):
-                Eigenform.mark_rendered(aff)
-            elif action == "add":
-                add_aff = aff
-                Eigenform.mark_rendered(aff)
-
-        gap = BUTTON_GAP
-        num_items = len(items)
-        html += '<ol style="margin: 4px 0; padding-left: 24px;">'
-
-        # Fixed-width ID label style (consistent column width)
-        id_style = ('display: inline-block; min-width: 52px; color: #666; text-align: center;'
-                    ' background: #e8e8e8; border-radius: 10px; padding: 1px 6px;'
-                    ' font-family: monospace; font-size: 0.85em;')
-
-        # Build prerequisite lookup for inline display — show ALL constraints
-        # (including demoted/unpinned) so they remain visible in both modes.
-        # Enforcement (move restrictions, topological sort) uses effective_must_follow internally.
-        mf = oc.all_must_follow
-        id_to_val = oc.id_to_value
         static_pairs = {(item_id, after_id)
                         for item_id, after_ids in self.must_follow.items()
                         for after_id in after_ids}
-
-        # Existing items
-        for idx, item in enumerate(items):
-            item_id = item["id"]
-            item_val = escape(str(item.get("value", "")))
-            is_fixed = item.get("fixed", False) and not data.get("edit_mode")
-            html += f'<li style="margin: 4px 0; display: flex; align-items: center; gap: 4px;">'
-
-            # Remove button (leftmost, editable items only)
-            if not is_fixed:
-                html += render_inline_button(url, {"action": "remove", "id": item_id}, "x", STYLE_REMOVE)
-            else:
-                html += gap
-
-            # ID label
-            html += f'<span style="{id_style}">{escape(item_id)}</span>'
-
-            # Move up/down buttons
-            for direction, arrow, can in [
-                ("move_up", "&#9650;", oc.can_move_up(idx, items)),
-                ("move_down", "&#9660;", oc.can_move_down(idx, items)),
-            ]:
-                if can:
-                    html += render_inline_button(url, {"action": direction, "id": item_id}, arrow, STYLE_ARROW)
-                else:
-                    html += gap
-
-            is_item_fixed = item.get("fixed", False)
-            if is_fixed:
-                html += (
-                    f'<span style="display: inline-block; width: 200px; padding: 2px 4px;'
-                    f' border: 1px solid transparent; box-sizing: content-box;'
-                    f' color: #555; background: #f0f0f0; border-radius: 3px;">{item_val}</span>'
-                    f'{gap}'
-                )
-            else:
-                edit_tooltip_js = (
-                    f"this.nextElementSibling.title="
-                    f"'{escape(endpoint)} '+JSON.stringify({{action:'edit',id:'{item_id}',value:this.value}})"
-                )
-                edit_default = {"action": "edit", "id": item_id, "value": item.get("value", "")}
-                edit_tooltip = f'{escape(endpoint)} {escape(json.dumps(edit_default))}'
-                html += (
-                    f'<form style="display: inline; margin: 0;" onsubmit="fetch(\'{url}\','
-                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                    f"body:JSON.stringify({{action:'edit',id:'{item_id}',value:this.elements.v.value}})"
-                    f'}}).then(()=>location.reload()); return false">'
-                    f'<input name="v" type="text" value="{item_val}"'
-                    f' style="border: 1px solid #ddd; padding: 2px 4px; width: 200px;"'
-                    f' oninput="{edit_tooltip_js}" />'
-                    f' <button type="submit" style="{STYLE_CONFIRM}"'
-                    f' title="{edit_tooltip}">&#10003;</button>'
-                    f'</form>'
-                )
-
-            # Fixed toggle (edit mode only) — pin icon
-            if data.get("edit_mode"):
-                pin_color = "#856404" if is_item_fixed else "#ccc"
-                pin_bg = "#fff3cd" if is_item_fixed else "none"
-                pin_label = "fixed" if is_item_fixed else "unfixed"
-                html += render_inline_button(
-                    url, {"action": "toggle_fixed", "id": item_id},
-                    f'<span style="font-size: 14px;">&#128204;</span>',
-                    f'cursor: pointer; border: 1px solid {pin_color}; background: {pin_bg};'
-                    f' width: 24px; height: 24px; font-size: 10px; padding: 0;'
-                    f' vertical-align: middle; box-sizing: content-box;',
-                )
-
-            # Inline add-constraint dropdown + prerequisite pills with remove buttons
-            prereqs = mf.get(item_id, [])
-            if prereqs or (self._effective_allow_constraints and num_items > 1):
-                html += '<span style="color: #999; display: inline-flex; align-items: center; gap: 2px;">'
-                if self._effective_allow_constraints:
-                    available = [i for i in items if i["id"] != item_id and i["id"] not in prereqs]
-                    if available:
-                        def _opt(i: dict) -> str:
-                            body = json.dumps({"action": "add_constraint", "item": item_id, "after": i["id"]})
-                            label = i["value"] + " (" + i["id"] + ")" if i["value"] else i["id"]
-                            return (
-                                f'<option value="{escape(i["id"])}"'
-                                f' title="POST {url} {escape(body)}">'
-                                f'{escape(label)}</option>'
-                            )
-                        add_opts = "".join(_opt(i) for i in available)
-                        html += (
-                            f'<span style="position: relative; display: inline-block;'
-                            f' width: 24px; height: 24px; box-sizing: content-box;'
-                            f' border: 1px solid #ccc; background: #f8f8f8; vertical-align: middle;">'
-                            f'<span style="position: absolute; inset: 0; display: flex;'
-                            f' align-items: center; justify-content: center;'
-                            f' font-size: 18px; font-weight: normal; pointer-events: none;">&#9745;</span>'
-                            f'<select title="POST {url} {{&quot;action&quot;:&quot;add_constraint&quot;,&quot;item&quot;:&quot;{item_id}&quot;,&quot;after&quot;:&quot;...&quot;}}"'
-                            f' style="position: absolute; inset: 0; width: 100%; height: 100%;'
-                            f' opacity: 0; cursor: pointer;" onchange="'
-                            f"if(this.value)fetch('{url}',"
-                            f"{{method:'POST',headers:{{'Content-Type':'application/json'}},"
-                            f"body:JSON.stringify({{action:'add_constraint',item:'{item_id}',after:this.value}})"
-                            f"}}).then(()=>location.reload())"
-                            f'">'
-                            f'<option value="">&#8212;</option>'
-                            f'{add_opts}'
-                            f'</select>'
-                            f'</span>'
-                        )
-                if prereqs:
-                    in_edit = data.get("edit_mode", False)
-                    stored_cs = oc.stored_constraints
-                    for p_id in prereqs:
-                        p_name = escape(id_to_val.get(p_id, p_id) or p_id)
-                        is_static = (item_id, p_id) in static_pairs
-                        # Check if a stored entry overrides this constraint's fixed state
-                        stored_c = next((c for c in stored_cs
-                                         if c["item"] == item_id and c["after"] == p_id), None)
-                        is_effectively_fixed = is_static and (not stored_c or stored_c.get("fixed") is not False)
-                        if not is_static and stored_c:
-                            is_effectively_fixed = bool(stored_c.get("fixed"))
-                        pill_bg = "#fff3cd" if is_effectively_fixed else "#e8e8e8"
-                        pill_border = "1px solid #856404" if is_effectively_fixed else "none"
-                        html += (
-                            f'<span style="display: inline-block; min-width: 52px; color: #666;'
-                            f' text-align: center; background: {pill_bg}; border: {pill_border}; border-radius: 10px;'
-                            f' padding: 1px 6px; font-family: monospace; font-size: 0.85em;">'
-                            f'{p_name}</span>'
-                        )
-                        if in_edit:
-                            # Pin/unpin toggle for constraint
-                            pin_icon = "&#128204;" if is_effectively_fixed else "&#128204;"
-                            pin_style = (
-                                f'cursor: pointer; border: 1px solid {"#856404" if is_effectively_fixed else "#ccc"};'
-                                f' background: {"#fff3cd" if is_effectively_fixed else "none"};'
-                                f' width: 18px; height: 18px; font-size: 10px; padding: 0;'
-                                f' vertical-align: middle; box-sizing: content-box;'
-                            )
-                            html += render_inline_button(
-                                url, {"action": "toggle_constraint_fixed", "item": item_id, "after": p_id},
-                                f'<span style="font-size: 11px;">{pin_icon}</span>', pin_style,
-                            )
-                            # Remove button (available for all constraints in edit mode)
-                            html += render_inline_button(
-                                url, {"action": "remove_constraint", "item": item_id, "after": p_id},
-                                "x", STYLE_REMOVE,
-                            )
-                        elif not is_effectively_fixed:
-                            html += render_inline_button(
-                                url, {"action": "remove_constraint", "item": item_id, "after": p_id},
-                                "x", STYLE_REMOVE,
-                            )
-                html += '</span>'
-            html += '</li>'
-
-        # Add row
-        if add_aff:
-            add_default = {"action": "add", "value": ""}
-            add_tooltip = f'{escape(endpoint)} {escape(json.dumps(add_default))}'
-            add_tooltip_js = (
-                f"this.nextElementSibling.title="
-                f"'{escape(endpoint)} '+JSON.stringify({{action:'add',value:this.value}})"
-            )
-            html += (
-                f'<li style="margin: 4px 0; display: flex; align-items: center; gap: 4px; list-style: none;">'
-                f'{gap}'
-                f'<span style="{id_style} visibility: hidden;">item_0</span>'
-                f'{gap}{gap}'
-                f'<form style="display: inline; margin: 0;" onsubmit="fetch(\'{url}\','
-                f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                f"body:JSON.stringify({{action:'add',value:this.elements.v.value}})"
-                f'}}).then(()=>location.reload()); return false">'
-                f'<input name="v" type="text" placeholder="New item"'
-                f' style="border: 1px solid #ddd; padding: 2px 4px; width: 200px;"'
-                f' oninput="{add_tooltip_js}" />'
-                f' <button type="submit" style="{STYLE_CONFIRM}"'
-                f' title="{add_tooltip}">+</button>'
-                f'</form>'
-                f'</li>'
-            )
-
-        html += '</ol>'
-
-        # Bottom controls
-        html += '<div style="margin-top: 8px;">'
-        for aff in affs:
-            if not aff.get("_rendered"):
-                html += render_affordance_html(aff)
-        html += '</div>'
-
-        return html
+        return render_template("list.html", data=data, ef=self,
+                               url=self.url, label=data["label"],
+                               instruction=data.get("instruction") or "",
+                               oc=oc,
+                               allow_constraints=self._effective_allow_constraints,
+                               all_must_follow=oc.all_must_follow,
+                               id_to_val=oc.id_to_value,
+                               static_pairs=static_pairs,
+                               stored_constraints=oc.stored_constraints)
 
     def _handle(self, body: dict) -> dict:
         action = body.get("action", "")

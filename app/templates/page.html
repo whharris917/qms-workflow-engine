@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <title>{{ title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div id="page-content">{{ page_html }}</div>
+    <script src="{{ url_for('static', filename='eigenform.js') }}"></script>
     <script>
         var source = new EventSource('/pages/{{ page_key }}/stream');
         source.onmessage = function(event) {

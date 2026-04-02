@@ -1,0 +1,61 @@
+{# SetForm template.
+
+   Context:
+     data  — the serialized eigenform dict
+     ef    — the SetForm instance
+#}
+<h3>{{ data.label }}</h3>
+{% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
+
+{% set affs = data.affordances %}
+{% set items = data.items %}
+{% set url = affs[0].url if affs else "" %}
+{% set endpoint = "POST " ~ url %}
+
+{# Mark remove and add affordances as rendered (inline elements handle them) #}
+{% set add_aff = namespace(val=none) %}
+{% for aff in affs %}
+  {% set action = aff.body.action if aff.body else "" %}
+  {% if action == "remove" %}
+    {% set _ = aff.update({"_rendered": true}) %}
+  {% elif action == "add" %}
+    {% set add_aff.val = aff %}
+    {% set _ = aff.update({"_rendered": true}) %}
+  {% endif %}
+{% endfor %}
+
+{# Items as pills with remove buttons #}
+{% if items %}
+  <div style="display: flex; flex-direction: column; gap: 4px; margin: 6px 0;">
+  {% for item in items %}
+    <span style="display: inline-flex; align-items: center; gap: 4px; width: fit-content;">
+    {{ render_btn(url, {"action": "remove", "value": item}, "x", CSS_REMOVE) }}
+    <span style="background: #f0f0f0; padding: 2px 8px; border-radius: 3px;">{{ item }}</span>
+    </span>
+  {% endfor %}
+  </div>
+{% else %}
+  <p style="color: #888; font-style: italic;">Empty set.</p>
+{% endif %}
+
+{# Add input #}
+{% if add_aff.val %}
+  {% set add_tooltip = endpoint ~ " " ~ {"action": "add", "value": ""}|tojson %}
+  <form style="display: inline; margin: 4px 0;" data-ef-submit="{{ url }}">
+  <input type="hidden" name="action" value="add" />
+  <input name="value" type="text" placeholder="New item"
+   style="border: 1px solid #ddd; padding: 2px 4px; width: 200px;" />
+   <button type="submit"
+   style="cursor: pointer; border: 1px solid #4a4; background: #efffef; padding: 2px 8px; color: #2a2;"
+   title="{{ add_tooltip }}">Add</button>
+  </form>
+{% endif %}
+
+{# Remaining affordances (Clear, etc.) #}
+<div style="margin-top: 8px;">
+{% for aff in affs %}
+  {% if not aff._rendered %}
+    {{ render_aff(aff) }}
+  {% endif %}
+{% endfor %}
+</div>

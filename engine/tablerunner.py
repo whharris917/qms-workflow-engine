@@ -17,14 +17,13 @@ is currently focused).
 from __future__ import annotations
 
 import copy
-import json
 from dataclasses import dataclass, field
-from html import escape
 from typing import Any
 
 from engine.affordances import Affordance, SimpleButtonAffordance, SwitchTabAffordance
 from engine.eigenform import Eigenform
 from engine.ordered_collection import OrderedCollection
+from engine.templates import render_template
 from engine.store import Store
 
 
@@ -248,81 +247,18 @@ class TableRunner(Eigenform):
     # --- Rendering ---
 
     def render_from_data(self, data: dict) -> str:
-        from engine.affordances import render_affordance_html
-        html = f'<h3>{escape(data["label"])}</h3>'
-        if data.get("instruction"):
-            html += f'<p>{escape(data["instruction"])}</p>'
-
         active_row = data.get("active_row")
         progress = data.get("progress", [])
-        affs = data.get("affordances", [])
-        cells = data.get("cells", [])
-
-        # Classify affordances
-        nav_affs = []
-        jump_affs = {}
-        for aff in affs:
-            label = aff.get("label", "")
-            row_id = aff.get("body", {}).get("row")
-            if label.startswith("\u2190") or label.startswith("Next"):
-                nav_affs.append(aff)
-            elif row_id:
-                jump_affs[row_id] = aff
-
-        # Progress bar
-        total = len(progress)
-        html += '<div style="display: flex; align-items: center; gap: 2px; margin-bottom: 12px; flex-wrap: wrap;">'
-        for i, step in enumerate(progress):
-            is_active = step["row_id"] == active_row
-            is_complete = step["complete"]
-            is_accessible = step["accessible"]
-
-            if is_active:
-                style = (
-                    "font-weight: bold; padding: 4px 10px;"
-                    " border-bottom: 3px solid #333; background: #f0f0f0;"
-                    " border-radius: 3px 3px 0 0;"
-                )
-                html += f'<span style="{style}">{escape(step["label"])}</span>'
-            elif is_complete and step["row_id"] in jump_affs:
-                html += render_affordance_html(jump_affs[step["row_id"]])
-            elif is_complete:
-                html += (
-                    f'<span style="padding: 4px 10px; color: #2a2; background: #efffef;'
-                    f' border-radius: 3px;">&#10003; {escape(step["label"])}</span>'
-                )
-            elif is_accessible:
-                style = "padding: 4px 10px; color: #555; background: #f8f8f8; border-radius: 3px;"
-                html += f'<span style="{style}">{escape(step["label"])}</span>'
-            else:
-                style = "padding: 4px 10px; color: #bbb; background: #f5f5f5; border-radius: 3px;"
-                html += f'<span style="{style}">&#128274; {escape(step["label"])}</span>'
-
-            if i < total - 1:
-                html += '<span style="color: #ccc; margin: 0 2px;">&#8594;</span>'
-        html += '</div>'
-
-        # Nav buttons
-        if nav_affs:
-            html += '<div style="display: flex; gap: 8px; margin-bottom: 12px;">'
-            for aff in nav_affs:
-                html += render_affordance_html(aff)
-            html += '</div>'
-
-        # Active row's typed cell eigenforms — rendered large
+        cells_html = ""
+        locked_msg = ""
         if active_row and self._is_row_accessible(active_row):
             rg = self._row_groups_by_id().get(active_row)
             if rg:
-                for ef in rg.cell_eigenforms.values():
-                    html += ef.render()
+                cells_html = "".join(ef.render() for ef in rg.cell_eigenforms.values())
         elif active_row and not self._is_row_accessible(active_row):
             prereqs = self._constraint_graph().get(active_row, [])
-            html += (
-                f'<p style="color: #999;">This row is locked. '
-                f'Complete prerequisite rows first: {", ".join(prereqs)}.</p>'
-            )
-
-        return html
+            locked_msg = f"This row is locked. Complete prerequisite rows first: {', '.join(prereqs)}."
+        return render_template("tablerunner.html", data=data, ef=self, url=self.url, progress=progress, active_row=active_row, cells_html=cells_html, locked_msg=locked_msg)
 
     # --- Action handling ---
 

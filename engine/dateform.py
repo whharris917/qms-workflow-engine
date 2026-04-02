@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass
-from html import escape
-from typing import Any
 
 from engine.affordances import Affordance
 from engine.eigenform import Eigenform
+from engine.templates import render_template
 
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 DATETIME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$")
@@ -72,15 +70,7 @@ class DateForm(Eigenform):
         ]
 
     def render_from_data(self, data: dict) -> str:
-        from engine.affordances import render_affordance_html
-        html = f'<h3>{escape(data["label"])}</h3>'
-        if data.get("instruction"):
-            html += f'<p>{escape(data["instruction"])}</p>'
-        val = data["value"]
-        html += f'<p><strong>Value:</strong> {escape(str(val if val is not None else "None"))}</p>'
-        for aff in data.get("affordances", []):
-            html += render_affordance_html(aff)
-        return html
+        return render_template("date.html", data=data, ef=self)
 
     def _handle(self, body: dict) -> dict:
         raw = body.get("value", "")

@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from html import escape
-from typing import Any
 
 from engine.affordances import Affordance
 from engine.eigenform import Eigenform
+from engine.templates import render_template
 
 
 class RangeAffordance(Affordance):
@@ -71,19 +69,7 @@ class RangeForm(Eigenform):
         ]
 
     def render_from_data(self, data: dict) -> str:
-        from engine.affordances import render_affordance_html
-        html = f'<h3>{escape(data["label"])}</h3>'
-        if data.get("instruction"):
-            html += f'<p>{escape(data["instruction"])}</p>'
-        val = data["value"]
-        unit = data.get("unit") or ""
-        if val is not None:
-            html += f'<p><strong>Value:</strong> {val}{escape(unit)}</p>'
-        else:
-            html += '<p style="color: #888;">Not set.</p>'
-        for aff in data.get("affordances", []):
-            html += render_affordance_html(aff)
-        return html
+        return render_template("range.html", data=data, ef=self)
 
     def _handle(self, body: dict) -> dict:
         try:

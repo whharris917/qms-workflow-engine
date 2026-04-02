@@ -18,17 +18,16 @@ Structure is persisted to the store so changes survive rebinds.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from html import escape
 
 from engine.affordances import (
     Affordance,
     SetValueAffordance,
     SimpleButtonAffordance,
     SwitchTabAffordance,
-    render_inline_button,
 )
 from engine.eigenform import Eigenform
 from engine.store import Store
+from engine.templates import render_template
 
 
 @dataclass
@@ -444,254 +443,12 @@ class SequenceForm(Eigenform):
     # --- Rendering ---
 
     def render_from_data(self, data: dict) -> str:
-        from engine.affordances import render_affordance_html
-
-        if data.get("edit_mode"):
-            html = self._render_edit_header(data)
-            html += self._render_edit_steps(data)
-        else:
-            html = f'<h3>{escape(data["label"])}</h3>'
-            if data.get("instruction"):
-                html += f'<p>{escape(data["instruction"])}</p>'
-            html += self._render_progress_bar(data)
-
-        # Active step content
-        active = self.active_step
-        if active:
-            html += active.render()
-
-        # Remaining affordances
-        html += '<div style="margin-top: 12px;">'
-        for aff in data.get("affordances", []):
-            if not aff.get("_rendered"):
-                html += render_affordance_html(aff)
-        html += '</div>'
-        return html
-
-    def _render_progress_bar(self, data: dict) -> str:
-        """Render the standard progress bar (execution mode)."""
-        from engine.affordances import render_affordance_html
-        active_key = data.get("active_step")
-        progress = data.get("progress", [])
-        affs = data.get("affordances", [])
-
-        nav_affs = []
-        jump_affs = {}
-        for aff in affs:
-            label = aff.get("label", "")
-            step_key = aff.get("body", {}).get("step")
-            if label.startswith("\u2190") or label.startswith("Next"):
-                nav_affs.append(aff)
-            elif step_key:
-                jump_affs[step_key] = aff
-
-        total = len(progress)
-        html = '<div style="display: flex; align-items: center; gap: 2px; margin-bottom: 12px; flex-wrap: wrap;">'
-        for i, step in enumerate(progress):
-            is_active = step["key"] == active_key
-            is_complete = step["complete"]
-            is_accessible = step.get("accessible", False)
-
-            if is_active:
-                style = (
-                    "font-weight: bold; padding: 4px 10px;"
-                    " border-bottom: 3px solid #333; background: #f0f0f0;"
-                    " border-radius: 3px 3px 0 0;"
-                )
-                html += f'<span style="{style}">{escape(step["label"])}</span>'
-            elif is_complete and step["key"] in jump_affs:
-                html += render_affordance_html(jump_affs[step["key"]])
-            elif is_complete:
-                html += (
-                    f'<span style="padding: 4px 10px; color: #2a2; background: #efffef;'
-                    f' border-radius: 3px;">&#10003; {escape(step["label"])}</span>'
-                )
-            elif is_accessible:
-                style = "padding: 4px 10px; color: #555; background: #f8f8f8; border-radius: 3px;"
-                html += f'<span style="{style}">{escape(step["label"])}</span>'
-            else:
-                style = "padding: 4px 10px; color: #bbb; background: #f5f5f5; border-radius: 3px;"
-                html += f'<span style="{style}">&#128274; {escape(step["label"])}</span>'
-
-            if i < total - 1:
-                html += '<span style="color: #ccc; margin: 0 2px;">&#8594;</span>'
-
-        html += '</div>'
-
-        if nav_affs:
-            html += '<div style="display: flex; gap: 8px; margin-bottom: 8px;">'
-            for aff in nav_affs:
-                html += render_affordance_html(aff)
-            html += '</div>'
-
-        return html
-
-    def _render_edit_header(self, data: dict) -> str:
-        affs = data.get("affordances", [])
-        url = self.url
-        label = data.get("label", "")
-        instruction = data.get("instruction") or ""
-
-        for aff in affs:
-            action = aff.get("body", {}).get("action", "")
-            if action in ("set_label", "set_instruction"):
-                Eigenform.mark_rendered(aff)
-
-        INPUT_STYLE = (
-            "font: inherit; border: 1px solid #ccc; border-radius: 3px;"
-            " padding: 2px 6px; background: #fefefe;"
-        )
-        CONFIRM = (
-            "cursor: pointer; border: 1px solid #4a4; background: #efffef;"
-            " width: 24px; height: 24px; font-size: 14px; padding: 0; color: #2a2;"
-        )
-        html = (
-            f'<div style="display: flex; align-items: center; gap: 6px;'
-            f' margin-bottom: 4px;">'
-            f'<input type="text" value="{escape(label)}" id="{self.uid}-label"'
-            f' style="{INPUT_STYLE} font-size: 1.17em; font-weight: bold; flex: 1;" />'
-            f'<button onclick="fetch(\'{url}\',{{method:\'POST\','
-            f'headers:{{\'Content-Type\':\'application/json\'}},'
-            f'body:JSON.stringify({{action:\'set_label\','
-            f'label:document.getElementById(\'{self.uid}-label\').value}})'
-            f'}}).then(()=>location.reload())"'
-            f' style="{CONFIRM}" title="Confirm label">&#10003;</button>'
-            f'</div>'
-        )
-        html += (
-            f'<div style="display: flex; align-items: center; gap: 6px;'
-            f' margin-bottom: 8px;">'
-            f'<input type="text" value="{escape(instruction)}" id="{self.uid}-instr"'
-            f' placeholder="Instruction text (optional)"'
-            f' style="{INPUT_STYLE} flex: 1; color: #555;" />'
-            f'<button onclick="fetch(\'{url}\',{{method:\'POST\','
-            f'headers:{{\'Content-Type\':\'application/json\'}},'
-            f'body:JSON.stringify({{action:\'set_instruction\','
-            f'instruction:document.getElementById(\'{self.uid}-instr\').value}})'
-            f'}}).then(()=>location.reload())"'
-            f' style="{CONFIRM}" title="Confirm instruction">&#10003;</button>'
-            f'</div>'
-        )
-        return html
-
-    def _render_edit_steps(self, data: dict) -> str:
         from engine.registry import get_registry
-        affs = data.get("affordances", [])
-        url = self.url
-
-        for aff in affs:
-            body = aff.get("body", {})
-            action = body.get("action", "")
-            if action in ("add_step", "remove_step", "move_step",
-                          "toggle_editable"):
-                Eigenform.mark_rendered(aff)
-            elif "step" in body:
-                Eigenform.mark_rendered(aff)
-
-        reg = get_registry()
-        available = sorted(reg.available())
-        type_options = "".join(
-            f'<option value="{escape(t)}">{escape(t)}</option>'
-            for t in available
-        )
-        html = (
-            f'<div style="background: #f5f5f5; border: 1px solid #ddd; padding: 10px;'
-            f' margin-bottom: 12px; border-radius: 4px;">'
-            f'<form style="display: flex; gap: 8px; align-items: end; flex-wrap: wrap;"'
-            f' onsubmit="'
-            f"var b={{action:'add_step',type:this.elements.t.value,"
-            f"key:this.elements.k.value,label:this.elements.l.value,config:{{}}}};"
-            f"fetch('{url}',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
-            f"body:JSON.stringify(b)}}).then(()=>location.reload()); return false\">"
-            f'<div><label style="font-size: 11px; color: #666; display: block;">Type</label>'
-            f'<select name="t" style="padding: 4px;">'
-            f'<option value="">-- type --</option>{type_options}</select></div>'
-            f'<div><label style="font-size: 11px; color: #666; display: block;">Key</label>'
-            f'<input name="k" type="text" placeholder="unique-key"'
-            f' style="padding: 4px; width: 140px;" /></div>'
-            f'<div><label style="font-size: 11px; color: #666; display: block;">Label</label>'
-            f'<input name="l" type="text" placeholder="Step Label"'
-            f' style="padding: 4px; width: 160px;" /></div>'
-            f'<button type="submit" style="padding: 4px 14px; cursor: pointer;'
-            f' background: #4a7; color: white; border: 1px solid #396;'
-            f' border-radius: 3px;">+ Add</button>'
-            f'</form></div>'
-        )
-
         active_key = data.get("active_step")
-        n = len(self.steps)
-        html += '<div style="display: flex; flex-wrap: wrap; gap: 2px; margin-bottom: 8px; align-items: center;">'
+        step_items = []
         for i, ef in enumerate(self.steps):
-            key = ef.key
-            is_active = key == active_key
-
-            bg = "#fff" if is_active else "#f5f5f5"
-            border_bottom = "2px solid #333" if is_active else "2px solid transparent"
-            html += (
-                f'<div style="display: flex; align-items: center; gap: 2px;'
-                f' padding: 4px 6px; background: {bg};'
-                f' border: 1px solid #ddd; border-bottom: {border_bottom};'
-                f' border-radius: 4px 4px 0 0; font-size: 12px;">'
-            )
-
-            if is_active:
-                html += (
-                    f'<span style="font-weight: bold; padding: 0 4px;">'
-                    f'{escape(ef.effective_label)}</span>'
-                )
-            else:
-                html += render_inline_button(
-                    url, {"step": key}, escape(ef.effective_label),
-                    "cursor: pointer; border: none; background: transparent;"
-                    " padding: 0 4px; font-size: 12px; color: #333;"
-                    " text-decoration: underline;",
-                )
-
-            if i > 0:
-                html += render_inline_button(
-                    url, {"action": "move_step", "key": key, "position": i - 1},
-                    "&#9664;",
-                    "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8;"
-                    " width: 18px; height: 18px; font-size: 8px; padding: 0;",
-                )
-            if i < n - 1:
-                html += render_inline_button(
-                    url, {"action": "move_step", "key": key, "position": i + 1},
-                    "&#9654;",
-                    "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8;"
-                    " width: 18px; height: 18px; font-size: 8px; padding: 0;",
-                )
-
-            if ef.editable:
-                edit_style = (
-                    "cursor: pointer; border: 1px solid #86c; background: #f3eaff;"
-                    " width: 18px; height: 18px; font-size: 10px; padding: 0; color: #639;"
-                )
-            else:
-                edit_style = (
-                    "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8;"
-                    " width: 18px; height: 18px; font-size: 10px; padding: 0; color: #aaa;"
-                )
-            html += render_inline_button(
-                url, {"action": "toggle_editable", "key": key},
-                "&#9998;", edit_style,
-            )
-
-            html += render_inline_button(
-                url, {"action": "remove_step", "key": key},
-                "&#10005;",
-                "cursor: pointer; border: 1px solid #dcc; background: #fef8f8;"
-                " width: 18px; height: 18px; font-size: 9px; padding: 0; color: #c00;",
-            )
-
-            html += '</div>'
-        html += '</div>'
-
-        if not self.steps:
-            html += (
-                '<div style="padding: 24px; text-align: center; color: #999;'
-                ' border: 2px dashed #ddd; border-radius: 4px; margin-bottom: 8px;">'
-                'No steps yet. Use the toolbar above to add one.</div>'
-            )
-
-        return html
+            step_items.append({"key": ef.key, "label": ef.effective_label, "is_active": ef.key == active_key, "editable": ef.editable, "index": i, "complete": ef.is_complete, "accessible": self._is_accessible(i)})
+        active = self.active_step
+        active_html = active.render() if active else ""
+        available_types = sorted(get_registry().available()) if data.get("edit_mode") else []
+        return render_template("step.html", data=data, ef=self, url=self.url, label=data.get("label", ""), instruction=data.get("instruction") or "", active_html=active_html, step_items=step_items, available_types=available_types)

@@ -1,0 +1,13 @@
+{# DateForm template.
+
+   Context:
+     data  — the serialized eigenform dict
+     ef    — the DateForm instance
+#}
+<h3>{{ data.label }}</h3>
+{% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
+{% set val = data.value %}
+<p><strong>Value:</strong> {{ (val if val is not none else "None")|string }}</p>
+{% for aff in data.affordances %}
+  {{ render_aff(aff) }}
+{% endfor %}

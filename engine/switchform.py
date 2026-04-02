@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from html import escape
 from typing import Any
 
 from engine.eigenform import Eigenform, render_dependency_line
+from engine.templates import render_template
 from engine.store import Store
 
 
@@ -87,22 +87,10 @@ class SwitchForm(Eigenform):
         return state
 
     def render_from_data(self, data: dict) -> str:
-        html = f'<h3>{escape(data["label"])}</h3>'
-        if data.get("instruction"):
-            html += f'<p>{escape(data["instruction"])}</p>'
-        html += render_dependency_line(data.get("depends_on"), self._url_prefix)
         active = self.active_case
-        if active:
-            html += active.render()
-        else:
-            dep = escape(data.get("depends_on", ""))
-            case_keys = data.get("case_keys", [])
-            html += (
-                f'<p style="color: #888; font-style: italic;">'
-                f'Select a value for {dep} to continue. '
-                f'Options: {", ".join(escape(k) for k in case_keys)}</p>'
-            )
-        return html
+        active_html = active.render() if active else None
+        dep_line = render_dependency_line(data.get("depends_on"), self._url_prefix)
+        return render_template("switch.html", data=data, ef=self, url_prefix=self._url_prefix, active_html=active_html, dep_line=dep_line, case_keys=data.get("case_keys", []), depends_on=data.get("depends_on", ""))
 
     def _handle(self, body: dict) -> dict:
         active = self.active_case

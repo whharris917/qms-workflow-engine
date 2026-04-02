@@ -38,19 +38,20 @@ BUTTON_GAP = (
 )
 
 
-def render_inline_button(url: str, body: dict, content: str, style: str) -> str:
-    """Render a button that POSTs a JSON body and reloads the page.
+def _body_attr(body: dict) -> str:
+    """Produce an HTML-escaped data-ef-body attribute value."""
+    return escape(json.dumps(body))
 
-    Generates the fetch() JS, JSON-escaped body, and endpoint tooltip
-    automatically. Use for inline action buttons (remove, move, etc.).
+
+def render_inline_button(url: str, body: dict, content: str, style: str) -> str:
+    """Render a button that POSTs a JSON body via event delegation.
+
+    The eigenform controls the URL, body, and style. The global
+    delegation script (eigenform.js) handles the fetch+reload cycle.
     """
-    body_js = json.dumps(body).replace('"', '&quot;')
-    endpoint = f'POST {url}'
-    tooltip = f'{escape(endpoint)} {escape(json.dumps(body))}'
+    tooltip = f'{escape("POST " + url)} {escape(json.dumps(body))}'
     return (
-        f'<button onclick="fetch(\'{url}\','
-        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-        f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
+        f'<button data-ef-post="{escape(url)}" data-ef-body="{_body_attr(body)}"'
         f' style="{style}"'
         f' title="{tooltip}">'
         f'{content}</button>'
@@ -197,27 +198,23 @@ def render_affordance_html(aff: dict) -> str:
         return _render_button(label, url, endpoint, body)
 
 
+
 def _render_text_input(label: str, url: str, endpoint: str) -> str:
+    body_template = {"value": ""}
     return (
-        f'<form style="display: inline" onsubmit="fetch(\'{url}\','
-        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-        f'body:JSON.stringify({{value:this.elements.value.value}})}}); return false">'
-        f'<input name="value" type="text" oninput="this.nextElementSibling.title='
-        f"'{escape(endpoint)} '+JSON.stringify({{value:this.value}})"
-        f'" />'
-        f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps({"value": ""}))}">'
+        f'<form style="display: inline" data-ef-submit="{escape(url)}">'
+        f'<input name="value" type="text"'
+        f' title="{escape(endpoint)} {escape(json.dumps(body_template))}" />'
+        f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps(body_template))}">'
         f'{escape(label)}</button>'
         f'</form>'
     )
 
 
 def _render_button(label: str, url: str, endpoint: str, body: dict) -> str:
-    body_js = json.dumps(body).replace('"', '&quot;')
     return (
         f'<div style="margin: 4px 0;">'
-        f'<button onclick="fetch(\'{url}\','
-        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-        f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
+        f'<button data-ef-post="{escape(url)}" data-ef-body="{_body_attr(body)}"'
         f' style="cursor: pointer; font-size: 12px; padding: 4px 10px;"'
         f' title="{escape(endpoint)} {escape(json.dumps(body))}">'
         f'{escape(label)}</button>'
@@ -229,14 +226,14 @@ def _render_checkbox(url: str, endpoint: str, items: dict) -> str:
     parts = []
     for item_key, checked in items.items():
         checked_attr = " checked" if checked else ""
-        key_escaped = item_key.replace("\\", "\\\\").replace("'", "\\'")
+        toggle_body = {item_key: not checked}
         parts.append(
             f'<label style="display: block; cursor: pointer;">'
-            f'<input type="checkbox"{checked_attr} autocomplete="off" onchange="'
-            f"var b={{}};b['{key_escaped}']=this.checked;"
-            f"fetch('{url}',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
-            f"body:JSON.stringify(b)}}).then(()=>location.reload())"
-            f'" title="{escape(endpoint)} {escape(json.dumps({item_key: not checked}))}"'
+            f'<input type="checkbox"{checked_attr} autocomplete="off"'
+            f' data-ef-post="{escape(url)}"'
+            f' data-ef-body="{_body_attr({item_key: "__TOGGLE"})}"'
+            f' data-ef-toggle-key="{escape(item_key)}"'
+            f' title="{escape(endpoint)} {escape(json.dumps(toggle_body))}"'
             f' /> {escape(item_key)}'
             f'</label>'
         )
@@ -247,12 +244,12 @@ def _render_radio(url: str, endpoint: str, options: list, current: str | None) -
     html = '<div style="margin: 4px 0;">'
     for opt in options:
         checked = " checked" if opt == current else ""
+        body = {"value": opt}
         html += (
             f'<label style="display: block; cursor: pointer; padding: 2px 0;">'
-            f'<input type="radio" name="{escape(url)}"{checked} onchange="'
-            f"fetch('{url}',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
-            f"body:JSON.stringify({{value:'{escape(opt)}'}})}}).then(()=>location.reload())"
-            f'" title="{escape(endpoint)} {escape(json.dumps({"value": opt}))}"'
+            f'<input type="radio" name="{escape(url)}"{checked}'
+            f' data-ef-post="{escape(url)}" data-ef-body="{_body_attr(body)}"'
+            f' title="{escape(endpoint)} {escape(json.dumps(body))}"'
             f' /> {escape(opt)}'
             f'</label>'
         )
@@ -261,22 +258,11 @@ def _render_radio(url: str, endpoint: str, options: list, current: str | None) -
 
 
 def _render_multi_field(label: str, url: str, endpoint: str, fields: list, values: dict) -> str:
-    js_keys = []
-
-    # Tooltip updater: rebuild body from all fields, update button title
-    def make_tooltip_js():
-        js = "var f=this.form;var b={};"
-        for k in js_keys:
-            js += f"b['{k}']=f.elements['{k}'].value;"
-        js += f"f.querySelector('button[type=submit]').title='{escape(endpoint)} '+JSON.stringify(b)"
-        return js
-
     inputs = ""
     for fd in fields:
         current = values.get(fd["key"])
         display = escape(str(current)) if current is not None else ""
         fd_type = fd.get("type", "text")
-        js_keys.append(fd["key"])
 
         if fd_type == "choice":
             options = fd.get("options", [])
@@ -304,20 +290,8 @@ def _render_multi_field(label: str, url: str, endpoint: str, fields: list, value
                 f'</div>'
             )
 
-    js_build = "var b={};"
-    for k in js_keys:
-        js_build += f"b['{k}']=this.elements['{k}'].value;"
-
-    # Add oninput/onchange to each input/select after we know all keys
-    tooltip_js = make_tooltip_js()
-    inputs = inputs.replace('<input name=', f'<input oninput="{tooltip_js}" name=')
-    inputs = inputs.replace('<select name=', f'<select onchange="{tooltip_js}" name=')
-
     return (
-        f'<form onsubmit="'
-        f"{js_build}"
-        f"fetch('{url}',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
-        f"body:JSON.stringify(b)}}).then(()=>location.reload()); return false\">"
+        f'<form data-ef-submit="{escape(url)}">'
         f'{inputs}'
         f'<button type="submit" title="{escape(endpoint)} {escape(json.dumps(values if values else {}))}">'
         f'{escape(label)}</button>'
@@ -326,7 +300,6 @@ def _render_multi_field(label: str, url: str, endpoint: str, fields: list, value
 
 
 def _render_text_input_add(label: str, url: str, endpoint: str, body: dict, placeholder: str) -> str:
-    # Determine the action and input key from the body template
     fixed_parts = {}
     input_key = "v"
     for k, v in body.items():
@@ -335,25 +308,14 @@ def _render_text_input_add(label: str, url: str, endpoint: str, body: dict, plac
         else:
             fixed_parts[k] = v
 
-    js_build = "var b={};"
+    hidden_inputs = ""
     for k, v in fixed_parts.items():
-        js_build += f"b['{k}']='{v}';"
-    js_build += f"b['{input_key}']=this.elements.v.value;"
-
-    # Build the oninput tooltip updater using the same body construction
-    js_tooltip = "var b={};"
-    for k, v in fixed_parts.items():
-        js_tooltip += f"b['{k}']='{v}';"
-    js_tooltip += f"b['{input_key}']=this.value;"
-    js_tooltip += f"this.form.querySelector('button[type=submit]').title='{escape(endpoint)} '+JSON.stringify(b)"
+        hidden_inputs += f'<input type="hidden" name="{escape(k)}" value="{escape(str(v))}" />'
 
     return (
-        f'<form style="display: inline" onsubmit="'
-        f"{js_build}"
-        f"fetch('{url}',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
-        f"body:JSON.stringify(b)}}).then(()=>location.reload()); return false\">"
-        f'<input name="v" type="text" placeholder="{escape(placeholder or input_key)}" style="width: 160px;"'
-        f' oninput="{js_tooltip}" />'
+        f'<form style="display: inline" data-ef-submit="{escape(url)}">'
+        f'{hidden_inputs}'
+        f'<input name="{escape(input_key)}" type="text" placeholder="{escape(placeholder or input_key)}" style="width: 160px;" />'
         f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps(body))}">'
         f'{escape(label)}</button>'
         f'</form>'
@@ -361,37 +323,23 @@ def _render_text_input_add(label: str, url: str, endpoint: str, body: dict, plac
 
 
 def _render_parameterized(label: str, url: str, endpoint: str, body: dict, param_keys: list[str]) -> str:
-    """Render an affordance with fillable parameters as a form with inputs."""
     fixed_parts = {k: v for k, v in body.items() if k not in param_keys}
 
-    js_build = "var b={};"
+    hidden_inputs = ""
     for k, v in fixed_parts.items():
-        js_build += f"b['{k}']='{v}';"
-    for pk in param_keys:
-        js_build += f"b['{pk}']=this.elements['{pk}'].value;"
-
-    # oninput: rebuild body from all form fields, update button title
-    js_tooltip = "var f=this.form;var b={};"
-    for k, v in fixed_parts.items():
-        js_tooltip += f"b['{k}']='{v}';"
-    for pk in param_keys:
-        js_tooltip += f"b['{pk}']=f.elements['{pk}'].value;"
-    js_tooltip += f"f.querySelector('button[type=submit]').title='{escape(endpoint)} '+JSON.stringify(b)"
+        hidden_inputs += f'<input type="hidden" name="{escape(k)}" value="{escape(str(v))}" />'
 
     inputs = ""
     for pk in param_keys:
         inputs += (
             f'<input name="{escape(pk)}" type="text" placeholder="{escape(pk)}"'
-            f' style="width: 100px; margin-right: 4px;"'
-            f' oninput="{js_tooltip}" />'
+            f' style="width: 100px; margin-right: 4px;" />'
         )
 
     return (
         f'<div style="margin: 4px 0; padding: 4px 0; border-top: 1px solid #eee;">'
-        f'<form style="margin: 0;" onsubmit="'
-        f"{js_build}"
-        f"fetch('{url}',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
-        f"body:JSON.stringify(b)}}).then(()=>location.reload()); return false\">"
+        f'<form style="margin: 0;" data-ef-submit="{escape(url)}">'
+        f'{hidden_inputs}'
         f'{inputs}'
         f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps(body))}">'
         f'{escape(label)}</button>'
@@ -401,11 +349,8 @@ def _render_parameterized(label: str, url: str, endpoint: str, body: dict, param
 
 
 def _render_tab_button(label: str, url: str, endpoint: str, body: dict) -> str:
-    body_js = json.dumps(body).replace('"', '&quot;')
     return (
-        f'<button onclick="fetch(\'{url}\','
-        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-        f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
+        f'<button data-ef-post="{escape(url)}" data-ef-body="{_body_attr(body)}"'
         f' style="cursor: pointer; font-size: 12px; padding: 2px 8px;"'
         f' title="{escape(endpoint)} {escape(json.dumps(body))}">'
         f'{escape(label)}</button>'
@@ -413,11 +358,8 @@ def _render_tab_button(label: str, url: str, endpoint: str, body: dict) -> str:
 
 
 def _render_small_button(label: str, url: str, endpoint: str, body: dict) -> str:
-    body_js = json.dumps(body).replace('"', '&quot;')
     return (
-        f'<button onclick="fetch(\'{url}\','
-        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-        f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
+        f'<button data-ef-post="{escape(url)}" data-ef-body="{_body_attr(body)}"'
         f' style="margin: 1px; cursor: pointer; width: 28px; height: 28px; font-size: 11px;"'
         f' title="{escape(endpoint)} {escape(json.dumps(body))}">'
         f'{escape(label)}</button>'
@@ -426,13 +368,9 @@ def _render_small_button(label: str, url: str, endpoint: str, body: dict) -> str
 
 def _render_number_input(label: str, url: str, endpoint: str, hints: dict) -> str:
     return (
-        f'<form style="display: inline" onsubmit="fetch(\'{url}\','
-        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-        f'body:JSON.stringify({{value:this.elements.value.value}})}}).then(()=>location.reload()); return false">'
+        f'<form style="display: inline" data-ef-submit="{escape(url)}">'
         f'<input name="value" type="text" inputmode="decimal" style="width: 120px;"'
-        f' oninput="this.nextElementSibling.title='
-        f"'{escape(endpoint)} '+JSON.stringify({{value:this.value}})"
-        f'" />'
+        f' title="{escape(endpoint)}" />'
         f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps({"value": ""}))}">'
         f'{escape(label)}</button>'
         f'</form>'
@@ -442,13 +380,9 @@ def _render_number_input(label: str, url: str, endpoint: str, hints: dict) -> st
 def _render_date_input(label: str, url: str, endpoint: str, hints: dict) -> str:
     input_type = "datetime-local" if hints.get("include_time") else "date"
     return (
-        f'<form style="display: inline" onsubmit="fetch(\'{url}\','
-        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-        f'body:JSON.stringify({{value:this.elements.value.value}})}}).then(()=>location.reload()); return false">'
+        f'<form style="display: inline" data-ef-submit="{escape(url)}">'
         f'<input name="value" type="{input_type}"'
-        f' onchange="this.nextElementSibling.title='
-        f"'{escape(endpoint)} '+JSON.stringify({{value:this.value}})"
-        f'" />'
+        f' title="{escape(endpoint)}" />'
         f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps({"value": ""}))}">'
         f'{escape(label)}</button>'
         f'</form>'
@@ -461,19 +395,17 @@ def _render_toggle(label: str, url: str, endpoint: str, hints: dict) -> str:
     false_label = escape(hints.get("false_label", "No"))
     true_style = "background: #2a2; color: white;" if current is True else ""
     false_style = "background: #c22; color: white;" if current is False else ""
+    true_body = {"value": True}
+    false_body = {"value": False}
     return (
         f'<div style="display: flex; gap: 4px; margin: 4px 0;">'
-        f'<button onclick="fetch(\'{url}\','
-        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-        f'body:JSON.stringify({{value:true}})}}).then(()=>location.reload())"'
+        f'<button data-ef-post="{escape(url)}" data-ef-body="{_body_attr(true_body)}"'
         f' style="cursor: pointer; padding: 4px 12px; {true_style}"'
-        f' title="{escape(endpoint)} {escape(json.dumps({"value": True}))}">'
+        f' title="{escape(endpoint)} {escape(json.dumps(true_body))}">'
         f'{true_label}</button>'
-        f'<button onclick="fetch(\'{url}\','
-        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-        f'body:JSON.stringify({{value:false}})}}).then(()=>location.reload())"'
+        f'<button data-ef-post="{escape(url)}" data-ef-body="{_body_attr(false_body)}"'
         f' style="cursor: pointer; padding: 4px 12px; {false_style}"'
-        f' title="{escape(endpoint)} {escape(json.dumps({"value": False}))}">'
+        f' title="{escape(endpoint)} {escape(json.dumps(false_body))}">'
         f'{false_label}</button>'
         f'</div>'
     )
@@ -486,14 +418,11 @@ def _render_range_input(label: str, url: str, endpoint: str, hints: dict) -> str
     current = hints.get("current")
     default = current if current is not None else min_val
     return (
-        f'<form style="margin: 4px 0;" onsubmit="fetch(\'{url}\','
-        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-        f'body:JSON.stringify({{value:parseFloat(this.elements.value.value)}})}}).then(()=>location.reload()); return false">'
+        f'<form style="margin: 4px 0;" data-ef-submit="{escape(url)}">'
+        f'<input type="hidden" name="__parse" value="value:float" />'
         f'<input name="value" type="range" min="{min_val}" max="{max_val}" step="{step}" value="{default}"'
-        f' oninput="this.nextElementSibling.textContent=this.value;'
-        f"this.form.querySelector('button[type=submit]').title="
-        f"'{escape(endpoint)} '+JSON.stringify({{value:parseFloat(this.value)}})"
-        f'" style="width: 200px; vertical-align: middle;" />'
+        f' oninput="this.nextElementSibling.textContent=this.value"'
+        f' style="width: 200px; vertical-align: middle;" />'
         f'<span style="margin-left: 8px;">{default}</span>'
         f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps({"value": default}))}">'
         f'{escape(label)}</button>'
@@ -504,13 +433,9 @@ def _render_range_input(label: str, url: str, endpoint: str, hints: dict) -> str
 def _render_textarea(label: str, url: str, endpoint: str, hints: dict) -> str:
     max_attr = f' maxlength="{hints["max_length"]}"' if hints.get("max_length") else ""
     return (
-        f'<form onsubmit="fetch(\'{url}\','
-        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-        f'body:JSON.stringify({{value:this.elements.value.value}})}}).then(()=>location.reload()); return false">'
+        f'<form data-ef-submit="{escape(url)}">'
         f'<textarea name="value" rows="5" style="width: 100%; box-sizing: border-box;"{max_attr}'
-        f' oninput="this.form.querySelector(\'button[type=submit]\').title='
-        f"'{escape(endpoint)} '+JSON.stringify({{value:this.value}})"
-        f'"></textarea>'
+        f'></textarea>'
         f'<button type="submit" title="{escape(endpoint)} {escape(json.dumps({"value": ""}))}">'
         f'{escape(label)}</button>'
         f'</form>'
@@ -526,10 +451,9 @@ def _render_rating(label: str, url: str, endpoint: str, hints: dict) -> str:
         active = "background: #f0a020; color: white; font-weight: bold;" if current is not None and i <= current else ""
         title_label = labels.get(str(i), labels.get(i, ""))
         title_suffix = f" ({title_label})" if title_label else ""
+        body = {"value": i}
         html += (
-            f'<button onclick="fetch(\'{url}\','
-            f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-            f'body:JSON.stringify({{value:{i}}})}}).then(()=>location.reload())"'
+            f'<button data-ef-post="{escape(url)}" data-ef-body="{_body_attr(body)}"'
             f' style="cursor: pointer; width: 32px; height: 32px; {active}"'
             f' title="{escape(endpoint)} {{value: {i}}}{escape(title_suffix)}">'
             f'{i}</button>'
@@ -541,19 +465,11 @@ def _render_rating(label: str, url: str, endpoint: str, hints: dict) -> str:
 def _render_kv_add(label: str, url: str, endpoint: str, hints: dict) -> str:
     key_label = escape(hints.get("key_label", "Key"))
     value_label = escape(hints.get("value_label", "Value"))
-    tooltip_js = (
-        f"var f=this.form;"
-        f"f.querySelector('button[type=submit]').title="
-        f"'{escape(endpoint)} '+JSON.stringify({{action:'add',key:f.elements.k.value,value:f.elements.v.value}})"
-    )
     return (
-        f'<form style="display: inline" onsubmit="'
-        f"fetch('{url}',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
-        f"body:JSON.stringify({{action:'add',key:this.elements.k.value,value:this.elements.v.value}})}}).then(()=>location.reload()); return false\">"
-        f'<input name="k" type="text" placeholder="{key_label}" style="width: 120px; margin-right: 4px;"'
-        f' oninput="{tooltip_js}" />'
-        f'<input name="v" type="text" placeholder="{value_label}" style="width: 160px; margin-right: 4px;"'
-        f' oninput="{tooltip_js}" />'
+        f'<form style="display: inline" data-ef-submit="{escape(url)}">'
+        f'<input type="hidden" name="action" value="add" />'
+        f'<input name="key" type="text" placeholder="{key_label}" style="width: 120px; margin-right: 4px;" />'
+        f'<input name="value" type="text" placeholder="{value_label}" style="width: 160px; margin-right: 4px;" />'
         f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps({"action": "add", "key": "", "value": ""}))}">'
         f'{escape(label)}</button>'
         f'</form>'
@@ -579,24 +495,13 @@ def _render_constraint_picker(label: str, url: str, endpoint: str, hints: dict) 
     for opt in options:
         display = f'{escape(labels.get(opt, opt))} ({escape(opt)})' if opt in labels else escape(opt)
         opts_html += f'<option value="{escape(opt)}">{display}</option>'
-    tooltip_js = (
-        f"var f=this.form;"
-        f"f.querySelector('button[type=submit]').title="
-        f"'{escape(endpoint)} '+JSON.stringify({{action:'add_constraint',"
-        f"item:f.querySelector('[name=ci]').value,"
-        f"after:f.querySelector('[name=ca]').value}})"
-    )
     return (
         f'<div style="margin: 4px 0; padding: 4px 0; border-top: 1px solid #eee;">'
-        f'<form style="margin: 0;" onsubmit="'
-        f"var b={{action:'add_constraint',"
-        f"item:this.querySelector('[name=ci]').value,"
-        f"after:this.querySelector('[name=ca]').value}};"
-        f"fetch('{url}',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
-        f"body:JSON.stringify(b)}}).then(()=>location.reload()); return false\">"
-        f'<select name="ci" onchange="{tooltip_js}">{opts_html}</select>'
+        f'<form style="margin: 0;" data-ef-submit="{escape(url)}">'
+        f'<input type="hidden" name="action" value="add_constraint" />'
+        f'<select name="item">{opts_html}</select>'
         f' must follow '
-        f'<select name="ca" onchange="{tooltip_js}">{opts_html}</select>'
+        f'<select name="after">{opts_html}</select>'
         f' <button type="submit" title="{escape(endpoint)}">{escape(label)}</button>'
         f'</form>'
         f'</div>'
@@ -606,11 +511,8 @@ def _render_constraint_picker(label: str, url: str, endpoint: str, hints: dict) 
 def _render_accordion_toggle(label: str, url: str, endpoint: str, body: dict, hints: dict) -> str:
     expanded = hints.get("expanded", True)
     arrow = "&#9660;" if expanded else "&#9654;"
-    body_js = json.dumps(body).replace('"', '&quot;')
     return (
-        f'<div onclick="fetch(\'{url}\','
-        f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-        f'body:JSON.stringify({body_js})}}).then(()=>location.reload())"'
+        f'<div data-ef-post="{escape(url)}" data-ef-body="{_body_attr(body)}"'
         f' style="cursor: pointer; padding: 6px 8px; background: #eee; margin: 4px 0;'
         f' border-radius: 4px; font-weight: bold; user-select: none;"'
         f' title="{escape(endpoint)} {escape(json.dumps(body))}">'

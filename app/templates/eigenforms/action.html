@@ -1,0 +1,31 @@
+{# ActionForm template.
+
+   Context:
+     data       — the serialized eigenform dict
+     ef         — the ActionForm instance
+     url_prefix — the eigenform's URL prefix for dependency links
+#}
+<h3>{{ data.label }}</h3>
+{% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
+{{ render_dep_line(data.depends_on, url_prefix) }}
+
+{% set val = data.value %}
+{% if val is mapping %}
+  {% if val.status == "success" %}
+    {% if val.result is mapping and val.result.message %}
+      <p style="color: #2a2;"><strong>Result:</strong> {{ val.result.message }}</p>
+    {% elif val.result is not none %}
+      <p style="color: #2a2;"><strong>Result:</strong> {{ val.result }}</p>
+    {% else %}
+      <p style="color: #2a2;"><strong>Executed successfully.</strong></p>
+    {% endif %}
+  {% elif val.status == "error" %}
+    <p style="color: #c22;"><strong>Error:</strong> {{ val.error }}</p>
+  {% elif val.status == "armed" %}
+    <p style="color: #f0a020;"><strong>Armed.</strong> Confirm or cancel.</p>
+  {% endif %}
+{% endif %}
+
+{% for aff in data.affordances %}
+  {{ render_aff(aff) }}
+{% endfor %}

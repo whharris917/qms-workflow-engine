@@ -2,15 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
-from html import escape
 
-from engine.affordances import (
-    Affordance, SimpleButtonAffordance,
-    STYLE_REMOVE, render_inline_button,
-)
+from engine.affordances import Affordance, SimpleButtonAffordance
 from engine.eigenform import Eigenform
+from engine.templates import render_template
 
 
 class AddToSetAffordance(Affordance):
@@ -69,75 +65,7 @@ class SetForm(Eigenform):
         return affordances
 
     def render_from_data(self, data: dict) -> str:
-        from engine.affordances import render_affordance_html
-        html = f'<h3>{escape(data["label"])}</h3>'
-        if data.get("instruction"):
-            html += f'<p>{escape(data["instruction"])}</p>'
-
-        affs = data.get("affordances", [])
-        items = data.get("items", [])
-        url = affs[0]["url"] if affs else ""
-        endpoint = f'POST {url}'
-
-        # Mark remove affordance as rendered (inline buttons handle it)
-        add_aff = None
-        for aff in affs:
-            action = aff.get("body", {}).get("action")
-            if action == "remove":
-                Eigenform.mark_rendered(aff)
-            elif action == "add":
-                add_aff = aff
-                Eigenform.mark_rendered(aff)
-
-        # Items as pills with remove buttons
-        if items:
-            html += '<div style="display: flex; flex-direction: column; gap: 4px; margin: 6px 0;">'
-            for item in items:
-                html += (
-                    f'<span style="display: inline-flex; align-items: center; gap: 4px; width: fit-content;">'
-                )
-                html += render_inline_button(
-                    url, {"action": "remove", "value": item}, "x", STYLE_REMOVE,
-                )
-                html += (
-                    f'<span style="background: #f0f0f0; padding: 2px 8px; border-radius: 3px;">'
-                    f'{escape(item)}</span>'
-                    f'</span>'
-                )
-            html += '</div>'
-        else:
-            html += '<p style="color: #888; font-style: italic;">Empty set.</p>'
-
-        # Add input
-        if add_aff:
-            add_tooltip = f'{escape(endpoint)} {escape(json.dumps({"action": "add", "value": ""}))}'
-            add_tooltip_js = (
-                f"this.nextElementSibling.title="
-                f"'{escape(endpoint)} '+JSON.stringify({{action:'add',value:this.value}})"
-            )
-            html += (
-                f'<form style="display: inline; margin: 4px 0;" onsubmit="fetch(\'{url}\','
-                f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                f"body:JSON.stringify({{action:'add',value:this.elements.v.value}})"
-                f'}}).then(()=>location.reload()); return false">'
-                f'<input name="v" type="text" placeholder="New item"'
-                f' style="border: 1px solid #ddd; padding: 2px 4px; width: 200px;"'
-                f' oninput="{add_tooltip_js}" />'
-                f' <button type="submit"'
-                f' style="cursor: pointer; border: 1px solid #4a4; background: #efffef;'
-                f' padding: 2px 8px; color: #2a2;"'
-                f' title="{add_tooltip}">Add</button>'
-                f'</form>'
-            )
-
-        # Remaining affordances (Clear, etc.)
-        html += '<div style="margin-top: 8px;">'
-        for aff in affs:
-            if not aff.get("_rendered"):
-                html += render_affordance_html(aff)
-        html += '</div>'
-
-        return html
+        return render_template("set.html", data=data, ef=self)
 
     def _handle(self, body: dict) -> dict:
         action = body.get("action", "")

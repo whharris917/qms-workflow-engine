@@ -16,12 +16,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from html import escape
 from typing import Any, Callable
 
 from engine.affordances import Affordance, SimpleButtonAffordance
-from engine.eigenform import Eigenform, render_dependency_line
+from engine.eigenform import Eigenform
 from engine.store import Store
+from engine.templates import render_template
 
 
 class DisabledAffordance(Affordance):
@@ -144,31 +144,8 @@ class ActionForm(Eigenform):
         return result
 
     def render_from_data(self, data: dict) -> str:
-        from engine.affordances import render_affordance_html
-        html = f'<h3>{escape(data["label"])}</h3>'
-        if data.get("instruction"):
-            html += f'<p>{escape(data["instruction"])}</p>'
-        html += render_dependency_line(data.get("depends_on"), self._url_prefix)
-
-        val = data.get("value")
-        if isinstance(val, dict):
-            status = val.get("status")
-            if status == "success":
-                result = val.get("result")
-                if isinstance(result, dict) and "message" in result:
-                    html += f'<p style="color: #2a2;"><strong>Result:</strong> {escape(str(result["message"]))}</p>'
-                elif result is not None:
-                    html += f'<p style="color: #2a2;"><strong>Result:</strong> {escape(str(result))}</p>'
-                else:
-                    html += '<p style="color: #2a2;"><strong>Executed successfully.</strong></p>'
-            elif status == "error":
-                html += f'<p style="color: #c22;"><strong>Error:</strong> {escape(str(val.get("error")))}</p>'
-            elif status == "armed":
-                html += '<p style="color: #f0a020;"><strong>Armed.</strong> Confirm or cancel.</p>'
-
-        for aff in data.get("affordances", []):
-            html += render_affordance_html(aff)
-        return html
+        return render_template("action.html", data=data, ef=self,
+                               url_prefix=self._url_prefix)
 
     def _handle(self, body: dict) -> dict:
         action = body.get("action")

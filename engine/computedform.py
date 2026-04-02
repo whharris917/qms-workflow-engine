@@ -16,10 +16,10 @@ list, since PageForm serializes children in list order.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from html import escape
 from typing import Any, Callable
 
-from engine.eigenform import Eigenform, render_dependency_line
+from engine.eigenform import Eigenform
+from engine.templates import render_template
 
 
 @dataclass
@@ -64,25 +64,8 @@ class ComputedForm(Eigenform):
         return []
 
     def render_from_data(self, data: dict) -> str:
-        html = f'<h3>{escape(data["label"])}</h3>'
-        if data.get("instruction"):
-            html += f'<p>{escape(data["instruction"])}</p>'
-        html += render_dependency_line(data.get("depends_on"), self._url_prefix)
-        computed = data.get("computed_value")
-        if isinstance(computed, dict):
-            msg = computed.get("message")
-            if msg:
-                html += f'<p><strong>{escape(str(msg))}</strong></p>'
-            else:
-                html += '<dl style="margin: 4px 0;">'
-                for k, v in computed.items():
-                    html += f'<dt style="font-weight: bold;">{escape(str(k))}</dt><dd>{escape(str(v))}</dd>'
-                html += '</dl>'
-        elif computed is not None:
-            html += f'<p><strong>Value:</strong> {escape(str(computed))}</p>'
-        else:
-            html += '<p style="color: #888;">Not yet computed.</p>'
-        return html
+        return render_template("computed.html", data=data, ef=self,
+                               url_prefix=self._url_prefix)
 
     def _handle(self, body: dict) -> dict:
         return self.serialize()

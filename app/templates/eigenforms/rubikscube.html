@@ -1,0 +1,53 @@
+{# RubiksCubeForm template.
+
+   Context:
+     data         — serialized eigenform dict
+     ef           — the RubiksCubeForm instance
+     faces        — dict of face stickers {U: [...], D: [...], ...}
+     solved       — bool
+     face_w       — pixel width of one face (for layout)
+     face_html    — dict mapping face key -> rendered face HTML (safe)
+     url          — eigenform POST URL
+#}
+<h3>{{ data.label }}</h3>
+{% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
+
+{# Unfolded cube layout:       U
+                              L F R B
+                                D       #}
+<div style="display: inline-block; font-size: 0;">
+  <div style="padding-left: {{ face_w }}px;">{{ face_html.U|safe }}</div>
+  <div>{{ face_html.L|safe }}{{ face_html.F|safe }}{{ face_html.R|safe }}{{ face_html.B|safe }}</div>
+  <div style="padding-left: {{ face_w }}px;">{{ face_html.D|safe }}</div>
+</div>
+
+{# Controls #}
+<div style="margin-top: 8px; font-size: 14px;">
+{% set rotate_aff = none %}
+{% for aff in data.affordances %}
+  {% if aff.body.action == "rotate" %}
+    {% set _ = aff.update({"_rendered": true}) %}
+    {# We handle this custom below #}
+  {% endif %}
+{% endfor %}
+
+{% if not solved %}
+  {% set face_names = ["U", "D", "L", "R", "F", "B"] %}
+  {% for direction, arrow in [("cw", "\u21bb"), ("ccw", "\u21ba")] %}
+    {% for face in face_names %}
+      {% set body = {"action": "rotate", "face": face, "direction": direction} %}
+      <button data-ef-post="{{ url }}" data-ef-body="{{ body|tojson }}"
+        style="margin: 1px; cursor: pointer; width: 36px; height: 28px; font-size: 11px;"
+        title="POST {{ url }} {{ body|tojson }}">{{ face }} {{ arrow }}</button>
+    {% endfor %}
+    <br>
+  {% endfor %}
+{% endif %}
+
+{# Remaining affordances (Shuffle/Restart) #}
+{% for aff in data.affordances %}
+  {% if not aff._rendered %}
+    {{ render_aff(aff) }}
+  {% endif %}
+{% endfor %}
+</div>

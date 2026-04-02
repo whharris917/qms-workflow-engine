@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from html import escape
-from typing import Any
 
-from engine.affordances import Affordance, STYLE_CONFIRM
+from engine.affordances import Affordance
 from engine.eigenform import Eigenform
+from engine.templates import render_template
 
 
 class ToggleAffordance(Affordance):
@@ -99,110 +97,9 @@ class BooleanForm(Eigenform):
         ]
 
     def render_from_data(self, data: dict) -> str:
-        from engine.affordances import render_affordance_html
-
-        if data.get("edit_mode"):
-            return self._render_edit_mode(data)
-
-        html = f'<h3>{escape(data["label"])}</h3>'
-        if data.get("instruction"):
-            html += f'<p>{escape(data["instruction"])}</p>'
-        val = data["value"]
-        if val is None:
-            display = "Not set"
-        elif val:
-            display = data["true_label"]
-        else:
-            display = data["false_label"]
-        html += f'<p><strong>Value:</strong> {escape(display)}</p>'
-        for aff in data.get("affordances", []):
-            if not aff.get("_rendered"):
-                html += render_affordance_html(aff)
-        return html
-
-    def _render_edit_mode(self, data: dict) -> str:
-        from engine.affordances import render_affordance_html
-        url = self.url
-        label = data["label"]
-        instruction = data.get("instruction") or ""
-
-        def inline_input(action, field, current_val, *, font_size="inherit",
-                         font_weight="normal", placeholder="", width="100%"):
-            body = json.dumps({"action": action, field: str(current_val)})
-            tooltip = f'POST {url} {escape(body)}'
-            return (
-                f'<form style="display: flex; align-items: center; gap: 4px;"'
-                f' onsubmit="fetch(\'{url}\','
-                f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                f'body:JSON.stringify({{action:\'{action}\',{field}:this.elements.v.value}})'
-                f'}}).then(()=>location.reload()); return false">'
-                f'<input name="v" type="text" value="{escape(str(current_val))}"'
-                f' placeholder="{escape(placeholder)}"'
-                f' style="font: inherit; font-size: {font_size}; font-weight: {font_weight};'
-                f' border: 1px solid #ddd; padding: 1px 3px; margin: 0; width: {width};"'
-                f' title="{tooltip}" />'
-                f' <button type="submit" style="{STYLE_CONFIRM}"'
-                f' title="{tooltip}">&#10003;</button>'
-                f'</form>'
-            )
-
-        # Label
-        html = f'<div style="margin: 0.83em 0;">'
-        html += inline_input("set_label", "label", label,
-                             font_size="1.17em", font_weight="bold")
-        html += '</div>'
-
-        # Instruction
-        html += f'<div style="margin: 1em 0;">'
-        html += inline_input("set_instruction", "instruction", instruction,
-                             placeholder="Instruction text")
-        html += '</div>'
-
-        # True/False labels — inline row
-        html += '<div style="display: flex; gap: 12px; align-items: center; margin: 4px 0; font-size: 0.9em; color: #666;">'
-        for lbl, action, field_val in [
-            ("True label", "set_true_label", data["true_label"]),
-            ("False label", "set_false_label", data["false_label"]),
-        ]:
-            body_json = json.dumps({"action": action, "label": field_val})
-            tooltip = f'POST {url} {escape(body_json)}'
-            html += (
-                f'<form style="display: flex; align-items: center; gap: 2px; margin: 0;"'
-                f' onsubmit="fetch(\'{url}\','
-                f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                f'body:JSON.stringify({{action:\'{action}\',label:this.elements.v.value}})'
-                f'}}).then(()=>location.reload()); return false">'
-                f'<span style="font-weight: 600;">{lbl}:</span>'
-                f'<input name="v" type="text" value="{escape(field_val)}"'
-                f' style="font: inherit; border: 1px solid #ddd; padding: 1px 3px;'
-                f' margin: 0; width: 80px;"'
-                f' title="{tooltip}" />'
-                f'<button type="submit" style="{STYLE_CONFIRM}"'
-                f' title="{tooltip}">&#10003;</button>'
-                f'</form>'
-            )
-        html += '</div>'
-
-        # Value — same as normal mode
-        val = data["value"]
-        if val is None:
-            display = "Not set"
-        elif val:
-            display = data["true_label"]
-        else:
-            display = data["false_label"]
-        html += f'<p><strong>Value:</strong> {escape(display)}</p>'
-
-        # Mark edit affordances as rendered
-        edit_actions = {"set_label", "set_instruction", "set_true_label", "set_false_label"}
-        for aff in data.get("affordances", []):
-            if aff.get("_rendered"):
-                continue
-            if aff.get("body", {}).get("action") in edit_actions:
-                aff["_rendered"] = True
-            else:
-                html += render_affordance_html(aff)
-        return html
+        return render_template("boolean.html", data=data, ef=self,
+                               url=self.url, label=data["label"],
+                               instruction=data.get("instruction") or "")
 
     def _handle(self, body: dict) -> dict:
         action = body.get("action")

@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import datetime
-import json
 from dataclasses import dataclass, field
-from html import escape
 from pathlib import Path
 from typing import Any
 
@@ -13,10 +11,10 @@ from engine.affordances import (
     Affordance,
     SimpleButtonAffordance,
     SetValueAffordance,
-    render_inline_button,
 )
 from engine.eigenform import Eigenform
 from engine.store import Store
+from engine.templates import render_template
 
 
 @dataclass
@@ -309,206 +307,15 @@ class PageForm(Eigenform):
         return state
 
     def render_from_data(self, data: dict) -> str:
-        from engine.affordances import render_affordance_html
-        html = f'<h2>{escape(data["label"])}</h2>'
-        if data.get("instruction"):
-            html += f'<p>{escape(data["instruction"])}</p>'
-
-        # Feedback banners
-        fb = data.get("feedback")
-        if fb:
-            affs = data.get("affordances", [])
-
-            # Index dismiss affordances by target for inline rendering
-            dismiss_affs = {}
-            for aff in affs:
-                body = aff.get("body", {})
-                if body.get("action") == "dismiss_feedback":
-                    dismiss_affs[body.get("target", "")] = aff
-
-            # Persistent errors (each with dismiss button from affordance)
-            STYLE_DISMISS = (
-                "cursor: pointer; font-size: 11px; padding: 1px 6px;"
-                " background: transparent; border: 1px solid #c88; color: #721c24;"
-                " border-radius: 3px;"
-            )
-            for err in fb.get("errors", []):
-                target = err.get("target", "")
-                target_label = f' <span style="opacity: 0.7;">({escape(target)})</span>' if target else ""
-                dismiss_html = ""
-                aff = dismiss_affs.get(target)
-                if aff:
-                    Eigenform.mark_rendered(aff)
-                    dismiss_html = render_inline_button(
-                        aff["url"], aff["body"], "&#10005;", STYLE_DISMISS,
-                    )
-                html += (
-                    f'<div style="background: #fdecea; border: 1px solid #f5c6cb; color: #721c24;'
-                    f' padding: 8px 12px; margin: 4px 0; border-radius: 4px;'
-                    f' display: flex; justify-content: space-between; align-items: center;">'
-                    f'<span><strong>&#10007; Error:</strong> {escape(err["message"])}{target_label}</span>'
-                    f'<span style="display: flex; align-items: center; gap: 8px;">'
-                    f'<span style="opacity: 0.5; font-size: 0.85em;">{escape(err.get("timestamp", ""))}</span>'
-                    f'{dismiss_html}'
-                    f'</span></div>'
-                )
-            # Latest success
-            succ = fb.get("success")
-            if succ:
-                target = succ.get("target", "")
-                target_label = f' <span style="opacity: 0.7;">({escape(target)})</span>' if target else ""
-                html += (
-                    f'<div style="background: #edf7ed; border: 1px solid #c3e6cb; color: #155724;'
-                    f' padding: 8px 12px; margin: 4px 0; border-radius: 4px;'
-                    f' display: flex; justify-content: space-between; align-items: center;">'
-                    f'<span><strong>&#10003; OK:</strong> {escape(succ["message"])}{target_label}</span>'
-                    f'<span style="opacity: 0.5; font-size: 0.85em;">{escape(succ.get("timestamp", ""))}</span>'
-                    f'</div>'
-                )
-            if fb.get("errors") or succ:
-                html += '<div style="margin-bottom: 8px;"></div>'
-
-        if self.mutable_structure:
-            html += self._render_mutable(data)
-        else:
-            html += "".join(ef.render() for ef in self.eigenforms)
-
-        # Remaining non-structural affordances (Reset Page, etc.)
-        html += '<div style="margin-top: 12px;">'
-        for aff in data.get("affordances", []):
-            if not aff.get("_rendered"):
-                html += render_affordance_html(aff)
-        html += '</div>'
-        return html
-
-    def _render_mutable(self, data: dict) -> str:
-        """Render a mutable page with an add toolbar and per-eigenform controls."""
         from engine.registry import get_registry
-        affs = data.get("affordances", [])
-        url = self._url_prefix
-
-        # Mark all structural affordances as rendered (we handle them custom)
-        remove_keys = {}
-        move_keys = {}
-        for aff in affs:
-            body = aff.get("body", {})
-            action = body.get("action", "")
-            if action == "add_eigenform":
-                Eigenform.mark_rendered(aff)
-            elif action == "remove_eigenform":
-                Eigenform.mark_rendered(aff)
-                remove_keys[body.get("key")] = aff
-            elif action == "move_eigenform":
-                Eigenform.mark_rendered(aff)
-                move_keys[body.get("key")] = aff
-            elif action == "rebuild_from_seed":
-                Eigenform.mark_rendered(aff)
-
-        # --- Add Eigenform toolbar ---
-        reg = get_registry()
-        available = sorted(reg.available())
-        type_options = "".join(
-            f'<option value="{escape(t)}">{escape(t)}</option>' for t in available
-        )
-        html = (
-            f'<div style="background: #f5f5f5; border: 1px solid #ddd; padding: 10px;'
-            f' margin-bottom: 12px; border-radius: 4px;">'
-            f'<form style="display: flex; gap: 8px; align-items: end; flex-wrap: wrap;" onsubmit="'
-            f"var b={{action:'add_eigenform',type:this.elements.t.value,"
-            f"key:this.elements.k.value,label:this.elements.l.value,config:{{}}}};"
-            f"fetch('{url}',{{method:'POST',headers:{{'Content-Type':'application/json'}},"
-            f"body:JSON.stringify(b)}}).then(()=>location.reload()); return false\">"
-            f'<div><label style="font-size: 11px; color: #666; display: block;">Type</label>'
-            f'<select name="t" style="padding: 4px;">'
-            f'<option value="">-- select type --</option>{type_options}</select></div>'
-            f'<div><label style="font-size: 11px; color: #666; display: block;">Key</label>'
-            f'<input name="k" type="text" placeholder="unique-key" style="padding: 4px; width: 140px;" /></div>'
-            f'<div><label style="font-size: 11px; color: #666; display: block;">Label</label>'
-            f'<input name="l" type="text" placeholder="Display Label" style="padding: 4px; width: 160px;" /></div>'
-            f'<button type="submit" style="padding: 4px 14px; cursor: pointer;'
-            f' background: #4a7; color: white; border: 1px solid #396; border-radius: 3px;">+ Add</button>'
-            f'</form></div>'
-        )
-
-        # --- Eigenforms with inline controls ---
-        n = len(self.eigenforms)
-        for i, ef in enumerate(self.eigenforms):
-            key = ef.key
-            # Control bar
-            ctrl = (
-                f'<div style="display: flex; align-items: center; gap: 4px;'
-                f' padding: 4px 8px; background: #fafafa; border: 1px solid #e0e0e0;'
-                f' border-bottom: none; border-radius: 4px 4px 0 0; font-size: 11px; color: #666;">'
-                f'<span style="font-family: monospace; background: #eee; padding: 1px 5px;'
-                f' border-radius: 2px;">{escape(key)}</span>'
-                f'<span style="flex: 1;"></span>'
-            )
-            # Move up
-            if i > 0:
-                ctrl += render_inline_button(
-                    url, {"action": "move_eigenform", "key": key, "position": i - 1},
-                    "&#9650;",
-                    "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8;"
-                    " width: 22px; height: 22px; font-size: 9px; padding: 0;"
-                )
-            else:
-                ctrl += (
-                    '<span style="display: inline-block; width: 22px; height: 22px;'
-                    ' border: 1px solid transparent;"></span>'
-                )
-            # Move down
-            if i < n - 1:
-                ctrl += render_inline_button(
-                    url, {"action": "move_eigenform", "key": key, "position": i + 1},
-                    "&#9660;",
-                    "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8;"
-                    " width: 22px; height: 22px; font-size: 9px; padding: 0;"
-                )
-            else:
-                ctrl += (
-                    '<span style="display: inline-block; width: 22px; height: 22px;'
-                    ' border: 1px solid transparent;"></span>'
-                )
-            # Remove
-            ctrl += render_inline_button(
-                url, {"action": "remove_eigenform", "key": key},
-                "&#10005;",
-                "cursor: pointer; border: 1px solid #dcc; background: #fef8f8;"
-                " width: 22px; height: 22px; font-size: 10px; padding: 0; color: #c00;"
-                " margin-left: 4px;"
-            )
-            ctrl += '</div>'
-
-            # Eigenform content in bordered container
-            html += (
-                f'<div style="margin-bottom: 8px;">'
-                f'{ctrl}'
-                f'<div style="border: 1px solid #e0e0e0; border-radius: 0 0 4px 4px;'
-                f' padding: 8px;">'
-                f'{ef.render()}'
-                f'</div></div>'
-            )
-
-        if not self.eigenforms:
-            html += (
-                '<div style="padding: 24px; text-align: center; color: #999;'
-                ' border: 2px dashed #ddd; border-radius: 4px; margin-bottom: 8px;">'
-                'No eigenforms yet. Use the toolbar above to add one.</div>'
-            )
-
-        # Rebuild from seed button (subtle, at the bottom)
-        html += (
-            f'<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee;">'
-        )
-        html += render_inline_button(
-            url, {"action": "rebuild_from_seed"},
-            "&#8634; Rebuild from Seed",
-            "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8;"
-            " font-size: 11px; padding: 3px 10px; color: #888;"
-        )
-        html += '</div>'
-
-        return html
+        children_html = [ef.render() for ef in self.eigenforms]
+        child_items = []
+        available_types = []
+        if self.mutable_structure:
+            available_types = sorted(get_registry().available())
+            for i, ef in enumerate(self.eigenforms):
+                child_items.append({"key": ef.key, "index": i, "html": ef.render()})
+        return render_template("page.html", data=data, ef=self, url=self._url_prefix, label=data.get("label", ""), instruction=data.get("instruction") or "", children_html=children_html, child_items=child_items, available_types=available_types, feedback=data.get("feedback"), mutable=self.mutable_structure)
 
     def find_eigenform(self, path: str) -> Eigenform | None:
         """Find an eigenform by its path (e.g., 'tabs/title')."""

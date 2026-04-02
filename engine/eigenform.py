@@ -412,10 +412,10 @@ class Eigenform:
                 body_json = json.dumps(body_dict)
                 t = title or f'POST {self.url} {escape(body_json)}'
                 return (
-                    f'<button onclick="fetch(\'{self.url}\','
-                    f'{{method:\'POST\',headers:{{\'Content-Type\':\'application/json\'}},'
-                    f'body:JSON.stringify({body_json.replace(chr(34), "&quot;")})}}).then(()=>location.reload())"'
-                    f' style="{btn_style} background: {bg}; border: 1px solid {border};"'
+                    f'<button data-ef-post="{escape(self.url)}"'
+                    f' data-ef-body="{escape(body_json)}"'
+                    f' class="ef-chrome-btn"'
+                    f' style="background: {bg}; border: 1px solid {border};"'
                     f' title="{t}">{icon}</button>'
                 )
 
