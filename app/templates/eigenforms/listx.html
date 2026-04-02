@@ -1,0 +1,115 @@
+{# ListFormX template — HTMX native.
+   The template IS the state machine. No affordance objects needed.
+   HTMX attributes inherit hx-target/hx-swap/hx-ext from #page-content.
+#}
+{% for aff in data.affordances %}
+{% set _ = aff.update({"_rendered": true}) %}
+{% endfor %}
+{% if edit_mode %}
+<form hx-post="{{ url }}">
+  <input type="hidden" name="action" value="set_label">
+  <label>Label: <input type="text" name="label" value="{{ label }}"></label>
+  <button type="submit">Save</button>
+</form>
+<form hx-post="{{ url }}">
+  <input type="hidden" name="action" value="set_instruction">
+  <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
+  <button type="submit">Save</button>
+</form>
+<button hx-post="{{ url }}" hx-vals='{"action": "toggle_constraints"}'>constraints: {{ "on" if allow_constraints else "off" }}</button>
+{% else %}
+<h3 data-field="label">{{ label }}</h3>
+{% if instruction %}<p data-field="instruction">{{ instruction }}</p>{% endif %}
+{% endif %}
+{% if na %}
+<p data-field="value">N/A</p>
+<button hx-post="{{ url }}" hx-vals='{"action": "clear_na"}'>Clear N/A</button>
+{% else %}
+{% set num_items = items|length %}
+<ol>
+{% for item in items %}
+{% set item_id = item.id %}
+{% set item_val = item.value|string %}
+{% set is_fixed = item.fixed and not edit_mode %}
+{% set is_item_fixed = item.fixed %}
+<li data-item-id="{{ item_id }}">
+{% if not is_fixed -%}
+<button hx-post="{{ url }}" hx-vals='{"action": "remove", "id": "{{ item_id }}"}'>x</button>
+{% endif %}
+{% set can_up = oc.can_move_up(loop.index0, items) %}
+{% set can_down = oc.can_move_down(loop.index0, items) %}
+{% if can_up -%}
+<button hx-post="{{ url }}" hx-vals='{"action": "move_up", "id": "{{ item_id }}"}'>&#9650;</button>
+{% endif %}
+{% if can_down -%}
+<button hx-post="{{ url }}" hx-vals='{"action": "move_down", "id": "{{ item_id }}"}'>&#9660;</button>
+{% endif %}
+{% if is_fixed -%}
+<span data-field="value" data-fixed="true">{{ item_val }}</span>
+{% else -%}
+<form hx-post="{{ url }}" style="display: inline;">
+  <input type="hidden" name="action" value="edit">
+  <input type="hidden" name="id" value="{{ item_id }}">
+  <input name="value" type="text" value="{{ item_val }}">
+  <button type="submit">&#10003;</button>
+</form>
+{% endif %}
+{% if edit_mode -%}
+<button hx-post="{{ url }}" hx-vals='{"action": "toggle_fixed", "id": "{{ item_id }}"}'>{{ "&#128204;" if is_item_fixed else "&#128203;" }}</button>
+{% endif %}
+{% set prereqs = all_must_follow.get(item_id, []) %}
+{% if allow_constraints and num_items > 1 %}
+{% set available = [] %}
+{% for i in items %}
+{% if i.id != item_id and i.id not in prereqs %}
+{% set _ = available.append(i) %}
+{% endif %}
+{% endfor %}
+{% if available -%}
+<select hx-post="{{ url }}" hx-vals='{"action": "add_constraint", "item": "{{ item_id }}"}' hx-trigger="change" name="after">
+  <option value="">add constraint...</option>
+{% for i in available %}
+  <option value="{{ i.id }}">after {{ i.value }} ({{ i.id }})</option>
+{% endfor %}
+</select>
+{% endif %}
+{% endif %}
+{% if prereqs %}
+{% for p_id in prereqs %}
+{% set p_name = id_to_val.get(p_id, p_id) or p_id %}
+{% set is_static = (item_id, p_id) in static_pairs %}
+{% set stored_c = namespace(val=none) %}
+{% for c in stored_constraints %}
+{% if c.item == item_id and c.after == p_id %}
+{% set stored_c.val = c %}
+{% endif %}
+{% endfor %}
+{% if is_static and (stored_c.val is none or stored_c.val.fixed is not false) %}
+{% set is_effectively_fixed = true %}
+{% elif not is_static and stored_c.val %}
+{% set is_effectively_fixed = stored_c.val.fixed %}
+{% else %}
+{% set is_effectively_fixed = false %}
+{% endif -%}
+<span data-constraint-after="{{ p_id }}" data-fixed="{{ is_effectively_fixed|lower }}">{{ p_name }}</span>
+{%- if edit_mode -%}
+<button hx-post="{{ url }}" hx-vals='{"action": "toggle_constraint_fixed", "item": "{{ item_id }}", "after": "{{ p_id }}"}'>{{ "&#128204;" if is_effectively_fixed else "&#128203;" }}</button>
+<button hx-post="{{ url }}" hx-vals='{"action": "remove_constraint", "item": "{{ item_id }}", "after": "{{ p_id }}"}'>x</button>
+{%- elif not is_effectively_fixed -%}
+<button hx-post="{{ url }}" hx-vals='{"action": "remove_constraint", "item": "{{ item_id }}", "after": "{{ p_id }}"}'>x</button>
+{%- endif %}
+{% endfor %}
+{% endif %}
+</li>
+{% endfor %}
+</ol>
+<form hx-post="{{ url }}" data-field="add">
+  <input type="hidden" name="action" value="add">
+  <input name="value" type="text" placeholder="New item">
+  <button type="submit">+ Add</button>
+</form>
+{% if has_data -%}
+<button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
+{% endif -%}
+<button hx-post="{{ url }}" hx-vals='{"action": "na"}'>N/A</button>
+{% endif %}

@@ -16,8 +16,11 @@ subscribers: dict[str, list[queue.Queue]] = {}
 
 
 def wants_html(req) -> bool:
-    """True if the client prefers HTML (i.e. a browser)."""
-    return "text/html" in req.accept_mimetypes
+    """True if the client prefers HTML (i.e. a browser or HTMX request)."""
+    if req.headers.get("HX-Request") == "true":
+        return True
+    best = req.accept_mimetypes.best_match(["application/json", "text/html"])
+    return best == "text/html"
 
 
 def notify_subscribers(page_key: str, data: dict):
@@ -52,6 +55,8 @@ def page(page_key):
         pg.handle(request.json)
         result = pg.serialize()
         notify_subscribers(page_key, result)
+        if wants_html(request):
+            return Markup(pg.render())
         return jsonify(result)
     if wants_html(request):
         html = Markup(pg.render())
@@ -106,4 +111,6 @@ def eigenform(page_key, path):
     if result is None:
         return jsonify({"error": f"Unknown path: {path}"}), 404
     notify_subscribers(page_key, result)
+    if wants_html(request):
+        return Markup(pg.render())
     return jsonify(result)

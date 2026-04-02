@@ -1,33 +1,31 @@
-{# TextForm template.
-
-   Context:
-     data  — the serialized eigenform dict (_serialize_full output)
-     ef    — the TextForm instance (for url, etc.)
-#}
-{% if data.edit_mode %}
-  {% include "_edit_header.html" with context %}
-
-  <p><strong>Value:</strong> {{ data.value|string }}</p>
-
-  {# Mark edit affordances, render the rest #}
-  {% for aff in data.affordances %}
-    {% if not aff._rendered %}
-      {% if aff.body.action in ("set_label", "set_instruction") %}
-        {% set _ = aff.update({"_rendered": true}) %}
-      {% else %}
-        {{ render_aff(aff) }}
-      {% endif %}
-    {% endif %}
-  {% endfor %}
-
+{# TextForm template — HTMX native. #}
+{% for aff in data.affordances %}
+{% set _ = aff.update({"_rendered": true}) %}
+{% endfor %}
+{% if edit_mode %}
+<form hx-post="{{ url }}">
+  <input type="hidden" name="action" value="set_label">
+  <label>Label: <input type="text" name="label" value="{{ label }}"></label>
+  <button type="submit">Save</button>
+</form>
+<form hx-post="{{ url }}">
+  <input type="hidden" name="action" value="set_instruction">
+  <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
+  <button type="submit">Save</button>
+</form>
+<p data-field="value">{{ value|string }}</p>
+{% if has_data -%}
+<button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
+{% endif %}
 {% else %}
-  <h3>{{ data.label }}</h3>
-  {% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
-  <p><strong>Value:</strong> {{ data.value|string }}</p>
-
-  {% for aff in data.affordances %}
-    {% if not aff._rendered %}
-      {{ render_aff(aff) }}
-    {% endif %}
-  {% endfor %}
+<h3 data-field="label">{{ label }}</h3>
+{% if instruction %}<p data-field="instruction">{{ instruction }}</p>{% endif %}
+<p data-field="value">{{ value|string }}</p>
+<form hx-post="{{ url }}">
+  <input name="value" type="text" placeholder="{{ label }}">
+  <button type="submit">Set {{ label }}</button>
+</form>
+{% if has_data -%}
+<button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
+{% endif %}
 {% endif %}

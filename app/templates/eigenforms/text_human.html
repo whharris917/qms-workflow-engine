@@ -1,0 +1,33 @@
+{# TextForm human template — styled HTMX. #}
+{% for aff in data.affordances %}
+{% set _ = aff.update({"_rendered": true}) %}
+{% endfor %}
+{% if edit_mode %}
+<form hx-post="{{ url }}" class="ef-edit-label-form">
+  <input type="hidden" name="action" value="set_label">
+  <input name="label" type="text" value="{{ label }}" class="ef-edit-label-input">
+  <button type="submit" class="{{ CSS_CONFIRM }}">&#10003;</button>
+</form>
+<form hx-post="{{ url }}" class="ef-edit-instr-form">
+  <input type="hidden" name="action" value="set_instruction">
+  <input name="instruction" type="text" value="{{ instruction }}" placeholder="Instruction text" class="ef-edit-instr-input">
+  <button type="submit" class="{{ CSS_CONFIRM }}">&#10003;</button>
+</form>
+<p><strong>Value:</strong> {{ value|string }}</p>
+{% if has_data %}
+<div style="margin: 4px 0;">
+  <button hx-post="{{ url }}" hx-vals='{"action": "clear"}' style="cursor: pointer; font-size: 12px; padding: 4px 10px;">Clear</button>
+</div>
+{% endif %}
+{% else %}
+<h3>{{ label }}</h3>
+{% if instruction %}<p>{{ instruction }}</p>{% endif %}
+<p><strong>Value:</strong> {{ value|string }}</p>
+<form hx-post="{{ url }}" style="display: inline;">
+  <input name="value" type="text">
+  <button type="submit">Set {{ label }}</button>
+</form>
+{% if has_data %}
+<button hx-post="{{ url }}" hx-vals='{"action": "clear"}' style="cursor: pointer; font-size: 12px; padding: 4px 10px; margin-left: 8px;">Clear</button>
+{% endif %}
+{% endif %}

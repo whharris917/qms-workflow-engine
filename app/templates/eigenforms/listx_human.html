@@ -1,101 +1,80 @@
-{# ListForm template.
-   Context:
-     data        — the serialized eigenform dict
-     ef          — the ListForm instance
-     url         — the eigenform's POST URL
-     label       — current label text
-     instruction — current instruction text
-     oc          — the OrderedCollection instance
-     allow_constraints — whether constraints are enabled
+{# ListFormX human template — styled HTMX.
+   Same visual layout as original ListForm, but using hx-post/hx-vals
+   instead of data-ef-*/render_aff().
 #}
-{% if data.edit_mode %}
-{% include "_edit_header.html" with context %}
-{% set ac = allow_constraints %}
-{% set ac_body = {"action": "toggle_constraints"} %}
-{% set ac_tooltip = "POST " ~ url ~ " " ~ (ac_body|tojson) %}
-{% set ac_bg = "#efffef" if ac else "#f8f8f8" %}
-{% set ac_border = "#4a4" if ac else "#ccc" %}
-<div style="margin: 4px 0; font-size: 0.9em; color: #666;">
-  <button data-ef-post="{{ url }}" data-ef-body="{{ ac_body|tojson }}"
-    style="cursor: pointer; font: inherit; font-size: 0.9em; border: 1px solid {{ ac_border }}; background: {{ ac_bg }}; padding: 1px 8px; border-radius: 3px;"
-    title="{{ ac_tooltip }}">constraints: {{ "on" if ac else "off" }}</button>
-</div>
 {% for aff in data.affordances %}
-{% if aff.body.action in ("set_label", "set_instruction", "toggle_constraints") %}
 {% set _ = aff.update({"_rendered": true}) %}
-{% endif %}
 {% endfor %}
+{% if edit_mode %}
+<form hx-post="{{ url }}" class="ef-edit-label-form">
+  <input type="hidden" name="action" value="set_label">
+  <input name="label" type="text" value="{{ label }}" class="ef-edit-label-input">
+  <button type="submit" class="{{ CSS_CONFIRM }}">&#10003;</button>
+</form>
+<form hx-post="{{ url }}" class="ef-edit-instr-form">
+  <input type="hidden" name="action" value="set_instruction">
+  <input name="instruction" type="text" value="{{ instruction }}" placeholder="Instruction text" class="ef-edit-instr-input">
+  <button type="submit" class="{{ CSS_CONFIRM }}">&#10003;</button>
+</form>
+{% set ac_bg = "#efffef" if allow_constraints else "#f8f8f8" %}
+{% set ac_border = "#4a4" if allow_constraints else "#ccc" %}
+<div style="margin: 4px 0; font-size: 0.9em; color: #666;">
+  <button hx-post="{{ url }}" hx-vals='{"action": "toggle_constraints"}'
+    style="cursor: pointer; font: inherit; font-size: 0.9em; border: 1px solid {{ ac_border }}; background: {{ ac_bg }}; padding: 1px 8px; border-radius: 3px;">
+    constraints: {{ "on" if allow_constraints else "off" }}</button>
+</div>
 {% else %}
-<h3>{{ data.label }}</h3>
-{% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
+<h3>{{ label }}</h3>
+{% if instruction %}<p>{{ instruction }}</p>{% endif %}
 {% endif %}
-{% set affs = data.affordances or [] %}
-{% if data.na %}
+{% if na %}
 <p style="color: #888; font-style: italic;">N/A</p>
-{% for aff in affs %}
-{% if not aff._rendered %}
-{{ render_aff(aff) }}
-{% endif %}
-{% endfor %}
+<div style="margin: 4px 0;">
+  <button hx-post="{{ url }}" hx-vals='{"action": "clear_na"}' style="cursor: pointer; font-size: 12px; padding: 4px 10px;">Clear N/A</button>
+</div>
 {% else %}
-{% set items = data["items"] or [] %}
 {% set num_items = items|length %}
-{% for aff in affs %}
-{% set action = aff.body.action %}
-{% if action in ("move_up", "move_down", "edit", "remove",
-                  "add_constraint", "remove_constraint",
-                  "toggle_fixed", "toggle_constraint_fixed") %}
-{% set _ = aff.update({"_rendered": true}) %}
-{% elif action == "add" %}
-{% set _ = aff.update({"_rendered": true, "_is_add": true}) %}
-{% endif %}
-{% endfor %}
 {% set id_style = "display: inline-block; min-width: 52px; color: #666; text-align: center; background: #e8e8e8; border-radius: 10px; padding: 1px 6px; font-family: monospace; font-size: 0.85em;" %}
-{% set endpoint = "POST " ~ url %}
 <ol style="margin: 4px 0; padding-left: 24px;">
 {% for item in items %}
 {% set item_id = item.id %}
 {% set item_val = item.value|string %}
-{% set is_fixed = item.fixed and not data.edit_mode %}
+{% set is_fixed = item.fixed and not edit_mode %}
 {% set is_item_fixed = item.fixed %}
 <li style="margin: 4px 0; display: flex; align-items: center; gap: 4px;">
-{%- if not is_fixed %}
+{% if not is_fixed -%}
 {{ render_btn(url, {"action": "remove", "id": item_id}, "x", CSS_REMOVE) }}
-{%- else %}
+{% else -%}
 {{ BUTTON_GAP|safe }}
-{%- endif %}
+{% endif -%}
 <span style="{{ id_style }}">{{ item_id }}</span>
-{%- set can_up = oc.can_move_up(loop.index0, items) %}
+{% set can_up = oc.can_move_up(loop.index0, items) %}
 {% set can_down = oc.can_move_down(loop.index0, items) %}
-{% for direction, arrow, can in [
-    ("move_up", "&#9650;", can_up),
-    ("move_down", "&#9660;", can_down),
-] %}
-{% if can -%}
-{{ render_btn(url, {"action": direction, "id": item_id}, arrow, CSS_ARROW) }}
-{%- else -%}
+{% if can_up -%}
+{{ render_btn(url, {"action": "move_up", "id": item_id}, "&#9650;", CSS_ARROW) }}
+{% else -%}
 {{ BUTTON_GAP|safe }}
-{%- endif %}
-{% endfor %}
-{%- if is_fixed -%}
+{% endif -%}
+{% if can_down -%}
+{{ render_btn(url, {"action": "move_down", "id": item_id}, "&#9660;", CSS_ARROW) }}
+{% else -%}
+{{ BUTTON_GAP|safe }}
+{% endif -%}
+{% if is_fixed -%}
 <span style="display: inline-block; width: 200px; padding: 2px 4px; border: 1px solid transparent; box-sizing: content-box; color: #555; background: #f0f0f0; border-radius: 3px;">{{ item_val }}</span>
 {{ BUTTON_GAP|safe }}
-{%- else %}
-{% set edit_default = {"action": "edit", "id": item_id, "value": item.value or ""} %}
-{% set edit_tooltip = endpoint ~ " " ~ (edit_default|tojson) %}
-<form style="display: inline; margin: 0;" data-ef-submit="{{ url }}">
-  <input type="hidden" name="action" value="edit" />
-  <input type="hidden" name="id" value="{{ item_id }}" />
-  <input name="value" type="text" value="{{ item_val }}"
-    style="border: 1px solid #ddd; padding: 2px 4px; width: 200px;" />
-  <button type="submit" class="{{ CSS_CONFIRM }}"
-    title="{{ edit_tooltip }}">&#10003;</button>
+{% else -%}
+<form hx-post="{{ url }}" style="display: inline; margin: 0;">
+  <input type="hidden" name="action" value="edit">
+  <input type="hidden" name="id" value="{{ item_id }}">
+  <input name="value" type="text" value="{{ item_val }}" style="border: 1px solid #ddd; padding: 2px 4px; width: 200px;">
+  <button type="submit" class="{{ CSS_CONFIRM }}">&#10003;</button>
 </form>
-{%- endif %}
-{% if data.edit_mode %}
+{% endif -%}
+{% if edit_mode -%}
 {% set pin_cls = "ef-pin-btn ef-pin-btn--pinned" if is_item_fixed else "ef-pin-btn ef-pin-btn--unpinned" %}
 {{ render_btn(url, {"action": "toggle_fixed", "id": item_id}, '<span style="font-size: 14px;">&#128204;</span>', pin_cls) }}
-{% endif %}
+{%- endif %}
 {% set prereqs = all_must_follow.get(item_id, []) %}
 {% if prereqs or (allow_constraints and num_items > 1) -%}
 <span style="color: #999; display: inline-flex; align-items: center; gap: 2px;">
@@ -107,25 +86,20 @@
 {% endif %}
 {% endfor %}
 {% if available %}
-{% set constraint_template_val = {"action": "add_constraint", "item": item_id, "after": "__VALUE"} %}
 <span style="position: relative; display: inline-block; width: 24px; height: 24px; box-sizing: content-box; border: 1px solid #ccc; background: #f8f8f8; vertical-align: middle;">
   <span style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: normal; pointer-events: none;">&#9745;</span>
-  <select title='POST {{ url }} {{ {"action":"add_constraint","item":item_id,"after":"..."} |tojson }}'
-    style="position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;"
-    data-ef-change="{{ url }}"
-    data-ef-template='{{ constraint_template_val|tojson }}'>
+  <select hx-post="{{ url }}" hx-vals='{"action": "add_constraint", "item": "{{ item_id }}"}' hx-trigger="change" name="after"
+    style="position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
     <option value="">&#8212;</option>
 {% for i in available %}
-{% set opt_body = {"action": "add_constraint", "item": item_id, "after": i.id} %}
 {% set opt_label = i.value ~ " (" ~ i.id ~ ")" if i.value else i.id %}
-    <option value="{{ i.id }}" title="POST {{ url }} {{ opt_body|tojson }}">{{ opt_label }}</option>
+    <option value="{{ i.id }}">{{ opt_label }}</option>
 {% endfor %}
   </select>
 </span>
 {% endif %}
 {% endif %}
 {% if prereqs %}
-{% set in_edit = data.edit_mode %}
 {% for p_id in prereqs %}
 {% set p_name = id_to_val.get(p_id, p_id) or p_id %}
 {% set is_static = (item_id, p_id) in static_pairs %}
@@ -145,7 +119,7 @@
 {% set pill_bg = "#fff3cd" if is_effectively_fixed else "#e8e8e8" %}
 {% set pill_border = "1px solid #856404" if is_effectively_fixed else "none" %}
 <span style="display: inline-block; min-width: 52px; color: #666; text-align: center; background: {{ pill_bg }}; border: {{ pill_border }}; border-radius: 10px; padding: 1px 6px; font-family: monospace; font-size: 0.85em;">{{ p_name }}</span>
-{%- if in_edit %}
+{%- if edit_mode %}
 {% set pin_cls = "ef-pin-btn ef-pin-btn--small ef-pin-btn--pinned" if is_effectively_fixed else "ef-pin-btn ef-pin-btn--small ef-pin-btn--unpinned" %}
 {{ render_btn(url, {"action": "toggle_constraint_fixed", "item": item_id, "after": p_id}, '<span style="font-size: 11px;">&#128204;</span>', pin_cls) }}
 {{ render_btn(url, {"action": "remove_constraint", "item": item_id, "after": p_id}, "x", CSS_REMOVE) }}
@@ -162,22 +136,17 @@
   {{ BUTTON_GAP|safe }}
   <span style="{{ id_style }} visibility: hidden;">item_0</span>
   {{ BUTTON_GAP|safe }}{{ BUTTON_GAP|safe }}
-{% set add_default = {"action": "add", "value": ""} %}
-{% set add_tooltip = endpoint ~ " " ~ (add_default|tojson) %}
-  <form style="display: inline; margin: 0;" data-ef-submit="{{ url }}">
-    <input type="hidden" name="action" value="add" />
-    <input name="value" type="text" placeholder="New item"
-      style="border: 1px solid #ddd; padding: 2px 4px; width: 200px;" />
-    <button type="submit" class="{{ CSS_CONFIRM }}"
-      title="{{ add_tooltip }}">+</button>
+  <form hx-post="{{ url }}" style="display: inline; margin: 0;">
+    <input type="hidden" name="action" value="add">
+    <input name="value" type="text" placeholder="New item" style="border: 1px solid #ddd; padding: 2px 4px; width: 200px;">
+    <button type="submit" class="{{ CSS_CONFIRM }}">+</button>
   </form>
 </li>
 </ol>
 <div style="margin-top: 8px;">
-{% for aff in affs %}
-{% if not aff._rendered %}
-{{ render_aff(aff) }}
+{% if has_data %}
+<button hx-post="{{ url }}" hx-vals='{"action": "clear"}' style="cursor: pointer; font-size: 12px; padding: 4px 10px;">Clear</button>
 {% endif %}
-{% endfor %}
+<button hx-post="{{ url }}" hx-vals='{"action": "na"}' style="cursor: pointer; font-size: 12px; padding: 4px 10px;">N/A</button>
 </div>
 {% endif %}

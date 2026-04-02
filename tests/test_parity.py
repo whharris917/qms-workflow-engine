@@ -57,7 +57,7 @@ class _DataAttrParser(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]):
         for name, val in attrs:
-            if name in ("data-ef-post", "data-ef-submit", "data-ef-change"):
+            if name in ("data-ef-post", "data-ef-submit", "data-ef-change", "hx-post"):
                 if val:
                     self.urls.add(val)
 

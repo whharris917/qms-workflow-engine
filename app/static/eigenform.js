@@ -3,7 +3,7 @@
  *
  * Eigenforms control their own interaction by emitting data attributes.
  * This script is a thin mechanism that reads those attributes and
- * executes the fetch+reload cycle. It does not contain any eigenform
+ * executes the fetch+swap cycle. It does not contain any eigenform
  * logic — the eigenform dictates the URL, body, and input strategy.
  *
  * Protocols:
@@ -59,7 +59,15 @@ document.addEventListener('change', function(e) {
 function _efPost(url, body) {
     fetch(url, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'text/html'
+        },
         body: body
-    }).then(function() { location.reload(); });
+    }).then(function(resp) {
+        return resp.text();
+    }).then(function(html) {
+        document.getElementById('page-content').innerHTML = html;
+        htmx.process(document.getElementById('page-content'));
+    });
 }

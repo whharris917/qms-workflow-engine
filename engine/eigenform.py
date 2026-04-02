@@ -61,6 +61,9 @@ def _is_json_safe(val) -> bool:
 @dataclass
 class Eigenform:
     """Base protocol for all eigenform types."""
+    # Plain class attr — not a dataclass field. Subclasses override to True.
+    htmx_native = False
+
     key: str
     label: str
     instruction: str | None = None
@@ -371,6 +374,47 @@ class Eigenform:
         """Mark an affordance dict as accounted for (rendered or intentionally skipped)."""
         aff["_rendered"] = True
 
+    def render_agent_from_data(self, data: dict) -> str | None:
+        """Render agent-facing HTML from serialized state.
+
+        Override in htmx_native subclasses to provide a separate agent view.
+        Returns None if no agent HTML is available (non-HTMX eigenforms).
+        """
+        return None
+
+    def _render_toggle_btn(self, uid: str, inner: str, json_str: str, agent_html: str | None = None) -> str:
+        """Render the view-selector dropdown and alternate content panes."""
+        # Build ordered list of (pane_id, label, tag, content)
+        panes = []
+        panes.append((f'{uid}-human', 'Human View', 'div', inner))
+        if self.htmx_native and agent_html is not None:
+            panes.append((f'{uid}-agent', 'Agent View', 'div', agent_html))
+            panes.append((f'{uid}-agent-src', 'Agent HTMX', 'pre', escape(agent_html)))
+        panes.append((f'{uid}-json', 'JSON', 'pre', json_str))
+
+        pane_ids_js = '[' + ','.join(f'"{p[0]}"' for p in panes) + ']'
+        onchange = (
+            f'var ps={pane_ids_js},v=this.value;'
+            f'for(var i=0;i<ps.length;i++)document.getElementById(ps[i]).style.display=i==v?"block":"none";'
+        )
+
+        select_style = (
+            'position: absolute; top: 8px; right: 8px; font-size: 11px;'
+            ' cursor: pointer; background: #555; color: white;'
+            ' border: none; padding: 2px 6px; border-radius: 3px;'
+        )
+        html = f'<select onchange=\'{onchange}\' style="{select_style}">'
+        for i, (_, label, _, _) in enumerate(panes):
+            html += f'<option value="{i}">{escape(label)}</option>'
+        html += '</select>'
+
+        pre_style = 'margin: 0; white-space: pre-wrap;'
+        for i, (pane_id, _, tag, content) in enumerate(panes):
+            display = 'block' if i == 0 else 'none'
+            style = f'display: {display};' + (f' {pre_style}' if tag == 'pre' else '')
+            html += f'<{tag} id="{pane_id}" style="{style}">{content}</{tag}>'
+        return html
+
     def render(self) -> str:
         """Render this eigenform as HTML, wrapped in a standard container.
 
@@ -393,8 +437,9 @@ class Eigenform:
                 f"Use render_affordance_html() to render or Eigenform.mark_rendered() to skip."
             )
 
-        json_str = escape(json.dumps(self.serialize(), indent=2))
         uid = self.uid
+        json_str = escape(json.dumps(self.serialize(), indent=2))
+        agent_html = self.render_agent_from_data(data) if self.htmx_native else None
 
         complete_color = '#2a2' if self.is_complete else '#888'
         edit_border = ' border-style: dashed;' if self.edit_mode else ''
@@ -473,12 +518,7 @@ class Eigenform:
             f'<div class="eigenform" data-form="{self.form}" data-key="{self.key}"'
             f' style="border: 2px solid {complete_color};{edit_border} padding: {"38px" if self.editable else "30px"} 12px 12px 12px; margin: 8px 0; position: relative;">'
             f'{chrome_html}'
-            f'<button onclick="var h=document.getElementById(\'{uid}-human\'),j=document.getElementById(\'{uid}-json\'),'
-            f'v=j.style.display===\'none\';j.style.display=v?\'block\':\'none\';h.style.display=v?\'none\':\'block\';'
-            f'this.textContent=v?\'See HTML\':\'See JSON\'"'
-            f' style="position: absolute; top: 8px; right: 8px; font-size: 12px; cursor: pointer; background: #7b2d8b; color: white; border: none; padding: 2px 8px; border-radius: 3px;">See JSON</button>'
-            f'<div id="{uid}-human">{inner}</div>'
-            f'<pre id="{uid}-json" style="display: none; margin: 0; white-space: pre-wrap;">{json_str}</pre>'
+            f'{self._render_toggle_btn(uid, inner, json_str, agent_html)}'
             f'</div>'
         )
 

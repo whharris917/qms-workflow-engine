@@ -43,16 +43,16 @@ def _body_attr(body: dict) -> str:
     return escape(json.dumps(body))
 
 
-def render_inline_button(url: str, body: dict, content: str, style: str) -> str:
+def render_inline_button(url: str, body: dict, content: str, css_class: str) -> str:
     """Render a button that POSTs a JSON body via event delegation.
 
-    The eigenform controls the URL, body, and style. The global
-    delegation script (eigenform.js) handles the fetch+reload cycle.
+    The eigenform controls the URL, body, and CSS class. The global
+    delegation script (eigenform.js) handles the fetch+swap cycle.
     """
     tooltip = f'{escape("POST " + url)} {escape(json.dumps(body))}'
     return (
         f'<button data-ef-post="{escape(url)}" data-ef-body="{_body_attr(body)}"'
-        f' style="{style}"'
+        f' class="{css_class}"'
         f' title="{tooltip}">'
         f'{content}</button>'
     )

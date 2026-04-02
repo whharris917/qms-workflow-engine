@@ -112,6 +112,7 @@ def _build_default_registry() -> EigenformRegistry:
     from engine.stepform import SequenceForm
     from engine.tablerunner import TableRunner
     from engine.historyform import HistoryForm
+    from engine.listformx import ListFormX
 
     r = EigenformRegistry()
     for cls in [
@@ -123,7 +124,7 @@ def _build_default_registry() -> EigenformRegistry:
         SwitchForm,
         VisibilityForm, DynamicChoiceForm,
         ScoreForm, ComputedForm, ValidationForm,
-        ActionForm, RubiksCubeForm,
+        ActionForm, RubiksCubeForm, ListFormX,
     ]:
         r.register(cls)
     return r

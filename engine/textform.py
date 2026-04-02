@@ -10,6 +10,7 @@ from engine.templates import render_template
 @dataclass
 class TextForm(Eigenform):
     """Single free-form string input."""
+    htmx_native = True
     default: str | None = None
 
     @property
@@ -21,10 +22,20 @@ class TextForm(Eigenform):
             "value": self.value if self.value is not None else self.default,
         }
 
+    def _template_context(self, data: dict) -> dict:
+        return dict(data=data, ef=self,
+                    url=self.url, label=data["label"],
+                    instruction=data.get("instruction") or "",
+                    value=data.get("value"),
+                    edit_mode=data.get("edit_mode", False),
+                    has_data=self.has_data,
+                    undo_depth=self._undo_depth if self.edit_mode else 0)
+
     def render_from_data(self, data: dict) -> str:
-        return render_template("text.html", data=data, ef=self,
-                               url=self.url, label=data["label"],
-                               instruction=data.get("instruction") or "")
+        return render_template("text_human.html", **self._template_context(data))
+
+    def render_agent_from_data(self, data: dict) -> str:
+        return render_template("text.html", **self._template_context(data))
 
     def get_affordances(self) -> list[Affordance]:
         return [

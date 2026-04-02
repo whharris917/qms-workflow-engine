@@ -19,6 +19,8 @@ _TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "app" / "templates" / "
 _env = Environment(
     loader=FileSystemLoader(str(_TEMPLATE_DIR)),
     autoescape=True,
+    trim_blocks=True,
+    lstrip_blocks=True,
 )
 
 
