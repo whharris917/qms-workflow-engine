@@ -1,0 +1,273 @@
+{# TableFormX human template — styled HTMX.
+   Same visual layout as original TableForm, but using hx-post/hx-vals
+   instead of data-ef-*/render_aff().
+#}
+{% for aff in data.affordances %}
+{% set _ = aff.update({"_rendered": true}) %}
+{% endfor %}
+<h3>{{ label }}</h3>
+{% if instruction %}<p>{{ instruction }}</p>{% endif %}
+
+{# Configuration panel #}
+{% if config_toggles %}
+<div style="background: #f8f8f8; border: 1px solid #ddd; border-radius: 4px; padding: 6px 10px; margin: 8px 0; display: inline-flex; align-items: center; gap: 12px;">
+  <span style="font-weight: bold; font-size: 0.9em; color: #555;">Configuration</span>
+  {% for cfg_key, action_name, toggle_label in config_toggles %}
+  <label style="display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+    <input type="checkbox" {{ "checked" if config.get(cfg_key, false) }}
+      hx-post="{{ url }}" hx-vals='{"action": "{{ action_name }}"}'>
+    <span>{{ toggle_label }}</span>
+  </label>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if col_data %}
+<div style="overflow-x: auto; margin: 8px 0;">
+<table style="border-collapse: collapse; white-space: nowrap; width: max-content;">
+
+  {# Header row #}
+  <tr>
+    {# Control columns: remove, up, down, constraint dropdown #}
+    <th style="border: 1px solid #ccc; padding: 2px 4px; background: #f0f0f0;"></th>
+    {% if num_rows > 1 %}
+    <th style="border: 1px solid #ccc; padding: 2px 4px; background: #f0f0f0;"></th>
+    <th style="border: 1px solid #ccc; padding: 2px 4px; background: #f0f0f0;"></th>
+    {% endif %}
+    {% if show_row_constraints %}
+    <th style="border: 1px solid #ccc; padding: 2px 4px; background: #f0f0f0;"></th>
+    {% endif %}
+    <th style="border: 1px solid #ccc; padding: 4px 8px; background: #f0f0f0;">ID</th>
+    {% if any_row_prereqs %}
+    <th style="border: 1px solid #ccc; padding: 4px 8px; background: #f0f0f0;">Prerequisites</th>
+    {% endif %}
+
+    {# Column headers #}
+    {% for col in col_data %}
+    <th style="border: 1px solid #ccc; padding: 2px; background: #f0f0f0; vertical-align: top;">
+      {# ID row: arrows + pill #}
+      <div style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 2px 4px;">
+        <div style="text-align: left;">
+          {% if col.can_left -%}
+          {{ render_btn(url, {"action": "move_col_left", "column": col.id}, "&#9664;", CSS_ARROW) }}
+          {% else %}{{ BUTTON_GAP|safe }}{% endif %}
+        </div>
+        <div>
+          <span style="display: inline-block; min-width: 52px; color: #666; text-align: center; background: #e8e8e8; border-radius: 10px; padding: 1px 6px; font-family: monospace; font-size: 0.85em;">{{ col.id }}</span>
+        </div>
+        <div style="text-align: right;">
+          {% if col.can_right -%}
+          {{ render_btn(url, {"action": "move_col_right", "column": col.id}, "&#9654;", CSS_ARROW) }}
+          {% else %}{{ BUTTON_GAP|safe }}{% endif %}
+        </div>
+      </div>
+      {# Label row: remove + name input #}
+      {% if col.fixed %}
+      <div style="display: flex; align-items: center; padding: 2px 4px; gap: 4px;">
+        {{ BUTTON_GAP|safe }}
+        <span style="flex: 1; font-weight: bold; text-align: center; color: #555;">{{ col.label }}</span>
+        {{ BUTTON_GAP|safe }}
+      </div>
+      {% else %}
+      <div style="display: flex; align-items: center; padding: 2px 4px; gap: 4px;">
+        {{ render_btn(url, {"action": "remove_column", "column": col.id}, "&minus;", CSS_REMOVE) }}
+        <form hx-post="{{ url }}" style="margin: 0; flex: 1;">
+          <input type="hidden" name="action" value="rename_column">
+          <input type="hidden" name="column" value="{{ col.id }}">
+          <input name="label" type="text" value="{{ col.label }}" size="12"
+            style="border: 1px solid #ddd; padding: 2px 4px; width: 100%; box-sizing: border-box; font-family: inherit; font-size: inherit; font-weight: bold; text-align: center; color: #555;">
+        </form>
+        <button class="{{ CSS_CONFIRM }}" onclick="this.closest('th').querySelector('form').requestSubmit(); return false;">&#10003;</button>
+      </div>
+      {% endif %}
+      {# Column constraints #}
+      {% if show_col_constraints %}
+      {% set col_prereqs = col.prereqs %}
+      {% if col_prereqs or num_cols > 1 %}
+      <div style="display: flex; align-items: center; justify-content: center; padding: 2px 4px 0 4px; border-top: 1px solid #e0e0e0;">
+        <span style="display: inline-flex; flex-direction: column; align-items: center; gap: 2px;">
+          {# Constraint dropdown #}
+          {% set available_cols = [] %}
+          {% for c in col_data %}
+          {% if c.id != col.id and c.id not in col_prereqs %}
+          {% set _ = available_cols.append(c) %}
+          {% endif %}
+          {% endfor %}
+          {% if available_cols %}
+          <span style="position: relative; display: inline-block; width: 24px; height: 24px; box-sizing: content-box; border: 1px solid #ccc; background: #f8f8f8; vertical-align: middle;">
+            <span style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: normal; pointer-events: none;">&#9745;</span>
+            <select hx-post="{{ url }}" hx-vals='{"action": "add_col_constraint", "item": "{{ col.id }}"}' hx-trigger="change" name="after"
+              style="position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
+              <option value="">&mdash;</option>
+              {% for c in available_cols %}
+              {% set opt_label = c.label ~ " (" ~ c.id ~ ")" if c.label else c.id %}
+              <option value="{{ c.id }}">{{ opt_label }}</option>
+              {% endfor %}
+            </select>
+          </span>
+          {% endif %}
+          {# Constraint pills #}
+          {% if col_prereqs %}
+          <span style="display: inline-flex; flex-direction: column; gap: 2px;">
+          {% for p_id in col_prereqs %}
+          {% set p_name = col_id_to_val.get(p_id, p_id) or p_id %}
+          {% set is_static = (col.id, p_id) in col_static_pairs %}
+          <span style="display: inline-flex; align-items: center; gap: 2px;">
+            <span style="display: inline-block; min-width: 52px; color: #666; text-align: center; background: #e8e8e8; border-radius: 10px; padding: 1px 6px; font-family: monospace; font-size: 0.85em;">{{ p_name }}</span>
+            {% if not is_static %}
+            {{ render_btn(url, {"action": "remove_col_constraint", "item": col.id, "after": p_id}, "x", CSS_REMOVE) }}
+            {% endif %}
+          </span>
+          {% endfor %}
+          </span>
+          {% endif %}
+        </span>
+      </div>
+      {% endif %}
+      {% endif %}
+    </th>
+    {% endfor %}
+
+    {# +Column header #}
+    <th style="border: 1px solid #ccc; padding: 2px; background: #f0f0f0; vertical-align: top;">
+      <div style="padding: 2px 4px;">{{ BUTTON_GAP|safe }}</div>
+      <div style="display: flex; align-items: center; padding: 2px 4px; gap: 4px;">
+        <form hx-post="{{ url }}" style="margin: 0; flex: 1;">
+          <input type="hidden" name="action" value="add_column">
+          <input name="label" type="text" placeholder="Column name" size="12"
+            style="border: 1px solid #ddd; padding: 2px 4px; width: 100%; box-sizing: border-box; font-family: inherit; font-size: inherit; font-weight: bold; text-align: center; color: #555;">
+        </form>
+        <button class="{{ CSS_CONFIRM }}" onclick="this.closest('th').querySelector('form').requestSubmit(); return false;">+</button>
+      </div>
+    </th>
+  </tr>
+
+  {# Data rows #}
+  {% for row in row_data %}
+  <tr>
+    {# Remove #}
+    <td style="border: 1px solid #ccc; padding: 2px 4px; text-align: center; background: #f0f0f0;">
+      {% if not row.fixed -%}
+      {{ render_btn(url, {"action": "remove_row", "row": row.id}, "&minus;", CSS_REMOVE) }}
+      {% else %}{{ BUTTON_GAP|safe }}{% endif %}
+    </td>
+    {# Up / Down #}
+    {% if num_rows > 1 %}
+    <td style="border: 1px solid #ccc; padding: 2px 4px; text-align: center; background: #f0f0f0;">
+      {% if row.can_up -%}
+      {{ render_btn(url, {"action": "move_row_up", "row": row.id}, "&#9650;", CSS_ARROW) }}
+      {% else %}{{ BUTTON_GAP|safe }}{% endif %}
+    </td>
+    <td style="border: 1px solid #ccc; padding: 2px 4px; text-align: center; background: #f0f0f0;">
+      {% if row.can_down -%}
+      {{ render_btn(url, {"action": "move_row_down", "row": row.id}, "&#9660;", CSS_ARROW) }}
+      {% else %}{{ BUTTON_GAP|safe }}{% endif %}
+    </td>
+    {% endif %}
+    {# Constraint dropdown #}
+    {% if show_row_constraints %}
+    <td style="border: 1px solid #ccc; padding: 4px 8px; white-space: nowrap; background: #f0f0f0;">
+      {% set row_prereqs = row.prereqs %}
+      {% set available_rows = [] %}
+      {% for r in row_data %}
+      {% if r.id != row.id and r.id not in row_prereqs %}
+      {% set _ = available_rows.append(r) %}
+      {% endif %}
+      {% endfor %}
+      {% if available_rows %}
+      <span style="position: relative; display: inline-block; width: 24px; height: 24px; box-sizing: content-box; border: 1px solid #ccc; background: #f8f8f8; vertical-align: middle;">
+        <span style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: normal; pointer-events: none;">&#9745;</span>
+        <select hx-post="{{ url }}" hx-vals='{"action": "add_row_constraint", "item": "{{ row.id }}"}' hx-trigger="change" name="after"
+          style="position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer;">
+          <option value="">&mdash;</option>
+          {% for r in available_rows %}
+          {% set opt_label = r.id %}
+          <option value="{{ r.id }}">{{ opt_label }}</option>
+          {% endfor %}
+        </select>
+      </span>
+      {% endif %}
+    </td>
+    {% endif %}
+    {# ID pill #}
+    <td style="border: 1px solid #ccc; padding: 4px 8px; white-space: nowrap; text-align: center;">
+      <span style="display: inline-block; min-width: 52px; color: #666; text-align: center; background: #e8e8e8; border-radius: 10px; padding: 1px 6px; font-family: monospace; font-size: 0.85em;">{{ row.id }}</span>
+    </td>
+    {# Prerequisite pills #}
+    {% if any_row_prereqs %}
+    <td style="border: 1px solid #ccc; padding: 4px 8px; white-space: nowrap;">
+      {% if row.prereqs %}
+      <span style="display: inline-flex; flex-direction: column; gap: 2px;">
+      {% for p_id in row.prereqs %}
+      {% set p_name = row_id_to_val.get(p_id, p_id) or p_id %}
+      {% set is_static = (row.id, p_id) in row_static_pairs %}
+      <span style="display: inline-flex; align-items: center; gap: 2px;">
+        <span style="display: inline-block; min-width: 52px; color: #666; text-align: center; background: #e8e8e8; border-radius: 10px; padding: 1px 6px; font-family: monospace; font-size: 0.85em;">{{ p_name }}</span>
+        {% if not is_static %}
+        {{ render_btn(url, {"action": "remove_row_constraint", "item": row.id, "after": p_id}, "x", CSS_REMOVE) }}
+        {% endif %}
+      </span>
+      {% endfor %}
+      </span>
+      {% endif %}
+    </td>
+    {% endif %}
+    {# Data cells #}
+    {% for cell in row.cells %}
+    {% if cell.typed %}
+    <td style="border: 1px solid #ccc; padding: 4px; vertical-align: top;">{{ cell.rendered|safe }}</td>
+    {% else %}
+    <td style="border: 1px solid #ccc; padding: 2px;">
+      <form hx-post="{{ url }}" style="margin: 0;">
+        <input type="hidden" name="action" value="set_cell">
+        <input type="hidden" name="row" value="{{ row.id }}">
+        <input type="hidden" name="column" value="{{ cell.col_id }}">
+        <input name="value" type="text" value="{{ cell.value }}"
+          style="border: none; width: 100%; box-sizing: border-box; padding: 2px 4px;">
+      </form>
+    </td>
+    {% endif %}
+    {% endfor %}
+    {# Empty cell under +Column #}
+    <td style="border: 1px solid #ccc;"></td>
+  </tr>
+  {% endfor %}
+
+  {# +Row button row #}
+  {% set total_cols = 1 + (2 if num_rows > 1 else 0) + (1 if show_row_constraints else 0) + 1 + (1 if any_row_prereqs else 0) + num_cols + 1 %}
+  <tr>
+    <td style="border: 1px solid #ccc; padding: 2px 4px; text-align: center; background: #f0f0f0;">
+      <button hx-post="{{ url }}" hx-vals='{"action": "add_row"}' class="{{ CSS_CONFIRM }}">+</button>
+    </td>
+    {% for i in range(total_cols - 1) %}
+    <td style="border: 1px solid #ccc; background: #f0f0f0;"></td>
+    {% endfor %}
+  </tr>
+
+</table>
+</div>
+{% else %}
+{# Empty table — show just +Column input #}
+<table style="border-collapse: collapse; margin: 8px 0;">
+  <tr>
+    <th style="border: 1px solid #ccc; padding: 2px; background: #f0f0f0;">
+      <form hx-post="{{ url }}" style="margin: 0; display: flex; align-items: center;">
+        <input type="hidden" name="action" value="add_column">
+        <input name="label" type="text" placeholder="Column name" size="12"
+          style="border: 1px solid #ddd; width: 100px; padding: 2px 4px;">
+        <button type="submit" style="cursor: pointer; border: none; background: none; color: #2a2; font-size: 14px; font-weight: bold; padding: 0 4px; line-height: 1;">+</button>
+      </form>
+    </th>
+  </tr>
+</table>
+{% endif %}
+
+{% if col_data and not row_data %}
+<p style="color: #888;">No rows yet. Add a row to start entering data.</p>
+{% endif %}
+
+<div style="margin-top: 8px;">
+{% if has_data %}
+<button hx-post="{{ url }}" hx-vals='{"action": "clear"}' style="cursor: pointer; font-size: 12px; padding: 4px 10px;">Clear</button>
+{% endif %}
+</div>
