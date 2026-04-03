@@ -1,0 +1,59 @@
+{# NumberFormX human template — styled HTMX. #}
+{% for aff in data.affordances %}
+{% set _ = aff.update({"_rendered": true}) %}
+{% endfor %}
+{% if edit_mode %}
+<form hx-post="{{ url }}" class="ef-edit-label-form">
+  <input type="hidden" name="action" value="set_label">
+  <input name="label" type="text" value="{{ label }}" class="ef-edit-label-input">
+  <button type="submit" class="{{ CSS_CONFIRM }}">&#10003;</button>
+</form>
+<form hx-post="{{ url }}" class="ef-edit-instr-form">
+  <input type="hidden" name="action" value="set_instruction">
+  <input name="instruction" type="text" value="{{ instruction }}" placeholder="Instruction text" class="ef-edit-instr-input">
+  <button type="submit" class="{{ CSS_CONFIRM }}">&#10003;</button>
+</form>
+<div style="margin: 2px 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 0.9em; color: #666;">
+{% for field_label, action, field_val in [
+  ("min", "set_min", min_val),
+  ("max", "set_max", max_val),
+  ("step", "set_step", step),
+] %}
+  {% set display_val = "" if field_val is none else field_val|string %}
+  <form style="display: flex; align-items: center; gap: 2px; margin: 0;" hx-post="{{ url }}">
+    <input type="hidden" name="action" value="{{ action }}">
+    <span style="font-weight: 600;">{{ field_label }}:</span>
+    <input name="value" type="text" value="{{ display_val }}" placeholder="none" style="font: inherit; border: 1px solid #ddd; padding: 1px 3px; margin: 0; width: 60px; text-align: center;">
+    <button type="submit" class="{{ CSS_CONFIRM }}">&#10003;</button>
+  </form>
+{% endfor %}
+  {% set int_bg = "#efffef" if integer else "#f8f8f8" %}
+  {% set int_border = "#4a4" if integer else "#ccc" %}
+  <button hx-post="{{ url }}" hx-vals='{"action": "toggle_integer"}' style="cursor: pointer; font: inherit; font-size: 0.9em; border: 1px solid {{ int_border }}; background: {{ int_bg }}; padding: 1px 8px; border-radius: 3px;">integer: {{ "on" if integer else "off" }}</button>
+</div>
+<p><strong>Value:</strong> {{ value if value is not none else "None" }}</p>
+{% if has_data %}
+<div style="margin: 4px 0;">
+  <button hx-post="{{ url }}" hx-vals='{"action": "clear"}' style="cursor: pointer; font-size: 12px; padding: 4px 10px;">Clear</button>
+</div>
+{% endif %}
+{% else %}
+<h3>{{ label }}</h3>
+{% if instruction %}<p>{{ instruction }}</p>{% endif %}
+{% set constraints = [] %}
+{% if min_val is not none %}{% set _ = constraints.append("min: " ~ min_val|string) %}{% endif %}
+{% if max_val is not none %}{% set _ = constraints.append("max: " ~ max_val|string) %}{% endif %}
+{% if step is not none %}{% set _ = constraints.append("step: " ~ step|string) %}{% endif %}
+{% if integer %}{% set _ = constraints.append("integer") %}{% endif %}
+{% if constraints %}
+<p style="color: #666; font-size: 0.9em; margin: 2px 0;">{{ constraints|join(", ") }}</p>
+{% endif %}
+<p><strong>Value:</strong> {{ value if value is not none else "None" }}</p>
+<form hx-post="{{ url }}" style="display: inline;">
+  <input name="value" type="number"{% if min_val is not none %} min="{{ min_val }}"{% endif %}{% if max_val is not none %} max="{{ max_val }}"{% endif %}{% if step is not none %} step="{{ step }}"{% elif integer %} step="1"{% endif %}>
+  <button type="submit">Set</button>
+</form>
+{% if has_data %}
+<button hx-post="{{ url }}" hx-vals='{"action": "clear"}' style="cursor: pointer; font-size: 12px; padding: 4px 10px; margin-left: 8px;">Clear</button>
+{% endif %}
+{% endif %}

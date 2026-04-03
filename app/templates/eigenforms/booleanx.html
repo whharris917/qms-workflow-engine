@@ -1,0 +1,55 @@
+{# BooleanFormX agent template — HTMX native.
+   Yes/No toggle buttons.
+#}
+{% for aff in data.affordances %}
+{% set _ = aff.update({"_rendered": true}) %}
+{% endfor %}
+{% if edit_mode %}
+<form hx-post="{{ url }}">
+  <input type="hidden" name="action" value="set_label">
+  <label>Label: <input type="text" name="label" value="{{ label }}"></label>
+  <button type="submit">Save</button>
+</form>
+<form hx-post="{{ url }}">
+  <input type="hidden" name="action" value="set_instruction">
+  <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
+  <button type="submit">Save</button>
+</form>
+<form hx-post="{{ url }}">
+  <input type="hidden" name="action" value="set_true_label">
+  <label>True label: <input type="text" name="label" value="{{ true_label }}"></label>
+  <button type="submit">Set</button>
+</form>
+<form hx-post="{{ url }}">
+  <input type="hidden" name="action" value="set_false_label">
+  <label>False label: <input type="text" name="label" value="{{ false_label }}"></label>
+  <button type="submit">Set</button>
+</form>
+{% if value is none %}
+<p data-field="value">Not set</p>
+{% elif value %}
+<p data-field="value">{{ true_label }}</p>
+{% else %}
+<p data-field="value">{{ false_label }}</p>
+{% endif %}
+{% if has_data %}
+<button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
+{% endif %}
+{% else %}
+<h3 data-field="label">{{ label }}</h3>
+{% if instruction %}
+<p data-field="instruction">{{ instruction }}</p>
+{% endif %}
+{% if value is none %}
+<p data-field="value">Not set</p>
+{% elif value %}
+<p data-field="value">{{ true_label }}</p>
+{% else %}
+<p data-field="value">{{ false_label }}</p>
+{% endif %}
+<button hx-post="{{ url }}" hx-vals='{"value": true}'>{{ true_label }}</button>
+<button hx-post="{{ url }}" hx-vals='{"value": false}'>{{ false_label }}</button>
+{% if has_data %}
+<button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
+{% endif %}
+{% endif %}

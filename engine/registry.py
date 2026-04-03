@@ -114,6 +114,11 @@ def _build_default_registry() -> EigenformRegistry:
     from engine.historyform import HistoryForm
     from engine.listformx import ListFormX
     from engine.tableformx import TableFormX
+    from engine.choiceformx import ChoiceFormX
+    from engine.checkboxformx import CheckboxFormX
+    from engine.numberformx import NumberFormX
+    from engine.booleanformx import BooleanFormX
+    from engine.memoformx import MemoFormX
 
     r = EigenformRegistry()
     for cls in [
@@ -126,6 +131,8 @@ def _build_default_registry() -> EigenformRegistry:
         VisibilityForm, DynamicChoiceForm,
         ScoreForm, ComputedForm, ValidationForm,
         ActionForm, RubiksCubeForm, ListFormX, TableFormX,
+        ChoiceFormX, CheckboxFormX,
+        NumberFormX, BooleanFormX, MemoFormX,
     ]:
         r.register(cls)
     return r

@@ -1,4 +1,6 @@
-{# TextForm template — HTMX native. #}
+{# CheckboxFormX agent template — HTMX native.
+   Checkbox toggles with clean semantic markup.
+#}
 {% for aff in data.affordances %}
 {% set _ = aff.update({"_rendered": true}) %}
 {% endfor %}
@@ -13,7 +15,10 @@
   <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
   <button type="submit">Save</button>
 </form>
-<p data-field="value">{{ value|string }}</p>
+{{ items_html|safe }}
+{% if confirmed %}
+<p data-field="confirmed">Confirmed</p>
+{% endif %}
 {% if has_data %}
 <button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
 {% endif %}
@@ -22,11 +27,17 @@
 {% if instruction %}
 <p data-field="instruction">{{ instruction }}</p>
 {% endif %}
-<p data-field="value">{{ value|string }}</p>
-<form hx-post="{{ url }}">
-  <input name="value" type="text" placeholder="{{ label }}">
-  <button type="submit">Set {{ label }}</button>
-</form>
+{% for item_key, checked in items.items() %}
+<label>
+  <input type="checkbox" name="{{ item_key }}"{{ ' checked' if checked }} hx-post="{{ url }}" hx-vals='{"{{ item_key }}": {{ 'false' if checked else 'true' }}}'>
+  {{ item_key }}
+</label>
+{% endfor %}
+{% if confirmed %}
+<p data-field="confirmed">Confirmed</p>
+{% else %}
+<button hx-post="{{ url }}" hx-vals='{"action": "done"}'>Done</button>
+{% endif %}
 {% if has_data %}
 <button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
 {% endif %}

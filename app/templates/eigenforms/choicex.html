@@ -1,4 +1,6 @@
-{# TextForm template — HTMX native. #}
+{# ChoiceFormX agent template — HTMX native.
+   Radio selection with clean semantic markup.
+#}
 {% for aff in data.affordances %}
 {% set _ = aff.update({"_rendered": true}) %}
 {% endfor %}
@@ -13,7 +15,8 @@
   <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
   <button type="submit">Save</button>
 </form>
-<p data-field="value">{{ value|string }}</p>
+{{ options_html|safe }}
+<p data-field="value">Selected: {{ value or "None" }}</p>
 {% if has_data %}
 <button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
 {% endif %}
@@ -22,10 +25,14 @@
 {% if instruction %}
 <p data-field="instruction">{{ instruction }}</p>
 {% endif %}
-<p data-field="value">{{ value|string }}</p>
+<p data-field="value">Selected: {{ value or "None" }}</p>
 <form hx-post="{{ url }}">
-  <input name="value" type="text" placeholder="{{ label }}">
-  <button type="submit">Set {{ label }}</button>
+  <select name="value">
+  {% for opt in options %}
+    <option value="{{ opt }}"{{ ' selected' if opt == value }}>{{ opt }}</option>
+  {% endfor %}
+  </select>
+  <button type="submit">Select</button>
 </form>
 {% if has_data %}
 <button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>

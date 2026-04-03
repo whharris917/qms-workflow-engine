@@ -1,4 +1,6 @@
-{# TextForm template — HTMX native. #}
+{# MemoFormX agent template — HTMX native.
+   Multi-line textarea input.
+#}
 {% for aff in data.affordances %}
 {% set _ = aff.update({"_rendered": true}) %}
 {% endfor %}
@@ -13,7 +15,11 @@
   <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
   <button type="submit">Save</button>
 </form>
-<p data-field="value">{{ value|string }}</p>
+{% if value %}
+<div data-field="value">{{ value }}</div>
+{% else %}
+<p data-field="value">No text entered.</p>
+{% endif %}
 {% if has_data %}
 <button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
 {% endif %}
@@ -22,10 +28,14 @@
 {% if instruction %}
 <p data-field="instruction">{{ instruction }}</p>
 {% endif %}
-<p data-field="value">{{ value|string }}</p>
+{% if value %}
+<div data-field="value">{{ value }}</div>
+{% else %}
+<p data-field="value">No text entered.</p>
+{% endif %}
 <form hx-post="{{ url }}">
-  <input name="value" type="text" placeholder="{{ label }}">
-  <button type="submit">Set {{ label }}</button>
+  <textarea name="value" placeholder="{{ placeholder }}"{% if min_length is not none %} minlength="{{ min_length }}"{% endif %}{% if max_length is not none %} maxlength="{{ max_length }}"{% endif %}>{{ value or "" }}</textarea>
+  <button type="submit">Set</button>
 </form>
 {% if has_data %}
 <button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>

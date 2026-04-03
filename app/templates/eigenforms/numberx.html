@@ -1,0 +1,59 @@
+{# NumberFormX agent template — HTMX native.
+   Numeric input with constraint display.
+#}
+{% for aff in data.affordances %}
+{% set _ = aff.update({"_rendered": true}) %}
+{% endfor %}
+{% if edit_mode %}
+<form hx-post="{{ url }}">
+  <input type="hidden" name="action" value="set_label">
+  <label>Label: <input type="text" name="label" value="{{ label }}"></label>
+  <button type="submit">Save</button>
+</form>
+<form hx-post="{{ url }}">
+  <input type="hidden" name="action" value="set_instruction">
+  <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
+  <button type="submit">Save</button>
+</form>
+<form hx-post="{{ url }}">
+  <input type="hidden" name="action" value="set_min">
+  <label>Min: <input type="text" name="value" value="{{ min_val if min_val is not none else '' }}" placeholder="none"></label>
+  <button type="submit">Set</button>
+</form>
+<form hx-post="{{ url }}">
+  <input type="hidden" name="action" value="set_max">
+  <label>Max: <input type="text" name="value" value="{{ max_val if max_val is not none else '' }}" placeholder="none"></label>
+  <button type="submit">Set</button>
+</form>
+<form hx-post="{{ url }}">
+  <input type="hidden" name="action" value="set_step">
+  <label>Step: <input type="text" name="value" value="{{ step if step is not none else '' }}" placeholder="none"></label>
+  <button type="submit">Set</button>
+</form>
+<button hx-post="{{ url }}" hx-vals='{"action": "toggle_integer"}'>integer: {{ "on" if integer else "off" }}</button>
+<p data-field="value">Value: {{ value if value is not none else "None" }}</p>
+{% if has_data %}
+<button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
+{% endif %}
+{% else %}
+<h3 data-field="label">{{ label }}</h3>
+{% if instruction %}
+<p data-field="instruction">{{ instruction }}</p>
+{% endif %}
+{% set constraints = [] %}
+{% if min_val is not none %}{% set _ = constraints.append("min: " ~ min_val|string) %}{% endif %}
+{% if max_val is not none %}{% set _ = constraints.append("max: " ~ max_val|string) %}{% endif %}
+{% if step is not none %}{% set _ = constraints.append("step: " ~ step|string) %}{% endif %}
+{% if integer %}{% set _ = constraints.append("integer") %}{% endif %}
+{% if constraints %}
+<p data-field="constraints">{{ constraints|join(", ") }}</p>
+{% endif %}
+<p data-field="value">Value: {{ value if value is not none else "None" }}</p>
+<form hx-post="{{ url }}">
+  <input name="value" type="number"{% if min_val is not none %} min="{{ min_val }}"{% endif %}{% if max_val is not none %} max="{{ max_val }}"{% endif %}{% if step is not none %} step="{{ step }}"{% elif integer %} step="1"{% endif %}>
+  <button type="submit">Set</button>
+</form>
+{% if has_data %}
+<button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
+{% endif %}
+{% endif %}

@@ -19,7 +19,9 @@
 <button hx-post="{{ url }}" hx-vals='{"action": "toggle_constraints"}'>constraints: {{ "on" if allow_constraints else "off" }}</button>
 {% else %}
 <h3 data-field="label">{{ label }}</h3>
-{% if instruction %}<p data-field="instruction">{{ instruction }}</p>{% endif %}
+{% if instruction %}
+<p data-field="instruction">{{ instruction }}</p>
+{% endif %}
 {% endif %}
 {% if na %}
 <p data-field="value">N/A</p>
@@ -108,8 +110,8 @@
   <input name="value" type="text" placeholder="New item">
   <button type="submit">+ Add</button>
 </form>
-{% if has_data -%}
+{% if has_data %}
 <button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
-{% endif -%}
+{% endif %}
 <button hx-post="{{ url }}" hx-vals='{"action": "na"}'>N/A</button>
 {% endif %}

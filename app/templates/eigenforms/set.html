@@ -8,7 +8,7 @@
 {% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
 
 {% set affs = data.affordances %}
-{% set items = data.items %}
+{% set items = data["items"] %}
 {% set url = affs[0].url if affs else "" %}
 {% set endpoint = "POST " ~ url %}
 

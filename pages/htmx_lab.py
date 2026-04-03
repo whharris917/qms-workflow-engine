@@ -3,6 +3,11 @@
 from engine.textform import TextForm
 from engine.listformx import ListFormX
 from engine.tableformx import TableFormX
+from engine.choiceformx import ChoiceFormX
+from engine.checkboxformx import CheckboxFormX
+from engine.numberformx import NumberFormX
+from engine.booleanformx import BooleanFormX
+from engine.memoformx import MemoFormX
 from engine.pageform import PageForm
 
 
@@ -27,6 +32,40 @@ definition = PageForm(
             fixed_items=["Design", "Build", "Test", "Deploy"],
             must_follow={"item_2": ["item_1"], "item_3": ["item_2"]},
             editable=True,
+        ),
+        ChoiceFormX(
+            key="priority",
+            label="Priority",
+            instruction="Select a priority level.",
+            options=["Low", "Medium", "High", "Critical"],
+        ),
+        CheckboxFormX(
+            key="tags",
+            label="Tags",
+            instruction="Select applicable tags.",
+            items=["Frontend", "Backend", "Database", "DevOps", "Security"],
+        ),
+        NumberFormX(
+            key="score",
+            label="Score",
+            instruction="Enter a score from 0 to 100.",
+            min_val=0,
+            max_val=100,
+            step=5,
+        ),
+        BooleanFormX(
+            key="approved",
+            label="Approved",
+            instruction="Has this been approved?",
+            true_label="Approved",
+            false_label="Rejected",
+        ),
+        MemoFormX(
+            key="notes",
+            label="Notes",
+            instruction="Enter any additional notes.",
+            placeholder="Type your notes here...",
+            min_length=10,
         ),
         TableFormX(
             key="simple-table",
