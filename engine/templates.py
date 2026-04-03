@@ -9,6 +9,7 @@ Templates that embed child eigenform HTML use the |safe filter.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
@@ -62,9 +63,13 @@ def _tojson_filter(value):
 _env.filters["tojson"] = _tojson_filter
 
 
+_COLLAPSE_BLANK_LINES = re.compile(r'\n{3,}')
+
+
 def render_template(template_name: str, **context) -> str:
     """Render a Jinja2 template with the given context."""
-    return _env.get_template(template_name).render(**context)
+    html = _env.get_template(template_name).render(**context)
+    return _COLLAPSE_BLANK_LINES.sub('\n\n', html)
 
 
 def safe(html: str) -> Markup:
