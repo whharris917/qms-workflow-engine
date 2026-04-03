@@ -10,6 +10,8 @@ from engine.booleanformx import BooleanFormX
 from engine.memoformx import MemoFormX
 from engine.tabformx import TabFormX
 from engine.accordionformx import AccordionFormX
+from engine.chainformx import ChainFormX
+from engine.stepformx import SequenceFormX
 from engine.pageform import PageForm
 
 
@@ -120,6 +122,36 @@ definition = PageForm(
                     true_label="Enabled", false_label="Disabled",
                 ),
             },
+        ),
+        ChainFormX(
+            key="wizard",
+            label="Setup Wizard",
+            instruction="Complete each step in order. Auto-advances on completion.",
+            steps=[
+                TextForm(key="name", label="Your Name",
+                         instruction="Enter your full name."),
+                ChoiceFormX(key="role", label="Your Role",
+                            instruction="Select your role.",
+                            options=["Developer", "Designer", "Manager", "QA"]),
+                BooleanFormX(key="confirm", label="Confirm",
+                             instruction="Confirm your details are correct.",
+                             true_label="Confirmed", false_label="Not yet"),
+            ],
+        ),
+        SequenceFormX(
+            key="workflow",
+            label="Gated Workflow",
+            instruction="Complete steps in order. Step N+1 unlocks when step N is complete.",
+            steps=[
+                TextForm(key="draft", label="1. Draft",
+                         instruction="Write a draft."),
+                MemoFormX(key="review", label="2. Review",
+                          instruction="Add review comments.",
+                          placeholder="Review notes..."),
+                CheckboxFormX(key="checklist", label="3. Checklist",
+                              instruction="Verify all items.",
+                              items=["Code reviewed", "Tests passing", "Docs updated"]),
+            ],
         ),
     ],
 )

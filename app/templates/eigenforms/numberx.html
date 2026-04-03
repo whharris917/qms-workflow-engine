@@ -5,27 +5,27 @@
 {% set _ = aff.update({"_rendered": true}) %}
 {% endfor %}
 {% if edit_mode %}
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "set_label", "label": "<label>"}'>
   <input type="hidden" name="action" value="set_label">
   <label>Label: <input type="text" name="label" value="{{ label }}"></label>
   <button type="submit">Save</button>
 </form>
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "set_instruction", "instruction": "<instruction>"}'>
   <input type="hidden" name="action" value="set_instruction">
   <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
   <button type="submit">Save</button>
 </form>
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "set_min", "value": "<value>"}'>
   <input type="hidden" name="action" value="set_min">
   <label>Min: <input type="text" name="value" value="{{ min_val if min_val is not none else '' }}" placeholder="none"></label>
   <button type="submit">Set</button>
 </form>
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "set_max", "value": "<value>"}'>
   <input type="hidden" name="action" value="set_max">
   <label>Max: <input type="text" name="value" value="{{ max_val if max_val is not none else '' }}" placeholder="none"></label>
   <button type="submit">Set</button>
 </form>
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "set_step", "value": "<value>"}'>
   <input type="hidden" name="action" value="set_step">
   <label>Step: <input type="text" name="value" value="{{ step if step is not none else '' }}" placeholder="none"></label>
   <button type="submit">Set</button>
@@ -34,6 +34,9 @@
 <p data-field="value">Value: {{ value if value is not none else "None" }}</p>
 {% if has_data %}
 <button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
+{% if hints.clear %}
+<p data-field="instruction">{{ hints.clear }}</p>
+{% endif %}
 {% endif %}
 {% else %}
 <h3 data-field="label">{{ label }}</h3>
@@ -49,11 +52,17 @@
 <p data-field="constraints">{{ constraints|join(", ") }}</p>
 {% endif %}
 <p data-field="value">Value: {{ value if value is not none else "None" }}</p>
-<form hx-post="{{ url }}">
-  <input name="value" type="number"{% if min_val is not none %} min="{{ min_val }}"{% endif %}{% if max_val is not none %} max="{{ max_val }}"{% endif %}{% if step is not none %} step="{{ step }}"{% elif integer %} step="1"{% endif %}>
+<form hx-post="{{ url }}" hx-vals='{"value": "<value>"}'>
+  <label>value: <input type="number" name="value"{% if min_val is not none %} min="{{ min_val }}"{% endif %}{% if max_val is not none %} max="{{ max_val }}"{% endif %}{% if step is not none %} step="{{ step }}"{% elif integer %} step="1"{% endif %}></label>
   <button type="submit">Set</button>
 </form>
+{% if hints.set %}
+<p data-field="instruction">{{ hints.set }}</p>
+{% endif %}
 {% if has_data %}
 <button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
+{% if hints.clear %}
+<p data-field="instruction">{{ hints.clear }}</p>
+{% endif %}
 {% endif %}
 {% endif %}

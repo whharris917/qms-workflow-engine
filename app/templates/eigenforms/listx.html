@@ -6,12 +6,12 @@
 {% set _ = aff.update({"_rendered": true}) %}
 {% endfor %}
 {% if edit_mode %}
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "set_label", "label": "<label>"}'>
   <input type="hidden" name="action" value="set_label">
   <label>Label: <input type="text" name="label" value="{{ label }}"></label>
   <button type="submit">Save</button>
 </form>
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "set_instruction", "instruction": "<instruction>"}'>
   <input type="hidden" name="action" value="set_instruction">
   <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
   <button type="submit">Save</button>
@@ -26,6 +26,9 @@
 {% if na %}
 <p data-field="value">N/A</p>
 <button hx-post="{{ url }}" hx-vals='{"action": "clear_na"}'>Clear N/A</button>
+{% if hints.clear_na %}
+<p data-field="instruction">{{ hints.clear_na }}</p>
+{% endif %}
 {% else %}
 {% set num_items = items|length %}
 <ol>
@@ -49,10 +52,10 @@
 {% if is_fixed -%}
 <span data-field="value" data-fixed="true">{{ item_val }}</span>
 {% else -%}
-<form hx-post="{{ url }}" style="display: inline;">
+<form hx-post="{{ url }}" hx-vals='{"action": "edit", "id": "{{ item_id }}", "value": "<value>"}' style="display: inline;">
   <input type="hidden" name="action" value="edit">
   <input type="hidden" name="id" value="{{ item_id }}">
-  <input name="value" type="text" value="{{ item_val }}">
+  <input type="text" name="value" value="{{ item_val }}">
   <button type="submit">&#10003;</button>
 </form>
 {% endif %}
@@ -105,13 +108,22 @@
 </li>
 {% endfor %}
 </ol>
-<form hx-post="{{ url }}" data-field="add">
+<form hx-post="{{ url }}" hx-vals='{"action": "add", "value": "<value>"}' data-field="add">
   <input type="hidden" name="action" value="add">
-  <input name="value" type="text" placeholder="New item">
+  <input type="text" name="value" placeholder="New item">
   <button type="submit">+ Add</button>
 </form>
+{% if hints.add %}
+<p data-field="instruction">{{ hints.add }}</p>
+{% endif %}
 {% if has_data %}
 <button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
+{% if hints.clear %}
+<p data-field="instruction">{{ hints.clear }}</p>
+{% endif %}
 {% endif %}
 <button hx-post="{{ url }}" hx-vals='{"action": "na"}'>N/A</button>
+{% if hints.na %}
+<p data-field="instruction">{{ hints.na }}</p>
+{% endif %}
 {% endif %}

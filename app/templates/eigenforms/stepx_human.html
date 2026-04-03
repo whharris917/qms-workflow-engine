@@ -1,0 +1,110 @@
+{# SequenceFormX human template — styled HTMX. #}
+{% for aff in data.affordances %}
+{% set _ = aff.update({"_rendered": true}) %}
+{% endfor %}
+{% if edit_mode %}
+<form hx-post="{{ url }}" class="ef-edit-label-form">
+  <input type="hidden" name="action" value="set_label">
+  <input name="label" type="text" value="{{ label }}" class="ef-edit-label-input">
+  <button type="submit" class="{{ CSS_CONFIRM }}">&#10003;</button>
+</form>
+<form hx-post="{{ url }}" class="ef-edit-instr-form">
+  <input type="hidden" name="action" value="set_instruction">
+  <input name="instruction" type="text" value="{{ instruction }}" placeholder="Instruction text" class="ef-edit-instr-input">
+  <button type="submit" class="{{ CSS_CONFIRM }}">&#10003;</button>
+</form>
+
+{# Add Step toolbar #}
+<div class="ef-add-toolbar">
+<form class="ef-add-toolbar-form" hx-post="{{ url }}">
+  <input type="hidden" name="action" value="add_step">
+  <div><label class="ef-add-toolbar-label">Type</label>
+  <select name="type" class="ef-add-toolbar-input">
+    <option value="">-- type --</option>
+    {% for t in available_types %}
+    <option value="{{ t }}">{{ t }}</option>
+    {% endfor %}
+  </select></div>
+  <div><label class="ef-add-toolbar-label">Key</label>
+  <input name="key" type="text" placeholder="unique-key" class="ef-add-toolbar-input" style="width: 140px;"></div>
+  <div><label class="ef-add-toolbar-label">Label</label>
+  <input name="label" type="text" placeholder="Step Label" class="ef-add-toolbar-input" style="width: 160px;"></div>
+  <button type="submit" class="ef-add-toolbar-submit">+ Add</button>
+</form></div>
+
+{# Step bar with per-step controls #}
+<div class="ef-tab-bar">
+{% for step in step_items %}
+  {% set bg = "#fff" if step.is_active else "#f5f5f5" %}
+  {% set bb = "2px solid #333" if step.is_active else "2px solid transparent" %}
+  <div style="display: flex; align-items: center; gap: 2px; padding: 4px 6px; background: {{ bg }}; border: 1px solid #ddd; border-bottom: {{ bb }}; border-radius: 4px 4px 0 0; font-size: 12px;">
+    {% if step.is_active %}
+    <span style="font-weight: bold; padding: 0 4px;">{{ step.label }}</span>
+    {% elif step.accessible %}
+    <button hx-post="{{ url }}" hx-vals='{"step": "{{ step.key }}"}' style="cursor: pointer; border: none; background: transparent; padding: 0 4px; font-size: 12px; color: #333; text-decoration: underline;">{{ step.label }}</button>
+    {% else %}
+    <span style="padding: 0 4px; color: #aaa;">{{ step.label }}</span>
+    {% endif %}
+    {% if step.index > 0 %}
+    <button hx-post="{{ url }}" hx-vals='{"action": "move_step", "key": "{{ step.key }}", "position": {{ step.index - 1 }}}' style="cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 18px; height: 18px; font-size: 8px; padding: 0;">&#9664;</button>
+    {% endif %}
+    {% if step.index < step_items|length - 1 %}
+    <button hx-post="{{ url }}" hx-vals='{"action": "move_step", "key": "{{ step.key }}", "position": {{ step.index + 1 }}}' style="cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 18px; height: 18px; font-size: 8px; padding: 0;">&#9654;</button>
+    {% endif %}
+    {% if step.editable %}
+    <button hx-post="{{ url }}" hx-vals='{"action": "toggle_editable", "key": "{{ step.key }}"}' style="cursor: pointer; border: 1px solid #86c; background: #f3eaff; width: 18px; height: 18px; font-size: 10px; padding: 0; color: #639;">&#9998;</button>
+    {% else %}
+    <button hx-post="{{ url }}" hx-vals='{"action": "toggle_editable", "key": "{{ step.key }}"}' style="cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 18px; height: 18px; font-size: 10px; padding: 0; color: #aaa;">&#9998;</button>
+    {% endif %}
+    <button hx-post="{{ url }}" hx-vals='{"action": "remove_step", "key": "{{ step.key }}"}' style="cursor: pointer; border: 1px solid #dcc; background: #fef8f8; width: 18px; height: 18px; font-size: 9px; padding: 0; color: #c00;">&#10005;</button>
+  </div>
+{% endfor %}
+</div>
+
+{% if not step_items %}
+<div class="ef-empty-state">No steps yet. Use the toolbar above to add one.</div>
+{% endif %}
+
+{% else %}
+<h3>{{ label }}</h3>
+{% if instruction %}<p>{{ instruction }}</p>{% endif %}
+
+{# Progress bar with gating #}
+<div style="display: flex; align-items: center; gap: 2px; margin-bottom: 12px; flex-wrap: wrap;">
+{% for step in step_items %}
+  {% if step.is_active %}
+  <span style="font-weight: bold; padding: 4px 10px; border-bottom: 3px solid #333; background: #f0f0f0; border-radius: 3px 3px 0 0;">{{ step.label }}</span>
+  {% elif step.complete %}
+  <button hx-post="{{ url }}" hx-vals='{"step": "{{ step.key }}"}' style="cursor: pointer; border: 1px solid #ccc; background: #efffef; padding: 4px 10px; color: #2a2; border-radius: 3px;">&#10003; {{ step.label }}</button>
+  {% elif step.accessible %}
+  <span style="padding: 4px 10px; color: #555; background: #f8f8f8; border-radius: 3px;">{{ step.label }}</span>
+  {% else %}
+  <span style="padding: 4px 10px; color: #bbb; background: #f5f5f5; border-radius: 3px;">&#128274; {{ step.label }}</span>
+  {% endif %}
+  {% if not loop.last %}
+  <span style="color: #ccc; margin: 0 2px;">&#8594;</span>
+  {% endif %}
+{% endfor %}
+</div>
+
+{# Back/Next navigation #}
+{% set active_idx = ef.active_index %}
+{% set has_nav = (active_idx > 0) or (active_idx < step_items|length - 1 and step_items[active_idx].complete) %}
+{% if has_nav %}
+<div style="display: flex; gap: 8px; margin-bottom: 8px;">
+  {% if active_idx > 0 %}
+  {% set prev = step_items[active_idx - 1] %}
+  <button hx-post="{{ url }}" hx-vals='{"step": "{{ prev.key }}"}' style="cursor: pointer; border: 1px solid #ccc; background: #f0f0f0; padding: 4px 12px; border-radius: 3px;">&#8592; Back: {{ prev.label }}</button>
+  {% endif %}
+  {% if active_idx < step_items|length - 1 and step_items[active_idx].complete %}
+  {% set nxt = step_items[active_idx + 1] %}
+  <button hx-post="{{ url }}" hx-vals='{"step": "{{ nxt.key }}"}' style="cursor: pointer; border: 1px solid #ccc; background: #f0f0f0; padding: 4px 12px; border-radius: 3px;">Next: {{ nxt.label }} &#8594;</button>
+  {% endif %}
+</div>
+{% endif %}
+{% endif %}
+
+{# Active step content #}
+{% if active_html %}
+{{ active_html|safe }}
+{% endif %}

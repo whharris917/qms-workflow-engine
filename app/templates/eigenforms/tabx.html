@@ -5,17 +5,17 @@
 {% set _ = aff.update({"_rendered": true}) %}
 {% endfor %}
 {% if edit_mode %}
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "set_label", "label": "<label>"}'>
   <input type="hidden" name="action" value="set_label">
   <label>Label: <input type="text" name="label" value="{{ label }}"></label>
   <button type="submit">Save</button>
 </form>
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "set_instruction", "instruction": "<instruction>"}'>
   <input type="hidden" name="action" value="set_instruction">
   <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
   <button type="submit">Save</button>
 </form>
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "add_tab", "tab_key": "<tab_key>", "type": "<type>", "key": "<key>", "label": "<label>"}'>
   <input type="hidden" name="action" value="add_tab">
   <label>Tab Key: <input name="tab_key" type="text" placeholder="tab-key"></label>
   <label>Type:
@@ -31,7 +31,7 @@
 </form>
 <nav data-section="tabs">
   {% for tab in tab_items %}
-  <span data-tab="{{ tab.key }}"{{ ' data-active="true"' if tab.is_active }}>{{ tab.label }}</span>
+  <span data-tab="{{ tab.key }}"{% if tab.is_active %} data-active="true"{% endif %}>{{ tab.label }}</span>
   {% endfor %}
 </nav>
 {% for tab in tab_items %}
@@ -40,7 +40,7 @@
 {% endif %}
 {% endfor %}
 {% if tab_items|length > 1 %}
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "move_tab", "tab_key": "<tab_key>", "position": "<position>"}'>
   <input type="hidden" name="action" value="move_tab">
   <label>Move Tab:
     <select name="tab_key">
@@ -53,7 +53,7 @@
   <button type="submit">Move</button>
 </form>
 {% endif %}
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "remove_tab", "tab_key": "<tab_key>"}'>
   <input type="hidden" name="action" value="remove_tab">
   <label>Remove Tab:
     <select name="tab_key">
@@ -64,7 +64,7 @@
   </label>
   <button type="submit">Remove</button>
 </form>
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "toggle_editable", "tab_key": "<tab_key>"}'>
   <input type="hidden" name="action" value="toggle_editable">
   <label>Toggle Editable:
     <select name="tab_key">

@@ -121,6 +121,8 @@ def _build_default_registry() -> EigenformRegistry:
     from engine.memoformx import MemoFormX
     from engine.tabformx import TabFormX
     from engine.accordionformx import AccordionFormX
+    from engine.chainformx import ChainFormX
+    from engine.stepformx import SequenceFormX as SequenceFormX_cls
 
     r = EigenformRegistry()
     for cls in [
@@ -135,6 +137,7 @@ def _build_default_registry() -> EigenformRegistry:
         ActionForm, RubiksCubeForm, ListFormX, TableFormX,
         ChoiceFormX, CheckboxFormX,
         NumberFormX, BooleanFormX, MemoFormX, TabFormX, AccordionFormX,
+        ChainFormX, SequenceFormX_cls,
     ]:
         r.register(cls)
     return r

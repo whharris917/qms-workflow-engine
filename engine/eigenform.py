@@ -374,6 +374,53 @@ class Eigenform:
         """Mark an affordance dict as accounted for (rendered or intentionally skipped)."""
         aff["_rendered"] = True
 
+    def _affordance_hints(self, data: dict) -> dict[str, str]:
+        """Build action -> instruction lookup from serialized affordance data.
+
+        Keys are derived from the affordance body:
+          - body.action present: keyed by action value (e.g., "add", "clear")
+          - body.value only (no action): keyed by "set"
+          - body.focus/step/tab: keyed by "focus"/"step"/"tab"
+          - boolean value: keyed by "true"/"false"
+        """
+        hints: dict[str, str] = {}
+        for aff in data.get("affordances", []):
+            instruction = aff.get("instruction", "")
+            if not instruction:
+                continue
+            body = aff.get("body", {})
+            action = body.get("action")
+            if action:
+                hints[action] = instruction
+            elif "value" in body:
+                v = body["value"]
+                if v is True:
+                    hints["true"] = instruction
+                elif v is False:
+                    hints["false"] = instruction
+                else:
+                    hints["set"] = instruction
+            elif "focus" in body:
+                hints["focus"] = instruction
+            elif "step" in body:
+                hints["step"] = instruction
+            elif "tab" in body:
+                hints["tab"] = instruction
+        return hints
+
+    def _wrap_agent_html(self, inner: str) -> str:
+        """Wrap agent HTML in a bounding div with eigenform identity."""
+        from markupsafe import escape
+        indented = '\n'.join(
+            f'  {line}' if line.strip() else line
+            for line in inner.strip().split('\n')
+        )
+        return (
+            f'<div data-eigenform="{escape(self.key)}" data-type="{escape(self.form)}">\n'
+            f'{indented}\n'
+            f'</div>'
+        )
+
     def render_agent_from_data(self, data: dict) -> str | None:
         """Render agent-facing HTML from serialized state.
 
@@ -383,9 +430,11 @@ class Eigenform:
         return None
 
     def render_agent(self) -> str:
-        """Render this eigenform for agent consumption — no chrome, no wrapper.
+        """Render this eigenform for agent consumption.
 
-        For htmx_native eigenforms, returns the agent template output directly.
+        For htmx_native eigenforms, wraps the agent template output in a
+        bounding div with data-eigenform (key) and data-type (form type)
+        so agents can identify eigenform boundaries in nested HTML.
         For legacy eigenforms, falls back to the standard render().
         """
         if not self.htmx_native:
@@ -396,7 +445,7 @@ class Eigenform:
         agent_html = self.render_agent_from_data(data)
         if agent_html is None:
             return self.render()
-        return agent_html
+        return self._wrap_agent_html(agent_html)
 
     def _render_toggle_btn(self, uid: str, inner: str, json_str: str, agent_html: str | None = None) -> str:
         """Render the view-selector dropdown and alternate content panes."""
@@ -455,7 +504,11 @@ class Eigenform:
 
         uid = self.uid
         json_str = escape(json.dumps(self.serialize(), indent=2))
-        agent_html = self.render_agent_from_data(data) if self.htmx_native else None
+        if self.htmx_native:
+            raw_agent = self.render_agent_from_data(data)
+            agent_html = self._wrap_agent_html(raw_agent) if raw_agent is not None else None
+        else:
+            agent_html = None
 
         complete_color = '#2a2' if self.is_complete else '#888'
         edit_border = ' border-style: dashed;' if self.edit_mode else ''

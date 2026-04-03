@@ -30,7 +30,8 @@ class NumberFormX(NumberForm):
                     step=data.get("step"),
                     integer=data.get("integer", False),
                     edit_mode=data.get("edit_mode", False),
-                    has_data=self.has_data)
+                    has_data=self.has_data,
+                    hints=self._affordance_hints(data))
 
     def render_from_data(self, data: dict) -> str:
         return render_template("numberx_human.html", **self._template_context(data))

@@ -29,7 +29,8 @@ class TextForm(Eigenform):
                     value=data.get("value"),
                     edit_mode=data.get("edit_mode", False),
                     has_data=self.has_data,
-                    undo_depth=self._undo_depth if self.edit_mode else 0)
+                    undo_depth=self._undo_depth if self.edit_mode else 0,
+                    hints=self._affordance_hints(data))
 
     def render_from_data(self, data: dict) -> str:
         return render_template("text_human.html", **self._template_context(data))

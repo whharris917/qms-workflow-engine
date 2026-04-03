@@ -5,17 +5,17 @@
 {% set _ = aff.update({"_rendered": true}) %}
 {% endfor %}
 {% if edit_mode %}
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "set_label", "label": "<label>"}'>
   <input type="hidden" name="action" value="set_label">
   <label>Label: <input type="text" name="label" value="{{ label }}"></label>
   <button type="submit">Save</button>
 </form>
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "set_instruction", "instruction": "<instruction>"}'>
   <input type="hidden" name="action" value="set_instruction">
   <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
   <button type="submit">Save</button>
 </form>
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "add_section", "section_key": "<section_key>", "type": "<type>", "key": "<key>", "label": "<label>"}'>
   <input type="hidden" name="action" value="add_section">
   <label>Section Key: <input name="section_key" type="text" placeholder="section-key"></label>
   <label>Type:
@@ -39,7 +39,7 @@
 </section>
 {% endfor %}
 {% if section_items|length > 1 %}
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "move_section", "section_key": "<section_key>", "position": "<position>"}'>
   <input type="hidden" name="action" value="move_section">
   <label>Move Section:
     <select name="section_key">
@@ -52,7 +52,7 @@
   <button type="submit">Move</button>
 </form>
 {% endif %}
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "remove_section", "section_key": "<section_key>"}'>
   <input type="hidden" name="action" value="remove_section">
   <label>Remove Section:
     <select name="section_key">
@@ -63,7 +63,7 @@
   </label>
   <button type="submit">Remove</button>
 </form>
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "toggle_editable", "section_key": "<section_key>"}'>
   <input type="hidden" name="action" value="toggle_editable">
   <label>Toggle Editable:
     <select name="section_key">

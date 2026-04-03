@@ -49,7 +49,8 @@ class AccordionFormX(AccordionForm):
                     section_html=section_html,
                     available_types=available_types,
                     edit_mode=data.get("edit_mode", False),
-                    has_data=self.has_data)
+                    has_data=self.has_data,
+                    hints=self._affordance_hints(data))
 
     def render_from_data(self, data: dict) -> str:
         return render_template("accordionx_human.html", **self._template_context(data))

@@ -28,7 +28,8 @@ class CheckboxFormX(CheckboxForm):
                     confirmed=data.get("confirmed", False),
                     edit_mode=data.get("edit_mode", False),
                     has_data=self.has_data,
-                    items_html=items_html)
+                    items_html=items_html,
+                    hints=self._affordance_hints(data))
 
     def render_from_data(self, data: dict) -> str:
         return render_template("checkboxx_human.html", **self._template_context(data))

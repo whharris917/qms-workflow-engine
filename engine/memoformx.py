@@ -28,7 +28,8 @@ class MemoFormX(MemoForm):
                     max_length=data.get("max_length"),
                     placeholder=self.placeholder or "",
                     edit_mode=data.get("edit_mode", False),
-                    has_data=self.has_data)
+                    has_data=self.has_data,
+                    hints=self._affordance_hints(data))
 
     def render_from_data(self, data: dict) -> str:
         return render_template("memox_human.html", **self._template_context(data))

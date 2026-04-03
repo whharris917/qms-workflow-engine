@@ -27,7 +27,8 @@ class BooleanFormX(BooleanForm):
                     true_label=data.get("true_label", "Yes"),
                     false_label=data.get("false_label", "No"),
                     edit_mode=data.get("edit_mode", False),
-                    has_data=self.has_data)
+                    has_data=self.has_data,
+                    hints=self._affordance_hints(data))
 
     def render_from_data(self, data: dict) -> str:
         return render_template("booleanx_human.html", **self._template_context(data))

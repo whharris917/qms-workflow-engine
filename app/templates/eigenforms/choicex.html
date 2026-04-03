@@ -5,12 +5,12 @@
 {% set _ = aff.update({"_rendered": true}) %}
 {% endfor %}
 {% if edit_mode %}
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "set_label", "label": "<label>"}'>
   <input type="hidden" name="action" value="set_label">
   <label>Label: <input type="text" name="label" value="{{ label }}"></label>
   <button type="submit">Save</button>
 </form>
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "set_instruction", "instruction": "<instruction>"}'>
   <input type="hidden" name="action" value="set_instruction">
   <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
   <button type="submit">Save</button>
@@ -19,6 +19,9 @@
 <p data-field="value">Selected: {{ value or "None" }}</p>
 {% if has_data %}
 <button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
+{% if hints.clear %}
+<p data-field="instruction">{{ hints.clear }}</p>
+{% endif %}
 {% endif %}
 {% else %}
 <h3 data-field="label">{{ label }}</h3>
@@ -26,15 +29,23 @@
 <p data-field="instruction">{{ instruction }}</p>
 {% endif %}
 <p data-field="value">Selected: {{ value or "None" }}</p>
-<form hx-post="{{ url }}">
-  <select name="value">
-  {% for opt in options %}
-    <option value="{{ opt }}"{{ ' selected' if opt == value }}>{{ opt }}</option>
-  {% endfor %}
-  </select>
+<form hx-post="{{ url }}" hx-vals='{"value": "<value>"}'>
+  <label>value:
+    <select name="value">
+    {% for opt in options %}
+      <option value="{{ opt }}"{% if opt == value %} selected{% endif %}>{{ opt }}</option>
+    {% endfor %}
+    </select>
+  </label>
   <button type="submit">Select</button>
 </form>
+{% if hints.set %}
+<p data-field="instruction">{{ hints.set }}</p>
+{% endif %}
 {% if has_data %}
 <button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
+{% if hints.clear %}
+<p data-field="instruction">{{ hints.clear }}</p>
+{% endif %}
 {% endif %}
 {% endif %}

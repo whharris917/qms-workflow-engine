@@ -40,7 +40,8 @@ class ListFormX(ListForm):
                     all_must_follow=oc.all_must_follow,
                     id_to_val=oc.id_to_value,
                     static_pairs=static_pairs,
-                    stored_constraints=oc.stored_constraints)
+                    stored_constraints=oc.stored_constraints,
+                    hints=self._affordance_hints(data))
 
     def render_from_data(self, data: dict) -> str:
         return render_template("listx_human.html", **self._template_context(data))

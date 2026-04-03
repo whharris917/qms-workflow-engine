@@ -1,0 +1,113 @@
+{# SequenceFormX agent template — HTMX native.
+   Gated sequential steps with manual navigation. Faithful projection: only active step visible.
+#}
+{% for aff in data.affordances %}
+{% set _ = aff.update({"_rendered": true}) %}
+{% endfor %}
+{% if edit_mode %}
+<form hx-post="{{ url }}" hx-vals='{"action": "set_label", "label": "<label>"}'>
+  <input type="hidden" name="action" value="set_label">
+  <label>Label: <input type="text" name="label" value="{{ label }}"></label>
+  <button type="submit">Save</button>
+</form>
+<form hx-post="{{ url }}" hx-vals='{"action": "set_instruction", "instruction": "<instruction>"}'>
+  <input type="hidden" name="action" value="set_instruction">
+  <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
+  <button type="submit">Save</button>
+</form>
+<form hx-post="{{ url }}" hx-vals='{"action": "add_step", "type": "<type>", "key": "<key>", "label": "<label>"}'>
+  <input type="hidden" name="action" value="add_step">
+  <label>Type:
+    <select name="type">
+    {% for t in available_types %}
+      <option value="{{ t }}">{{ t }}</option>
+    {% endfor %}
+    </select>
+  </label>
+  <label>Key: <input name="key" type="text" placeholder="unique-key"></label>
+  <label>Label: <input name="label" type="text" placeholder="Step Label"></label>
+  <button type="submit">+ Add Step</button>
+</form>
+<nav data-section="steps">
+  {% for step in step_items %}
+  <span data-step="{{ step.key }}"{% if step.is_active %} data-active="true"{% endif %}{% if step.complete %} data-complete="true"{% endif %}{% if step.accessible %} data-accessible="true"{% endif %}>{{ step.label }}</span>
+  {% endfor %}
+</nav>
+{% for step in step_items %}
+{% if step.accessible and not step.is_active %}
+<button hx-post="{{ url }}" hx-vals='{"step": "{{ step.key }}"}'>Go to {{ step.label }}</button>
+{% endif %}
+{% endfor %}
+{% set active_idx = ef.active_index %}
+{% if active_idx > 0 %}
+{% set prev = step_items[active_idx - 1] %}
+<button hx-post="{{ url }}" hx-vals='{"step": "{{ prev.key }}"}'>Back: {{ prev.label }}</button>
+{% endif %}
+{% if active_idx < step_items|length - 1 and step_items[active_idx].complete %}
+{% set nxt = step_items[active_idx + 1] %}
+<button hx-post="{{ url }}" hx-vals='{"step": "{{ nxt.key }}"}'>Next: {{ nxt.label }}</button>
+{% endif %}
+{% if step_items|length > 1 %}
+<form hx-post="{{ url }}" hx-vals='{"action": "move_step", "key": "<key>", "position": "<position>"}'>
+  <input type="hidden" name="action" value="move_step">
+  <label>Move Step:
+    <select name="key">
+    {% for step in step_items %}
+      <option value="{{ step.key }}">{{ step.key }}</option>
+    {% endfor %}
+    </select>
+  </label>
+  <label>Position: <input name="position" type="number" min="0" max="{{ step_items|length - 1 }}"></label>
+  <button type="submit">Move</button>
+</form>
+{% endif %}
+<form hx-post="{{ url }}" hx-vals='{"action": "remove_step", "key": "<key>"}'>
+  <input type="hidden" name="action" value="remove_step">
+  <label>Remove Step:
+    <select name="key">
+    {% for step in step_items %}
+      <option value="{{ step.key }}">{{ step.key }}</option>
+    {% endfor %}
+    </select>
+  </label>
+  <button type="submit">Remove</button>
+</form>
+<form hx-post="{{ url }}" hx-vals='{"action": "toggle_editable", "key": "<key>"}'>
+  <input type="hidden" name="action" value="toggle_editable">
+  <label>Toggle Editable:
+    <select name="key">
+    {% for step in step_items %}
+      <option value="{{ step.key }}">{{ step.key }} ({{ "editable" if step.editable else "locked" }})</option>
+    {% endfor %}
+    </select>
+  </label>
+  <button type="submit">Toggle</button>
+</form>
+{% else %}
+<h3 data-field="label">{{ label }}</h3>
+{% if instruction %}
+<p data-field="instruction">{{ instruction }}</p>
+{% endif %}
+<nav data-section="steps">
+  {% for step in step_items %}
+  <span data-step="{{ step.key }}"{% if step.is_active %} data-active="true"{% endif %}{% if step.complete %} data-complete="true"{% endif %}{% if step.accessible %} data-accessible="true"{% endif %}>{{ step.label }}</span>
+  {% endfor %}
+</nav>
+{% set active_idx = ef.active_index %}
+{% if active_idx > 0 %}
+{% set prev = step_items[active_idx - 1] %}
+<button hx-post="{{ url }}" hx-vals='{"step": "{{ prev.key }}"}'>Back: {{ prev.label }}</button>
+{% endif %}
+{% if active_idx < step_items|length - 1 and step_items[active_idx].complete %}
+{% set nxt = step_items[active_idx + 1] %}
+<button hx-post="{{ url }}" hx-vals='{"step": "{{ nxt.key }}"}'>Next: {{ nxt.label }}</button>
+{% endif %}
+{% for step in step_items %}
+{% if step.complete and not step.is_active %}
+<button hx-post="{{ url }}" hx-vals='{"step": "{{ step.key }}"}'>Go to {{ step.label }}</button>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if active_html %}
+{{ active_html|safe }}
+{% endif %}

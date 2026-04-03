@@ -5,12 +5,12 @@
 {% set _ = aff.update({"_rendered": true}) %}
 {% endfor %}
 {% if edit_mode %}
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "set_label", "label": "<label>"}'>
   <input type="hidden" name="action" value="set_label">
   <label>Label: <input type="text" name="label" value="{{ label }}"></label>
   <button type="submit">Save</button>
 </form>
-<form hx-post="{{ url }}">
+<form hx-post="{{ url }}" hx-vals='{"action": "set_instruction", "instruction": "<instruction>"}'>
   <input type="hidden" name="action" value="set_instruction">
   <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
   <button type="submit">Save</button>
@@ -21,6 +21,9 @@
 {% endif %}
 {% if has_data %}
 <button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
+{% if hints.clear %}
+<p data-field="instruction">{{ hints.clear }}</p>
+{% endif %}
 {% endif %}
 {% else %}
 <h3 data-field="label">{{ label }}</h3>
@@ -29,7 +32,7 @@
 {% endif %}
 {% for item_key, checked in items.items() %}
 <label>
-  <input type="checkbox" name="{{ item_key }}"{{ ' checked' if checked }} hx-post="{{ url }}" hx-vals='{"{{ item_key }}": {{ 'false' if checked else 'true' }}}'>
+  <input type="checkbox" name="{{ item_key }}"{% if checked %} checked{% endif %} hx-post="{{ url }}" hx-vals='{"{{ item_key }}": {{ 'false' if checked else 'true' }}}'>
   {{ item_key }}
 </label>
 {% endfor %}
@@ -37,8 +40,14 @@
 <p data-field="confirmed">Confirmed</p>
 {% else %}
 <button hx-post="{{ url }}" hx-vals='{"action": "done"}'>Done</button>
+{% if hints.done %}
+<p data-field="instruction">{{ hints.done }}</p>
+{% endif %}
 {% endif %}
 {% if has_data %}
 <button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
+{% if hints.clear %}
+<p data-field="instruction">{{ hints.clear }}</p>
+{% endif %}
 {% endif %}
 {% endif %}

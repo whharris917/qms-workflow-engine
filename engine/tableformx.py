@@ -163,6 +163,7 @@ class TableFormX(TableForm):
             row_dynamic_constraints=row_dynamic_constraints,
             col_dynamic_constraints=col_dynamic_constraints,
             typed_templates=templates,
+            hints=self._affordance_hints(data),
         )
 
     def render_from_data(self, data: dict) -> str:
