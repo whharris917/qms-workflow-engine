@@ -8,6 +8,8 @@ from engine.checkboxformx import CheckboxFormX
 from engine.numberformx import NumberFormX
 from engine.booleanformx import BooleanFormX
 from engine.memoformx import MemoFormX
+from engine.tabformx import TabFormX
+from engine.accordionformx import AccordionFormX
 from engine.pageform import PageForm
 
 
@@ -67,6 +69,22 @@ definition = PageForm(
             placeholder="Type your notes here...",
             min_length=10,
         ),
+        TabFormX(
+            key="details",
+            label="Details",
+            instruction="Project details organized by category.",
+            tabs={
+                "overview": TextForm(key="overview", label="Overview"),
+                "status": ChoiceFormX(
+                    key="status", label="Status",
+                    options=["Draft", "In Progress", "Complete"],
+                ),
+                "comments": MemoFormX(
+                    key="comments", label="Comments",
+                    placeholder="Add comments...",
+                ),
+            },
+        ),
         TableFormX(
             key="simple-table",
             label="Simple Table",
@@ -86,6 +104,22 @@ definition = PageForm(
             ],
             row_must_follow={"row_1": ["row_0"], "row_2": ["row_1"], "row_3": ["row_2"]},
             allow_row_constraints=True,
+        ),
+        AccordionFormX(
+            key="settings",
+            label="Settings",
+            instruction="Expand sections to configure.",
+            sections={
+                "general": TextForm(key="project-name", label="Project Name"),
+                "limits": NumberFormX(
+                    key="max-retries", label="Max Retries",
+                    min_val=0, max_val=10, integer=True,
+                ),
+                "flags": BooleanFormX(
+                    key="debug-mode", label="Debug Mode",
+                    true_label="Enabled", false_label="Disabled",
+                ),
+            },
         ),
     ],
 )

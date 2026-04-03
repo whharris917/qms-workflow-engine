@@ -1,0 +1,91 @@
+{# AccordionFormX agent template — HTMX native.
+   Collapsible sections with faithful projection: collapsed sections omitted.
+#}
+{% for aff in data.affordances %}
+{% set _ = aff.update({"_rendered": true}) %}
+{% endfor %}
+{% if edit_mode %}
+<form hx-post="{{ url }}">
+  <input type="hidden" name="action" value="set_label">
+  <label>Label: <input type="text" name="label" value="{{ label }}"></label>
+  <button type="submit">Save</button>
+</form>
+<form hx-post="{{ url }}">
+  <input type="hidden" name="action" value="set_instruction">
+  <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
+  <button type="submit">Save</button>
+</form>
+<form hx-post="{{ url }}">
+  <input type="hidden" name="action" value="add_section">
+  <label>Section Key: <input name="section_key" type="text" placeholder="section-key"></label>
+  <label>Type:
+    <select name="type">
+    {% for t in available_types %}
+      <option value="{{ t }}">{{ t }}</option>
+    {% endfor %}
+    </select>
+  </label>
+  <label>Key: <input name="key" type="text" placeholder="eigenform-key"></label>
+  <label>Label: <input name="label" type="text" placeholder="Section Label"></label>
+  <button type="submit">+ Add Section</button>
+</form>
+{% for sec in section_items %}
+<section data-section="{{ sec.key }}" data-expanded="{{ sec.expanded|lower }}">
+  <h4>{{ sec.label }}</h4>
+  <button hx-post="{{ url }}" hx-vals='{"action": "toggle", "section": "{{ sec.key }}"}'>{{ "Collapse" if sec.expanded else "Expand" }}</button>
+  {% if sec.expanded and sec.key in section_html %}
+  {{ section_html[sec.key]|safe }}
+  {% endif %}
+</section>
+{% endfor %}
+{% if section_items|length > 1 %}
+<form hx-post="{{ url }}">
+  <input type="hidden" name="action" value="move_section">
+  <label>Move Section:
+    <select name="section_key">
+    {% for sec in section_items %}
+      <option value="{{ sec.key }}">{{ sec.key }}</option>
+    {% endfor %}
+    </select>
+  </label>
+  <label>Position: <input name="position" type="number" min="0" max="{{ section_items|length - 1 }}"></label>
+  <button type="submit">Move</button>
+</form>
+{% endif %}
+<form hx-post="{{ url }}">
+  <input type="hidden" name="action" value="remove_section">
+  <label>Remove Section:
+    <select name="section_key">
+    {% for sec in section_items %}
+      <option value="{{ sec.key }}">{{ sec.key }}</option>
+    {% endfor %}
+    </select>
+  </label>
+  <button type="submit">Remove</button>
+</form>
+<form hx-post="{{ url }}">
+  <input type="hidden" name="action" value="toggle_editable">
+  <label>Toggle Editable:
+    <select name="section_key">
+    {% for sec in section_items %}
+      <option value="{{ sec.key }}">{{ sec.key }} ({{ "editable" if sec.editable else "locked" }})</option>
+    {% endfor %}
+    </select>
+  </label>
+  <button type="submit">Toggle</button>
+</form>
+{% else %}
+<h3 data-field="label">{{ label }}</h3>
+{% if instruction %}
+<p data-field="instruction">{{ instruction }}</p>
+{% endif %}
+{% for sec in section_items %}
+<section data-section="{{ sec.key }}" data-expanded="{{ sec.expanded|lower }}">
+  <h4>{{ sec.label }}</h4>
+  <button hx-post="{{ url }}" hx-vals='{"action": "toggle", "section": "{{ sec.key }}"}'>{{ "Collapse" if sec.expanded else "Expand" }}</button>
+  {% if sec.expanded and sec.key in section_html %}
+  {{ section_html[sec.key]|safe }}
+  {% endif %}
+</section>
+{% endfor %}
+{% endif %}

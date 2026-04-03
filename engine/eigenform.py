@@ -382,6 +382,22 @@ class Eigenform:
         """
         return None
 
+    def render_agent(self) -> str:
+        """Render this eigenform for agent consumption — no chrome, no wrapper.
+
+        For htmx_native eigenforms, returns the agent template output directly.
+        For legacy eigenforms, falls back to the standard render().
+        """
+        if not self.htmx_native:
+            return self.render()
+        data = self._serialize_full()
+        for aff in data.get("affordances", []):
+            aff["_rendered"] = aff.pop("_chrome_rendered", False)
+        agent_html = self.render_agent_from_data(data)
+        if agent_html is None:
+            return self.render()
+        return agent_html
+
     def _render_toggle_btn(self, uid: str, inner: str, json_str: str, agent_html: str | None = None) -> str:
         """Render the view-selector dropdown and alternate content panes."""
         # Build ordered list of (pane_id, label, tag, content)

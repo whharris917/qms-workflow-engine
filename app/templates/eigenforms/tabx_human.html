@@ -1,0 +1,83 @@
+{# TabFormX human template — styled HTMX. #}
+{% for aff in data.affordances %}
+{% set _ = aff.update({"_rendered": true}) %}
+{% endfor %}
+{% if edit_mode %}
+<form hx-post="{{ url }}" class="ef-edit-label-form">
+  <input type="hidden" name="action" value="set_label">
+  <input name="label" type="text" value="{{ label }}" class="ef-edit-label-input">
+  <button type="submit" class="{{ CSS_CONFIRM }}">&#10003;</button>
+</form>
+<form hx-post="{{ url }}" class="ef-edit-instr-form">
+  <input type="hidden" name="action" value="set_instruction">
+  <input name="instruction" type="text" value="{{ instruction }}" placeholder="Instruction text" class="ef-edit-instr-input">
+  <button type="submit" class="{{ CSS_CONFIRM }}">&#10003;</button>
+</form>
+
+{# Add Tab toolbar #}
+<div class="ef-add-toolbar">
+<form class="ef-add-toolbar-form" hx-post="{{ url }}">
+  <input type="hidden" name="action" value="add_tab">
+  <div><label class="ef-add-toolbar-label">Tab Key</label>
+  <input name="tab_key" type="text" placeholder="tab-key" class="ef-add-toolbar-input" style="width: 100px;"></div>
+  <div><label class="ef-add-toolbar-label">Type</label>
+  <select name="type" class="ef-add-toolbar-input">
+    <option value="">-- type --</option>
+    {% for t in available_types %}
+    <option value="{{ t }}">{{ t }}</option>
+    {% endfor %}
+  </select></div>
+  <div><label class="ef-add-toolbar-label">Key</label>
+  <input name="key" type="text" placeholder="eigenform-key" class="ef-add-toolbar-input" style="width: 120px;"></div>
+  <div><label class="ef-add-toolbar-label">Label</label>
+  <input name="label" type="text" placeholder="Tab Label" class="ef-add-toolbar-input" style="width: 140px;"></div>
+  <button type="submit" class="ef-add-toolbar-submit">+ Add</button>
+</form></div>
+
+{# Tab bar with per-tab controls #}
+<div class="ef-tab-bar">
+{% for tab in tab_items %}
+  {% set bg = "#fff" if tab.is_active else "#f5f5f5" %}
+  {% set bb = "2px solid #333" if tab.is_active else "2px solid transparent" %}
+  <div style="display: flex; align-items: center; gap: 2px; padding: 4px 6px; background: {{ bg }}; border: 1px solid #ddd; border-bottom: {{ bb }}; border-radius: 4px 4px 0 0; font-size: 12px;">
+    {% if tab.is_active %}
+    <span style="font-weight: bold; padding: 0 4px;">{{ tab.label }}</span>
+    {% else %}
+    <button hx-post="{{ url }}" hx-vals='{"tab": "{{ tab.key }}"}' style="cursor: pointer; border: none; background: transparent; padding: 0 4px; font-size: 12px; color: #333; text-decoration: underline;">{{ tab.label }}</button>
+    {% endif %}
+    {% if tab.index > 0 %}
+    <button hx-post="{{ url }}" hx-vals='{"action": "move_tab", "tab_key": "{{ tab.key }}", "position": {{ tab.index - 1 }}}' style="cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 18px; height: 18px; font-size: 8px; padding: 0;">&#9664;</button>
+    {% endif %}
+    {% if tab.index < tab_items|length - 1 %}
+    <button hx-post="{{ url }}" hx-vals='{"action": "move_tab", "tab_key": "{{ tab.key }}", "position": {{ tab.index + 1 }}}' style="cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 18px; height: 18px; font-size: 8px; padding: 0;">&#9654;</button>
+    {% endif %}
+    {% if tab.editable %}
+    <button hx-post="{{ url }}" hx-vals='{"action": "toggle_editable", "tab_key": "{{ tab.key }}"}' style="cursor: pointer; border: 1px solid #86c; background: #f3eaff; width: 18px; height: 18px; font-size: 10px; padding: 0; color: #639;">&#9998;</button>
+    {% else %}
+    <button hx-post="{{ url }}" hx-vals='{"action": "toggle_editable", "tab_key": "{{ tab.key }}"}' style="cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 18px; height: 18px; font-size: 10px; padding: 0; color: #aaa;">&#9998;</button>
+    {% endif %}
+    <button hx-post="{{ url }}" hx-vals='{"action": "remove_tab", "tab_key": "{{ tab.key }}"}' style="cursor: pointer; border: 1px solid #dcc; background: #fef8f8; width: 18px; height: 18px; font-size: 9px; padding: 0; color: #c00;">&#10005;</button>
+  </div>
+{% endfor %}
+</div>
+
+{% else %}
+<h3>{{ label }}</h3>
+{% if instruction %}<p>{{ instruction }}</p>{% endif %}
+
+{# Standard tab bar #}
+<div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;">
+{% for tab in tab_items %}
+  {% if tab.is_active %}
+  <span style="font-weight: bold; padding: 2px 8px; border-bottom: 2px solid #333;">{{ tab.label }}</span>
+  {% else %}
+  <button hx-post="{{ url }}" hx-vals='{"tab": "{{ tab.key }}"}' style="cursor: pointer; border: none; background: transparent; padding: 2px 8px; color: #333; text-decoration: underline;">{{ tab.label }}</button>
+  {% endif %}
+{% endfor %}
+</div>
+{% endif %}
+
+{# Active tab content #}
+{% if active_html %}
+{{ active_html|safe }}
+{% endif %}

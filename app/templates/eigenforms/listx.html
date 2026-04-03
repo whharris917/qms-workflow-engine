@@ -57,7 +57,7 @@
 </form>
 {% endif %}
 {% if edit_mode -%}
-<button hx-post="{{ url }}" hx-vals='{"action": "toggle_fixed", "id": "{{ item_id }}"}'>{{ "&#128204;" if is_item_fixed else "&#128203;" }}</button>
+<button hx-post="{{ url }}" hx-vals='{"action": "toggle_fixed", "id": "{{ item_id }}"}'>{{ "📌" if is_item_fixed else "📋" }}</button>
 {% endif %}
 {% set prereqs = all_must_follow.get(item_id, []) %}
 {% if allow_constraints and num_items > 1 %}
@@ -95,7 +95,7 @@
 {% endif -%}
 <span data-constraint-after="{{ p_id }}" data-fixed="{{ is_effectively_fixed|lower }}">{{ p_name }}</span>
 {%- if edit_mode -%}
-<button hx-post="{{ url }}" hx-vals='{"action": "toggle_constraint_fixed", "item": "{{ item_id }}", "after": "{{ p_id }}"}'>{{ "&#128204;" if is_effectively_fixed else "&#128203;" }}</button>
+<button hx-post="{{ url }}" hx-vals='{"action": "toggle_constraint_fixed", "item": "{{ item_id }}", "after": "{{ p_id }}"}'>{{ "📌" if is_effectively_fixed else "📋" }}</button>
 <button hx-post="{{ url }}" hx-vals='{"action": "remove_constraint", "item": "{{ item_id }}", "after": "{{ p_id }}"}'>x</button>
 {%- elif not is_effectively_fixed -%}
 <button hx-post="{{ url }}" hx-vals='{"action": "remove_constraint", "item": "{{ item_id }}", "after": "{{ p_id }}"}'>x</button>

@@ -317,6 +317,12 @@ class PageForm(Eigenform):
                 child_items.append({"key": ef.key, "index": i, "html": ef.render()})
         return render_template("page.html", data=data, ef=self, url=self._url_prefix, label=data.get("label", ""), instruction=data.get("instruction") or "", children_html=children_html, child_items=child_items, available_types=available_types, feedback=data.get("feedback"), mutable=self.mutable_structure)
 
+    def render_agent(self) -> str:
+        """Render page for agent consumption — children use agent rendering."""
+        data = self._serialize_full()
+        children_html = [ef.render_agent() for ef in self.eigenforms]
+        return render_template("page.html", data=data, ef=self, url=self._url_prefix, label=data.get("label", ""), instruction=data.get("instruction") or "", children_html=children_html, child_items=[], available_types=[], feedback=data.get("feedback"), mutable=False)
+
     def find_eigenform(self, path: str) -> Eigenform | None:
         """Find an eigenform by its path (e.g., 'tabs/title')."""
         segments = path.split("/")

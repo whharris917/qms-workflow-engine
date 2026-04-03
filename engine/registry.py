@@ -119,6 +119,8 @@ def _build_default_registry() -> EigenformRegistry:
     from engine.numberformx import NumberFormX
     from engine.booleanformx import BooleanFormX
     from engine.memoformx import MemoFormX
+    from engine.tabformx import TabFormX
+    from engine.accordionformx import AccordionFormX
 
     r = EigenformRegistry()
     for cls in [
@@ -132,7 +134,7 @@ def _build_default_registry() -> EigenformRegistry:
         ScoreForm, ComputedForm, ValidationForm,
         ActionForm, RubiksCubeForm, ListFormX, TableFormX,
         ChoiceFormX, CheckboxFormX,
-        NumberFormX, BooleanFormX, MemoFormX,
+        NumberFormX, BooleanFormX, MemoFormX, TabFormX, AccordionFormX,
     ]:
         r.register(cls)
     return r
