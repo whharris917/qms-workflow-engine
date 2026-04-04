@@ -1,7 +1,5 @@
 {# TableFormX agent template — HTMX native.
-   Data grid (read-only) + parameterized affordances (one form per action).
-   Mirrors the JSON affordance structure to minimize agent context usage.
-   HTMX attributes inherit hx-target/hx-swap/hx-ext from #page-content.
+   Pure semantic markup: data grid + annotated action endpoints.
 #}
 {% for aff in data.affordances %}
 {% set _ = aff.update({"_rendered": true}) %}
@@ -46,242 +44,85 @@
 <p>No columns defined.</p>
 {% endif %}
 
-{# ── Parameterized Affordances ── #}
-<div data-section="affordances">
-
-{# + Column #}
-<form hx-post="{{ url }}" hx-vals='{"action": "add_column", "label": "<label>"}'>
-  <label>+ Column: <input type="text" name="label" placeholder="column name"></label>
-  <button type="submit">Add</button>
-</form>
-
-{# Rename Column (editable columns only) #}
+{# ── Affordances ── #}
+<div data-affordance="add_column">
+  <button hx-post="{{ url }}" hx-vals='{"action": "add_column", "label": "<label>"}'>Add Column</button>
+</div>
 {% if editable_cols %}
-<form hx-post="{{ url }}" hx-vals='{"action": "rename_column", "column": "<{{ editable_cols|map(attribute="id")|join(" | ") }}>", "label": "<label>"}'>
-  <label>Rename Column:
-    <select name="column">
-    {% for c in editable_cols %}
-      <option value="{{ c.id }}">{{ c.id }} ({{ c.value }})</option>
-    {% endfor %}
-    </select>
-  </label>
-  <label><input type="text" name="label" placeholder="new label"></label>
-  <button type="submit">Rename</button>
-</form>
+<div data-affordance="rename_column">
+  <button hx-post="{{ url }}" hx-vals='{"action": "rename_column", "column": "<{{ editable_cols|map(attribute="id")|join(" | ") }}>", "label": "<label>"}'>Rename Column</button>
+</div>
 {% endif %}
-
-{# + Row #}
 {% if col_data %}
-<form hx-post="{{ url }}" hx-vals='{"action": "add_row"}'>
-  {% for c in text_col_items %}
-  <label>{{ c.id }} ({{ c.value }}): <input type="text" name="{{ c.id }}"></label>
-  {% endfor %}
-  <button type="submit">+ Row</button>
-</form>
+<div data-affordance="add_row">
+  <button hx-post="{{ url }}" hx-vals='{"action": "add_row"{% for c in text_col_items %}, "{{ c.id }}": "<value>"{% endfor %}}'>Add Row</button>
+</div>
 {% endif %}
-
-{# Set Cell (text columns + rows) #}
 {% if text_col_items and row_data %}
-<form hx-post="{{ url }}" hx-vals='{"action": "set_cell", "row": "<{{ all_row_ids|join(" | ") }}>", "column": "<{{ text_col_items|map(attribute="id")|join(" | ") }}>", "value": "<value>"}'>
-  <label>Row:
-    <select name="row">
-    {% for r in all_row_ids %}
-      <option value="{{ r }}">{{ r }}</option>
-    {% endfor %}
-    </select>
-  </label>
-  <label>Column:
-    <select name="column">
-    {% for c in text_col_items %}
-      <option value="{{ c.id }}">{{ c.id }} ({{ c.value }})</option>
-    {% endfor %}
-    </select>
-  </label>
-  <label>Value: <input type="text" name="value"></label>
-  <button type="submit">Set Cell</button>
-</form>
+<div data-affordance="set_cell">
+  <button hx-post="{{ url }}" hx-vals='{"action": "set_cell", "row": "<{{ all_row_ids|join(" | ") }}>", "column": "<{{ text_col_items|map(attribute="id")|join(" | ") }}>", "value": "<value>"}'>Set Cell</button>
+</div>
+<div data-affordance="set_row">
+  <button hx-post="{{ url }}" hx-vals='{"action": "set_row", "row": "<{{ all_row_ids|join(" | ") }}>"{% for c in text_col_items %}, "{{ c.id }}": "<value>"{% endfor %}}'>Set Row</button>
+</div>
 {% endif %}
-
-{# Set Row (text columns) #}
-{% if text_col_items and row_data %}
-<form hx-post="{{ url }}" hx-vals='{"action": "set_row", "row": "<{{ all_row_ids|join(" | ") }}>"}'>
-  <label>Row:
-    <select name="row">
-    {% for r in all_row_ids %}
-      <option value="{{ r }}">{{ r }}</option>
-    {% endfor %}
-    </select>
-  </label>
-  {% for c in text_col_items %}
-  <label>{{ c.id }} ({{ c.value }}): <input type="text" name="{{ c.id }}"></label>
-  {% endfor %}
-  <button type="submit">Set Row</button>
-</form>
-{% endif %}
-
-{# Move Row Up #}
 {% if can_move_up_rows %}
-<form hx-post="{{ url }}" hx-vals='{"action": "move_row_up", "row": "<{{ can_move_up_rows|join(" | ") }}>"}'>
-  <label>Move Row Up:
-    <select name="row">
-    {% for r in can_move_up_rows %}
-      <option value="{{ r }}">{{ r }}</option>
-    {% endfor %}
-    </select>
-  </label>
-  <button type="submit">Move Up</button>
-</form>
+<div data-affordance="move_row_up">
+  <button hx-post="{{ url }}" hx-vals='{"action": "move_row_up", "row": "<{{ can_move_up_rows|join(" | ") }}>"}'>Move Row Up</button>
+</div>
 {% endif %}
-
-{# Move Row Down #}
 {% if can_move_down_rows %}
-<form hx-post="{{ url }}" hx-vals='{"action": "move_row_down", "row": "<{{ can_move_down_rows|join(" | ") }}>"}'>
-  <label>Move Row Down:
-    <select name="row">
-    {% for r in can_move_down_rows %}
-      <option value="{{ r }}">{{ r }}</option>
-    {% endfor %}
-    </select>
-  </label>
-  <button type="submit">Move Down</button>
-</form>
+<div data-affordance="move_row_down">
+  <button hx-post="{{ url }}" hx-vals='{"action": "move_row_down", "row": "<{{ can_move_down_rows|join(" | ") }}>"}'>Move Row Down</button>
+</div>
 {% endif %}
-
-{# Move Column Left #}
 {% if can_move_left_cols %}
-<form hx-post="{{ url }}" hx-vals='{"action": "move_col_left", "column": "<{{ can_move_left_cols|join(" | ") }}>"}'>
-  <label>Move Column Left:
-    <select name="column">
-    {% for c in can_move_left_cols %}
-      <option value="{{ c }}">{{ c }}</option>
-    {% endfor %}
-    </select>
-  </label>
-  <button type="submit">Move Left</button>
-</form>
+<div data-affordance="move_col_left">
+  <button hx-post="{{ url }}" hx-vals='{"action": "move_col_left", "column": "<{{ can_move_left_cols|join(" | ") }}>"}'>Move Column Left</button>
+</div>
 {% endif %}
-
-{# Move Column Right #}
 {% if can_move_right_cols %}
-<form hx-post="{{ url }}" hx-vals='{"action": "move_col_right", "column": "<{{ can_move_right_cols|join(" | ") }}>"}'>
-  <label>Move Column Right:
-    <select name="column">
-    {% for c in can_move_right_cols %}
-      <option value="{{ c }}">{{ c }}</option>
-    {% endfor %}
-    </select>
-  </label>
-  <button type="submit">Move Right</button>
-</form>
+<div data-affordance="move_col_right">
+  <button hx-post="{{ url }}" hx-vals='{"action": "move_col_right", "column": "<{{ can_move_right_cols|join(" | ") }}>"}'>Move Column Right</button>
+</div>
 {% endif %}
-
-{# Row Constraints #}
 {% if show_row_constraints and num_rows > 1 %}
-<form hx-post="{{ url }}" hx-vals='{"action": "add_row_constraint", "item": "<{{ all_row_ids|join(" | ") }}>", "after": "<{{ all_row_ids|join(" | ") }}>"}'>
-  <label>Add Row Constraint — item:
-    <select name="item">
-    {% for r in all_row_ids %}
-      <option value="{{ r }}">{{ r }}</option>
-    {% endfor %}
-    </select>
-  </label>
-  <label>after:
-    <select name="after">
-    {% for r in all_row_ids %}
-      <option value="{{ r }}">{{ r }}</option>
-    {% endfor %}
-    </select>
-  </label>
-  <button type="submit">Add Constraint</button>
-</form>
+<div data-affordance="add_row_constraint">
+  <button hx-post="{{ url }}" hx-vals='{"action": "add_row_constraint", "item": "<{{ all_row_ids|join(" | ") }}>", "after": "<{{ all_row_ids|join(" | ") }}>"}'>Add Row Constraint</button>
+</div>
 {% endif %}
 {% if row_dynamic_constraints %}
-{% set row_constraint_opts = row_dynamic_constraints|map(attribute="item")|list %}
-<form hx-post="{{ url }}" hx-vals='{"action": "remove_row_constraint", "item": "<{{ row_constraint_opts|join(" | ") }}>", "after": "<after>"}'>
-  <label>Remove Row Constraint:
-    <select name="item">
-    {% for c in row_dynamic_constraints %}
-    <option value="{{ c.item }}">{{ c.item }} after {{ c.after }}</option>
-    {% endfor %}
-    </select>
-  </label>
-  <button type="submit">Remove</button>
-</form>
+<div data-affordance="remove_row_constraint">
+  <button hx-post="{{ url }}" hx-vals='{"action": "remove_row_constraint", "item": "<item>", "after": "<after>"}'>Remove Row Constraint</button>
+</div>
 {% endif %}
-
-{# Column Constraints #}
 {% if show_col_constraints and num_cols > 1 %}
-<form hx-post="{{ url }}" hx-vals='{"action": "add_col_constraint", "item": "<{{ all_col_ids|join(" | ") }}>", "after": "<{{ all_col_ids|join(" | ") }}>"}'>
-  <label>Add Column Constraint — item:
-    <select name="item">
-    {% for c in all_col_ids %}
-      <option value="{{ c }}">{{ c }}</option>
-    {% endfor %}
-    </select>
-  </label>
-  <label>after:
-    <select name="after">
-    {% for c in all_col_ids %}
-      <option value="{{ c }}">{{ c }}</option>
-    {% endfor %}
-    </select>
-  </label>
-  <button type="submit">Add Constraint</button>
-</form>
+<div data-affordance="add_col_constraint">
+  <button hx-post="{{ url }}" hx-vals='{"action": "add_col_constraint", "item": "<{{ all_col_ids|join(" | ") }}>", "after": "<{{ all_col_ids|join(" | ") }}>"}'>Add Column Constraint</button>
+</div>
 {% endif %}
 {% if col_dynamic_constraints %}
-{% set col_constraint_opts = col_dynamic_constraints|map(attribute="item")|list %}
-<form hx-post="{{ url }}" hx-vals='{"action": "remove_col_constraint", "item": "<{{ col_constraint_opts|join(" | ") }}>", "after": "<after>"}'>
-  <label>Remove Column Constraint:
-    <select name="item">
-    {% for c in col_dynamic_constraints %}
-    <option value="{{ c.item }}">{{ c.item }} after {{ c.after }}</option>
-    {% endfor %}
-    </select>
-  </label>
-  <button type="submit">Remove</button>
-</form>
-{% endif %}
-
-{# Remove Row #}
-{% if editable_rows %}
-<form hx-post="{{ url }}" hx-vals='{"action": "remove_row", "row": "<{{ editable_rows|map(attribute="id")|join(" | ") }}>"}'>
-  <label>Remove Row:
-    <select name="row">
-    {% for r in editable_rows %}
-      <option value="{{ r.id }}">{{ r.id }}</option>
-    {% endfor %}
-    </select>
-  </label>
-  <button type="submit">Remove</button>
-</form>
-{% endif %}
-
-{# Remove Column #}
-{% if editable_cols %}
-<form hx-post="{{ url }}" hx-vals='{"action": "remove_column", "column": "<{{ editable_cols|map(attribute="id")|join(" | ") }}>"}'>
-  <label>Remove Column:
-    <select name="column">
-    {% for c in editable_cols %}
-      <option value="{{ c.id }}">{{ c.id }} ({{ c.value }})</option>
-    {% endfor %}
-    </select>
-  </label>
-  <button type="submit">Remove</button>
-</form>
-{% endif %}
-
-{# Config toggles #}
-{% for cfg_key, action_name, toggle_label in config_toggles %}
-<label>
-  <input type="checkbox" {{ "checked" if config.get(cfg_key, false) }} hx-post="{{ url }}" hx-vals='{"action": "{{ action_name }}"}'>
-  {{ toggle_label }}
-</label>
-{% endfor %}
-
-{# Clear #}
-{% if has_data %}
-<button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
-{% endif %}
-
+<div data-affordance="remove_col_constraint">
+  <button hx-post="{{ url }}" hx-vals='{"action": "remove_col_constraint", "item": "<item>", "after": "<after>"}'>Remove Column Constraint</button>
 </div>
+{% endif %}
+{% if editable_rows %}
+<div data-affordance="remove_row">
+  <button hx-post="{{ url }}" hx-vals='{"action": "remove_row", "row": "<{{ editable_rows|map(attribute="id")|join(" | ") }}>"}'>Remove Row</button>
+</div>
+{% endif %}
+{% if editable_cols %}
+<div data-affordance="remove_column">
+  <button hx-post="{{ url }}" hx-vals='{"action": "remove_column", "column": "<{{ editable_cols|map(attribute="id")|join(" | ") }}>"}'>Remove Column</button>
+</div>
+{% endif %}
+{% for cfg_key, action_name, toggle_label in config_toggles %}
+<div data-affordance="{{ action_name }}">
+  <button hx-post="{{ url }}" hx-vals='{"action": "{{ action_name }}"}'>{{ toggle_label }} ({{ "on" if config.get(cfg_key, false) else "off" }})</button>
+</div>
+{% endfor %}
+{% if has_data %}
+<div data-affordance="clear">
+  <button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
+</div>
+{% endif %}

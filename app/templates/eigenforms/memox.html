@@ -1,50 +1,28 @@
 {# MemoFormX agent template — HTMX native.
-   Multi-line textarea input.
+   Pure semantic markup: state display + annotated action endpoints.
 #}
 {% for aff in data.affordances %}
 {% set _ = aff.update({"_rendered": true}) %}
 {% endfor %}
-{% if edit_mode %}
-<form hx-post="{{ url }}" hx-vals='{"action": "set_label", "label": "<label>"}'>
-  <label>Label: <input type="text" name="label" value="{{ label }}"></label>
-  <button type="submit">Save</button>
-</form>
-<form hx-post="{{ url }}" hx-vals='{"action": "set_instruction", "instruction": "<instruction>"}'>
-  <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
-  <button type="submit">Save</button>
-</form>
-{% if value %}
-<div data-field="value">{{ value }}</div>
-{% else %}
-<p data-field="value">No text entered.</p>
-{% endif %}
-{% if has_data %}
-<button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
-{% if hints.clear %}
-<p data-field="instruction">{{ hints.clear }}</p>
-{% endif %}
-{% endif %}
-{% else %}
 <h3 data-field="label">{{ label }}</h3>
 {% if instruction %}
 <p data-field="instruction">{{ instruction }}</p>
 {% endif %}
-{% if value %}
-<div data-field="value">{{ value }}</div>
-{% else %}
-<p data-field="value">No text entered.</p>
+{% if min_length is not none or max_length is not none %}
+<p data-field="constraints">{% if min_length is not none %}min: {{ min_length }}{% endif %}{% if min_length is not none and max_length is not none %}, {% endif %}{% if max_length is not none %}max: {{ max_length }}{% endif %}</p>
 {% endif %}
-<form hx-post="{{ url }}" hx-vals='{"value": "<value>"}'>
-  <label>value: <textarea name="value"{% if min_length is not none %} minlength="{{ min_length }}"{% endif %}{% if max_length is not none %} maxlength="{{ max_length }}"{% endif %}>{{ value or "" }}</textarea></label>
-  <button type="submit">Set</button>
-</form>
-{% if hints.set %}
-<p data-field="instruction">{{ hints.set }}</p>
-{% endif %}
+<p data-field="value">{{ value or "" }}</p>
+<div data-affordance="set">
+  <button hx-post="{{ url }}" hx-vals='{"value": "<value>"}'>Set</button>
+  {% if hints.set %}
+  <p data-field="instruction">{{ hints.set }}</p>
+  {% endif %}
+</div>
 {% if has_data %}
-<button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
-{% if hints.clear %}
-<p data-field="instruction">{{ hints.clear }}</p>
-{% endif %}
-{% endif %}
+<div data-affordance="clear">
+  <button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
+  {% if hints.clear %}
+  <p data-field="instruction">{{ hints.clear }}</p>
+  {% endif %}
+</div>
 {% endif %}

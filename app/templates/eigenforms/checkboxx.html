@@ -1,51 +1,38 @@
 {# CheckboxFormX agent template — HTMX native.
-   Checkbox toggles with clean semantic markup.
+   Pure semantic markup: state display + annotated action endpoints.
 #}
 {% for aff in data.affordances %}
 {% set _ = aff.update({"_rendered": true}) %}
 {% endfor %}
-{% if edit_mode %}
-<form hx-post="{{ url }}" hx-vals='{"action": "set_label", "label": "<label>"}'>
-  <label>Label: <input type="text" name="label" value="{{ label }}"></label>
-  <button type="submit">Save</button>
-</form>
-<form hx-post="{{ url }}" hx-vals='{"action": "set_instruction", "instruction": "<instruction>"}'>
-  <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
-  <button type="submit">Save</button>
-</form>
-{{ items_html|safe }}
-{% if confirmed %}
-<p data-field="confirmed">Confirmed</p>
-{% endif %}
-{% if has_data %}
-<button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
-{% if hints.clear %}
-<p data-field="instruction">{{ hints.clear }}</p>
-{% endif %}
-{% endif %}
-{% else %}
 <h3 data-field="label">{{ label }}</h3>
 {% if instruction %}
 <p data-field="instruction">{{ instruction }}</p>
 {% endif %}
+<ul data-field="items">
 {% for item_key, checked in items.items() %}
-<label>
-  <input type="checkbox" name="{{ item_key }}"{% if checked %} checked{% endif %} hx-post="{{ url }}" hx-vals='{"{{ item_key }}": {{ 'false' if checked else 'true' }}}'>
-  {{ item_key }}
-</label>
+  <li data-item="{{ item_key }}" data-checked="{{ checked|lower }}">{{ item_key }}</li>
+{% endfor %}
+</ul>
+{% for item_key, checked in items.items() %}
+<div data-affordance="toggle" data-item="{{ item_key }}">
+  <button hx-post="{{ url }}" hx-vals='{"{{ item_key }}": {{ "false" if checked else "true" }}}'>{{ "Uncheck" if checked else "Check" }} {{ item_key }}</button>
+</div>
 {% endfor %}
 {% if confirmed %}
 <p data-field="confirmed">Confirmed</p>
 {% else %}
-<button hx-post="{{ url }}" hx-vals='{"action": "done"}'>Done</button>
-{% if hints.done %}
-<p data-field="instruction">{{ hints.done }}</p>
-{% endif %}
+<div data-affordance="done">
+  <button hx-post="{{ url }}" hx-vals='{"action": "done"}'>Done</button>
+  {% if hints.done %}
+  <p data-field="instruction">{{ hints.done }}</p>
+  {% endif %}
+</div>
 {% endif %}
 {% if has_data %}
-<button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
-{% if hints.clear %}
-<p data-field="instruction">{{ hints.clear }}</p>
-{% endif %}
-{% endif %}
+<div data-affordance="clear">
+  <button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
+  {% if hints.clear %}
+  <p data-field="instruction">{{ hints.clear }}</p>
+  {% endif %}
+</div>
 {% endif %}

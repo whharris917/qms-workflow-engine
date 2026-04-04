@@ -11,19 +11,34 @@
     <script src="{{ url_for('static', filename='json-enc.js') }}"></script>
     <script src="{{ url_for('static', filename='eigenform.js') }}"></script>
     <script>
+        /* Preserve scroll position across all DOM swaps. */
+        document.body.addEventListener('htmx:beforeSwap', function() {
+            window._scrollY = window.scrollY;
+        });
+        document.body.addEventListener('htmx:afterSwap', function() {
+            if (window._scrollY != null) window.scrollTo(0, window._scrollY);
+        });
+
+        /* SSE: reload page when another client mutates state.
+           Suppress for 500ms after this tab's own POSTs. */
+        var _selfUpdated = 0;
+        document.body.addEventListener('htmx:beforeRequest', function() { _selfUpdated = Date.now(); });
+
         var source = new EventSource('/pages/{{ page_key }}/stream');
         source.onmessage = function(event) {
+            if (Date.now() - _selfUpdated < 500) return;
+            var scrollY = window.scrollY;
             fetch('/pages/{{ page_key }}', {
                 headers: {'Accept': 'text/html'}
             }).then(function(resp) {
                 return resp.text();
             }).then(function(html) {
-                /* Response is full page — extract page-content div */
                 var doc = new DOMParser().parseFromString(html, 'text/html');
                 var content = doc.getElementById('page-content');
                 if (content) {
                     document.getElementById('page-content').innerHTML = content.innerHTML;
                     htmx.process(document.getElementById('page-content'));
+                    window.scrollTo(0, scrollY);
                 }
             });
         };

@@ -1,78 +1,10 @@
 {# ChainFormX agent template — HTMX native.
-   Sequential steps with auto-advance. Faithful projection: only active step visible.
+   Pure semantic markup: state display + annotated action endpoints.
+   Faithful projection: only active step visible.
 #}
 {% for aff in data.affordances %}
 {% set _ = aff.update({"_rendered": true}) %}
 {% endfor %}
-{% if edit_mode %}
-<form hx-post="{{ url }}" hx-vals='{"action": "set_label", "label": "<label>"}'>
-  <label>Label: <input type="text" name="label" value="{{ label }}"></label>
-  <button type="submit">Save</button>
-</form>
-<form hx-post="{{ url }}" hx-vals='{"action": "set_instruction", "instruction": "<instruction>"}'>
-  <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
-  <button type="submit">Save</button>
-</form>
-<form hx-post="{{ url }}" hx-vals='{"action": "add_step", "type": "<{{ available_types|join(" | ") }}>", "key": "<key>", "label": "<label>"}'>
-  <label>Type:
-    <select name="type">
-    {% for t in available_types %}
-      <option value="{{ t }}">{{ t }}</option>
-    {% endfor %}
-    </select>
-  </label>
-  <label>Key: <input name="key" type="text" placeholder="unique-key"></label>
-  <label>Label: <input name="label" type="text" placeholder="Step Label"></label>
-  <button type="submit">+ Add Step</button>
-</form>
-<nav data-section="steps">
-  {% for step in step_items %}
-  <span data-step="{{ step.key }}"{% if step.is_active %} data-active="true"{% endif %}{% if step.complete %} data-complete="true"{% endif %}>{{ step.label }}</span>
-  {% endfor %}
-</nav>
-{% for step in step_items %}
-{% if step.complete and not step.is_active %}
-<button hx-post="{{ url }}" hx-vals='{"focus": "{{ step.key }}"}'>Back to {{ step.label }}</button>
-{% endif %}
-{% endfor %}
-{% if active_step_key and ef.active_step and ef.active_step.is_complete and ef._focused_key is not none %}
-<button hx-post="{{ url }}" hx-vals='{"action": "continue"}'>Continue</button>
-{% endif %}
-{% if step_items|length > 1 %}
-{% set step_keys = step_items|map(attribute="key")|join(" | ") %}
-<form hx-post="{{ url }}" hx-vals='{"action": "move_step", "key": "<{{ step_keys }}>", "position": "<position>"}'>
-  <label>Move Step:
-    <select name="key">
-    {% for step in step_items %}
-      <option value="{{ step.key }}">{{ step.key }}</option>
-    {% endfor %}
-    </select>
-  </label>
-  <label>Position: <input name="position" type="number" min="0" max="{{ step_items|length - 1 }}"></label>
-  <button type="submit">Move</button>
-</form>
-{% endif %}
-<form hx-post="{{ url }}" hx-vals='{"action": "remove_step", "key": "<{{ step_keys }}>"}'>
-  <label>Remove Step:
-    <select name="key">
-    {% for step in step_items %}
-      <option value="{{ step.key }}">{{ step.key }}</option>
-    {% endfor %}
-    </select>
-  </label>
-  <button type="submit">Remove</button>
-</form>
-<form hx-post="{{ url }}" hx-vals='{"action": "toggle_editable", "key": "<{{ step_keys }}>"}'>
-  <label>Toggle Editable:
-    <select name="key">
-    {% for step in step_items %}
-      <option value="{{ step.key }}">{{ step.key }} ({{ "editable" if step.editable else "locked" }})</option>
-    {% endfor %}
-    </select>
-  </label>
-  <button type="submit">Toggle</button>
-</form>
-{% else %}
 <h3 data-field="label">{{ label }}</h3>
 {% if instruction %}
 <p data-field="instruction">{{ instruction }}</p>
@@ -84,12 +16,15 @@
 </nav>
 {% for step in step_items %}
 {% if step.complete and not step.is_active %}
-<button hx-post="{{ url }}" hx-vals='{"focus": "{{ step.key }}"}'>Back to {{ step.label }}</button>
+<div data-affordance="focus" data-step="{{ step.key }}">
+  <button hx-post="{{ url }}" hx-vals='{"focus": "{{ step.key }}"}'>Back to {{ step.label }}</button>
+</div>
 {% endif %}
 {% endfor %}
 {% if active_step_key and ef.active_step and ef.active_step.is_complete and ef._focused_key is not none %}
-<button hx-post="{{ url }}" hx-vals='{"action": "continue"}'>Continue</button>
-{% endif %}
+<div data-affordance="continue">
+  <button hx-post="{{ url }}" hx-vals='{"action": "continue"}'>Continue</button>
+</div>
 {% endif %}
 {% if active_html %}
 {{ active_html|safe }}

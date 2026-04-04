@@ -1,76 +1,10 @@
 {# TabFormX agent template — HTMX native.
-   Tab navigation + active tab content. Faithful projection: only active tab visible.
+   Pure semantic markup: state display + annotated action endpoints.
+   Faithful projection: only active tab content visible.
 #}
 {% for aff in data.affordances %}
 {% set _ = aff.update({"_rendered": true}) %}
 {% endfor %}
-{% if edit_mode %}
-<form hx-post="{{ url }}" hx-vals='{"action": "set_label", "label": "<label>"}'>
-  <label>Label: <input type="text" name="label" value="{{ label }}"></label>
-  <button type="submit">Save</button>
-</form>
-<form hx-post="{{ url }}" hx-vals='{"action": "set_instruction", "instruction": "<instruction>"}'>
-  <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
-  <button type="submit">Save</button>
-</form>
-<form hx-post="{{ url }}" hx-vals='{"action": "add_tab", "tab_key": "<tab_key>", "type": "<{{ available_types|join(" | ") }}>", "key": "<key>", "label": "<label>"}'>
-  <label>Tab Key: <input name="tab_key" type="text" placeholder="tab-key"></label>
-  <label>Type:
-    <select name="type">
-    {% for t in available_types %}
-      <option value="{{ t }}">{{ t }}</option>
-    {% endfor %}
-    </select>
-  </label>
-  <label>Key: <input name="key" type="text" placeholder="eigenform-key"></label>
-  <label>Label: <input name="label" type="text" placeholder="Tab Label"></label>
-  <button type="submit">+ Add Tab</button>
-</form>
-<nav data-section="tabs">
-  {% for tab in tab_items %}
-  <span data-tab="{{ tab.key }}"{% if tab.is_active %} data-active="true"{% endif %}>{{ tab.label }}</span>
-  {% endfor %}
-</nav>
-{% for tab in tab_items %}
-{% if not tab.is_active %}
-<button hx-post="{{ url }}" hx-vals='{"tab": "{{ tab.key }}"}'>Switch to {{ tab.label }}</button>
-{% endif %}
-{% endfor %}
-{% if tab_items|length > 1 %}
-{% set tab_keys = tab_items|map(attribute="key")|join(" | ") %}
-<form hx-post="{{ url }}" hx-vals='{"action": "move_tab", "tab_key": "<{{ tab_keys }}>", "position": "<position>"}'>
-  <label>Move Tab:
-    <select name="tab_key">
-    {% for tab in tab_items %}
-      <option value="{{ tab.key }}">{{ tab.key }}</option>
-    {% endfor %}
-    </select>
-  </label>
-  <label>Position: <input name="position" type="number" min="0" max="{{ tab_items|length - 1 }}"></label>
-  <button type="submit">Move</button>
-</form>
-{% endif %}
-<form hx-post="{{ url }}" hx-vals='{"action": "remove_tab", "tab_key": "<{{ tab_keys }}>"}'>
-  <label>Remove Tab:
-    <select name="tab_key">
-    {% for tab in tab_items %}
-      <option value="{{ tab.key }}">{{ tab.key }}</option>
-    {% endfor %}
-    </select>
-  </label>
-  <button type="submit">Remove</button>
-</form>
-<form hx-post="{{ url }}" hx-vals='{"action": "toggle_editable", "tab_key": "<{{ tab_keys }}>"}'>
-  <label>Toggle Editable:
-    <select name="tab_key">
-    {% for tab in tab_items %}
-      <option value="{{ tab.key }}">{{ tab.key }} ({{ "editable" if tab.editable else "locked" }})</option>
-    {% endfor %}
-    </select>
-  </label>
-  <button type="submit">Toggle</button>
-</form>
-{% else %}
 <h3 data-field="label">{{ label }}</h3>
 {% if instruction %}
 <p data-field="instruction">{{ instruction }}</p>
@@ -80,11 +14,17 @@
   {% if tab.is_active %}
   <span data-tab="{{ tab.key }}" data-active="true">{{ tab.label }}</span>
   {% else %}
-  <button hx-post="{{ url }}" hx-vals='{"tab": "{{ tab.key }}"}'>{{ tab.label }}</button>
+  <span data-tab="{{ tab.key }}">{{ tab.label }}</span>
   {% endif %}
   {% endfor %}
 </nav>
+{% for tab in tab_items %}
+{% if not tab.is_active %}
+<div data-affordance="tab" data-tab="{{ tab.key }}">
+  <button hx-post="{{ url }}" hx-vals='{"tab": "{{ tab.key }}"}'>{{ tab.label }}</button>
+</div>
 {% endif %}
+{% endfor %}
 {% if active_html %}
 {{ active_html|safe }}
 {% endif %}

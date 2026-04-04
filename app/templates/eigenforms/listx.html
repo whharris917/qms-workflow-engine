@@ -1,124 +1,97 @@
-{# ListFormX template — HTMX native.
-   The template IS the state machine. No affordance objects needed.
-   HTMX attributes inherit hx-target/hx-swap/hx-ext from #page-content.
+{# ListFormX agent template — HTMX native.
+   Pure semantic markup: state display + annotated action endpoints.
 #}
 {% for aff in data.affordances %}
 {% set _ = aff.update({"_rendered": true}) %}
 {% endfor %}
-{% if edit_mode %}
-<form hx-post="{{ url }}" hx-vals='{"action": "set_label", "label": "<label>"}'>
-  <label>Label: <input type="text" name="label" value="{{ label }}"></label>
-  <button type="submit">Save</button>
-</form>
-<form hx-post="{{ url }}" hx-vals='{"action": "set_instruction", "instruction": "<instruction>"}'>
-  <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
-  <button type="submit">Save</button>
-</form>
-<button hx-post="{{ url }}" hx-vals='{"action": "toggle_constraints"}'>constraints: {{ "on" if allow_constraints else "off" }}</button>
-{% else %}
 <h3 data-field="label">{{ label }}</h3>
 {% if instruction %}
 <p data-field="instruction">{{ instruction }}</p>
 {% endif %}
-{% endif %}
 {% if na %}
 <p data-field="value">N/A</p>
-<button hx-post="{{ url }}" hx-vals='{"action": "clear_na"}'>Clear N/A</button>
-{% if hints.clear_na %}
-<p data-field="instruction">{{ hints.clear_na }}</p>
-{% endif %}
+<div data-affordance="clear_na">
+  <button hx-post="{{ url }}" hx-vals='{"action": "clear_na"}'>Clear N/A</button>
+  {% if hints.clear_na %}
+  <p data-field="instruction">{{ hints.clear_na }}</p>
+  {% endif %}
+</div>
 {% else %}
-{% set num_items = items|length %}
+{% set item_ids = items|map(attribute="id")|list %}
 <ol>
 {% for item in items %}
-{% set item_id = item.id %}
-{% set item_val = item.value|string %}
-{% set is_fixed = item.fixed and not edit_mode %}
-{% set is_item_fixed = item.fixed %}
-<li data-item-id="{{ item_id }}">
-{% if not is_fixed -%}
-<button hx-post="{{ url }}" hx-vals='{"action": "remove", "id": "{{ item_id }}"}'>x</button>
-{% endif %}
-{% set can_up = oc.can_move_up(loop.index0, items) %}
-{% set can_down = oc.can_move_down(loop.index0, items) %}
-{% if can_up -%}
-<button hx-post="{{ url }}" hx-vals='{"action": "move_up", "id": "{{ item_id }}"}'>Up</button>
-{% endif %}
-{% if can_down -%}
-<button hx-post="{{ url }}" hx-vals='{"action": "move_down", "id": "{{ item_id }}"}'>Down</button>
-{% endif %}
-{% if is_fixed -%}
-<span data-field="value" data-fixed="true">{{ item_val }}</span>
-{% else -%}
-<form hx-post="{{ url }}" hx-vals='{"action": "edit", "id": "{{ item_id }}", "value": "<value>"}' style="display: inline;">
-  <input type="text" name="value" value="{{ item_val }}">
-  <button type="submit">Save</button>
-</form>
-{% endif %}
-{% if edit_mode -%}
-<button hx-post="{{ url }}" hx-vals='{"action": "toggle_fixed", "id": "{{ item_id }}"}'>{{ "📌" if is_item_fixed else "📋" }}</button>
-{% endif %}
-{% set prereqs = all_must_follow.get(item_id, []) %}
-{% if allow_constraints and num_items > 1 %}
-{% set available = [] %}
-{% for i in items %}
-{% if i.id != item_id and i.id not in prereqs %}
-{% set _ = available.append(i) %}
-{% endif %}
-{% endfor %}
-{% if available -%}
-<select hx-post="{{ url }}" hx-vals='{"action": "add_constraint", "item": "{{ item_id }}"}' hx-trigger="change" name="after">
-  <option value="">add constraint...</option>
-{% for i in available %}
-  <option value="{{ i.id }}">after {{ i.value }} ({{ i.id }})</option>
-{% endfor %}
-</select>
-{% endif %}
-{% endif %}
-{% if prereqs %}
-{% for p_id in prereqs %}
-{% set p_name = id_to_val.get(p_id, p_id) or p_id %}
-{% set is_static = (item_id, p_id) in static_pairs %}
-{% set stored_c = namespace(val=none) %}
-{% for c in stored_constraints %}
-{% if c.item == item_id and c.after == p_id %}
-{% set stored_c.val = c %}
-{% endif %}
-{% endfor %}
-{% if is_static and (stored_c.val is none or stored_c.val.fixed is not false) %}
-{% set is_effectively_fixed = true %}
-{% elif not is_static and stored_c.val %}
-{% set is_effectively_fixed = stored_c.val.fixed %}
-{% else %}
-{% set is_effectively_fixed = false %}
-{% endif -%}
-<span data-constraint-after="{{ p_id }}" data-fixed="{{ is_effectively_fixed|lower }}">{{ p_name }}</span>
-{%- if edit_mode -%}
-<button hx-post="{{ url }}" hx-vals='{"action": "toggle_constraint_fixed", "item": "{{ item_id }}", "after": "{{ p_id }}"}'>{{ "📌" if is_effectively_fixed else "📋" }}</button>
-<button hx-post="{{ url }}" hx-vals='{"action": "remove_constraint", "item": "{{ item_id }}", "after": "{{ p_id }}"}'>x</button>
-{%- elif not is_effectively_fixed -%}
-<button hx-post="{{ url }}" hx-vals='{"action": "remove_constraint", "item": "{{ item_id }}", "after": "{{ p_id }}"}'>x</button>
-{%- endif %}
-{% endfor %}
-{% endif %}
-</li>
+  <li data-item-id="{{ item.id }}" data-value="{{ item.value }}"{% if item.fixed %} data-fixed="true"{% endif %}>{{ item.value }}
+  {%- set prereqs = all_must_follow.get(item.id, []) -%}
+  {%- if prereqs %} (after: {{ prereqs|join(", ") }}){% endif -%}
+  </li>
 {% endfor %}
 </ol>
-<form hx-post="{{ url }}" hx-vals='{"action": "add", "value": "<value>"}' data-field="add">
-  <input type="text" name="value" placeholder="New item">
-  <button type="submit">+ Add</button>
-</form>
-{% if hints.add %}
-<p data-field="instruction">{{ hints.add }}</p>
+<div data-affordance="add">
+  <button hx-post="{{ url }}" hx-vals='{"action": "add", "value": "<value>"}'>Add</button>
+  {% if hints.add %}
+  <p data-field="instruction">{{ hints.add }}</p>
+  {% endif %}
+</div>
+{% set editable_ids = [] %}
+{% for item in items %}{% if not item.fixed %}{% set _ = editable_ids.append(item.id) %}{% endif %}{% endfor %}
+{% if editable_ids %}
+<div data-affordance="edit">
+  <button hx-post="{{ url }}" hx-vals='{"action": "edit", "id": "<{{ editable_ids|join(" | ") }}>", "value": "<value>"}'>Edit</button>
+</div>
+<div data-affordance="remove">
+  <button hx-post="{{ url }}" hx-vals='{"action": "remove", "id": "<{{ editable_ids|join(" | ") }}>"}'>Remove</button>
+</div>
+{% endif %}
+{% set up_ids = [] %}
+{% set down_ids = [] %}
+{% for item in items %}
+{% if oc.can_move_up(loop.index0, items) %}{% set _ = up_ids.append(item.id) %}{% endif %}
+{% if oc.can_move_down(loop.index0, items) %}{% set _ = down_ids.append(item.id) %}{% endif %}
+{% endfor %}
+{% if up_ids %}
+<div data-affordance="move_up">
+  <button hx-post="{{ url }}" hx-vals='{"action": "move_up", "id": "<{{ up_ids|join(" | ") }}>"}'>Move Up</button>
+</div>
+{% endif %}
+{% if down_ids %}
+<div data-affordance="move_down">
+  <button hx-post="{{ url }}" hx-vals='{"action": "move_down", "id": "<{{ down_ids|join(" | ") }}>"}'>Move Down</button>
+</div>
+{% endif %}
+{% if allow_constraints and items|length > 1 %}
+<div data-affordance="add_constraint">
+  <button hx-post="{{ url }}" hx-vals='{"action": "add_constraint", "item": "<{{ item_ids|join(" | ") }}>", "after": "<{{ item_ids|join(" | ") }}>"}'>Add Constraint</button>
+</div>
+{% endif %}
+{% set removable_constraints = [] %}
+{% for item in items %}
+{% for p_id in all_must_follow.get(item.id, []) %}
+{% set is_static = (item.id, p_id) in static_pairs %}
+{% set stored_c = namespace(val=none) %}
+{% for c in stored_constraints %}{% if c.item == item.id and c.after == p_id %}{% set stored_c.val = c %}{% endif %}{% endfor %}
+{% if is_static and (stored_c.val is none or stored_c.val.fixed is not false) %}
+{% elif true %}
+{% set _ = removable_constraints.append({"item": item.id, "after": p_id}) %}
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% if removable_constraints %}
+<div data-affordance="remove_constraint">
+  <button hx-post="{{ url }}" hx-vals='{"action": "remove_constraint", "item": "<item>", "after": "<after>"}'>Remove Constraint</button>
+</div>
 {% endif %}
 {% if has_data %}
-<button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
-{% if hints.clear %}
-<p data-field="instruction">{{ hints.clear }}</p>
+<div data-affordance="clear">
+  <button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
+  {% if hints.clear %}
+  <p data-field="instruction">{{ hints.clear }}</p>
+  {% endif %}
+</div>
 {% endif %}
-{% endif %}
-<button hx-post="{{ url }}" hx-vals='{"action": "na"}'>N/A</button>
-{% if hints.na %}
-<p data-field="instruction">{{ hints.na }}</p>
-{% endif %}
+<div data-affordance="na">
+  <button hx-post="{{ url }}" hx-vals='{"action": "na"}'>N/A</button>
+  {% if hints.na %}
+  <p data-field="instruction">{{ hints.na }}</p>
+  {% endif %}
+</div>
 {% endif %}

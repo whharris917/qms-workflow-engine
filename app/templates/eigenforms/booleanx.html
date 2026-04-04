@@ -1,60 +1,37 @@
 {# BooleanFormX agent template — HTMX native.
-   Yes/No toggle buttons.
+   Pure semantic markup: state display + annotated action endpoints.
 #}
 {% for aff in data.affordances %}
 {% set _ = aff.update({"_rendered": true}) %}
 {% endfor %}
-{% if edit_mode %}
-<form hx-post="{{ url }}" hx-vals='{"action": "set_label", "label": "<label>"}'>
-  <label>Label: <input type="text" name="label" value="{{ label }}"></label>
-  <button type="submit">Save</button>
-</form>
-<form hx-post="{{ url }}" hx-vals='{"action": "set_instruction", "instruction": "<instruction>"}'>
-  <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
-  <button type="submit">Save</button>
-</form>
-<form hx-post="{{ url }}" hx-vals='{"action": "set_true_label", "label": "<label>"}'>
-  <label>True label: <input type="text" name="label" value="{{ true_label }}"></label>
-  <button type="submit">Set</button>
-</form>
-<form hx-post="{{ url }}" hx-vals='{"action": "set_false_label", "label": "<label>"}'>
-  <label>False label: <input type="text" name="label" value="{{ false_label }}"></label>
-  <button type="submit">Set</button>
-</form>
-{% if value is none %}
-<p data-field="value">Not set</p>
-{% elif value %}
-<p data-field="value">{{ true_label }}</p>
-{% else %}
-<p data-field="value">{{ false_label }}</p>
-{% endif %}
-{% if has_data %}
-<button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
-{% if hints.clear %}
-<p data-field="instruction">{{ hints.clear }}</p>
-{% endif %}
-{% endif %}
-{% else %}
 <h3 data-field="label">{{ label }}</h3>
 {% if instruction %}
 <p data-field="instruction">{{ instruction }}</p>
 {% endif %}
 {% if value is none %}
-<p data-field="value">Not set</p>
+<p data-field="value"></p>
 {% elif value %}
 <p data-field="value">{{ true_label }}</p>
 {% else %}
 <p data-field="value">{{ false_label }}</p>
 {% endif %}
-<button hx-post="{{ url }}" hx-vals='{"value": true}'>{{ true_label }}</button>
-<button hx-post="{{ url }}" hx-vals='{"value": false}'>{{ false_label }}</button>
-{% if hints.set %}
-<p data-field="instruction">{{ hints.set }}</p>
-{% endif %}
+<div data-affordance="true">
+  <button hx-post="{{ url }}" hx-vals='{"value": true}'>{{ true_label }}</button>
+  {% if hints.true %}
+  <p data-field="instruction">{{ hints.true }}</p>
+  {% endif %}
+</div>
+<div data-affordance="false">
+  <button hx-post="{{ url }}" hx-vals='{"value": false}'>{{ false_label }}</button>
+  {% if hints.false %}
+  <p data-field="instruction">{{ hints.false }}</p>
+  {% endif %}
+</div>
 {% if has_data %}
-<button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
-{% if hints.clear %}
-<p data-field="instruction">{{ hints.clear }}</p>
-{% endif %}
-{% endif %}
+<div data-affordance="clear">
+  <button hx-post="{{ url }}" hx-vals='{"action": "clear"}'>Clear</button>
+  {% if hints.clear %}
+  <p data-field="instruction">{{ hints.clear }}</p>
+  {% endif %}
+</div>
 {% endif %}

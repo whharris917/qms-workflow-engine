@@ -17,6 +17,7 @@ without any external input.
 from __future__ import annotations
 
 import copy
+import types
 import dataclasses
 import json
 from dataclasses import dataclass
@@ -374,8 +375,11 @@ class Eigenform:
         """Mark an affordance dict as accounted for (rendered or intentionally skipped)."""
         aff["_rendered"] = True
 
-    def _affordance_hints(self, data: dict) -> dict[str, str]:
+    def _affordance_hints(self, data: dict) -> types.SimpleNamespace:
         """Build action -> instruction lookup from serialized affordance data.
+
+        Returns a SimpleNamespace so Jinja2 dot access (``hints.clear``)
+        resolves to our keys rather than colliding with dict methods.
 
         Keys are derived from the affordance body:
           - body.action present: keyed by action value (e.g., "add", "clear")
@@ -410,7 +414,7 @@ class Eigenform:
                 hints["step"] = Markup(instruction)
             elif "tab" in body:
                 hints["tab"] = Markup(instruction)
-        return hints
+        return types.SimpleNamespace(**hints)
 
     def _wrap_agent_html(self, inner: str) -> str:
         """Wrap agent HTML in a bounding div with eigenform identity."""
