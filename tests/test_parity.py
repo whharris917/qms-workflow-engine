@@ -13,15 +13,16 @@ from pathlib import Path
 
 import pytest
 
-from pages import build_pages
+from pages import discover_pages, bind_page
 
 
 # ---- Fixtures ----
 
 @pytest.fixture(scope="module")
 def all_pages():
-    """Build all page definitions once per test module."""
-    return build_pages(data_dir=Path("data"))
+    """Bind all page definitions once per test module."""
+    data_dir = Path("data")
+    return {key: bind_page(seed, data_dir) for key, seed in discover_pages().items()}
 
 
 # ---- Helpers ----
@@ -111,5 +112,5 @@ def test_affordance_parity(all_pages, page_key):
 def pytest_generate_tests(metafunc):
     """Dynamically parametrize test_affordance_parity with all page keys."""
     if "page_key" in metafunc.fixturenames:
-        pages = build_pages(data_dir=Path("data"))
+        pages = discover_pages()
         metafunc.parametrize("page_key", sorted(pages.keys()))

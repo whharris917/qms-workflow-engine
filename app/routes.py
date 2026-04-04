@@ -5,14 +5,26 @@ from pathlib import Path
 from flask import Blueprint, Response, render_template, request, jsonify
 from markupsafe import Markup
 
-from pages import build_pages
+from pages import discover_pages, bind_page
 
 bp = Blueprint("main", __name__)
 
-pages = build_pages(data_dir=Path("data"))
+DATA_DIR = Path("data")
+
+# Seed registry — unbound definitions with no runtime state
+seeds = discover_pages()
 
 # SSE subscribers: {page_key: [queue, ...]}
+# Connection state only — knows nothing about eigenforms
 subscribers: dict[str, list[queue.Queue]] = {}
+
+
+def get_page(page_key):
+    """Bind a seed into a transient page for this request."""
+    seed = seeds.get(page_key)
+    if seed is None:
+        return None
+    return bind_page(seed, DATA_DIR)
 
 
 def wants_html(req) -> bool:
@@ -38,13 +50,13 @@ def notify_subscribers(page_key: str, data: dict):
 
 @bp.route("/")
 def index():
-    page_list = [{"key": k, "label": pg.label} for k, pg in pages.items()]
+    page_list = [{"key": k, "label": s.label} for k, s in seeds.items()]
     return render_template("index.html", pages=page_list)
 
 
 @bp.route("/pages/<page_key>", methods=["GET", "POST"])
 def page(page_key):
-    pg = pages.get(page_key)
+    pg = get_page(page_key)
     if pg is None:
         if wants_html(request):
             return "Not found", 404
@@ -64,7 +76,7 @@ def page(page_key):
 
 @bp.route("/pages/<page_key>/stream")
 def page_stream(page_key):
-    if page_key not in pages:
+    if page_key not in seeds:
         return jsonify({"error": f"Unknown page: {page_key}"}), 404
 
     q = queue.Queue(maxsize=50)
@@ -87,7 +99,7 @@ def page_stream(page_key):
 
 @bp.route("/pages/<page_key>/<path:path>", methods=["GET", "POST"])
 def eigenform(page_key, path):
-    pg = pages.get(page_key)
+    pg = get_page(page_key)
     if pg is None:
         if wants_html(request):
             return "Not found", 404
