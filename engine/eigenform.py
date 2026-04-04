@@ -17,7 +17,6 @@ without any external input.
 from __future__ import annotations
 
 import copy
-import types
 import dataclasses
 import json
 from dataclasses import dataclass
@@ -62,8 +61,6 @@ def _is_json_safe(val) -> bool:
 @dataclass
 class Eigenform:
     """Base protocol for all eigenform types."""
-    # Plain class attr — not a dataclass field. Subclasses override to True.
-    htmx_native = False
 
     key: str
     label: str
@@ -375,95 +372,12 @@ class Eigenform:
         """Mark an affordance dict as accounted for (rendered or intentionally skipped)."""
         aff["_rendered"] = True
 
-    def _affordance_hints(self, data: dict) -> types.SimpleNamespace:
-        """Build action -> instruction lookup from serialized affordance data.
-
-        Returns a SimpleNamespace so Jinja2 dot access (``hints.clear``)
-        resolves to our keys rather than colliding with dict methods.
-
-        Keys are derived from the affordance body:
-          - body.action present: keyed by action value (e.g., "add", "clear")
-          - body.value only (no action): keyed by "set"
-          - body.focus/step/tab: keyed by "focus"/"step"/"tab"
-          - boolean value: keyed by "true"/"false"
-
-        Values are marked as Markup so Jinja2 preserves angle-bracket
-        placeholders like ``<value>`` instead of escaping them to ``&lt;value&gt;``.
-        """
-        from markupsafe import Markup
-        hints: dict[str, str] = {}
-        for aff in data.get("affordances", []):
-            instruction = aff.get("instruction", "")
-            if not instruction:
-                continue
-            body = aff.get("body", {})
-            action = body.get("action")
-            if action:
-                hints[action] = Markup(instruction)
-            elif "value" in body:
-                v = body["value"]
-                if v is True:
-                    hints["true"] = Markup(instruction)
-                elif v is False:
-                    hints["false"] = Markup(instruction)
-                else:
-                    hints["set"] = Markup(instruction)
-            elif "focus" in body:
-                hints["focus"] = Markup(instruction)
-            elif "step" in body:
-                hints["step"] = Markup(instruction)
-            elif "tab" in body:
-                hints["tab"] = Markup(instruction)
-        return types.SimpleNamespace(**hints)
-
-    def _wrap_agent_html(self, inner: str) -> str:
-        """Wrap agent HTML in a bounding div with eigenform identity."""
-        from markupsafe import escape
-        indented = '\n'.join(
-            f'  {line}' if line.strip() else line
-            for line in inner.strip().split('\n')
-        )
-        return (
-            f'<div data-eigenform="{escape(self.key)}" data-type="{escape(self.form)}">\n'
-            f'{indented}\n'
-            f'</div>'
-        )
-
-    def render_agent_from_data(self, data: dict) -> str | None:
-        """Render agent-facing HTML from serialized state.
-
-        Override in htmx_native subclasses to provide a separate agent view.
-        Returns None if no agent HTML is available (non-HTMX eigenforms).
-        """
-        return None
-
-    def render_agent(self) -> str:
-        """Render this eigenform for agent consumption.
-
-        For htmx_native eigenforms, wraps the agent template output in a
-        bounding div with data-eigenform (key) and data-type (form type)
-        so agents can identify eigenform boundaries in nested HTML.
-        For legacy eigenforms, falls back to the standard render().
-        """
-        if not self.htmx_native:
-            return self.render()
-        data = self._serialize_full()
-        for aff in data.get("affordances", []):
-            aff["_rendered"] = aff.pop("_chrome_rendered", False)
-        agent_html = self.render_agent_from_data(data)
-        if agent_html is None:
-            return self.render()
-        return self._wrap_agent_html(agent_html)
-
-    def _render_toggle_btn(self, uid: str, inner: str, json_str: str, agent_html: str | None = None) -> str:
+    def _render_toggle_btn(self, uid: str, inner: str, json_str: str) -> str:
         """Render the view-selector dropdown and alternate content panes."""
-        # Build ordered list of (pane_id, label, tag, content)
-        panes = []
-        panes.append((f'{uid}-human', 'Human View', 'div', inner))
-        if self.htmx_native and agent_html is not None:
-            panes.append((f'{uid}-agent', 'Agent View', 'div', agent_html))
-            panes.append((f'{uid}-agent-src', 'Agent HTMX', 'pre', escape(agent_html)))
-        panes.append((f'{uid}-json', 'JSON', 'pre', json_str))
+        panes = [
+            (f'{uid}-human', 'Human View', 'div', inner),
+            (f'{uid}-json', 'JSON', 'pre', json_str),
+        ]
 
         pane_ids_js = '[' + ','.join(f'"{p[0]}"' for p in panes) + ']'
         onchange = (
@@ -512,11 +426,6 @@ class Eigenform:
 
         uid = self.uid
         json_str = escape(json.dumps(self.serialize(), indent=2))
-        if self.htmx_native:
-            raw_agent = self.render_agent_from_data(data)
-            agent_html = self._wrap_agent_html(raw_agent) if raw_agent is not None else None
-        else:
-            agent_html = None
 
         complete_color = '#2a2' if self.is_complete else '#888'
         edit_border = ' border-style: dashed;' if self.edit_mode else ''
@@ -595,7 +504,7 @@ class Eigenform:
             f'<div class="eigenform" data-form="{self.form}" data-key="{self.key}"'
             f' style="border: 2px solid {complete_color};{edit_border} padding: {"38px" if self.editable else "30px"} 12px 12px 12px; margin: 8px 0; position: relative;">'
             f'{chrome_html}'
-            f'{self._render_toggle_btn(uid, inner, json_str, agent_html)}'
+            f'{self._render_toggle_btn(uid, inner, json_str)}'
             f'</div>'
         )
 

@@ -112,18 +112,6 @@ def _build_default_registry() -> EigenformRegistry:
     from engine.stepform import SequenceForm
     from engine.tablerunner import TableRunner
     from engine.historyform import HistoryForm
-    from engine.listformx import ListFormX
-    from engine.tableformx import TableFormX
-    from engine.choiceformx import ChoiceFormX
-    from engine.checkboxformx import CheckboxFormX
-    from engine.numberformx import NumberFormX
-    from engine.booleanformx import BooleanFormX
-    from engine.memoformx import MemoFormX
-    from engine.tabformx import TabFormX
-    from engine.accordionformx import AccordionFormX
-    from engine.chainformx import ChainFormX
-    from engine.stepformx import SequenceFormX as SequenceFormX_cls
-
     r = EigenformRegistry()
     for cls in [
         TextForm, CheckboxForm, ChoiceForm, MultiForm, ListForm, SetForm,
@@ -134,10 +122,7 @@ def _build_default_registry() -> EigenformRegistry:
         SwitchForm,
         VisibilityForm, DynamicChoiceForm,
         ScoreForm, ComputedForm, ValidationForm,
-        ActionForm, RubiksCubeForm, ListFormX, TableFormX,
-        ChoiceFormX, CheckboxFormX,
-        NumberFormX, BooleanFormX, MemoFormX, TabFormX, AccordionFormX,
-        ChainFormX, SequenceFormX_cls,
+        ActionForm, RubiksCubeForm,
     ]:
         r.register(cls)
     return r

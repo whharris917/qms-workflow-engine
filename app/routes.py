@@ -16,9 +16,7 @@ subscribers: dict[str, list[queue.Queue]] = {}
 
 
 def wants_html(req) -> bool:
-    """True if the client prefers HTML (i.e. a browser or HTMX request)."""
-    if req.headers.get("HX-Request") == "true":
-        return True
+    """True if the client prefers HTML (i.e. a browser request)."""
     best = req.accept_mimetypes.best_match(["application/json", "text/html"])
     return best == "text/html"
 
@@ -51,18 +49,15 @@ def page(page_key):
         if wants_html(request):
             return "Not found", 404
         return jsonify({"error": f"Unknown page: {page_key}"}), 404
-    agent_view = request.args.get("view") == "agent"
     if request.method == "POST":
         pg.handle(request.json)
         result = pg.serialize()
         notify_subscribers(page_key, result)
         if wants_html(request):
-            html = pg.render_agent() if agent_view else pg.render()
-            return Markup(html)
+            return Markup(pg.render())
         return jsonify(result)
     if wants_html(request):
-        html = pg.render_agent() if agent_view else pg.render()
-        html = Markup(html)
+        html = Markup(pg.render())
         return render_template("page.html", page_html=html, title=pg.label, page_key=page_key)
     return jsonify(pg.serialize())
 
@@ -98,8 +93,6 @@ def eigenform(page_key, path):
             return "Not found", 404
         return jsonify({"error": f"Unknown page: {page_key}"}), 404
 
-    agent_view = request.args.get("view") == "agent"
-
     if request.method == "GET":
         ef = pg.find_eigenform(path)
         if ef is None:
@@ -107,7 +100,7 @@ def eigenform(page_key, path):
                 return "Not found", 404
             return jsonify({"error": f"Unknown path: {path}"}), 404
         if wants_html(request):
-            html = Markup(ef.render_agent() if agent_view else ef.render())
+            html = Markup(ef.render())
             return render_template("page.html", page_html=html, title=ef.label, page_key=page_key)
         return jsonify(ef.serialize())
 
@@ -117,6 +110,5 @@ def eigenform(page_key, path):
         return jsonify({"error": f"Unknown path: {path}"}), 404
     notify_subscribers(page_key, result)
     if wants_html(request):
-        html = pg.render_agent() if agent_view else pg.render()
-        return Markup(html)
+        return Markup(pg.render())
     return jsonify(result)

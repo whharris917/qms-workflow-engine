@@ -10,7 +10,6 @@ from engine.templates import render_template
 @dataclass
 class TextForm(Eigenform):
     """Single free-form string input."""
-    htmx_native = True
     default: str | None = None
 
     @property
@@ -29,14 +28,10 @@ class TextForm(Eigenform):
                     value=data.get("value"),
                     edit_mode=data.get("edit_mode", False),
                     has_data=self.has_data,
-                    undo_depth=self._undo_depth if self.edit_mode else 0,
-                    hints=self._affordance_hints(data))
+                    undo_depth=self._undo_depth if self.edit_mode else 0)
 
     def render_from_data(self, data: dict) -> str:
         return render_template("text_human.html", **self._template_context(data))
-
-    def render_agent_from_data(self, data: dict) -> str:
-        return render_template("text.html", **self._template_context(data))
 
     def get_affordances(self) -> list[Affordance]:
         return [

@@ -67,7 +67,8 @@ function _efPost(url, body) {
     }).then(function(resp) {
         return resp.text();
     }).then(function(html) {
+        var scrollY = window.scrollY;
         document.getElementById('page-content').innerHTML = html;
-        htmx.process(document.getElementById('page-content'));
+        window.scrollTo(0, scrollY);
     });
 }

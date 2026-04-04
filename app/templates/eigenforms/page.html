@@ -29,8 +29,6 @@
   {# Persistent errors #}
   {% for err in feedback.errors|default([]) %}
     {% set target = err.target|default("") %}
-    {% set target_label = "" %}
-    {% if target %}{% set target_label = ' <span style="opacity: 0.7;">(' + target|e + ')</span>' %}{% endif %}
     {% set dismiss_html = "" %}
     {% set aff = dismiss_affs.get(target) %}
     {% if aff %}
@@ -39,7 +37,7 @@
           "cursor: pointer; font-size: 11px; padding: 1px 6px; background: transparent; border: 1px solid #c88; color: #721c24; border-radius: 3px;") %}
     {% endif %}
     <div style="background: #fdecea; border: 1px solid #f5c6cb; color: #721c24; padding: 8px 12px; margin: 4px 0; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
-      <span><strong>&#10007; Error:</strong> {{ err.message }}{{ target_label|safe }}</span>
+      <span><strong>&#10007; Error:</strong> {{ err.message }}{% if target %} <span style="opacity: 0.7;">({{ target }})</span>{% endif %}</span>
       <span style="display: flex; align-items: center; gap: 8px;">
         <span style="opacity: 0.5; font-size: 0.85em;">{{ err.timestamp|default("") }}</span>
         {{ dismiss_html|safe }}
@@ -51,10 +49,8 @@
   {% set succ = feedback.success %}
   {% if succ %}
     {% set target = succ.target|default("") %}
-    {% set target_label = "" %}
-    {% if target %}{% set target_label = ' <span style="opacity: 0.7;">(' + target|e + ')</span>' %}{% endif %}
     <div style="background: #edf7ed; border: 1px solid #c3e6cb; color: #155724; padding: 8px 12px; margin: 4px 0; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
-      <span><strong>&#10003; OK:</strong> {{ succ.message }}{{ target_label|safe }}</span>
+      <span><strong>&#10003; OK:</strong> {{ succ.message }}{% if target %} <span style="opacity: 0.7;">({{ target }})</span>{% endif %}</span>
       <span style="opacity: 0.5; font-size: 0.85em;">{{ succ.timestamp|default("") }}</span>
     </div>
   {% endif %}
