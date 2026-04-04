@@ -175,6 +175,58 @@ _CHILD_FIELDS = {
 }
 
 
+def validate_config(type_name: str, config: dict,
+                    reg: EigenformRegistry | None = None) -> str | None:
+    """Validate config keys against a type's accepted fields.
+
+    Returns None if valid, or an error message string if invalid.
+    """
+    if reg is None:
+        reg = get_registry()
+    cls = reg.lookup(type_name)
+    if cls is None:
+        return f"Unknown type: {type_name}"
+    if not config:
+        return None
+
+    import dataclasses
+    from engine.eigenform import _BASE_FIELDS
+    valid_fields = {
+        f.name for f in dataclasses.fields(cls)
+        if f.name not in _BASE_FIELDS
+        and not f.name.startswith("_")
+        and f.name not in _CHILD_FIELDS
+    }
+    invalid = set(config.keys()) - valid_fields
+    if invalid:
+        return (
+            f"Invalid config for {type_name}: {', '.join(sorted(invalid))}. "
+            f"Valid config fields: {', '.join(sorted(valid_fields)) or 'none'}"
+        )
+    return None
+
+
+def describe_types(reg: EigenformRegistry | None = None) -> dict:
+    """Return a description of all registered types and their config fields."""
+    if reg is None:
+        reg = get_registry()
+    import dataclasses
+    from engine.eigenform import _BASE_FIELDS
+    result = {}
+    for name in sorted(reg.available()):
+        cls = reg.lookup(name)
+        fields = {}
+        for f in dataclasses.fields(cls):
+            if f.name in _BASE_FIELDS or f.name.startswith("_") or f.name in _CHILD_FIELDS:
+                continue
+            # Determine type hint string
+            type_str = str(f.type) if f.type is not dataclasses.MISSING else "any"
+            has_default = f.default is not dataclasses.MISSING or f.default_factory is not dataclasses.MISSING
+            fields[f.name] = {"type": type_str, "optional": has_default}
+        result[name] = {"config": fields}
+    return result
+
+
 def from_descriptor(desc: dict, reg: EigenformRegistry | None = None,
                     seed: "Eigenform | None" = None) -> "Eigenform":
     """Reconstruct an eigenform from a structural descriptor.

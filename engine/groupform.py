@@ -166,46 +166,59 @@ class GroupForm(Eigenform):
                 f"Add a new eigenform to this group. "
                 f"Available types: {', '.join(available)}. "
                 f"'after' places it after the named sibling (null = append to end). "
-                f"'config' is type-specific (e.g. {{\"options\": [\"A\", \"B\"]}} for choice)."
+                f"'config' is type-specific. Common examples: "
+                f"text/memo/boolean/date: {{}} (no config needed), "
+                f"choice: {{\"options\": [\"A\", \"B\"]}}, "
+                f"checkbox: {{\"items\": [\"X\", \"Y\"]}}, "
+                f"number: {{\"min\": 0, \"max\": 100, \"step\": 1, \"integer\": true}}, "
+                f"list: {{\"fixed_items\": [\"a\", \"b\"]}}. "
+                f"GET /types for full config schema per type."
             ),
         ))
 
-        for ef in self.eigenforms:
-            affs.append(SimpleButtonAffordance(
-                label=f"Remove {ef.key}",
+        keys = [ef.key for ef in self.eigenforms]
+        if keys:
+            affs.append(SetValueAffordance(
+                label="Remove Eigenform",
                 method="POST",
                 url=self.url,
-                body={"action": "remove_eigenform", "key": ef.key},
-                instruction=f"Remove the '{ef.key}' eigenform and its data.",
+                body={"action": "remove_eigenform", "key": "<key>"},
+                instruction=(
+                    f"Remove an eigenform and its data. "
+                    f"Valid keys: {', '.join(keys)}."
+                ),
             ))
 
-        if len(self.eigenforms) > 1:
-            for ef in self.eigenforms:
-                affs.append(SetValueAffordance(
-                    label=f"Move {ef.key}",
-                    method="POST",
-                    url=self.url,
-                    body={
-                        "action": "move_eigenform",
-                        "key": ef.key,
-                        "position": "<index>",
-                    },
-                    instruction=(
-                        f"Move '{ef.key}' to a new position (0-based index). "
-                        f"Current order: {', '.join(e.key for e in self.eigenforms)}."
-                    ),
-                ))
-
-        for ef in self.eigenforms:
-            state = "on" if ef.editable else "off"
-            affs.append(SimpleButtonAffordance(
-                label=f"Toggle Editable {ef.key}",
+        if len(keys) > 1:
+            affs.append(SetValueAffordance(
+                label="Move Eigenform",
                 method="POST",
                 url=self.url,
-                body={"action": "toggle_editable", "key": ef.key},
+                body={
+                    "action": "move_eigenform",
+                    "key": "<key>",
+                    "position": "<index>",
+                },
                 instruction=(
-                    f"Toggle editability of '{ef.key}' "
-                    f"(currently {'editable' if ef.editable else 'not editable'})."
+                    f"Move an eigenform to a new position (0-based index). "
+                    f"Current order: {', '.join(keys)}."
+                ),
+            ))
+
+        if keys:
+            editable_status = ", ".join(
+                f"{ef.key}={'on' if ef.editable else 'off'}"
+                for ef in self.eigenforms
+            )
+            affs.append(SetValueAffordance(
+                label="Toggle Editable",
+                method="POST",
+                url=self.url,
+                body={"action": "toggle_editable", "key": "<key>"},
+                instruction=(
+                    f"Toggle editability of an eigenform. "
+                    f"Valid keys: {', '.join(keys)}. "
+                    f"Current state: {editable_status}."
                 ),
             ))
 
@@ -223,7 +236,7 @@ class GroupForm(Eigenform):
             self._clear_eigenform_data(child)
 
     def _add_eigenform(self, body: dict) -> dict:
-        from engine.registry import get_registry
+        from engine.registry import get_registry, validate_config
 
         type_name = body.get("type")
         key = body.get("key")
@@ -246,6 +259,12 @@ class GroupForm(Eigenform):
         if key in existing_keys:
             return self._error(f"Key '{key}' already exists.",
                                action="add_eigenform")
+
+        # Validate config before persisting
+        if config:
+            err = validate_config(type_name, config, reg)
+            if err:
+                return self._error(err, action="add_eigenform")
 
         desc = {"type": type_name, "key": key, "label": label, "editable": True}
         if body.get("instruction"):

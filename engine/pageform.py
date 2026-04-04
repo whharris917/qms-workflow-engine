@@ -85,7 +85,12 @@ class PageForm(Eigenform):
             source = bound._seed
         else:
             # Subsequent bind: reconstruct from stored structure
-            source = bound._reconstruct(stored_structure)
+            # Fall back to seed if stored structure is corrupted
+            try:
+                source = bound._reconstruct(stored_structure)
+            except Exception:
+                store.delete(scope, "__structure")
+                source = bound._seed
 
         bound.eigenforms = [
             ef.bind(store=store, scope=bound.key, url_prefix=url_prefix)
@@ -114,7 +119,11 @@ class PageForm(Eigenform):
         stored = self._store.get(self._scope, "__structure")
         if stored is None:
             return
-        source = self._reconstruct(stored)
+        try:
+            source = self._reconstruct(stored)
+        except Exception:
+            self._store.delete(self._scope, "__structure")
+            source = self._seed
         self.eigenforms = [
             ef.bind(store=self._store, scope=self.key, url_prefix=self._url_prefix)
             for ef in source
@@ -251,17 +260,43 @@ class PageForm(Eigenform):
                     f"Add a new eigenform to this page. "
                     f"Available types: {', '.join(available)}. "
                     f"'after' places it after the named sibling (null = append to end). "
-                    f"'config' is type-specific (e.g. {{\"options\": [\"A\", \"B\"]}} for choice)."
+                    f"'config' is type-specific. Common examples: "
+                    f"text/memo/boolean/date: {{}} (no config needed), "
+                    f"choice: {{\"options\": [\"A\", \"B\"]}}, "
+                    f"checkbox: {{\"items\": [\"X\", \"Y\"]}}, "
+                    f"number: {{\"min\": 0, \"max\": 100, \"step\": 1, \"integer\": true}}, "
+                    f"list: {{\"fixed_items\": [\"a\", \"b\"]}}. "
+                    f"GET /types for full config schema per type."
                 ),
             ))
 
-            for ef in self.eigenforms:
-                affs.append(SimpleButtonAffordance(
-                    label=f"Remove {ef.key}",
+            keys = [ef.key for ef in self.eigenforms]
+            if keys:
+                affs.append(SetValueAffordance(
+                    label="Remove Eigenform",
                     method="POST",
                     url=self._url_prefix,
-                    body={"action": "remove_eigenform", "key": ef.key},
-                    instruction=f"Remove the '{ef.key}' eigenform and its data.",
+                    body={"action": "remove_eigenform", "key": "<key>"},
+                    instruction=(
+                        f"Remove an eigenform and its data. "
+                        f"Valid keys: {', '.join(keys)}."
+                    ),
+                ))
+
+            if len(keys) > 1:
+                affs.append(SetValueAffordance(
+                    label="Move Eigenform",
+                    method="POST",
+                    url=self._url_prefix,
+                    body={
+                        "action": "move_eigenform",
+                        "key": "<key>",
+                        "position": "<index>",
+                    },
+                    instruction=(
+                        f"Move an eigenform to a new position (0-based index). "
+                        f"Current order: {', '.join(keys)}."
+                    ),
                 ))
 
             affs.append(SimpleButtonAffordance(
@@ -271,23 +306,6 @@ class PageForm(Eigenform):
                 body={"action": "rebuild_from_seed"},
                 instruction="Discard all structural changes and restore the original page definition. Clears all data.",
             ))
-
-            if len(self.eigenforms) > 1:
-                for ef in self.eigenforms:
-                    affs.append(SetValueAffordance(
-                        label=f"Move {ef.key}",
-                        method="POST",
-                        url=self._url_prefix,
-                        body={
-                            "action": "move_eigenform",
-                            "key": ef.key,
-                            "position": "<index>",
-                        },
-                        instruction=(
-                            f"Move '{ef.key}' to a new position (0-based index). "
-                            f"Current order: {', '.join(e.key for e in self.eigenforms)}."
-                        ),
-                    ))
 
         return affs
 
@@ -355,11 +373,18 @@ class PageForm(Eigenform):
             return self.serialize()
 
         if action == "reset":
-            structure = self._store.get(self._scope, "__structure")
-            self._store.clear_scope(self._scope)
-            self._clear_recursive(self.eigenforms)
-            if structure is not None:
-                self._store.set(self._scope, "__structure", structure)
+            if self.mutable_structure:
+                # Mutable pages: clear everything including structure
+                self._store.clear_scope(self._scope)
+                self._clear_recursive(self.eigenforms)
+                self._rebuild()
+            else:
+                # Fixed pages: preserve structure, clear data only
+                structure = self._store.get(self._scope, "__structure")
+                self._store.clear_scope(self._scope)
+                self._clear_recursive(self.eigenforms)
+                if structure is not None:
+                    self._store.set(self._scope, "__structure", structure)
             return self.serialize()
 
         if not self.mutable_structure and action in (
@@ -379,7 +404,7 @@ class PageForm(Eigenform):
         return self.serialize()
 
     def _add_eigenform(self, body: dict) -> dict:
-        from engine.registry import get_registry
+        from engine.registry import get_registry, validate_config
 
         type_name = body.get("type")
         key = body.get("key")
@@ -399,6 +424,12 @@ class PageForm(Eigenform):
         existing_keys = {ef.key for ef in self.eigenforms}
         if key in existing_keys:
             return self._error(f"Key '{key}' already exists.", action="add_eigenform")
+
+        # Validate config before persisting
+        if config:
+            err = validate_config(type_name, config, reg)
+            if err:
+                return self._error(err, action="add_eigenform")
 
         # Build descriptor
         desc = {"type": type_name, "key": key, "label": label, "editable": True}

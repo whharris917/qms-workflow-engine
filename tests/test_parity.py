@@ -33,6 +33,8 @@ def extract_affordance_urls(data: dict) -> set[str]:
     if not isinstance(data, dict):
         return urls
     for aff in data.get("affordances", []):
+        if aff.get("_chrome_rendered"):
+            continue  # chrome-rendered affordances have no HTML counterpart
         url = aff.get("url", "")
         if url:  # skip disabled/empty-URL affordances
             urls.add(url)

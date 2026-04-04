@@ -96,7 +96,7 @@ class CheckboxForm(Eigenform):
                 method="POST",
                 url=self.url,
                 body={item: "<true | false>" for item in items},
-                instruction="Set one or more items. Omitted items are unchanged.",
+                instruction="Set one or more items. Omitted items are unchanged. After setting, submit the 'Done' action to confirm.",
                 items=self.checked,
             ),
         ]

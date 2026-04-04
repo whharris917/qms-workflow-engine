@@ -326,13 +326,24 @@ class Eigenform:
                     body={"action": "set_mode", "mode": "edit"},
                     instruction="Switch to edit mode.",
                 ))
+        affordances.append(Affordance(
+            label="Batch",
+            method="POST",
+            url=self.url,
+            body={"action": "batch", "actions": [{"action": "...", "...": "..."}]},
+            instruction=(
+                "Execute multiple actions in a single request. "
+                "Actions run sequentially; execution stops on first error."
+            ),
+        ))
         state["affordances"] = [a.serialize() for a in affordances]
-        # Mark chrome-rendered affordances (icons handle them visually)
+        # Mark chrome-rendered affordances (no visual button needed in HTML)
+        chrome_actions = {"batch"}
         if self.editable:
-            chrome_actions = {"set_mode", "undo", "discard"}
-            for aff in state["affordances"]:
-                if aff.get("body", {}).get("action") in chrome_actions:
-                    aff["_chrome_rendered"] = True
+            chrome_actions |= {"set_mode", "undo", "discard"}
+        for aff in state["affordances"]:
+            if aff.get("body", {}).get("action") in chrome_actions:
+                aff["_chrome_rendered"] = True
         return state
 
     def serialize(self) -> dict | None:

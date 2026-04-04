@@ -27,10 +27,14 @@ def discover_pages() -> dict[str, PageForm]:
     return pages
 
 
-def bind_page(seed: PageForm, data_dir: Path, instance_id: str) -> PageForm:
+def bind_page(seed: PageForm, data_dir: Path, instance_id: str,
+              label: str | None = None) -> PageForm:
     """Bind a seed to its store, producing a transient bound page."""
-    return seed.bind(
+    bound = seed.bind(
         data_dir=data_dir,
         scope=instance_id,
         url_prefix=f"/pages/{instance_id}",
     )
+    if label is not None:
+        bound.label = label
+    return bound

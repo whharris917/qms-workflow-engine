@@ -36,7 +36,7 @@ def get_page(instance_id: str):
     seed = seeds.get(info["type"])
     if seed is None:
         return None
-    return bind_page(seed, DATA_DIR, instance_id)
+    return bind_page(seed, DATA_DIR, instance_id, label=info.get("label"))
 
 
 def wants_html(req) -> bool:
@@ -65,8 +65,8 @@ def index():
     seed_list = [{"key": k, "label": s.label} for k, s in seeds.items()]
     instances = registry.list_instances()
     instance_list = [
-        {"id": iid, "type": info["type"], "label": info["label"],
-         "created_at": info.get("created_at", "")}
+        {"id": iid, "url": f"/pages/{iid}", "type": info["type"],
+         "label": info["label"], "created_at": info.get("created_at", "")}
         for iid, info in instances.items()
     ]
     if wants_html(request):
@@ -91,7 +91,8 @@ def create_instance():
     instance_id = registry.create_instance(type_key, label)
     if wants_html(request):
         return redirect("/")
-    return jsonify({"instance_id": instance_id, "type": type_key, "label": label}), 201
+    return jsonify({"instance_id": instance_id, "url": f"/pages/{instance_id}",
+                    "type": type_key, "label": label}), 201
 
 
 @bp.route("/instances/<instance_id>/delete", methods=["POST"])
@@ -104,6 +105,12 @@ def delete_instance(instance_id):
     if wants_html(request):
         return redirect("/")
     return jsonify({"deleted": instance_id})
+
+
+@bp.route("/types")
+def types():
+    from engine.registry import describe_types
+    return jsonify(describe_types())
 
 
 @bp.route("/pages/<instance_id>", methods=["GET", "POST"])
@@ -124,7 +131,21 @@ def page(instance_id):
         html = Markup(pg.render())
         return render_template("page.html", page_html=html, title=pg.label,
                                instance_id=instance_id)
+    if request.args.get("depth") == "shallow":
+        return jsonify(_shallow_serialize(pg))
     return jsonify(pg.serialize())
+
+
+def _shallow_serialize(pg) -> dict:
+    """Produce a compact page summary: labels and completion status only."""
+    return {
+        "label": pg.label,
+        "complete": pg.is_complete,
+        "eigenforms": [
+            {"label": ef.effective_label, "complete": ef.is_complete}
+            for ef in pg.eigenforms
+        ],
+    }
 
 
 @bp.route("/pages/<instance_id>/stream")
@@ -177,4 +198,12 @@ def eigenform(instance_id, path):
     notify_subscribers(instance_id, result)
     if wants_html(request):
         return Markup(pg.render())
+    # Return just the targeted eigenform state, not the full page
+    ef = pg.find_eigenform(path)
+    if ef is not None:
+        ef_state = ef.serialize()
+        if "error" in result:
+            ef_state["error"] = result["error"]
+            ef_state["failed_action"] = result.get("failed_action")
+        return jsonify(ef_state)
     return jsonify(result)
