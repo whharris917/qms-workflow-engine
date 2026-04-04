@@ -3,31 +3,43 @@
 {% set _ = aff.update({"_rendered": true}) %}
 {% endfor %}
 {% if edit_mode %}
+{% set label_body = {"action": "set_label", "label": label}|tojson %}
+{% set label_tooltip = "POST " ~ url ~ " " ~ label_body %}
 <form data-ef-submit="{{ url }}" class="ef-edit-label-form">
   <input type="hidden" name="action" value="set_label">
-  <input name="label" type="text" value="{{ label }}" class="ef-edit-label-input">
-  <button type="submit" class="{{ CSS_CONFIRM }}">&#10003;</button>
+  <input name="label" type="text" value="{{ label }}" class="ef-edit-label-input" title="{{ label_tooltip }}">
+  <button type="submit" class="{{ CSS_CONFIRM }}" title="{{ label_tooltip }}">&#10003;</button>
 </form>
+{% set instr_body = {"action": "set_instruction", "instruction": instruction or ""}|tojson %}
+{% set instr_tooltip = "POST " ~ url ~ " " ~ instr_body %}
 <form data-ef-submit="{{ url }}" class="ef-edit-instr-form">
   <input type="hidden" name="action" value="set_instruction">
-  <input name="instruction" type="text" value="{{ instruction }}" placeholder="Instruction text" class="ef-edit-instr-input">
-  <button type="submit" class="{{ CSS_CONFIRM }}">&#10003;</button>
+  <input name="instruction" type="text" value="{{ instruction }}" placeholder="Instruction text" class="ef-edit-instr-input" title="{{ instr_tooltip }}">
+  <button type="submit" class="{{ CSS_CONFIRM }}" title="{{ instr_tooltip }}">&#10003;</button>
 </form>
 <p><strong>Value:</strong> {{ value|string }}</p>
 {% if has_data %}
+{% set clear_body = {"action": "clear"}|tojson %}
+{% set clear_tooltip = "POST " ~ url ~ " " ~ clear_body %}
 <div style="margin: 4px 0;">
-  <button data-ef-post="{{ url }}" data-ef-body='{"action": "clear"}' style="cursor: pointer; font-size: 12px; padding: 4px 10px;">Clear</button>
+  <button data-ef-post="{{ url }}" data-ef-body='{"action": "clear"}' style="cursor: pointer; font-size: 12px; padding: 4px 10px;" title="{{ clear_tooltip }}">Clear</button>
 </div>
 {% endif %}
 {% else %}
 <h3>{{ label }}</h3>
 {% if instruction %}<p>{{ instruction }}</p>{% endif %}
 <p><strong>Value:</strong> {{ value|string }}</p>
+{% set set_body = {"action": "set", "value": ""}|tojson %}
+{% set set_tooltip = "POST " ~ url ~ " " ~ set_body %}
 <form data-ef-submit="{{ url }}" style="display: inline;">
-  <input name="value" type="text">
-  <button type="submit">Set {{ label }}</button>
+  <input name="value" type="text" title="{{ set_tooltip }}">
+  <button type="submit" title="{{ set_tooltip }}">Set {{ label }}</button>
 </form>
 {% if has_data %}
-<button data-ef-post="{{ url }}" data-ef-body='{"action": "clear"}' style="cursor: pointer; font-size: 12px; padding: 4px 10px; margin-left: 8px;">Clear</button>
+{% set clear_body = {"action": "clear"}|tojson %}
+{% set clear_tooltip = "POST " ~ url ~ " " ~ clear_body %}
+<div style="margin: 4px 0;">
+  <button data-ef-post="{{ url }}" data-ef-body='{"action": "clear"}' style="cursor: pointer; font-size: 12px; padding: 4px 10px;" title="{{ clear_tooltip }}">Clear</button>
+</div>
 {% endif %}
 {% endif %}

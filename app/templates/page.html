@@ -22,11 +22,11 @@
             if (e.target.closest('[data-ef-change]')) _selfUpdated = Date.now();
         });
 
-        var source = new EventSource('/pages/{{ page_key }}/stream');
+        var source = new EventSource('/pages/{{ instance_id }}/stream');
         source.onmessage = function(event) {
             if (Date.now() - _selfUpdated < 500) return;
             var scrollY = window.scrollY;
-            fetch('/pages/{{ page_key }}', {
+            fetch('/pages/{{ instance_id }}', {
                 headers: {'Accept': 'text/html'}
             }).then(function(resp) {
                 return resp.text();

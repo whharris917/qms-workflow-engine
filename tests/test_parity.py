@@ -22,7 +22,7 @@ from pages import discover_pages, bind_page
 def all_pages():
     """Bind all page definitions once per test module."""
     data_dir = Path("data")
-    return {key: bind_page(seed, data_dir) for key, seed in discover_pages().items()}
+    return {key: bind_page(seed, data_dir, key) for key, seed in discover_pages().items()}
 
 
 # ---- Helpers ----
