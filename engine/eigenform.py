@@ -382,7 +382,11 @@ class Eigenform:
           - body.value only (no action): keyed by "set"
           - body.focus/step/tab: keyed by "focus"/"step"/"tab"
           - boolean value: keyed by "true"/"false"
+
+        Values are marked as Markup so Jinja2 preserves angle-bracket
+        placeholders like ``<value>`` instead of escaping them to ``&lt;value&gt;``.
         """
+        from markupsafe import Markup
         hints: dict[str, str] = {}
         for aff in data.get("affordances", []):
             instruction = aff.get("instruction", "")
@@ -391,21 +395,21 @@ class Eigenform:
             body = aff.get("body", {})
             action = body.get("action")
             if action:
-                hints[action] = instruction
+                hints[action] = Markup(instruction)
             elif "value" in body:
                 v = body["value"]
                 if v is True:
-                    hints["true"] = instruction
+                    hints["true"] = Markup(instruction)
                 elif v is False:
-                    hints["false"] = instruction
+                    hints["false"] = Markup(instruction)
                 else:
-                    hints["set"] = instruction
+                    hints["set"] = Markup(instruction)
             elif "focus" in body:
-                hints["focus"] = instruction
+                hints["focus"] = Markup(instruction)
             elif "step" in body:
-                hints["step"] = instruction
+                hints["step"] = Markup(instruction)
             elif "tab" in body:
-                hints["tab"] = instruction
+                hints["tab"] = Markup(instruction)
         return hints
 
     def _wrap_agent_html(self, inner: str) -> str:

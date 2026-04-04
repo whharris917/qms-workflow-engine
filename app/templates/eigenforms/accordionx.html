@@ -6,17 +6,14 @@
 {% endfor %}
 {% if edit_mode %}
 <form hx-post="{{ url }}" hx-vals='{"action": "set_label", "label": "<label>"}'>
-  <input type="hidden" name="action" value="set_label">
   <label>Label: <input type="text" name="label" value="{{ label }}"></label>
   <button type="submit">Save</button>
 </form>
 <form hx-post="{{ url }}" hx-vals='{"action": "set_instruction", "instruction": "<instruction>"}'>
-  <input type="hidden" name="action" value="set_instruction">
   <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
   <button type="submit">Save</button>
 </form>
-<form hx-post="{{ url }}" hx-vals='{"action": "add_section", "section_key": "<section_key>", "type": "<type>", "key": "<key>", "label": "<label>"}'>
-  <input type="hidden" name="action" value="add_section">
+<form hx-post="{{ url }}" hx-vals='{"action": "add_section", "section_key": "<section_key>", "type": "<{{ available_types|join(" | ") }}>", "key": "<key>", "label": "<label>"}'>
   <label>Section Key: <input name="section_key" type="text" placeholder="section-key"></label>
   <label>Type:
     <select name="type">
@@ -39,8 +36,8 @@
 </section>
 {% endfor %}
 {% if section_items|length > 1 %}
-<form hx-post="{{ url }}" hx-vals='{"action": "move_section", "section_key": "<section_key>", "position": "<position>"}'>
-  <input type="hidden" name="action" value="move_section">
+{% set sec_keys = section_items|map(attribute="key")|join(" | ") %}
+<form hx-post="{{ url }}" hx-vals='{"action": "move_section", "section_key": "<{{ sec_keys }}>", "position": "<position>"}'>
   <label>Move Section:
     <select name="section_key">
     {% for sec in section_items %}
@@ -52,8 +49,7 @@
   <button type="submit">Move</button>
 </form>
 {% endif %}
-<form hx-post="{{ url }}" hx-vals='{"action": "remove_section", "section_key": "<section_key>"}'>
-  <input type="hidden" name="action" value="remove_section">
+<form hx-post="{{ url }}" hx-vals='{"action": "remove_section", "section_key": "<{{ sec_keys }}>"}'>
   <label>Remove Section:
     <select name="section_key">
     {% for sec in section_items %}
@@ -63,8 +59,7 @@
   </label>
   <button type="submit">Remove</button>
 </form>
-<form hx-post="{{ url }}" hx-vals='{"action": "toggle_editable", "section_key": "<section_key>"}'>
-  <input type="hidden" name="action" value="toggle_editable">
+<form hx-post="{{ url }}" hx-vals='{"action": "toggle_editable", "section_key": "<{{ sec_keys }}>"}'>
   <label>Toggle Editable:
     <select name="section_key">
     {% for sec in section_items %}

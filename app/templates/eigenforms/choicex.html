@@ -6,12 +6,10 @@
 {% endfor %}
 {% if edit_mode %}
 <form hx-post="{{ url }}" hx-vals='{"action": "set_label", "label": "<label>"}'>
-  <input type="hidden" name="action" value="set_label">
   <label>Label: <input type="text" name="label" value="{{ label }}"></label>
   <button type="submit">Save</button>
 </form>
 <form hx-post="{{ url }}" hx-vals='{"action": "set_instruction", "instruction": "<instruction>"}'>
-  <input type="hidden" name="action" value="set_instruction">
   <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
   <button type="submit">Save</button>
 </form>
@@ -29,7 +27,7 @@
 <p data-field="instruction">{{ instruction }}</p>
 {% endif %}
 <p data-field="value">Selected: {{ value or "None" }}</p>
-<form hx-post="{{ url }}" hx-vals='{"value": "<value>"}'>
+<form hx-post="{{ url }}" hx-vals='{"value": "<{{ options|join(" | ") }}>"}'>
   <label>value:
     <select name="value">
     {% for opt in options %}

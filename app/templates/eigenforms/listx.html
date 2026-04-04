@@ -7,12 +7,10 @@
 {% endfor %}
 {% if edit_mode %}
 <form hx-post="{{ url }}" hx-vals='{"action": "set_label", "label": "<label>"}'>
-  <input type="hidden" name="action" value="set_label">
   <label>Label: <input type="text" name="label" value="{{ label }}"></label>
   <button type="submit">Save</button>
 </form>
 <form hx-post="{{ url }}" hx-vals='{"action": "set_instruction", "instruction": "<instruction>"}'>
-  <input type="hidden" name="action" value="set_instruction">
   <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
   <button type="submit">Save</button>
 </form>
@@ -44,19 +42,17 @@
 {% set can_up = oc.can_move_up(loop.index0, items) %}
 {% set can_down = oc.can_move_down(loop.index0, items) %}
 {% if can_up -%}
-<button hx-post="{{ url }}" hx-vals='{"action": "move_up", "id": "{{ item_id }}"}'>&#9650;</button>
+<button hx-post="{{ url }}" hx-vals='{"action": "move_up", "id": "{{ item_id }}"}'>Up</button>
 {% endif %}
 {% if can_down -%}
-<button hx-post="{{ url }}" hx-vals='{"action": "move_down", "id": "{{ item_id }}"}'>&#9660;</button>
+<button hx-post="{{ url }}" hx-vals='{"action": "move_down", "id": "{{ item_id }}"}'>Down</button>
 {% endif %}
 {% if is_fixed -%}
 <span data-field="value" data-fixed="true">{{ item_val }}</span>
 {% else -%}
 <form hx-post="{{ url }}" hx-vals='{"action": "edit", "id": "{{ item_id }}", "value": "<value>"}' style="display: inline;">
-  <input type="hidden" name="action" value="edit">
-  <input type="hidden" name="id" value="{{ item_id }}">
   <input type="text" name="value" value="{{ item_val }}">
-  <button type="submit">&#10003;</button>
+  <button type="submit">Save</button>
 </form>
 {% endif %}
 {% if edit_mode -%}
@@ -109,7 +105,6 @@
 {% endfor %}
 </ol>
 <form hx-post="{{ url }}" hx-vals='{"action": "add", "value": "<value>"}' data-field="add">
-  <input type="hidden" name="action" value="add">
   <input type="text" name="value" placeholder="New item">
   <button type="submit">+ Add</button>
 </form>

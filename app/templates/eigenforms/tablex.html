@@ -51,15 +51,13 @@
 
 {# + Column #}
 <form hx-post="{{ url }}" hx-vals='{"action": "add_column", "label": "<label>"}'>
-  <input type="hidden" name="action" value="add_column">
   <label>+ Column: <input type="text" name="label" placeholder="column name"></label>
   <button type="submit">Add</button>
 </form>
 
 {# Rename Column (editable columns only) #}
 {% if editable_cols %}
-<form hx-post="{{ url }}" hx-vals='{"action": "rename_column", "column": "<column>", "label": "<label>"}'>
-  <input type="hidden" name="action" value="rename_column">
+<form hx-post="{{ url }}" hx-vals='{"action": "rename_column", "column": "<{{ editable_cols|map(attribute="id")|join(" | ") }}>", "label": "<label>"}'>
   <label>Rename Column:
     <select name="column">
     {% for c in editable_cols %}
@@ -75,7 +73,6 @@
 {# + Row #}
 {% if col_data %}
 <form hx-post="{{ url }}" hx-vals='{"action": "add_row"}'>
-  <input type="hidden" name="action" value="add_row">
   {% for c in text_col_items %}
   <label>{{ c.id }} ({{ c.value }}): <input type="text" name="{{ c.id }}"></label>
   {% endfor %}
@@ -85,8 +82,7 @@
 
 {# Set Cell (text columns + rows) #}
 {% if text_col_items and row_data %}
-<form hx-post="{{ url }}" hx-vals='{"action": "set_cell", "row": "<row>", "column": "<column>", "value": "<value>"}'>
-  <input type="hidden" name="action" value="set_cell">
+<form hx-post="{{ url }}" hx-vals='{"action": "set_cell", "row": "<{{ all_row_ids|join(" | ") }}>", "column": "<{{ text_col_items|map(attribute="id")|join(" | ") }}>", "value": "<value>"}'>
   <label>Row:
     <select name="row">
     {% for r in all_row_ids %}
@@ -108,8 +104,7 @@
 
 {# Set Row (text columns) #}
 {% if text_col_items and row_data %}
-<form hx-post="{{ url }}" hx-vals='{"action": "set_row", "row": "<row>"}'>
-  <input type="hidden" name="action" value="set_row">
+<form hx-post="{{ url }}" hx-vals='{"action": "set_row", "row": "<{{ all_row_ids|join(" | ") }}>"}'>
   <label>Row:
     <select name="row">
     {% for r in all_row_ids %}
@@ -126,8 +121,7 @@
 
 {# Move Row Up #}
 {% if can_move_up_rows %}
-<form hx-post="{{ url }}" hx-vals='{"action": "move_row_up", "row": "<row>"}'>
-  <input type="hidden" name="action" value="move_row_up">
+<form hx-post="{{ url }}" hx-vals='{"action": "move_row_up", "row": "<{{ can_move_up_rows|join(" | ") }}>"}'>
   <label>Move Row Up:
     <select name="row">
     {% for r in can_move_up_rows %}
@@ -141,8 +135,7 @@
 
 {# Move Row Down #}
 {% if can_move_down_rows %}
-<form hx-post="{{ url }}" hx-vals='{"action": "move_row_down", "row": "<row>"}'>
-  <input type="hidden" name="action" value="move_row_down">
+<form hx-post="{{ url }}" hx-vals='{"action": "move_row_down", "row": "<{{ can_move_down_rows|join(" | ") }}>"}'>
   <label>Move Row Down:
     <select name="row">
     {% for r in can_move_down_rows %}
@@ -156,8 +149,7 @@
 
 {# Move Column Left #}
 {% if can_move_left_cols %}
-<form hx-post="{{ url }}" hx-vals='{"action": "move_col_left", "column": "<column>"}'>
-  <input type="hidden" name="action" value="move_col_left">
+<form hx-post="{{ url }}" hx-vals='{"action": "move_col_left", "column": "<{{ can_move_left_cols|join(" | ") }}>"}'>
   <label>Move Column Left:
     <select name="column">
     {% for c in can_move_left_cols %}
@@ -171,8 +163,7 @@
 
 {# Move Column Right #}
 {% if can_move_right_cols %}
-<form hx-post="{{ url }}" hx-vals='{"action": "move_col_right", "column": "<column>"}'>
-  <input type="hidden" name="action" value="move_col_right">
+<form hx-post="{{ url }}" hx-vals='{"action": "move_col_right", "column": "<{{ can_move_right_cols|join(" | ") }}>"}'>
   <label>Move Column Right:
     <select name="column">
     {% for c in can_move_right_cols %}
@@ -186,8 +177,7 @@
 
 {# Row Constraints #}
 {% if show_row_constraints and num_rows > 1 %}
-<form hx-post="{{ url }}" hx-vals='{"action": "add_row_constraint", "item": "<item>", "after": "<after>"}'>
-  <input type="hidden" name="action" value="add_row_constraint">
+<form hx-post="{{ url }}" hx-vals='{"action": "add_row_constraint", "item": "<{{ all_row_ids|join(" | ") }}>", "after": "<{{ all_row_ids|join(" | ") }}>"}'>
   <label>Add Row Constraint — item:
     <select name="item">
     {% for r in all_row_ids %}
@@ -206,24 +196,22 @@
 </form>
 {% endif %}
 {% if row_dynamic_constraints %}
-<form hx-post="{{ url }}" hx-vals='{"action": "remove_row_constraint", "item": "<item>", "after": "<after>"}'>
-  <input type="hidden" name="action" value="remove_row_constraint">
+{% set row_constraint_opts = row_dynamic_constraints|map(attribute="item")|list %}
+<form hx-post="{{ url }}" hx-vals='{"action": "remove_row_constraint", "item": "<{{ row_constraint_opts|join(" | ") }}>", "after": "<after>"}'>
   <label>Remove Row Constraint:
-    <select name="item" onchange="this.form.after.value=this.options[this.selectedIndex].dataset.after">
+    <select name="item">
     {% for c in row_dynamic_constraints %}
-    <option value="{{ c.item }}" data-after="{{ c.after }}">{{ c.item }} after {{ c.after }}</option>
+    <option value="{{ c.item }}">{{ c.item }} after {{ c.after }}</option>
     {% endfor %}
     </select>
   </label>
-  <input type="hidden" name="after" value="{{ row_dynamic_constraints[0].after if row_dynamic_constraints else '' }}">
   <button type="submit">Remove</button>
 </form>
 {% endif %}
 
 {# Column Constraints #}
 {% if show_col_constraints and num_cols > 1 %}
-<form hx-post="{{ url }}" hx-vals='{"action": "add_col_constraint", "item": "<item>", "after": "<after>"}'>
-  <input type="hidden" name="action" value="add_col_constraint">
+<form hx-post="{{ url }}" hx-vals='{"action": "add_col_constraint", "item": "<{{ all_col_ids|join(" | ") }}>", "after": "<{{ all_col_ids|join(" | ") }}>"}'>
   <label>Add Column Constraint — item:
     <select name="item">
     {% for c in all_col_ids %}
@@ -242,24 +230,22 @@
 </form>
 {% endif %}
 {% if col_dynamic_constraints %}
-<form hx-post="{{ url }}" hx-vals='{"action": "remove_col_constraint", "item": "<item>", "after": "<after>"}'>
-  <input type="hidden" name="action" value="remove_col_constraint">
+{% set col_constraint_opts = col_dynamic_constraints|map(attribute="item")|list %}
+<form hx-post="{{ url }}" hx-vals='{"action": "remove_col_constraint", "item": "<{{ col_constraint_opts|join(" | ") }}>", "after": "<after>"}'>
   <label>Remove Column Constraint:
-    <select name="item" onchange="this.form.after.value=this.options[this.selectedIndex].dataset.after">
+    <select name="item">
     {% for c in col_dynamic_constraints %}
-    <option value="{{ c.item }}" data-after="{{ c.after }}">{{ c.item }} after {{ c.after }}</option>
+    <option value="{{ c.item }}">{{ c.item }} after {{ c.after }}</option>
     {% endfor %}
     </select>
   </label>
-  <input type="hidden" name="after" value="{{ col_dynamic_constraints[0].after if col_dynamic_constraints else '' }}">
   <button type="submit">Remove</button>
 </form>
 {% endif %}
 
 {# Remove Row #}
 {% if editable_rows %}
-<form hx-post="{{ url }}" hx-vals='{"action": "remove_row", "row": "<row>"}'>
-  <input type="hidden" name="action" value="remove_row">
+<form hx-post="{{ url }}" hx-vals='{"action": "remove_row", "row": "<{{ editable_rows|map(attribute="id")|join(" | ") }}>"}'>
   <label>Remove Row:
     <select name="row">
     {% for r in editable_rows %}
@@ -273,8 +259,7 @@
 
 {# Remove Column #}
 {% if editable_cols %}
-<form hx-post="{{ url }}" hx-vals='{"action": "remove_column", "column": "<column>"}'>
-  <input type="hidden" name="action" value="remove_column">
+<form hx-post="{{ url }}" hx-vals='{"action": "remove_column", "column": "<{{ editable_cols|map(attribute="id")|join(" | ") }}>"}'>
   <label>Remove Column:
     <select name="column">
     {% for c in editable_cols %}

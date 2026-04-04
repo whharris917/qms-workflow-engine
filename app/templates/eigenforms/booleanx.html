@@ -6,22 +6,18 @@
 {% endfor %}
 {% if edit_mode %}
 <form hx-post="{{ url }}" hx-vals='{"action": "set_label", "label": "<label>"}'>
-  <input type="hidden" name="action" value="set_label">
   <label>Label: <input type="text" name="label" value="{{ label }}"></label>
   <button type="submit">Save</button>
 </form>
 <form hx-post="{{ url }}" hx-vals='{"action": "set_instruction", "instruction": "<instruction>"}'>
-  <input type="hidden" name="action" value="set_instruction">
   <label>Instruction: <input type="text" name="instruction" value="{{ instruction }}"></label>
   <button type="submit">Save</button>
 </form>
 <form hx-post="{{ url }}" hx-vals='{"action": "set_true_label", "label": "<label>"}'>
-  <input type="hidden" name="action" value="set_true_label">
   <label>True label: <input type="text" name="label" value="{{ true_label }}"></label>
   <button type="submit">Set</button>
 </form>
 <form hx-post="{{ url }}" hx-vals='{"action": "set_false_label", "label": "<label>"}'>
-  <input type="hidden" name="action" value="set_false_label">
   <label>False label: <input type="text" name="label" value="{{ false_label }}"></label>
   <button type="submit">Set</button>
 </form>
