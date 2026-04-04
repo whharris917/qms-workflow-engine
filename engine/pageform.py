@@ -319,10 +319,64 @@ class PageForm(Eigenform):
                 ],
                 "success": fb["success"],
             }
-        state["eigenforms"] = [s for ef in self.eigenforms if (s := ef.serialize()) is not None]
+        page_affs = [a.serialize() for a in self.get_affordances()]
+        child_dicts = [s for ef in self.eigenforms
+                       if (s := ef._serialize_full()) is not None]
+        self._float_affordances(child_dicts, page_affs)
+        # Strip render noise from children (what serialize() normally does)
+        for d in child_dicts:
+            d.pop("form", None)
+            d.pop("key", None)
+            for aff in d.get("affordances", []):
+                aff.pop("render_hints", None)
+        state["eigenforms"] = child_dicts
         state["complete"] = self.is_complete
-        state["affordances"] = [a.serialize() for a in self.get_affordances()]
+        state["affordances"] = page_affs
         return state
+
+    def _float_affordances(self, child_dicts: list[dict],
+                           page_affs: list[dict]) -> None:
+        """Collect floatable affordances from children, merge into page-level compounds."""
+        merge_groups: dict[str, dict] = {}
+
+        for ef_dict in child_dicts:
+            ef_label = ef_dict.get("label", "")
+            remaining = []
+            for aff in ef_dict.get("affordances", []):
+                fkey = aff.pop("_floatable", None)
+                if fkey is not None:
+                    aff.pop("render_hints", None)
+                    if fkey not in merge_groups:
+                        merge_groups[fkey] = {"template": aff, "targets": []}
+                    merge_groups[fkey]["targets"].append((aff["url"], ef_label))
+                else:
+                    remaining.append(aff)
+            ef_dict["affordances"] = remaining
+
+        _MERGED_INSTRUCTIONS = {
+            "clear": "Clear all data from the target eigenform.",
+            "edit": "Switch the target eigenform to edit mode.",
+            "batch": (
+                "Execute multiple actions on the target eigenform. "
+                "Actions run sequentially; execution stops on first error."
+            ),
+        }
+        for fkey, group in merge_groups.items():
+            template = group["template"]
+            targets = group["targets"]
+            targets_dict = {
+                url.rsplit("/", 1)[-1]: label for url, label in targets
+            }
+            base_url = targets[0][0].rsplit("/", 1)[0]
+            merged = {
+                "label": template["label"],
+                "method": template["method"],
+                "url": f"{base_url}/<target>",
+                "body": template["body"],
+                "targets": targets_dict,
+                "instruction": _MERGED_INSTRUCTIONS.get(fkey, template.get("instruction", "")),
+            }
+            page_affs.append(merged)
 
     def render_from_data(self, data: dict) -> str:
         from engine.registry import get_registry

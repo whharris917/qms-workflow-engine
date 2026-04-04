@@ -286,13 +286,15 @@ class Eigenform:
         else:
             affordances.extend(self.get_affordances())
         if self.has_data:
-            affordances.append(SimpleButtonAffordance(
+            _aff = SimpleButtonAffordance(
                 label="Clear",
                 method="POST",
                 url=self.url,
                 body={"action": "clear"},
                 instruction=f"Clear all data from this {self.effective_label}.",
-            ))
+            )
+            _aff._floatable = "clear"
+            affordances.append(_aff)
         if self.editable:
             # Chrome icons handle these visually; affordances exist for agent discoverability.
             if self.edit_mode:
@@ -319,14 +321,16 @@ class Eigenform:
                     instruction="Discard all edit-mode changes and return to execution mode.",
                 ))
             else:
-                affordances.append(Affordance(
+                _aff = Affordance(
                     label="Edit",
                     method="POST",
                     url=self.url,
                     body={"action": "set_mode", "mode": "edit"},
                     instruction="Switch to edit mode.",
-                ))
-        affordances.append(Affordance(
+                )
+                _aff._floatable = "edit"
+                affordances.append(_aff)
+        _aff = Affordance(
             label="Batch",
             method="POST",
             url=self.url,
@@ -335,8 +339,17 @@ class Eigenform:
                 "Execute multiple actions in a single request. "
                 "Actions run sequentially; execution stops on first error."
             ),
-        ))
-        state["affordances"] = [a.serialize() for a in affordances]
+        )
+        _aff._floatable = "batch"
+        affordances.append(_aff)
+        serialized_affs = []
+        for a in affordances:
+            d = a.serialize()
+            fkey = getattr(a, '_floatable', None)
+            if fkey is not None:
+                d["_floatable"] = fkey
+            serialized_affs.append(d)
+        state["affordances"] = serialized_affs
         # Mark chrome-rendered affordances (no visual button needed in HTML)
         chrome_actions = {"batch"}
         if self.editable:
@@ -359,6 +372,7 @@ class Eigenform:
         state.pop("key", None)
         for aff in state.get("affordances", []):
             aff.pop("render_hints", None)
+            aff.pop("_floatable", None)
         return state
 
     def render_from_data(self, data: dict) -> str:
