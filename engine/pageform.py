@@ -336,22 +336,9 @@ class PageForm(Eigenform):
 
     def _float_affordances(self, child_dicts: list[dict],
                            page_affs: list[dict]) -> None:
-        """Collect floatable affordances from children, merge into page-level compounds."""
+        """Collect floatable affordances from the full eigenform tree."""
         merge_groups: dict[str, dict] = {}
-
-        for ef_dict in child_dicts:
-            ef_label = ef_dict.get("label", "")
-            remaining = []
-            for aff in ef_dict.get("affordances", []):
-                fkey = aff.pop("_floatable", None)
-                if fkey is not None:
-                    aff.pop("render_hints", None)
-                    if fkey not in merge_groups:
-                        merge_groups[fkey] = {"template": aff, "targets": []}
-                    merge_groups[fkey]["targets"].append((aff["url"], ef_label))
-                else:
-                    remaining.append(aff)
-            ef_dict["affordances"] = remaining
+        self._collect_floatable(child_dicts, merge_groups)
 
         _MERGED_INSTRUCTIONS = {
             "clear": "Clear all data from the target eigenform.",
@@ -364,19 +351,41 @@ class PageForm(Eigenform):
         for fkey, group in merge_groups.items():
             template = group["template"]
             targets = group["targets"]
-            targets_dict = {
-                url.rsplit("/", 1)[-1]: label for url, label in targets
-            }
-            base_url = targets[0][0].rsplit("/", 1)[0]
             merged = {
                 "label": template["label"],
                 "method": template["method"],
-                "url": f"{base_url}/<target>",
                 "body": template["body"],
-                "targets": targets_dict,
+                "targets": {url: label for url, label in targets},
                 "instruction": _MERGED_INSTRUCTIONS.get(fkey, template.get("instruction", "")),
             }
             page_affs.append(merged)
+
+    def _collect_floatable(self, dicts: list[dict],
+                           merge_groups: dict[str, dict]) -> None:
+        """Recursively walk eigenform dicts, extracting floatable affordances."""
+        for ef_dict in dicts:
+            ef_label = ef_dict.get("label", "")
+            # Extract floatable affordances from this node
+            remaining = []
+            for aff in ef_dict.get("affordances", []):
+                fkey = aff.pop("_floatable", None)
+                if fkey is not None:
+                    aff.pop("render_hints", None)
+                    if fkey not in merge_groups:
+                        merge_groups[fkey] = {"template": aff, "targets": []}
+                    merge_groups[fkey]["targets"].append((aff["url"], ef_label))
+                else:
+                    remaining.append(aff)
+            ef_dict["affordances"] = remaining
+            # Recurse into nested eigenforms
+            if isinstance(ef_dict.get("eigenform"), dict):
+                self._collect_floatable([ef_dict["eigenform"]], merge_groups)
+            if isinstance(ef_dict.get("eigenforms"), list):
+                self._collect_floatable(ef_dict["eigenforms"], merge_groups)
+            if isinstance(ef_dict.get("sections"), dict):
+                nested = [s["eigenform"] for s in ef_dict["sections"].values()
+                          if isinstance(s, dict) and isinstance(s.get("eigenform"), dict)]
+                self._collect_floatable(nested, merge_groups)
 
     def render_from_data(self, data: dict) -> str:
         from engine.registry import get_registry

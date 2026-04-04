@@ -372,7 +372,6 @@ class Eigenform:
         state.pop("key", None)
         for aff in state.get("affordances", []):
             aff.pop("render_hints", None)
-            aff.pop("_floatable", None)
         return state
 
     def render_from_data(self, data: dict) -> str:
