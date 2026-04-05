@@ -74,14 +74,11 @@ Affordances are HATEOAS links: each carries `label`, `method`, `url`, `body` tem
 | **NumberForm** | `engine/number.py` | Numeric input with min/max/step/integer constraint | Value is not None |
 | **DateForm** | `engine/date.py` | ISO 8601 date or datetime with optional bounds | Value is not None |
 | **BooleanForm** | `engine/boolean.py` | Binary yes/no toggle with custom labels | Value is not None |
-| **MemoForm** | `engine/memo.py` | Multi-line textarea with min/max length | Non-empty and meets min_length |
-| **RangeForm** | `engine/range.py` | Slider over continuous range with optional unit | Value is not None |
 | **ChoiceForm** | `engine/choice.py` | Single selection via radio buttons from fixed options | Valid option selected |
 | **CheckboxForm** | `engine/eigenforms.py` | Multi-select with N/A mode | Any item checked or N/A |
 | **MultiForm** | `engine/multi.py` | Groups FieldDescriptors under a single affordance | All fields filled |
 | **ListForm** | `engine/listform.py` | Ordered list with add/edit/remove/reorder + N/A | Items > 0 or N/A |
 | **TableForm** | `engine/table.py` | Dynamic columns + rows, inline cell editing | All cells filled |
-| **RankForm** | `engine/rank.py` | Fixed-set item reordering with move up/down | User has submitted ordering |
 | **KeyValueForm** | `engine/keyvalue.py` | Dynamic key-value pairs with stable entry IDs | At least one complete entry |
 
 ### Container Forms

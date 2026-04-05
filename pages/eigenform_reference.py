@@ -42,17 +42,17 @@ _DATA_FORMS = AccordionForm(
     sections={
         "text": _type_entry(
             "text",
-            "Single free-form string input. The simplest data eigenform.",
-            "Any single-line string: titles, names, short answers. Use memo for multi-line text.",
-            "default (str, optional): Initial value before user input. JSON-configurable.",
-            '{"default": "Untitled Document"}',
+            "Free-form string input. Single-line by default; set multiline=True for textarea behavior. Optional min_length/max_length validation.",
+            "Titles, names, short answers (single-line). Descriptions, paragraphs, long-form text (multiline). The most versatile data eigenform.",
+            "default (str, optional): Initial value. multiline (bool, optional): Textarea mode. min_length (int, optional): Minimum characters. max_length (int, optional): Maximum characters. All JSON-configurable.",
+            '{"multiline": true, "min_length": 10, "max_length": 500}',
         ),
         "number": _type_entry(
             "number",
-            "Numeric input with min/max/step validation. Supports integer-only mode.",
-            "Any numeric value. Use range instead when you want a slider UI.",
-            "min_val (float, optional): Minimum. max_val (float, optional): Maximum. step (float, optional): Increment. integer (bool, optional): Restrict to whole numbers. All JSON-configurable.",
-            '{"min_val": 0, "max_val": 100, "step": 1, "integer": true}',
+            "Numeric input with min/max/step validation. Supports integer-only mode and slider UI.",
+            "Any numeric value. Set slider=True for a range slider with optional unit label.",
+            "min_val (float, optional): Minimum. max_val (float, optional): Maximum. step (float, optional): Increment. integer (bool, optional): Restrict to whole numbers. slider (bool, optional): Render as slider. unit (str, optional): Display unit. All JSON-configurable.",
+            '{"min_val": 0, "max_val": 100, "step": 5, "slider": true, "unit": "%"}',
         ),
         "boolean": _type_entry(
             "boolean",
@@ -75,13 +75,6 @@ _DATA_FORMS = AccordionForm(
             "items (list[str], optional): Checkbox labels. JSON-configurable.",
             '{"items": ["Code", "Documentation", "Tests", "Infrastructure"]}',
         ),
-        "memo": _type_entry(
-            "memo",
-            "Multi-line textarea with optional length constraints.",
-            "Paragraphs, descriptions, long-form text. Use text for single-line input.",
-            "max_length (int, optional): Maximum characters. min_length (int, optional): Minimum characters. placeholder (str, optional): Placeholder text. All JSON-configurable.",
-            '{"min_length": 10, "max_length": 500}',
-        ),
         "date": _type_entry(
             "date",
             "ISO 8601 date or datetime picker with optional bounds.",
@@ -89,24 +82,10 @@ _DATA_FORMS = AccordionForm(
             "include_time (bool, optional): Add time component. min_date (str, optional): Earliest date (ISO 8601). max_date (str, optional): Latest date. JSON-configurable.",
             '{"include_time": true, "min_date": "2026-01-01"}',
         ),
-        "range": _type_entry(
-            "range",
-            "Slider over a continuous numeric range with optional unit label.",
-            "Bounded numeric input where a slider makes sense (ratings, percentages). Use number for unconstrained numeric input.",
-            "min_val (float, optional, default 0): Range minimum. max_val (float, optional, default 100): Range maximum. step (float, optional, default 1): Step increment. unit (str, optional): Display unit. JSON-configurable.",
-            '{"min_val": 0, "max_val": 10, "step": 0.5, "unit": "points"}',
-        ),
-        "rank": _type_entry(
-            "rank",
-            "Fixed-set item reordering via move up/down. Complete when explicitly ranked.",
-            "Priority ordering of a known set. Use list if items can be added/removed.",
-            "items (list[str], optional): Items to rank. JSON-configurable.",
-            '{"items": ["Security", "Performance", "Usability", "Cost"]}',
-        ),
         "list": _type_entry(
             "list",
             "Ordered list with add/edit/remove/reorder. Supports fixed items and ordering constraints.",
-            "User-defined ordered collections. Use set for unordered, rank for fixed-set reordering, checkbox for multi-select from fixed options.",
+            "User-defined ordered collections. Use fixed_items for ranking a known set. Use set for unordered, checkbox for multi-select from fixed options.",
             "fixed_items (list[str], optional): Immutable seed items. must_follow (dict[str, list[str]], optional): Ordering constraints {item: [must_come_after]}. allow_constraints (bool, optional): Show constraint UI. JSON-configurable.",
             '{"fixed_items": ["Setup", "Teardown"], "allow_constraints": true}',
         ),
@@ -367,7 +346,7 @@ _OVERVIEW = GroupForm(
                 "Simple form": (
                     "A simple form is a PageForm with data eigenforms as children. "
                     "Example: a bug report with TextForm (title), ChoiceForm (severity), "
-                    "MemoForm (description), CheckboxForm (affected areas)."
+                    "TextForm(multiline=True) (description), CheckboxForm (affected areas)."
                 ),
                 "Multi-step workflow": (
                     "A multi-step workflow uses ChainForm or SequenceForm to gate "

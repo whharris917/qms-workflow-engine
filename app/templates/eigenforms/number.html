@@ -63,18 +63,32 @@
   <h3>{{ data.label }}</h3>
   {% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
 
-  {# Constraints summary #}
-  {% set constraints = [] %}
-  {% if data.min is not none %}{% set _ = constraints.append("min: " ~ data.min|string) %}{% endif %}
-  {% if data.max is not none %}{% set _ = constraints.append("max: " ~ data.max|string) %}{% endif %}
-  {% if data.step is not none %}{% set _ = constraints.append("step: " ~ data.step|string) %}{% endif %}
-  {% if data.integer %}{% set _ = constraints.append("integer") %}{% endif %}
-  {% if constraints %}
-    <p style="color: #666; font-size: 0.9em; margin: 2px 0;">{{ constraints|join(", ") }}</p>
-  {% endif %}
-
   {% set val = data.value %}
-  <p><strong>Value:</strong> {{ (val if val is not none else "None")|string }}</p>
+  {% set unit = data.unit or "" %}
+
+  {% if data.slider %}
+    {# Slider mode #}
+    {% set min_v = data.min if data.min is not none else 0 %}
+    {% set max_v = data.max if data.max is not none else 100 %}
+    {% set step_v = data.step if data.step is not none else 1 %}
+    {% if val is not none %}
+      <p><strong>Value:</strong> {{ val }}{{ unit }}</p>
+    {% else %}
+      <p class="ef-na-text">Not set.</p>
+    {% endif %}
+  {% else %}
+    {# Constraints summary #}
+    {% set constraints = [] %}
+    {% if data.min is not none %}{% set _ = constraints.append("min: " ~ data.min|string) %}{% endif %}
+    {% if data.max is not none %}{% set _ = constraints.append("max: " ~ data.max|string) %}{% endif %}
+    {% if data.step is not none %}{% set _ = constraints.append("step: " ~ data.step|string) %}{% endif %}
+    {% if data.integer %}{% set _ = constraints.append("integer") %}{% endif %}
+    {% if constraints %}
+      <p style="color: #666; font-size: 0.9em; margin: 2px 0;">{{ constraints|join(", ") }}</p>
+    {% endif %}
+
+    <p><strong>Value:</strong> {{ (val if val is not none else "None")|string }}</p>
+  {% endif %}
 
   {% for aff in data.affordances %}
     {% if not aff._rendered %}

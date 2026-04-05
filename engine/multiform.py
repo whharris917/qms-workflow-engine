@@ -15,6 +15,7 @@ from typing import Any
 
 from engine.affordances import Affordance
 from engine.eigenform import Eigenform
+from engine.templates import render_template
 
 
 @dataclass
@@ -105,6 +106,9 @@ class MultiForm(Eigenform):
         return self._base_state() | {
             "fields": serialized_fields,
         }
+
+    def render_from_data(self, data: dict) -> str:
+        return render_template("multi.html", data=data, ef=self)
 
     def get_affordances(self) -> list[Affordance]:
         body = {}

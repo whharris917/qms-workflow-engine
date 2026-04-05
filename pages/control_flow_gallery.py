@@ -8,7 +8,6 @@ from engine.textform import TextForm
 from engine.checkboxform import CheckboxForm
 from engine.choiceform import ChoiceForm
 from engine.booleanform import BooleanForm
-from engine.memoform import MemoForm
 from engine.switchform import SwitchForm
 from engine.numberform import NumberForm
 
@@ -52,7 +51,7 @@ TechnicalReview = SequenceForm(
             instruction="Is the proposal technically feasible?",
             options=["Feasible", "Feasible with changes", "Not feasible"],
         ),
-        MemoForm(
+        TextForm(multiline=True,
             key="tech-notes",
             label="Technical Notes",
             instruction="Provide technical review notes.",
@@ -71,7 +70,7 @@ BusinessReview = SequenceForm(
             instruction="What priority should this receive?",
             options=["Critical", "High", "Medium", "Low"],
         ),
-        MemoForm(
+        TextForm(multiline=True,
             key="biz-notes",
             label="Business Notes",
             instruction="Provide business review notes.",
@@ -120,7 +119,7 @@ BugBranch = SequenceForm(
     label="Bug Report Branch",
     instruction="Describe the bug.",
     steps=[
-        MemoForm(
+        TextForm(multiline=True,
             key="repro-steps",
             label="Reproduction Steps",
             instruction="How do you reproduce the bug?",
@@ -139,7 +138,7 @@ FeatureBranch = SequenceForm(
     label="Feature Request Branch",
     instruction="Describe the feature.",
     steps=[
-        MemoForm(
+        TextForm(multiline=True,
             key="user-story",
             label="User Story",
             instruction="As a [role], I want [goal], so that [benefit].",
@@ -163,7 +162,7 @@ IssueBranch = SwitchForm(
     cases={
         "Bug Report": BugBranch,
         "Feature Request": FeatureBranch,
-        "Refactor": MemoForm(
+        "Refactor": TextForm(multiline=True,
             key="refactor-scope",
             label="Refactor Scope",
             instruction="Describe what will be refactored and why.",

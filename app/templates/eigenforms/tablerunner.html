@@ -17,9 +17,11 @@
 {# Classify nav affordances (Back/Next only) #}
 {% set nav_affs = [] %}
 {% for aff in affs %}
-  {% set lbl = aff.label|default("") %}
-  {% if lbl.startswith("\u2190") or lbl.startswith("Next") %}
-    {% if nav_affs.append(aff) %}{% endif %}
+  {% if not aff._rendered %}
+    {% set lbl = aff.label|default("") %}
+    {% if lbl.startswith("\u2190") or lbl.startswith("Next") %}
+      {% if nav_affs.append(aff) %}{% endif %}
+    {% endif %}
   {% endif %}
 {% endfor %}
 

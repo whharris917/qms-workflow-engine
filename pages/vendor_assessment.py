@@ -2,8 +2,8 @@
 realistic regulated-industry business workflow.
 
 Exercises: AccordionForm, ChainForm, TabForm, VisibilityForm, MultiForm,
-ChoiceForm, CheckboxForm, DateForm, BooleanForm, MemoForm,
-RangeForm, NumberForm, RankForm, KeyValueForm, TableForm, ComputedForm.
+ChoiceForm, CheckboxForm, DateForm, BooleanForm,
+NumberForm, TextForm, ListForm, KeyValueForm, TableForm, ComputedForm.
 """
 
 from engine.accordionform import AccordionForm
@@ -14,12 +14,11 @@ from engine.computedform import ComputedForm
 from engine.dateform import DateForm
 from engine.checkboxform import CheckboxForm
 from engine.keyvalueform import KeyValueForm
-from engine.memoform import MemoForm
+from engine.textform import TextForm
 from engine.multiform import FieldDescriptor, MultiForm
 from engine.numberform import NumberForm
 from engine.pageform import PageForm
-from engine.rangeform import RangeForm
-from engine.rankform import RankForm
+from engine.listform import ListForm
 from engine.tabform import TabForm
 from engine.tableform import TableForm
 from engine.visibilityform import VisibilityForm
@@ -82,10 +81,10 @@ definition = PageForm(
                             true_label="Yes, existing vendor", false_label="No, new vendor"),
                 VisibilityForm(key="v-history", label="Vendor History",
                                depends_on="existing_vendor", visible_when=True,
-                               eigenform=MemoForm(key="relationship_history",
+                               eigenform=TextForm(key="relationship_history",
                                                   label="Relationship History",
                                                   instruction="Describe your history with this vendor.",
-                                                  min_length=50)),
+                                                  multiline=True, min_length=50)),
             ]),
 
             "capabilities": TabForm(key="cap_tabs", label="Capability Assessment",
@@ -117,9 +116,9 @@ definition = PageForm(
         NumberForm(key="pricing_rating", label="Pricing Competitiveness Rating",
                    instruction="Rate the vendor's pricing relative to market (1-5).",
                    min_val=1, max_val=5, integer=True),
-        RangeForm(key="confidence_level", label="Assessment Confidence",
+        NumberForm(key="confidence_level", label="Assessment Confidence",
                   instruction="How confident are you in the accuracy of this assessment?",
-                  min_val=0, max_val=100, step=5, unit="%"),
+                  min_val=0, max_val=100, step=5, slider=True, unit="%"),
 
         # === Section 3: Financial ===
         NumberForm(key="proposed_credit_limit", label="Proposed Credit Limit ($)",
@@ -127,18 +126,19 @@ definition = PageForm(
                    min_val=0, max_val=10000000, step=1000, integer=True),
 
         # === Section 4: Prioritization ===
-        RankForm(key="priority_factors", label="Evaluation Priority Factors",
-                 instruction="Rank these factors by importance for this vendor relationship.",
-                 items=["Price", "Quality", "Delivery Speed", "Technical Support", "Innovation"]),
+        ListForm(key="priority_factors", label="Evaluation Priority Factors",
+                 instruction="Reorder these factors by importance for this vendor relationship.",
+                 fixed_items=["Price", "Quality", "Delivery Speed", "Technical Support", "Innovation"],
+                 allow_constraints=False),
 
         # === Section 5: Risk assessment ===
         TableForm(key="risk_matrix", label="Risk Assessment Matrix",
                   instruction="Add rows for each identified risk. Columns: Risk, Likelihood, Impact, Mitigation."),
 
         # === Section 6: Written assessment ===
-        MemoForm(key="executive_summary", label="Executive Summary",
+        TextForm(key="executive_summary", label="Executive Summary",
                  instruction="Write a summary of the vendor's strengths, weaknesses, and recommendation rationale.",
-                 min_length=100),
+                 multiline=True, min_length=100),
         KeyValueForm(key="custom_observations", label="Additional Observations",
                      instruction="Add any supplementary observations as key-value pairs.",
                      key_label="Category", value_label="Detail"),

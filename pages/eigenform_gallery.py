@@ -17,9 +17,6 @@ from engine.choiceform import ChoiceForm
 from engine.numberform import NumberForm
 from engine.dateform import DateForm
 from engine.booleanform import BooleanForm
-from engine.rangeform import RangeForm
-from engine.memoform import MemoForm
-from engine.rankform import RankForm
 from engine.multiform import MultiForm
 from engine.listform import ListForm
 from engine.setform import SetForm
@@ -47,6 +44,7 @@ from engine.validationform import ValidationRule
 simple_values = GroupForm(
     key="simple-values",
     label="Simple Value Forms",
+    editable=True,
     instruction=(
         "The building blocks. Each captures a single value and reports "
         "is_complete when that value is set. Try setting each one — the "
@@ -56,7 +54,16 @@ simple_values = GroupForm(
         TextForm(
             key="text-demo",
             label="TextForm",
-            instruction="The simplest eigenform. Accepts any string. POST {\"value\": \"hello\"} to set it. This one is editable — click the gear icon to rename it.",
+            instruction="The simplest eigenform. Accepts any string. POST {\"value\": \"hello\"} to set it. This one is editable — click the pencil icon to rename it.",
+            editable=True,
+        ),
+        TextForm(
+            key="memo-demo",
+            label="TextForm (multiline)",
+            instruction="Multi-line textarea. This one requires at least 10 characters and caps at 500.",
+            multiline=True,
+            min_length=10,
+            max_length=500,
             editable=True,
         ),
         NumberForm(
@@ -81,6 +88,17 @@ simple_values = GroupForm(
             integer=True,
             editable=True,
         ),
+        NumberForm(
+            key="range-demo",
+            label="NumberForm (slider)",
+            instruction="Slider from 0-100%. POST {\"value\": \"75\"} to set. Step is 5.",
+            min_val=0,
+            max_val=100,
+            step=5,
+            slider=True,
+            unit="%",
+            editable=True,
+        ),
         BooleanForm(
             key="boolean-demo",
             label="BooleanForm",
@@ -95,14 +113,6 @@ simple_values = GroupForm(
             false_label="Reject",
             editable=True,
         ),
-        MemoForm(
-            key="memo-demo",
-            label="MemoForm",
-            instruction="Multi-line textarea. This one requires at least 10 characters and caps at 500.",
-            min_length=10,
-            max_length=500,
-            placeholder="Write something longer than 10 characters...",
-        ),
         DateForm(
             key="date-demo",
             label="DateForm",
@@ -116,15 +126,6 @@ simple_values = GroupForm(
             instruction="With include_time=True, accepts YYYY-MM-DDTHH:MM format.",
             include_time=True,
         ),
-        RangeForm(
-            key="range-demo",
-            label="RangeForm",
-            instruction="Slider from 0-100%. POST {\"value\": \"75\"} to set. Step is 5.",
-            min_val=0,
-            max_val=100,
-            step=5,
-            unit="%",
-        ),
     ],
 )
 
@@ -136,9 +137,10 @@ simple_values = GroupForm(
 selection_forms = GroupForm(
     key="selection-forms",
     label="Selection Forms",
+    editable=True,
     instruction=(
         "Forms for choosing among options. ChoiceForm for single-select, "
-        "CheckboxForm for multi-select, RankForm for ordering."
+        "CheckboxForm for multi-select."
     ),
     eigenforms=[
         ChoiceForm(
@@ -164,17 +166,6 @@ selection_forms = GroupForm(
             items=["Unit Tests", "Integration Tests", "Load Tests", "Manual QA"],
             editable=True,
         ),
-        RankForm(
-            key="rank-demo",
-            label="RankForm",
-            instruction=(
-                "Reorder via Up/Down buttons, then click Done to confirm. "
-                "Done with the default order is valid (confirming the original ranking). "
-                "Moving items after Done requires re-confirmation. "
-                "Same confirmation pattern as CheckboxForm."
-            ),
-            items=["cost", "quality", "speed", "scope"],
-        ),
     ],
 )
 
@@ -186,6 +177,7 @@ selection_forms = GroupForm(
 collection_forms = GroupForm(
     key="collection-forms",
     label="Multi-Field & Collection Forms",
+    editable=True,
     instruction=(
         "Forms that manage multiple values or dynamic collections. "
         "All collection forms use stable IDs — removing an item never shifts other IDs."
@@ -214,15 +206,6 @@ collection_forms = GroupForm(
                 "value. Try adding 'apple' twice — the duplicate is rejected."
             ),
         ),
-        TableForm(
-            key="table-demo",
-            label="TableForm",
-            instruction=(
-                "Dynamic table: add columns first, then rows, then fill cells. "
-                "Supports batch actions for filling an entire row at once. "
-                "Try: add_column 'Name', add_column 'Score', add_row, set_cell."
-            ),
-        ),
         KeyValueForm(
             key="kv-demo",
             label="KeyValueForm",
@@ -245,6 +228,7 @@ collection_forms = GroupForm(
 list_forms = GroupForm(
     key="list-forms",
     label="ListForm Showcase",
+    editable=True,
     instruction=(
         "ListForm is a versatile ordered list with add/edit/remove/reorder. "
         "It supports fixed seed items, ordering constraints, and several "
@@ -351,6 +335,7 @@ _runner_source_table = TableForm(
 table_forms = GroupForm(
     key="table-forms",
     label="TableForm Showcase",
+    editable=True,
     instruction=(
         "TableForm manages a 2D grid with dynamic columns and rows. Both axes "
         "are backed by OrderedCollection, giving them stable IDs, fixed items, "
@@ -461,6 +446,7 @@ table_forms = GroupForm(
 container_forms = GroupForm(
     key="container-forms",
     label="Container Forms",
+    editable=True,
     instruction=(
         "Containers organize eigenforms into navigable structures. "
         "TabForm, SequenceForm, ChainForm, and AccordionForm all implement faithful projection — "
@@ -589,6 +575,7 @@ class DogProfile(GroupForm):
 conditional_forms = GroupForm(
     key="conditional-forms",
     label="Conditional & Dynamic Forms",
+    editable=True,
     instruction=(
         "Forms whose structure or options change based on sibling values. "
         "The depends_on parameter names the sibling to watch. "
@@ -600,6 +587,7 @@ conditional_forms = GroupForm(
             key="show-details",
             label="Show Details?",
             instruction="Toggle this to show/hide the detail field below via VisibilityForm.",
+            editable=True,
         ),
         VisibilityForm(
             key="vis-demo",
@@ -607,10 +595,11 @@ conditional_forms = GroupForm(
             instruction="This wraps a child and hides it when the condition is false.",
             depends_on="show-details",
             visible_when=True,
-            eigenform=MemoForm(
+            eigenform=TextForm(
                 key="hidden-detail",
                 label="Conditional Detail",
                 instruction="You can only see (and fill) this when 'Show Details' is True.",
+                multiline=True,
                 min_length=5,
             ),
         ),
@@ -620,6 +609,7 @@ conditional_forms = GroupForm(
             label="Pet Type",
             instruction="Select a pet type to see the SwitchForm swap between case subtrees.",
             options=["cat", "dog"],
+            editable=True,
         ),
         SwitchForm(
             key="switch-demo",
@@ -654,6 +644,7 @@ conditional_forms = GroupForm(
             label="Continent",
             instruction="Select a continent to see DynamicChoiceForm update its options.",
             options=["Europe", "Asia", "Americas"],
+            editable=True,
         ),
         DynamicChoiceForm(
             key="dynamic-demo",
@@ -696,6 +687,7 @@ conditional_forms = GroupForm(
 computed_forms = GroupForm(
     key="computed-forms",
     label="Computed, Scoring & Validation",
+    editable=True,
     instruction=(
         "Read-only eigenforms that derive display from sibling values. "
         "ScoreForm grades against an answer key. ComputedForm runs arbitrary "
@@ -707,12 +699,14 @@ computed_forms = GroupForm(
             key="capital-of-france",
             label="What is the capital of France?",
             instruction="Type the answer. ScoreForm below will grade it (case-insensitive).",
+            editable=True,
         ),
         ChoiceForm(
             key="largest-planet",
             label="What is the largest planet?",
             instruction="Select one.",
             options=["Mars", "Jupiter", "Saturn", "Earth"],
+            editable=True,
         ),
         ScoreForm(
             key="score-demo",
@@ -730,6 +724,7 @@ computed_forms = GroupForm(
             instruction="Enter a width. ComputedForm below will compute the area.",
             min_val=0,
             max_val=1000,
+            editable=True,
         ),
         NumberForm(
             key="height",
@@ -737,6 +732,7 @@ computed_forms = GroupForm(
             instruction="Enter a height.",
             min_val=0,
             max_val=1000,
+            editable=True,
         ),
         ComputedForm(
             key="computed-demo",
@@ -771,11 +767,13 @@ computed_forms = GroupForm(
             key="password",
             label="Password",
             instruction="Enter a password (at least 8 chars for the validation to pass).",
+            editable=True,
         ),
         TextForm(
             key="confirm-password",
             label="Confirm Password",
             instruction="Must match the password above.",
+            editable=True,
         ),
         ValidationForm(
             key="validation-demo",
@@ -828,6 +826,7 @@ def guarded_action(context, store, scope):
 action_forms = GroupForm(
     key="action-forms",
     label="Actions & Repeaters",
+    editable=True,
     instruction=(
         "ActionForm executes side effects. RepeaterForm stamps a template "
         "for each dynamic entry. Both are key to building real workflows."
@@ -838,6 +837,7 @@ action_forms = GroupForm(
             key="action-name",
             label="Your Name (for the action)",
             instruction="Fill this before clicking Execute below — it's passed as context.",
+            editable=True,
         ),
         ActionForm(
             key="action-demo",
@@ -855,6 +855,7 @@ action_forms = GroupForm(
             key="agree-terms",
             label="Agree to Terms",
             instruction="Toggle to True to satisfy the precondition for the action below.",
+            editable=True,
         ),
         ActionForm(
             key="guarded-action-demo",
@@ -900,6 +901,7 @@ action_forms = GroupForm(
 showcase = GroupForm(
     key="showcase",
     label="Showcase",
+    editable=True,
     instruction=(
         "Eigenforms can be arbitrarily complex. RubiksCubeForm is a full "
         "Rubik's Cube with face rotations, shuffle, and restart — proving "
@@ -934,6 +936,7 @@ definition = PageForm(
         TabForm(
             key="gallery",
             label="Gallery",
+            editable=True,
             tabs={
                 "simple": simple_values,
                 "selection": selection_forms,

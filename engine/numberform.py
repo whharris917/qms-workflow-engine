@@ -15,23 +15,32 @@ class NumberInputAffordance(Affordance):
     def __init__(self, label: str, method: str, url: str, body: dict,
                  instruction: str | None = None,
                  min_val: float | None = None, max_val: float | None = None,
-                 step: float | None = None):
+                 step: float | None = None, slider: bool = False,
+                 current: float | None = None):
         super().__init__(label=label, method=method, url=url, body=body, instruction=instruction)
         self.min_val = min_val
         self.max_val = max_val
         self.step = step
+        self.slider = slider
+        self.current = current
 
     def _render_hints(self) -> dict:
+        if self.slider:
+            return {"type": "range_input", "min": self.min_val, "max": self.max_val,
+                    "step": self.step, "current": self.current}
         return {"type": "number_input", "min": self.min_val, "max": self.max_val, "step": self.step}
 
 
 @dataclass
 class NumberForm(Eigenform):
-    """Numeric input with optional bounds and step."""
+    """Numeric input with optional bounds and step. Set slider=True for
+    a range slider UI. Optional unit label for display."""
     min_val: float | None = None
     max_val: float | None = None
     step: float | None = None
     integer: bool = False
+    slider: bool = False
+    unit: str | None = None
 
     def _snapshot_edit_state(self) -> dict:
         state = super()._snapshot_edit_state()
@@ -50,7 +59,8 @@ class NumberForm(Eigenform):
             if override is not None:
                 return override
         return {"min_val": self.min_val, "max_val": self.max_val,
-                "step": self.step, "integer": self.integer}
+                "step": self.step, "integer": self.integer,
+                "slider": self.slider, "unit": self.unit}
 
     @property
     def is_complete(self) -> bool:
@@ -58,18 +68,24 @@ class NumberForm(Eigenform):
 
     def _serialize_state(self) -> dict:
         cfg = self._effective_config
-        return self._base_state() | {
+        state = self._base_state() | {
             "value": self.value,
             "min": cfg.get("min_val"),
             "max": cfg.get("max_val"),
             "step": cfg.get("step"),
             "integer": cfg.get("integer", False),
         }
+        if cfg.get("slider"):
+            state["slider"] = True
+        if cfg.get("unit"):
+            state["unit"] = cfg["unit"]
+        return state
 
     def get_affordances(self) -> list[Affordance]:
         cfg = self._effective_config
         min_v, max_v = cfg.get("min_val"), cfg.get("max_val")
         step_v, int_v = cfg.get("step"), cfg.get("integer", False)
+        is_slider = cfg.get("slider", False)
         parts = []
         if int_v:
             parts.append("integer only")
@@ -78,16 +94,24 @@ class NumberForm(Eigenform):
         if max_v is not None:
             parts.append(f"max {max_v}")
         hint = f" ({', '.join(parts)})" if parts else ""
+        if is_slider:
+            body_hint = f"<{min_v if min_v is not None else 0}..{max_v if max_v is not None else 100}>"
+            instruction = f"Set a value between {min_v} and {max_v} (step {step_v or 1})."
+        else:
+            body_hint = "<number>"
+            instruction = f"Enter a number{hint}."
         return [
             NumberInputAffordance(
                 label=f"Set {self.effective_label}",
                 method="POST",
                 url=self.url,
-                body={"value": "<number>"},
-                instruction=f"Enter a number{hint}.",
+                body={"value": body_hint},
+                instruction=instruction,
                 min_val=min_v,
                 max_val=max_v,
                 step=step_v,
+                slider=is_slider,
+                current=self.value,
             )
         ]
 

@@ -9,5 +9,5 @@
 {% set val = data.value %}
 <p><strong>Value:</strong> {{ (val if val is not none else "None")|string }}</p>
 {% for aff in data.affordances %}
-  {{ render_aff(aff) }}
+  {% if not aff._rendered %}{{ render_aff(aff) }}{% endif %}
 {% endfor %}

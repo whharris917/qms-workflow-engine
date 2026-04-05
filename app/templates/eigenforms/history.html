@@ -41,7 +41,7 @@
 
   {# Navigation affordances #}
   {% for aff in data.affordances %}
-    {{ render_aff(aff) }}
+    {% if not aff._rendered %}{{ render_aff(aff) }}{% endif %}
   {% endfor %}
 {% else %}
   {# Current live view #}
@@ -49,6 +49,6 @@
 
   {# History affordance (view history button) #}
   {% for aff in data.affordances %}
-    {{ render_aff(aff) }}
+    {% if not aff._rendered %}{{ render_aff(aff) }}{% endif %}
   {% endfor %}
 {% endif %}
