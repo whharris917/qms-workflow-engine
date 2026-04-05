@@ -334,9 +334,10 @@ class Eigenform:
             label="Batch",
             method="POST",
             url=self.url,
-            body={"action": "batch", "actions": [{"action": "...", "...": "..."}]},
+            body={"action": "batch", "actions": ["<action_body_1>", "<action_body_2>", "..."]},
             instruction=(
                 "Execute multiple actions in a single request. "
+                "Each entry in 'actions' uses the same body format as this eigenform's other affordances. "
                 "Actions run sequentially; execution stops on first error."
             ),
         )
@@ -348,6 +349,13 @@ class Eigenform:
             fkey = getattr(a, '_floatable', None)
             if fkey is not None:
                 d["_floatable"] = fkey
+            # Carry through navigation option dicts (O(N)→O(1) collapse)
+            for attr in ('_tabs', '_sections', '_steps'):
+                val = getattr(a, attr, None)
+                if val is not None:
+                    d[attr.lstrip('_')] = val
+            if getattr(a, '_chrome_rendered', False):
+                d["_chrome_rendered"] = True
             serialized_affs.append(d)
         state["affordances"] = serialized_affs
         # Mark chrome-rendered affordances (no visual button needed in HTML)
@@ -372,6 +380,7 @@ class Eigenform:
         state.pop("key", None)
         for aff in state.get("affordances", []):
             aff.pop("render_hints", None)
+            aff.pop("_chrome_rendered", None)
         return state
 
     def render_from_data(self, data: dict) -> str:

@@ -329,6 +329,7 @@ class PageForm(Eigenform):
             d.pop("key", None)
             for aff in d.get("affordances", []):
                 aff.pop("render_hints", None)
+                aff.pop("_chrome_rendered", None)
         state["eigenforms"] = child_dicts
         state["complete"] = self.is_complete
         state["affordances"] = page_affs

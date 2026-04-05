@@ -23,7 +23,6 @@ from engine.affordances import (
     Affordance,
     SetValueAffordance,
     SimpleButtonAffordance,
-    SwitchTabAffordance,
 )
 from engine.eigenform import Eigenform
 from engine.store import Store
@@ -183,16 +182,24 @@ class SequenceForm(Eigenform):
 
         active = self.active_step
         highest = self._highest_accessible_index()
-        for i, ef in enumerate(self.steps):
-            if i <= highest and ef.key != (active.key if active else None):
-                if ef.is_complete:
-                    affordances.append(SwitchTabAffordance(
-                        label=f"Go to {ef.effective_label}",
-                        method="POST",
-                        url=url,
-                        body={"step": ef.key},
-                        instruction=f"Jump to completed step: {ef.effective_label}.",
-                    ))
+        completed = {
+            ef.key: ef.effective_label
+            for i, ef in enumerate(self.steps)
+            if i <= highest
+            and ef.key != (active.key if active else None)
+            and ef.is_complete
+        }
+        if completed:
+            aff = Affordance(
+                label="Go to Step",
+                method="POST",
+                url=url,
+                body={"step": "<step_key>"},
+                instruction="Jump to a completed step.",
+            )
+            aff._steps = completed
+            aff._chrome_rendered = True
+            affordances.append(aff)
 
         return affordances
 

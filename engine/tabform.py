@@ -14,7 +14,6 @@ from engine.affordances import (
     Affordance,
     SetValueAffordance,
     SimpleButtonAffordance,
-    SwitchTabAffordance,
 )
 from engine.eigenform import Eigenform
 from engine.store import Store
@@ -126,17 +125,23 @@ class TabForm(Eigenform):
         self._rebuild()
 
     def _tab_switch_affordances(self) -> list[Affordance]:
-        affordances = []
-        for tab_key, ef in self.tabs.items():
-            if tab_key != self.active_tab_key:
-                affordances.append(SwitchTabAffordance(
-                    label=ef.effective_label,
-                    method="POST",
-                    url=self.url,
-                    body={"tab": tab_key},
-                    instruction=f"Switch to the {ef.effective_label} tab.",
-                ))
-        return affordances
+        other_tabs = {
+            tab_key: ef.effective_label
+            for tab_key, ef in self.tabs.items()
+            if tab_key != self.active_tab_key
+        }
+        if not other_tabs:
+            return []
+        aff = Affordance(
+            label="Switch Tab",
+            method="POST",
+            url=self.url,
+            body={"tab": "<tab_key>"},
+            instruction="Switch to a different tab.",
+        )
+        aff._tabs = other_tabs
+        aff._chrome_rendered = True
+        return [aff]
 
     def _get_edit_affordances(self) -> list[Affordance]:
         affs = super()._get_edit_affordances()

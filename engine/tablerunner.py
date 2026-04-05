@@ -20,7 +20,7 @@ import copy
 from dataclasses import dataclass, field
 from typing import Any
 
-from engine.affordances import Affordance, SimpleButtonAffordance, SwitchTabAffordance
+from engine.affordances import Affordance, SimpleButtonAffordance
 from engine.eigenform import Eigenform
 from engine.ordered_collection import OrderedCollection
 from engine.templates import render_template
@@ -231,16 +231,24 @@ class TableRunner(Eigenform):
                 ))
 
         # Jump to completed accessible rows
-        for item in rows:
-            rid = item["id"]
-            if rid != active and rid in accessible and self._is_row_complete(rid):
-                affordances.append(SwitchTabAffordance(
-                    label=f"Go to {rid}",
-                    method="POST",
-                    url=self.url,
-                    body={"action": "navigate", "row": rid},
-                    instruction=f"Jump to completed row {rid}.",
-                ))
+        completed = {
+            item["id"]: item["id"]
+            for item in rows
+            if item["id"] != active
+            and item["id"] in accessible
+            and self._is_row_complete(item["id"])
+        }
+        if completed:
+            aff = Affordance(
+                label="Go to Row",
+                method="POST",
+                url=self.url,
+                body={"action": "navigate", "row": "<row_id>"},
+                instruction="Jump to a completed row.",
+            )
+            aff._steps = completed
+            aff._chrome_rendered = True
+            affordances.append(aff)
 
         return affordances
 

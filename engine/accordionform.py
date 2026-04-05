@@ -28,18 +28,6 @@ from engine.store import Store
 from engine.templates import render_template
 
 
-class ToggleSectionAffordance(Affordance):
-    """An affordance to expand/collapse an accordion section."""
-
-    def __init__(self, label: str, method: str, url: str, body: dict,
-                 instruction: str | None = None, expanded: bool = True):
-        super().__init__(label=label, method=method, url=url, body=body, instruction=instruction)
-        self.expanded = expanded
-
-    def _render_hints(self) -> dict:
-        return {"type": "accordion_toggle", "expanded": self.expanded}
-
-
 @dataclass
 class AccordionForm(Eigenform):
     """A container with collapsible sections."""
@@ -140,18 +128,25 @@ class AccordionForm(Eigenform):
 
     def _toggle_affordances(self) -> list[Affordance]:
         """Section toggle affordances — shared by both modes."""
-        affordances = []
-        for sec_key, ef in self.sections.items():
-            expanded = self._is_expanded(sec_key)
-            affordances.append(ToggleSectionAffordance(
-                label=ef.effective_label,
-                method="POST",
-                url=self.url,
-                body={"action": "toggle", "section": sec_key},
-                instruction=f"{'Collapse' if expanded else 'Expand'} the {ef.effective_label} section.",
-                expanded=expanded,
-            ))
-        return affordances
+        if not self.sections:
+            return []
+        sections = {
+            sec_key: {
+                "label": ef.effective_label,
+                "expanded": self._is_expanded(sec_key),
+            }
+            for sec_key, ef in self.sections.items()
+        }
+        aff = Affordance(
+            label="Toggle Section",
+            method="POST",
+            url=self.url,
+            body={"action": "toggle", "section": "<section_key>"},
+            instruction="Expand or collapse a section.",
+        )
+        aff._sections = sections
+        aff._chrome_rendered = True
+        return [aff]
 
     def _get_edit_affordances(self) -> list[Affordance]:
         affs = super()._get_edit_affordances()

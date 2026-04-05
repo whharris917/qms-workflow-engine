@@ -94,11 +94,6 @@ class SetValueAffordance(Affordance):
         return {"type": "text_input"}
 
 
-class SwitchTabAffordance(Affordance):
-    def _render_hints(self) -> dict:
-        return {"type": "tab_button"}
-
-
 class ConfirmAffordance(Affordance):
     def _render_hints(self) -> dict:
         return {"type": "button"}
@@ -160,8 +155,6 @@ def render_affordance_html(aff: dict) -> str:
         return _render_checkbox(url, endpoint, hints.get("items", {}))
     elif aff_type == "radio":
         return _render_radio(url, endpoint, hints.get("options", []), hints.get("current"))
-    elif aff_type == "tab_button":
-        return _render_tab_button(label, url, endpoint, body)
     elif aff_type == "multi_field":
         return _render_multi_field(label, url, endpoint, hints.get("fields", []), hints.get("values", {}))
     elif aff_type == "text_input_add":
@@ -184,8 +177,6 @@ def render_affordance_html(aff: dict) -> str:
         return _render_rating(label, url, endpoint, hints)
     elif aff_type == "kv_input_add":
         return _render_kv_add(label, url, endpoint, hints)
-    elif aff_type == "accordion_toggle":
-        return _render_accordion_toggle(label, url, endpoint, body, hints)
     elif aff_type == "disabled_button":
         return _render_disabled_button(label, hints.get("message", ""))
     elif aff_type == "constraint_picker":
@@ -348,15 +339,6 @@ def _render_parameterized(label: str, url: str, endpoint: str, body: dict, param
     )
 
 
-def _render_tab_button(label: str, url: str, endpoint: str, body: dict) -> str:
-    return (
-        f'<button data-ef-post="{escape(url)}" data-ef-body="{_body_attr(body)}"'
-        f' style="cursor: pointer; font-size: 12px; padding: 2px 8px;"'
-        f' title="{escape(endpoint)} {escape(json.dumps(body))}">'
-        f'{escape(label)}</button>'
-    )
-
-
 def _render_small_button(label: str, url: str, endpoint: str, body: dict) -> str:
     return (
         f'<button data-ef-post="{escape(url)}" data-ef-body="{_body_attr(body)}"'
@@ -508,13 +490,3 @@ def _render_constraint_picker(label: str, url: str, endpoint: str, hints: dict) 
     )
 
 
-def _render_accordion_toggle(label: str, url: str, endpoint: str, body: dict, hints: dict) -> str:
-    expanded = hints.get("expanded", True)
-    arrow = "&#9660;" if expanded else "&#9654;"
-    return (
-        f'<div data-ef-post="{escape(url)}" data-ef-body="{_body_attr(body)}"'
-        f' style="cursor: pointer; padding: 6px 8px; background: #eee; margin: 4px 0;'
-        f' border-radius: 4px; font-weight: bold; user-select: none;"'
-        f' title="{escape(endpoint)} {escape(json.dumps(body))}">'
-        f'{arrow} {escape(label)}</div>'
-    )

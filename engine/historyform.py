@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from engine.affordances import Affordance, SimpleButtonAffordance, SwitchTabAffordance
+from engine.affordances import Affordance, SimpleButtonAffordance
 from engine.eigenform import Eigenform
 from engine.templates import render_template
 from engine.store import Store

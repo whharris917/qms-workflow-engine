@@ -17,7 +17,8 @@
   {% for aff in data.affordances %}
     {% set action = aff.body.action|default("") %}
     {% if action in ("set_label", "set_instruction", "add_section", "remove_section",
-                      "move_section", "toggle_editable", "toggle") %}
+                      "move_section", "toggle_editable", "toggle")
+                      or aff.sections is defined %}
       {% set _ = aff.update({"_rendered": true}) %}
     {% endif %}
   {% endfor %}
@@ -102,11 +103,11 @@
 
   {# Standard sections with toggle headers #}
   {% for sec in section_items %}
-    {% for aff in data.affordances %}
-      {% if aff.body.section == sec.key %}
-        {{ render_aff(aff) }}
-      {% endif %}
-    {% endfor %}
+    {% set arrow = "&#9660;" if sec.expanded else "&#9654;" %}
+    <div data-ef-post="{{ url }}" data-ef-body="{{ {"action": "toggle", "section": sec.key}|tojson }}"
+     style="cursor: pointer; padding: 6px 8px; background: #eee; margin: 4px 0;
+     border-radius: 4px; font-weight: bold; user-select: none;"
+     title="POST {{ url }} {{ {"action": "toggle", "section": sec.key}|tojson }}">{{ arrow }} {{ sec.label }}</div>
 
     {% if sec.expanded %}
       <div class="ef-section-content">{{ section_html[sec.key]|safe }}</div>

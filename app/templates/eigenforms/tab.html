@@ -18,7 +18,8 @@
   {% for aff in data.affordances %}
     {% set action = aff.body.action|default("") %}
     {% if action in ("set_label", "set_instruction", "add_tab", "remove_tab",
-                      "move_tab", "toggle_editable") or aff.body.tab is defined %}
+                      "move_tab", "toggle_editable") or aff.body.tab is defined
+                      or aff.tabs is defined %}
       {% set _ = aff.update({"_rendered": true}) %}
     {% endif %}
   {% endfor %}
@@ -102,11 +103,8 @@
     {% if tab.is_active %}
       <span style="font-weight: bold; padding: 2px 8px; border-bottom: 2px solid #333;">{{ tab.label }}</span>
     {% else %}
-      {% for aff in data.affordances %}
-        {% if aff.body.tab == tab.key %}
-          {{ render_aff(aff) }}
-        {% endif %}
-      {% endfor %}
+      {{ render_btn(url, {"tab": tab.key}, tab.label,
+          "cursor: pointer; font-size: 12px; padding: 2px 8px;") }}
     {% endif %}
   {% endfor %}
   </div>

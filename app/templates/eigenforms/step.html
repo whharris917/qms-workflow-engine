@@ -17,7 +17,8 @@
   {% for aff in data.affordances %}
     {% set action = aff.body.action|default("") %}
     {% if action in ("set_label", "set_instruction", "add_step", "remove_step",
-                      "move_step", "toggle_editable") or aff.body.step is defined %}
+                      "move_step", "toggle_editable") or aff.body.step is defined
+                      or aff.steps is defined %}
       {% set _ = aff.update({"_rendered": true}) %}
     {% endif %}
   {% endfor %}
@@ -98,17 +99,8 @@
     {% if step.key == active_key %}
       <span style="font-weight: bold; padding: 4px 10px; border-bottom: 3px solid #333; background: #f0f0f0; border-radius: 3px 3px 0 0;">{{ step.label }}</span>
     {% elif step.complete %}
-      {# Try to find a jump affordance for completed steps #}
-      {% set found = [] %}
-      {% for aff in data.affordances %}
-        {% if aff.body.step == step.key and not found %}
-          {{ render_aff(aff) }}
-          {% if found.append(1) %}{% endif %}
-        {% endif %}
-      {% endfor %}
-      {% if not found %}
-        <span style="padding: 4px 10px; color: #2a2; background: #efffef; border-radius: 3px;">&#10003; {{ step.label }}</span>
-      {% endif %}
+      {{ render_btn(url, {"step": step.key}, step.label,
+          "cursor: pointer; font-size: 12px; padding: 4px 10px; color: #2a2; background: #efffef; border: 1px solid #cdc; border-radius: 3px;") }}
     {% elif step.accessible|default(false) %}
       <span style="padding: 4px 10px; color: #555; background: #f8f8f8; border-radius: 3px;">{{ step.label }}</span>
     {% else %}

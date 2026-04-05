@@ -17,7 +17,8 @@
   {% for aff in data.affordances %}
     {% set action = aff.body.action|default("") %}
     {% if action in ("set_label", "set_instruction", "add_step", "remove_step",
-                      "move_step", "toggle_editable", "continue") or aff.body.focus is defined %}
+                      "move_step", "toggle_editable", "continue") or aff.body.focus is defined
+                      or aff.steps is defined %}
       {% set _ = aff.update({"_rendered": true}) %}
     {% endif %}
   {% endfor %}
@@ -96,11 +97,8 @@
   <div style="margin-bottom: 8px;">
   {% for step in progress %}
     {% if step.complete and step.key != active_key %}
-      {% for aff in data.affordances %}
-        {% if aff.body.focus == step.key %}
-          {{ render_aff(aff) }}
-        {% endif %}
-      {% endfor %}
+      {{ render_btn(url, {"focus": step.key}, step.label,
+          "cursor: pointer; font-size: 12px; padding: 2px 8px;") }}
     {% elif step.key == active_key %}
       <span style="font-weight: bold; margin-right: 4px; padding: 2px 8px; border-bottom: 2px solid #333;">{{ step.label }}</span>
     {% else %}

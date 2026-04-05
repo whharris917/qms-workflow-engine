@@ -14,16 +14,12 @@
 
 {% set affs = data.affordances|default([]) %}
 
-{# Classify affordances #}
+{# Classify nav affordances (Back/Next only) #}
 {% set nav_affs = [] %}
-{% set jump_affs = {} %}
 {% for aff in affs %}
   {% set lbl = aff.label|default("") %}
-  {% set row_id = aff.body.row|default("") %}
   {% if lbl.startswith("\u2190") or lbl.startswith("Next") %}
     {% if nav_affs.append(aff) %}{% endif %}
-  {% elif row_id %}
-    {% set _ = jump_affs.update({row_id: aff}) %}
   {% endif %}
 {% endfor %}
 
@@ -32,8 +28,9 @@
 {% for step in progress %}
   {% if step.row_id == active_row %}
     <span style="font-weight: bold; padding: 4px 10px; border-bottom: 3px solid #333; background: #f0f0f0; border-radius: 3px 3px 0 0;">{{ step.label }}</span>
-  {% elif step.complete and step.row_id in jump_affs %}
-    {{ render_aff(jump_affs[step.row_id]) }}
+  {% elif step.complete and step.accessible %}
+    {{ render_btn(url, {"action": "navigate", "row": step.row_id}, step.label,
+        "cursor: pointer; font-size: 12px; padding: 4px 10px; color: #2a2; background: #efffef; border: 1px solid #cdc; border-radius: 3px;") }}
   {% elif step.complete %}
     <span style="padding: 4px 10px; color: #2a2; background: #efffef; border-radius: 3px;">&#10003; {{ step.label }}</span>
   {% elif step.accessible %}

@@ -17,7 +17,6 @@ from engine.affordances import (
     Affordance,
     SetValueAffordance,
     SimpleButtonAffordance,
-    SwitchTabAffordance,
 )
 from engine.eigenform import Eigenform
 from engine.store import Store
@@ -146,15 +145,22 @@ class ChainForm(Eigenform):
                 body={"action": "continue"},
                 instruction="Resume from the next incomplete step.",
             ))
-        for ef in self.steps:
-            if ef.is_complete and ef.key != self.active_key:
-                affordances.append(SwitchTabAffordance(
-                    label=f"Back to {ef.effective_label}",
-                    method="POST",
-                    url=self.url,
-                    body={"focus": ef.key},
-                    instruction=f"Jump back to the completed {ef.effective_label} step.",
-                ))
+        completed = {
+            ef.key: ef.effective_label
+            for ef in self.steps
+            if ef.is_complete and ef.key != self.active_key
+        }
+        if completed:
+            aff = Affordance(
+                label="Back to Step",
+                method="POST",
+                url=self.url,
+                body={"focus": "<step_key>"},
+                instruction="Jump back to a completed step.",
+            )
+            aff._steps = completed
+            aff._chrome_rendered = True
+            affordances.append(aff)
         return affordances
 
     def _get_edit_affordances(self) -> list[Affordance]:
