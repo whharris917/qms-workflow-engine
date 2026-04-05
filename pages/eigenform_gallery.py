@@ -20,7 +20,7 @@ from engine.listform import ListForm
 from engine.setform import SetForm
 from engine.tableform import TableForm
 from engine.tablerunner import TableRunner
-from engine.keyvalueform import KeyValueForm
+from engine.dictionaryform import DictionaryForm
 from engine.visibilityform import VisibilityForm
 from engine.switchform import SwitchForm
 from engine.dynamicchoiceform import DynamicChoiceForm
@@ -135,20 +135,10 @@ display_forms = GroupForm(
     ),
     eigenforms=[
         InfoForm(
-            key="info-string-demo",
-            label="InfoForm (string)",
+            key="info-demo",
+            label="InfoForm",
             editable=True,
-            text="This is a simple read-only text display. In edit mode, you can change the text.",
-        ),
-        InfoForm(
-            key="info-dict-demo",
-            label="InfoForm (dict)",
-            editable=True,
-            text={
-                "What it does": "Read-only text display. No affordances, always complete.",
-                "String mode": "Pass a plain string for simple text.",
-                "Dict mode": "Pass a dict for labeled key-value entries (like this one).",
-            },
+            text="Read-only text display. No interaction affordances, always complete.\nIn edit mode, an embedded multiline TextForm lets you change the content.",
         ),
     ],
 )
@@ -232,9 +222,9 @@ collection_forms = GroupForm(
             ),
             editable=True,
         ),
-        KeyValueForm(
+        DictionaryForm(
             key="kv-demo",
-            label="KeyValueForm",
+            label="DictionaryForm",
             instruction=(
                 "Dynamic key-value pairs with stable entry IDs. "
                 "POST {\"action\": \"add\", \"key\": \"color\", \"value\": \"blue\"} to add. "

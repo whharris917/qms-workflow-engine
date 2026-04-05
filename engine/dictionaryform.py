@@ -1,4 +1,4 @@
-"""KeyValueForm — dynamic set of key-value pairs."""
+"""DictionaryForm — dynamic set of key-value pairs."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ class KVAddAffordance(Affordance):
 
 
 @dataclass
-class KeyValueForm(Eigenform):
+class DictionaryForm(Eigenform):
     """A dynamic set of key-value pairs with stable IDs."""
     key_label: str = "Key"
     value_label: str = "Value"
@@ -126,7 +126,7 @@ class KeyValueForm(Eigenform):
         return affs
 
     def render_from_data(self, data: dict) -> str:
-        return render_template("keyvalue.html", data=data, ef=self,
+        return render_template("dictionary.html", data=data, ef=self,
                                url=self.url)
 
     def _handle(self, body: dict) -> dict:

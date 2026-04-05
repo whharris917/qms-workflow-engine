@@ -97,7 +97,7 @@ _DATA_FORMS = NavigationForm(
             "{}",
         ),
         _type_entry(
-            "keyvalue",
+            "dictionary",
             "Dynamic key-value pairs with inline editing. Complete when at least one entry.",
             "Metadata, environment variables, properties — any labeled values. Use multi for a fixed set of named fields.",
             "key_label (str, optional): Column header for keys. value_label (str, optional): Column header for values. JSON-configurable.",
@@ -106,7 +106,7 @@ _DATA_FORMS = NavigationForm(
         _type_entry(
             "multi",
             "Groups multiple named fields under a single affordance. Reduces agent round-trips.",
-            "Fixed-schema forms (name+email+phone). Use keyvalue for dynamic key-value pairs.",
+            "Fixed-schema forms (name+email+phone). Use dictionary for dynamic key-value pairs.",
             "fields (list[FieldDescriptor], optional): Field definitions. Requires Python — FieldDescriptor objects cannot be constructed from JSON config alone.",
             "{}  # Fields must be defined in Python seed",
         ),

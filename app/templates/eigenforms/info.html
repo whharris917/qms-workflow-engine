@@ -1,59 +1,33 @@
 {# InfoForm template — read-only text display with optional edit mode.
 
    Context:
-     data — serialized eigenform dict
-     ef   — the InfoForm instance
+     data      — serialized eigenform dict
+     ef        — the InfoForm instance
+     url       — eigenform POST URL
+     label     — current label text
+     instruction — current instruction text
+     text_html — rendered HTML of child TextForm (edit mode only)
 #}
 {% if data.edit_mode %}
   {% include "_edit_header.html" with context %}
 
-  {# Mark edit affordances as rendered #}
+  {# Mark edit-header affordances as rendered #}
   {% for aff in data.affordances %}
     {% set action = aff.body.action|default("") %}
-    {% if action in ("set_label", "set_instruction", "set_text", "set_entry", "remove_entry") %}
+    {% if action in ("set_label", "set_instruction") %}
       {% set _ = aff.update({"_rendered": true}) %}
     {% endif %}
   {% endfor %}
 
-  {% if data.text is mapping %}
-    {# Dict mode: inline editable entries #}
-    {% for key, value in data.text.items() %}
-      <div style="display: flex; align-items: baseline; gap: 6px; margin: 0 0 6px 0;">
-        <strong>{{ key }}</strong>:
-        <span style="flex: 1;">{{ value }}</span>
-        {{ render_btn(ef.url, {"action": "remove_entry", "key": key},
-            "&#10005;",
-            "cursor: pointer; border: 1px solid #dcc; background: #fef8f8; width: 18px; height: 18px; font-size: 9px; padding: 0; color: #c00;") }}
-      </div>
-    {% endfor %}
-    {# Add/edit entry form #}
-    <form data-ef-submit="{{ ef.url }}" style="display: flex; gap: 4px; margin-top: 8px; align-items: center;">
-      <input type="hidden" name="action" value="set_entry" />
-      <input name="key" type="text" placeholder="Label" style="width: 120px; font: inherit; padding: 2px 4px;" />
-      <input name="value" type="text" placeholder="Text" style="flex: 1; font: inherit; padding: 2px 4px;" />
-      <button type="submit" style="cursor: pointer; padding: 2px 8px;">+ Set</button>
-    </form>
-  {% else %}
-    {# String mode: editable text #}
-    {% if data.text %}
-      <p style="margin: 2px 0;">{{ data.text }}</p>
-    {% endif %}
-    <form data-ef-submit="{{ ef.url }}" style="display: flex; gap: 4px; margin-top: 8px; align-items: center;">
-      <input type="hidden" name="action" value="set_text" />
-      <input name="value" type="text" placeholder="Display text" value="{{ data.text }}" style="flex: 1; font: inherit; padding: 2px 4px;" />
-      <button type="submit" style="cursor: pointer; padding: 2px 8px;">Set</button>
-    </form>
-  {% endif %}
+  {% if text_html %}{{ text_html|safe }}{% endif %}
 
 {% else %}
   <div class="ef-info">
     {% if data.label %}<h4 style="margin: 4px 0 1em 0;">{{ data.label }}</h4>{% endif %}
-    {% if data.text is mapping %}
-      {% for key, value in data.text.items() %}
-        <div style="margin: 0 0 1em 0;"><strong>{{ key }}</strong>: {{ value }}</div>
+    {% if data.text %}
+      {% for line in data.text.split('\n') %}
+        {% if line %}<p style="margin: 2px 0;">{{ line }}</p>{% endif %}
       {% endfor %}
-    {% elif data.text %}
-      <p style="margin: 2px 0;">{{ data.text }}</p>
     {% endif %}
   </div>
 {% endif %}

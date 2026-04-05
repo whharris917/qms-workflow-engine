@@ -3,7 +3,7 @@ realistic regulated-industry business workflow.
 
 Exercises: AccordionForm, ChainForm, TabForm, VisibilityForm, MultiForm,
 ChoiceForm, CheckboxForm, DateForm, BooleanForm,
-NumberForm, TextForm, ListForm, KeyValueForm, TableForm, ComputedForm.
+NumberForm, TextForm, ListForm, DictionaryForm, TableForm, ComputedForm.
 """
 
 from engine.booleanform import BooleanForm
@@ -11,7 +11,7 @@ from engine.choiceform import ChoiceForm
 from engine.computedform import ComputedForm
 from engine.dateform import DateForm
 from engine.checkboxform import CheckboxForm
-from engine.keyvalueform import KeyValueForm
+from engine.dictionaryform import DictionaryForm
 from engine.textform import TextForm
 from engine.multiform import FieldDescriptor, MultiForm
 from engine.numberform import NumberForm
@@ -137,7 +137,7 @@ definition = PageForm(
         TextForm(key="executive_summary", label="Executive Summary",
                  instruction="Write a summary of the vendor's strengths, weaknesses, and recommendation rationale.",
                  multiline=True, min_length=100),
-        KeyValueForm(key="custom_observations", label="Additional Observations",
+        DictionaryForm(key="custom_observations", label="Additional Observations",
                      instruction="Add any supplementary observations as key-value pairs.",
                      key_label="Category", value_label="Detail"),
 

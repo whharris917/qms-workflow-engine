@@ -90,7 +90,7 @@ def _build_default_registry() -> EigenformRegistry:
     from engine.numberform import NumberForm
     from engine.dateform import DateForm
     from engine.booleanform import BooleanForm
-    from engine.keyvalueform import KeyValueForm
+    from engine.dictionaryform import DictionaryForm
     from engine.pageform import PageForm
     from engine.groupform import GroupForm
     from engine.repeaterform import RepeaterForm
@@ -112,7 +112,7 @@ def _build_default_registry() -> EigenformRegistry:
         TextForm, CheckboxForm, ChoiceForm, MultiForm, ListForm, SetForm,
         TableForm, NavigationForm, TableRunner, HistoryForm,
         NumberForm, DateForm, BooleanForm,
-        KeyValueForm,
+        DictionaryForm,
         PageForm, GroupForm, RepeaterForm,
         SwitchForm,
         VisibilityForm, DynamicChoiceForm,
@@ -125,6 +125,8 @@ def _build_default_registry() -> EigenformRegistry:
     r.register(NavigationForm, name="chain")
     r.register(NavigationForm, name="sequence")
     r.register(NavigationForm, name="accordion")
+    # Alias for renamed DictionaryForm
+    r.register(DictionaryForm, name="keyvalue")
     return r
 
 

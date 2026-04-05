@@ -1,16 +1,13 @@
 """InfoForm — read-only text display.
 
-Edit mode allows modifying the text content:
-- String mode: set the text string
-- Dict mode: add, edit, or remove labeled entries
+Edit mode exposes an embedded TextForm (multiline) for editing the content.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
 
-from engine.affordances import Affordance, SetValueAffordance, SimpleButtonAffordance
+from engine.affordances import Affordance
 from engine.eigenform import Eigenform
 from engine.templates import render_template
 
@@ -19,105 +16,72 @@ from engine.templates import render_template
 class InfoForm(Eigenform):
     """Display-only text. No interaction affordances, always complete.
 
-    text can be a string (rendered as-is) or a dict (rendered as labeled
-    key-value pairs in HTML, structured fields in JSON).
-
-    Edit mode allows modifying the text content via _effective_text.
+    Edit mode embeds a multiline TextForm for content editing.
     """
-    text: str | dict = ""
+    text: str | dict = ""  # dict is converted to "key: value" lines on bind
+
+    def __post_init__(self):
+        from engine.textform import TextForm
+        self._text_form = TextForm(
+            key="__text",
+            label="Content",
+            multiline=True,
+        )
+
+    @property
+    def children(self) -> list[Eigenform]:
+        if self.edit_mode:
+            return [self._text_form]
+        return []
+
+    def _bind_children(self, store, url_prefix):
+        self._text_form = self._text_form.bind(
+            store, scope=self.key, url_prefix=f"{url_prefix}/{self.key}")
+        # Seed from self.text if no data yet
+        if not self._text_form.value and self.text:
+            seed = self.text
+            if isinstance(seed, dict):
+                seed = "\n".join(f"{k}: {v}" for k, v in seed.items())
+            self._text_form.handle({"value": seed})
+        # Wrap child handle so InfoForm pushes undo before TextForm changes
+        original_handle = self._text_form.handle
+        parent = self
+        def _handle_with_undo(body):
+            if parent.edit_mode:
+                parent._push_undo()
+            return original_handle(body)
+        self._text_form.handle = _handle_with_undo
 
     @property
     def is_complete(self) -> bool:
         return True
 
-    # --- Edit mode config ---
-
     def _snapshot_edit_state(self) -> dict:
         state = super()._snapshot_edit_state()
-        state["__config"] = self._store.get(self._scope, f"{self.key}.__config")
+        state["__text"] = self._store.get(self.key, "__text")
         return state
 
     def _restore_edit_state(self, state: dict):
         super()._restore_edit_state(state)
-        self._store.set(self._scope, f"{self.key}.__config", state.get("__config"))
+        self._store.set(self.key, "__text", state.get("__text"))
 
     @property
-    def _effective_text(self) -> str | dict:
-        if self._store is not None:
-            override = self._store.get(self._scope, f"{self.key}.__config")
-            if override is not None:
-                return override.get("text", self.text)
+    def _effective_text(self) -> str:
+        val = self._text_form.value
+        if val:
+            return val
+        if isinstance(self.text, dict):
+            return "\n".join(f"{k}: {v}" for k, v in self.text.items())
         return self.text
 
-    def _get_edit_affordances(self) -> list[Affordance]:
-        affs = super()._get_edit_affordances()
-        text = self._effective_text
-
-        if isinstance(text, dict):
-            affs.append(SetValueAffordance(
-                label="Set Entry",
-                method="POST", url=self.url,
-                body={"action": "set_entry", "key": "<label>", "value": "<text>"},
-                instruction="Add or update a labeled entry.",
-            ))
-            for key in text:
-                affs.append(SimpleButtonAffordance(
-                    label=f"Remove Entry '{key}'",
-                    method="POST", url=self.url,
-                    body={"action": "remove_entry", "key": key},
-                    instruction=f"Remove the '{key}' entry.",
-                ))
-        else:
-            affs.append(SetValueAffordance(
-                label="Set Text",
-                method="POST", url=self.url,
-                body={"action": "set_text", "value": "<text>"},
-                instruction="Set the display text.",
-            ))
-
-        return affs
-
-    def _handle(self, body: dict) -> dict:
-        action = body.get("action", "")
-
-        if self.edit_mode:
-            if action == "set_text":
-                self._push_undo()
-                value = body.get("value", "")
-                cfg = {"text": value}
-                self._store.set(self._scope, f"{self.key}.__config", cfg)
-                return self.serialize()
-
-            elif action == "set_entry":
-                self._push_undo()
-                key = body.get("key")
-                value = body.get("value", "")
-                if not key:
-                    return self._error("'key' is required.", action="set_entry")
-                text = self._effective_text
-                if not isinstance(text, dict):
-                    text = {}
-                text = dict(text)
-                text[key] = value
-                self._store.set(self._scope, f"{self.key}.__config", {"text": text})
-                return self.serialize()
-
-            elif action == "remove_entry":
-                self._push_undo()
-                key = body.get("key")
-                if not key:
-                    return self._error("'key' is required.", action="remove_entry")
-                text = self._effective_text
-                if not isinstance(text, dict) or key not in text:
-                    return self._error(f"Entry '{key}' not found.", action="remove_entry")
-                text = dict(text)
-                del text[key]
-                self._store.set(self._scope, f"{self.key}.__config", {"text": text})
-                return self.serialize()
-
-        return self.serialize()
-
-    # --- Serialization ---
+    def _serialize_full(self) -> dict:
+        state = super()._serialize_full()
+        # InfoForm has no interaction affordances — Batch is meaningless
+        state["affordances"] = [
+            a for a in state.get("affordances", [])
+            if a.get("body", {}).get("action") != "batch"
+        ]
+        return state
 
     def _serialize_state(self) -> dict:
         return self._base_state() | {"text": self._effective_text}
@@ -126,8 +90,10 @@ class InfoForm(Eigenform):
         return []
 
     def render_from_data(self, data: dict) -> str:
+        text_html = self._text_form.render() if data.get("edit_mode") else ""
         return render_template(
             "info.html", data=data, ef=self, url=self.url,
             label=data.get("label", ""),
             instruction=data.get("instruction") or "",
+            text_html=text_html,
         )
