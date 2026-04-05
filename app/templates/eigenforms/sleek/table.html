@@ -1,0 +1,254 @@
+{# TableForm sleek theme — dark spreadsheet with compact controls.
+   Edit mode falls back to the default template.
+
+   Uses raw data (col_oc, row_oc, col_items, row_items, typed_templates,
+   row_groups_by_id, row_mf, col_mf, etc.) instead of pre-rendered HTML.
+#}
+{% if data.edit_mode %}
+{% include "table.html" %}
+{% else %}
+{# Mark all inline affordances as rendered (we handle them ourselves) #}
+{% for aff in data.affordances %}
+  {% set hints_type = aff.render_hints.type|default("") if aff.render_hints is defined else "" %}
+  {% set action = aff.body.action|default("") %}
+  {% if hints_type == "inline_cell" or action in (
+      "rename_column", "remove_column", "remove_row", "add_row", "add_column",
+      "move_row_up", "move_row_down", "move_col_left", "move_col_right",
+      "add_row_constraint", "remove_row_constraint",
+      "add_col_constraint", "remove_col_constraint",
+      "set_row", "toggle_auto_chain_rows", "toggle_auto_chain_cols") %}
+    {% set _ = aff.update({"_rendered": true}) %}
+  {% endif %}
+{% endfor %}
+{% set endpoint = "POST " ~ url %}
+<div class="sleek-table">
+{# Configuration toggles #}
+{% if config_toggles %}
+<div class="sleek-table__config">
+  {% for cfg_key, action_name, toggle_label in config_toggles %}
+  {% set checked = " checked" if config.get(cfg_key, false) else "" %}
+  {% set toggle_body = {"action": action_name} %}
+  <label class="sleek-table__config-toggle">
+    <input type="checkbox"{{ checked }}
+      data-ef-post="{{ url }}"
+      data-ef-body="{{ toggle_body|tojson }}"
+      title="{{ endpoint }} {{ toggle_body|tojson }}" />
+    <span>{{ toggle_label }}</span>
+  </label>
+  {% endfor %}
+</div>
+{% endif %}
+{% if has_columns %}
+<div class="sleek-table__scroll">
+<table class="sleek-table__grid">
+  {# Column headers #}
+  <thead>
+    <tr>
+      <th class="sleek-table__corner"></th>
+      {% for col in columns %}
+      {% set ci = loop.index0 %}
+      {% set col_id = col.key %}
+      {% set col_item = col_items[ci] if ci < col_items|length else none %}
+      {% set is_fixed_col = col_item.fixed if col_item and col_item.fixed is defined else false %}
+      <th class="sleek-table__col-header{% if is_fixed_col %} sleek-table__col-header--fixed{% endif %}">
+        <div class="sleek-table__col-top">
+          {% if num_cols > 1 and col_oc.can_move_up(ci, col_items) %}
+          <button class="sleek-table__btn sleek-table__btn--arrow"
+            data-ef-post="{{ url }}" data-ef-body="{{ {"action": "move_col_left", "column": col_id}|tojson }}"
+            title="{{ endpoint }} {{ {"action": "move_col_left", "column": col_id}|tojson }}">&#9664;</button>
+          {% endif %}
+          <span class="sleek-table__col-id">{{ col_id }}</span>
+          {% if num_cols > 1 and col_oc.can_move_down(ci, col_items) %}
+          <button class="sleek-table__btn sleek-table__btn--arrow"
+            data-ef-post="{{ url }}" data-ef-body="{{ {"action": "move_col_right", "column": col_id}|tojson }}"
+            title="{{ endpoint }} {{ {"action": "move_col_right", "column": col_id}|tojson }}">&#9654;</button>
+          {% endif %}
+        </div>
+        <div class="sleek-table__col-label-row">
+          {% if not is_fixed_col %}
+          <button class="sleek-table__btn sleek-table__btn--col-remove"
+            data-ef-post="{{ url }}" data-ef-body="{{ {"action": "remove_column", "column": col_id}|tojson }}"
+            title="{{ endpoint }} {{ {"action": "remove_column", "column": col_id}|tojson }}">&times;</button>
+          {% endif %}
+          {% if is_fixed_col %}
+          <span class="sleek-table__col-label sleek-table__col-label--fixed">{{ col.label }}</span>
+          {% else %}
+          <form class="sleek-table__col-rename" data-ef-submit="{{ url }}">
+            <input type="hidden" name="action" value="rename_column" />
+            <input type="hidden" name="column" value="{{ col_id }}" />
+            <input name="label" type="text" value="{{ col.label }}"
+              class="sleek-table__col-input"
+              title="{{ endpoint }} {{ {"action": "rename_column", "column": col_id, "label": col.label}|tojson }}" />
+          </form>
+          {% endif %}
+        </div>
+        {% if show_col_constraints %}
+        {% set col_prereqs = col_mf.get(col_id, []) %}
+        {% if col_prereqs %}
+        <div class="sleek-table__col-prereqs">
+          {% for p_id in col_prereqs %}
+          {% set p_name = col_id_to_val.get(p_id, p_id) or p_id %}
+          {% set is_static = (col_id, p_id) in col_static_pairs %}
+          <span class="sleek-table__prereq{% if is_static %} sleek-table__prereq--fixed{% endif %}">{{ p_name }}
+            {%- if not is_static %}
+            <button class="sleek-table__btn sleek-table__btn--pill-remove"
+              data-ef-post="{{ url }}" data-ef-body="{{ {"action": "remove_col_constraint", "item": col_id, "after": p_id}|tojson }}">&times;</button>
+            {%- endif %}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if col_items|length > 1 %}
+        {% set avail_cols = [] %}
+        {% for ci2 in col_items %}
+        {% if ci2.id != col_id and ci2.id not in (col_mf.get(col_id, [])) %}
+        {% set _ = avail_cols.append(ci2) %}
+        {% endif %}
+        {% endfor %}
+        {% if avail_cols %}
+        <select class="sleek-table__constraint-add"
+          data-ef-change="{{ url }}"
+          data-ef-template='{{ {"action": "add_col_constraint", "item": col_id, "after": "__VALUE"}|tojson }}'>
+          <option value="">+dep</option>
+          {% for ci2 in avail_cols %}
+          <option value="{{ ci2.id }}">{{ ci2.value or ci2.id }}</option>
+          {% endfor %}
+        </select>
+        {% endif %}
+        {% endif %}
+        {% endif %}
+      </th>
+      {% endfor %}
+      {# +Column header #}
+      <th class="sleek-table__col-add">
+        <form class="sleek-table__col-add-form" data-ef-submit="{{ url }}">
+          <input type="hidden" name="action" value="add_column" />
+          <input name="label" type="text" placeholder="+ Column"
+            class="sleek-table__col-add-input"
+            title="{{ endpoint }} {{ {"action": "add_column", "label": ""}|tojson }}" />
+        </form>
+      </th>
+    </tr>
+  </thead>
+  <tbody>
+  {# Data rows #}
+  {% for row_data in rows %}
+    {% set ri = loop.index0 %}
+    {% set row_id = row_data._id %}
+    {% set row_item = row_items[ri] if ri < row_items|length else none %}
+    {% set is_fixed_row = row_item.fixed if row_item and row_item.fixed is defined else false %}
+    {% set can_up = row_oc.can_move_up(ri, row_items) if num_rows > 1 else false %}
+    {% set can_down = row_oc.can_move_down(ri, row_items) if num_rows > 1 else false %}
+    {% set row_prereqs = row_mf.get(row_id, []) if show_row_constraints else [] %}
+    <tr class="sleek-table__row{% if is_fixed_row %} sleek-table__row--fixed{% endif %}">
+      {# Row control cell #}
+      <td class="sleek-table__row-ctrl">
+        <span class="sleek-table__row-id">{{ row_id }}</span>
+        <span class="sleek-table__row-actions">
+          {% if can_up %}
+          <button class="sleek-table__btn sleek-table__btn--arrow"
+            data-ef-post="{{ url }}" data-ef-body="{{ {"action": "move_row_up", "row": row_id}|tojson }}"
+            title="{{ endpoint }} {{ {"action": "move_row_up", "row": row_id}|tojson }}">&#9650;</button>
+          {% endif %}
+          {% if can_down %}
+          <button class="sleek-table__btn sleek-table__btn--arrow"
+            data-ef-post="{{ url }}" data-ef-body="{{ {"action": "move_row_down", "row": row_id}|tojson }}"
+            title="{{ endpoint }} {{ {"action": "move_row_down", "row": row_id}|tojson }}">&#9660;</button>
+          {% endif %}
+          {% if not is_fixed_row %}
+          <button class="sleek-table__btn sleek-table__btn--remove"
+            data-ef-post="{{ url }}" data-ef-body="{{ {"action": "remove_row", "row": row_id}|tojson }}"
+            title="{{ endpoint }} {{ {"action": "remove_row", "row": row_id}|tojson }}">&times;</button>
+          {% endif %}
+        </span>
+        {% if row_prereqs %}
+        <span class="sleek-table__row-prereqs">
+          {% for p_id in row_prereqs %}
+          {% set p_name = row_id_to_val.get(p_id, p_id) or p_id %}
+          {% set is_static = (row_id, p_id) in row_static_pairs %}
+          <span class="sleek-table__prereq{% if is_static %} sleek-table__prereq--fixed{% endif %}">{{ p_name }}
+            {%- if not is_static %}
+            <button class="sleek-table__btn sleek-table__btn--pill-remove"
+              data-ef-post="{{ url }}" data-ef-body="{{ {"action": "remove_row_constraint", "item": row_id, "after": p_id}|tojson }}">&times;</button>
+            {%- endif %}</span>
+          {% endfor %}
+        </span>
+        {% endif %}
+        {% if show_row_constraints and num_rows > 1 %}
+        {% set avail_rows = [] %}
+        {% for ri2 in row_items %}
+        {% if ri2.id != row_id and ri2.id not in row_prereqs %}
+        {% set _ = avail_rows.append(ri2) %}
+        {% endif %}
+        {% endfor %}
+        {% if avail_rows %}
+        <select class="sleek-table__constraint-add"
+          data-ef-change="{{ url }}"
+          data-ef-template='{{ {"action": "add_row_constraint", "item": row_id, "after": "__VALUE"}|tojson }}'>
+          <option value="">+dep</option>
+          {% for ri2 in avail_rows %}
+          <option value="{{ ri2.id }}">{{ ri2.value or ri2.id }}</option>
+          {% endfor %}
+        </select>
+        {% endif %}
+        {% endif %}
+      </td>
+      {# Data cells #}
+      {% set rg = row_groups_by_id.get(row_id) %}
+      {% for col in columns %}
+      {% set col_id = col.key %}
+      {% if col_id in typed_templates and rg %}
+        {% set cell_ef = rg.cell_eigenforms.get(col_id) %}
+        <td class="sleek-table__cell sleek-table__cell--typed">
+          {% if cell_ef %}{{ cell_ef.render()|safe }}{% endif %}
+        </td>
+      {% else %}
+        {% set cell_value = row_data.get(col_id) %}
+        {% set display = cell_value|string if cell_value is not none else "" %}
+        <td class="sleek-table__cell">
+          <form class="sleek-table__cell-form" data-ef-submit="{{ url }}">
+            <input type="hidden" name="action" value="set_cell" />
+            <input type="hidden" name="row" value="{{ row_id }}" />
+            <input type="hidden" name="column" value="{{ col_id }}" />
+            <input name="value" type="text" value="{{ display }}"
+              class="sleek-table__cell-input"
+              title="{{ endpoint }} {{ {"action": "set_cell", "row": row_id, "column": col_id, "value": display}|tojson }}" />
+          </form>
+        </td>
+      {% endif %}
+      {% endfor %}
+      <td class="sleek-table__cell sleek-table__cell--pad"></td>
+    </tr>
+  {% endfor %}
+  {# Add row #}
+  <tr class="sleek-table__add-row">
+    <td class="sleek-table__row-ctrl">
+      <button class="sleek-table__btn sleek-table__btn--add-row"
+        data-ef-post="{{ url }}" data-ef-body="{{ {"action": "add_row"}|tojson }}"
+        title="{{ endpoint }} {{ {"action": "add_row"}|tojson }}">+ Row</button>
+    </td>
+    {% for col in columns %}<td class="sleek-table__cell sleek-table__cell--empty"></td>{% endfor %}
+    <td class="sleek-table__cell sleek-table__cell--pad"></td>
+  </tr>
+  </tbody>
+</table>
+</div>
+{% elif not has_columns %}
+{# Empty table — add first column #}
+<form class="sleek-table__empty-add" data-ef-submit="{{ url }}">
+  <input type="hidden" name="action" value="add_column" />
+  <input name="label" type="text" placeholder="First column name..."
+    class="sleek-table__col-add-input" />
+  <button type="submit" class="sleek-table__btn sleek-table__btn--add-row">+ Column</button>
+</form>
+{% endif %}
+{% if has_columns and not has_rows %}
+<p class="sleek-table__empty-msg">No rows yet. Add a row to start entering data.</p>
+{% endif %}
+{# Remaining affordances #}
+<div class="sleek-table__extra-affs">
+{% for aff in data.affordances %}
+  {% if not aff._rendered %}{{ render_aff(aff) }}{% endif %}
+{% endfor %}
+</div>
+</div>
+{% endif %}

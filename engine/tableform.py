@@ -20,7 +20,8 @@ from typing import Any
 
 from engine.affordances import (
     Affordance, AddConstraintAffordance, SimpleButtonAffordance,
-    BUTTON_GAP, STYLE_CONFIRM, STYLE_REMOVE, STYLE_ARROW, render_inline_button,
+    BUTTON_GAP, STYLE_CONFIRM, STYLE_REMOVE, STYLE_ARROW,
+    CSS_CONFIRM, CSS_REMOVE, CSS_ARROW, render_inline_button,
 )
 from engine.eigenform import Eigenform
 from engine.ordered_collection import OrderedCollection
@@ -653,7 +654,7 @@ class TableForm(Eigenform):
             if not is_static:
                 html += render_inline_button(
                     url, {"action": remove_action, "item": item_id, "after": p_id},
-                    "x", STYLE_REMOVE,
+                    "x", CSS_REMOVE,
                 )
             html += '</span>'
         html += '</span>'
@@ -726,13 +727,13 @@ class TableForm(Eigenform):
             right_arrow = gap
             if num_cols > 1:
                 if col_oc.can_move_up(ci, col_items):
-                    left_arrow = render_inline_button(url, {"action": "move_col_left", "column": col_id}, "&#9664;", STYLE_ARROW)
+                    left_arrow = render_inline_button(url, {"action": "move_col_left", "column": col_id}, "&#9664;", CSS_ARROW)
                 if col_oc.can_move_down(ci, col_items):
-                    right_arrow = render_inline_button(url, {"action": "move_col_right", "column": col_id}, "&#9654;", STYLE_ARROW)
+                    right_arrow = render_inline_button(url, {"action": "move_col_right", "column": col_id}, "&#9654;", CSS_ARROW)
 
             rm_col_btn = ''
             if not is_fixed_col:
-                rm_col_btn = render_inline_button(url, {"action": "remove_column", "column": col_id}, "\u2212", STYLE_REMOVE)
+                rm_col_btn = render_inline_button(url, {"action": "remove_column", "column": col_id}, "\u2212", CSS_REMOVE)
 
             constraint_html = ''
             if show_col_constraints:
@@ -832,15 +833,15 @@ class TableForm(Eigenform):
 
             rm_html = gap
             if not is_fixed_row:
-                rm_html = render_inline_button(url, {"action": "remove_row", "row": row_id}, "\u2212", STYLE_REMOVE)
+                rm_html = render_inline_button(url, {"action": "remove_row", "row": row_id}, "\u2212", CSS_REMOVE)
 
             up_html = gap
             down_html = gap
             if num_rows > 1:
                 if row_oc.can_move_up(ri, row_items):
-                    up_html = render_inline_button(url, {"action": "move_row_up", "row": row_id}, "&#9650;", STYLE_ARROW)
+                    up_html = render_inline_button(url, {"action": "move_row_up", "row": row_id}, "&#9650;", CSS_ARROW)
                 if row_oc.can_move_down(ri, row_items):
-                    down_html = render_inline_button(url, {"action": "move_row_down", "row": row_id}, "&#9660;", STYLE_ARROW)
+                    down_html = render_inline_button(url, {"action": "move_row_down", "row": row_id}, "&#9660;", CSS_ARROW)
 
             prereq_dropdown_html = ""
             if show_row_constraints:
@@ -952,9 +953,21 @@ class TableForm(Eigenform):
                                has_columns=bool(columns),
                                has_rows=bool(rows),
                                num_rows=num_rows,
+                               num_cols=num_cols,
                                show_row_constraints=show_row_constraints,
+                               show_col_constraints=show_col_constraints,
                                any_row_prereqs=any_row_prereqs,
-                               empty_col_html=empty_col_html)
+                               empty_col_html=empty_col_html,
+                               # Raw data for themed templates
+                               col_oc=col_oc, row_oc=row_oc,
+                               col_items=col_items, row_items=row_items,
+                               typed_templates=templates,
+                               row_groups_by_id=row_groups_by_id,
+                               row_mf=row_mf, col_mf=col_mf,
+                               row_id_to_val=row_id_to_val,
+                               col_id_to_val=col_id_to_val,
+                               row_static_pairs=row_static_pairs,
+                               col_static_pairs=col_static_pairs)
 
     def _handle(self, body: dict) -> dict:
         action = body.get("action", "")

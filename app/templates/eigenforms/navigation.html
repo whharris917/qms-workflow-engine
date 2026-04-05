@@ -201,9 +201,7 @@
     {# Collapsible sections #}
     {% for step in step_items %}
       {% set arrow = "&#9660;" if step.expanded else "&#9654;" %}
-      <div data-ef-post="{{ url }}" data-ef-body="{{ {"action": "toggle", "step": step.key}|tojson }}"
-       style="cursor: pointer; padding: 6px 8px; background: #eee; margin: 4px 0;
-       border-radius: 4px; font-weight: bold; user-select: none;"
+      <div class="ef-aff-accordion" data-ef-post="{{ url }}" data-ef-body="{{ {"action": "toggle", "step": step.key}|tojson }}"
        title="POST {{ url }} {{ {"action": "toggle", "step": step.key}|tojson }}">{{ arrow|safe }} {{ step.label }}</div>
       {% if step.expanded and step.key in section_html %}
         <div class="ef-section-content">{{ section_html[step.key]|safe }}</div>

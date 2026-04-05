@@ -16,7 +16,7 @@ import json
 from dataclasses import dataclass, field
 from html import escape
 
-# --- Inline button style constants ---
+# --- Inline button style constants (legacy, used by STYLE_ refs) ---
 STYLE_CONFIRM = (
     "cursor: pointer; border: 1px solid #4a4; background: #efffef;"
     " width: 24px; height: 24px; font-size: 14px; padding: 0; color: #2a2;"
@@ -32,6 +32,11 @@ STYLE_ARROW = (
     " width: 24px; height: 24px; font-size: 10px; padding: 0;"
     " vertical-align: middle; box-sizing: content-box;"
 )
+
+# --- CSS class constants (for render_inline_button) ---
+CSS_CONFIRM = "ef-btn-confirm"
+CSS_REMOVE = "ef-btn-remove"
+CSS_ARROW = "ef-btn-arrow"
 BUTTON_GAP = (
     '<span style="display: inline-block; width: 24px; height: 24px;'
     ' border: 1px solid transparent; vertical-align: middle;"></span>'
