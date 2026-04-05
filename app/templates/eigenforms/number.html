@@ -33,15 +33,31 @@
     </form>
   {% endfor %}
 
-  {# Integer toggle — checkbox-style button #}
-  {% set int_val = data.integer or false %}
-  {% set int_body = {"action": "toggle_integer"}|tojson %}
-  {% set int_tooltip = "POST " ~ url ~ " " ~ int_body %}
-  {% set int_bg = "#efffef" if int_val else "#f8f8f8" %}
-  {% set int_border = "#4a4" if int_val else "#ccc" %}
-  <button data-ef-post="{{ url }}" data-ef-body="{{ int_body }}"
-   style="cursor: pointer; font: inherit; font-size: 0.9em; border: 1px solid {{ int_border }}; background: {{ int_bg }}; padding: 1px 8px; border-radius: 3px;"
-   title="{{ int_tooltip }}">integer: {{ "on" if int_val else "off" }}</button>
+  {# Slider toggle — checkbox-style button #}
+  {% set slider_val = data.slider or false %}
+  {% set slider_body = {"action": "toggle_slider"}|tojson %}
+  {% set slider_tooltip = "POST " ~ url ~ " " ~ slider_body %}
+  {% set slider_bg = "#efffef" if slider_val else "#f8f8f8" %}
+  {% set slider_border = "#4a4" if slider_val else "#ccc" %}
+  <button data-ef-post="{{ url }}" data-ef-body="{{ slider_body }}"
+   style="cursor: pointer; font: inherit; font-size: 0.9em; border: 1px solid {{ slider_border }}; background: {{ slider_bg }}; padding: 1px 8px; border-radius: 3px;"
+   title="{{ slider_tooltip }}">slider: {{ "on" if slider_val else "off" }}</button>
+
+  {# Unit input #}
+  {% set unit_val = data.unit or "" %}
+  {% set unit_body = {"action": "set_unit", "value": unit_val}|tojson %}
+  {% set unit_tooltip = "POST " ~ url ~ " " ~ unit_body %}
+  <form style="display: flex; align-items: center; gap: 2px; margin: 0;"
+   data-ef-submit="{{ url }}">
+  <input type="hidden" name="action" value="set_unit" />
+  <span style="font-weight: 600;">unit:</span>
+  <input name="value" type="text" value="{{ unit_val }}"
+   placeholder="none"
+   style="font: inherit; border: 1px solid #ddd; padding: 1px 3px; margin: 0; width: 60px; text-align: center;"
+   title="{{ unit_tooltip }}" />
+  <button type="submit" class="{{ CSS_CONFIRM }}"
+   title="{{ unit_tooltip }}">&#10003;</button>
+  </form>
   </div>
 
   {# Value #}
@@ -51,7 +67,7 @@
   {# Mark edit affordances, render the rest #}
   {% for aff in data.affordances %}
     {% if not aff._rendered %}
-      {% if aff.body.action in ("set_label", "set_instruction", "set_min", "set_max", "set_step", "toggle_integer") %}
+      {% if aff.body.action in ("set_label", "set_instruction", "set_min", "set_max", "set_step", "toggle_slider", "set_unit") %}
         {% set _ = aff.update({"_rendered": true}) %}
       {% else %}
         {{ render_aff(aff) }}
@@ -82,12 +98,12 @@
     {% if data.min is not none %}{% set _ = constraints.append("min: " ~ data.min|string) %}{% endif %}
     {% if data.max is not none %}{% set _ = constraints.append("max: " ~ data.max|string) %}{% endif %}
     {% if data.step is not none %}{% set _ = constraints.append("step: " ~ data.step|string) %}{% endif %}
-    {% if data.integer %}{% set _ = constraints.append("integer") %}{% endif %}
+    {% if data.unit %}{% set _ = constraints.append("unit: " ~ data.unit) %}{% endif %}
     {% if constraints %}
       <p style="color: #666; font-size: 0.9em; margin: 2px 0;">{{ constraints|join(", ") }}</p>
     {% endif %}
 
-    <p><strong>Value:</strong> {{ (val if val is not none else "None")|string }}</p>
+    <p><strong>Value:</strong> {% if val is not none %}{{ val|string }}{% if unit %} {{ unit }}{% endif %}{% else %}None{% endif %}</p>
   {% endif %}
 
   {% for aff in data.affordances %}

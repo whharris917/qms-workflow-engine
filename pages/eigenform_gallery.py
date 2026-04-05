@@ -80,15 +80,6 @@ simple_values = GroupForm(
             editable=True,
         ),
         NumberForm(
-            key="integer-demo",
-            label="NumberForm (integer mode)",
-            instruction="With integer=True, decimal values are truncated. Min 0, max 10.",
-            min_val=0,
-            max_val=10,
-            integer=True,
-            editable=True,
-        ),
-        NumberForm(
             key="range-demo",
             label="NumberForm (slider)",
             instruction="Slider from 0-100%. POST {\"value\": \"75\"} to set. Step is 5.",
@@ -119,12 +110,14 @@ simple_values = GroupForm(
             instruction="ISO 8601 date. POST {\"value\": \"2026-03-28\"}. Bounded to 2026.",
             min_date="2026-01-01",
             max_date="2026-12-31",
+            editable=True,
         ),
         DateForm(
             key="datetime-demo",
             label="DateForm (with time)",
             instruction="With include_time=True, accepts YYYY-MM-DDTHH:MM format.",
             include_time=True,
+            editable=True,
         ),
     ],
 )
@@ -196,6 +189,7 @@ collection_forms = GroupForm(
                 FieldDescriptor(key="role", label="Role", type="choice",
                                 options=["Engineer", "Designer", "Manager", "QA"]),
             ],
+            editable=True,
         ),
         SetForm(
             key="set-demo",
@@ -205,6 +199,7 @@ collection_forms = GroupForm(
                 "no ordering and no duplicate values. Items are added and removed by "
                 "value. Try adding 'apple' twice — the duplicate is rejected."
             ),
+            editable=True,
         ),
         KeyValueForm(
             key="kv-demo",
@@ -216,6 +211,7 @@ collection_forms = GroupForm(
             ),
             key_label="Property",
             value_label="Setting",
+            editable=True,
         ),
     ],
 )
@@ -884,7 +880,7 @@ action_forms = GroupForm(
             ),
             template=[
                 TextForm(key="item-name", label="Item Name"),
-                NumberForm(key="item-qty", label="Quantity", min_val=1, max_val=999, integer=True),
+                NumberForm(key="item-qty", label="Quantity", min_val=1, max_val=999, step=1),
             ],
             min_entries=1,
             max_entries=5,

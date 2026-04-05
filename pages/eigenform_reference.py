@@ -49,9 +49,9 @@ _DATA_FORMS = AccordionForm(
         ),
         "number": _type_entry(
             "number",
-            "Numeric input with min/max/step validation. Supports integer-only mode and slider UI.",
-            "Any numeric value. Set slider=True for a range slider with optional unit label.",
-            "min_val (float, optional): Minimum. max_val (float, optional): Maximum. step (float, optional): Increment. integer (bool, optional): Restrict to whole numbers. slider (bool, optional): Render as slider. unit (str, optional): Display unit. All JSON-configurable.",
+            "Numeric input with min/max/step validation. Supports slider UI and unit labels.",
+            "Any numeric value. Set slider=True for a range slider with optional unit label. Use step=1 for integer-only input.",
+            "min_val (float, optional): Minimum. max_val (float, optional): Maximum. step (float, optional): Increment (use 1 for integers). slider (bool, optional): Render as slider. unit (str, optional): Display unit. All JSON-configurable.",
             '{"min_val": 0, "max_val": 100, "step": 5, "slider": true, "unit": "%"}',
         ),
         "boolean": _type_entry(
@@ -375,7 +375,7 @@ _OVERVIEW = GroupForm(
                     "Each eigenform type has config fields — parameters that control its "
                     "behavior. When adding an eigenform via the Page Builder, you pass a "
                     "config dict with these fields. Example: NumberForm accepts "
-                    '{\"min_val\": 0, \"max_val\": 100, \"integer\": true}.'
+                    '{\"min_val\": 0, \"max_val\": 100, \"step\": 1}.'
                 ),
                 "JSON vs Python": (
                     "Some config fields accept Python callables (functions) that cannot be "

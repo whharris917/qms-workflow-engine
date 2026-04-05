@@ -61,8 +61,22 @@ class MultiForm(Eigenform):
     """
     fields: list[FieldDescriptor] = field(default_factory=list)
 
-    def _descriptor_config(self) -> dict:
-        """Serialize FieldDescriptors to plain dicts."""
+    def _snapshot_edit_state(self) -> dict:
+        state = super()._snapshot_edit_state()
+        state["__config"] = self._store.get(self._scope, f"{self.key}.__config")
+        return state
+
+    def _restore_edit_state(self, state: dict):
+        super()._restore_edit_state(state)
+        self._store.set(self._scope, f"{self.key}.__config", state.get("__config"))
+
+    @property
+    def _effective_config(self) -> dict:
+        """Config from store override if set, else Python defaults."""
+        if self._store is not None:
+            override = self._store.get(self._scope, f"{self.key}.__config")
+            if override is not None:
+                return override
         return {
             "fields": [
                 {k: v for k, v in {
@@ -74,6 +88,24 @@ class MultiForm(Eigenform):
         }
 
     @property
+    def _effective_fields(self) -> list[FieldDescriptor]:
+        """Reconstruct FieldDescriptors from effective config."""
+        cfg = self._effective_config
+        return [
+            FieldDescriptor(
+                key=f["key"], label=f.get("label", f["key"]),
+                type=f.get("type", "text"),
+                instruction=f.get("instruction"),
+                options=f.get("options"),
+            )
+            for f in cfg.get("fields", [])
+        ]
+
+    def _descriptor_config(self) -> dict:
+        """Serialize FieldDescriptors to plain dicts."""
+        return self._effective_config
+
+    @property
     def values(self) -> dict:
         stored = self.value
         if stored and isinstance(stored, dict):
@@ -82,7 +114,7 @@ class MultiForm(Eigenform):
 
     @property
     def is_complete(self) -> bool:
-        for fd in self.fields:
+        for fd in self._effective_fields:
             val = self.values.get(fd.key)
             if val is None or val == "":
                 return False
@@ -90,8 +122,9 @@ class MultiForm(Eigenform):
 
     def _serialize_state(self) -> dict:
         vals = self.values
+        fields = self._effective_fields
         serialized_fields = []
-        for fd in self.fields:
+        for fd in fields:
             f = {
                 "key": fd.key,
                 "label": fd.label,
@@ -108,11 +141,14 @@ class MultiForm(Eigenform):
         }
 
     def render_from_data(self, data: dict) -> str:
-        return render_template("multi.html", data=data, ef=self)
+        return render_template("multi.html", data=data, ef=self,
+                               url=self.url, label=data["label"],
+                               instruction=data.get("instruction") or "")
 
     def get_affordances(self) -> list[Affordance]:
+        fields = self._effective_fields
         body = {}
-        for fd in self.fields:
+        for fd in fields:
             if fd.type == "choice" and fd.options:
                 body[fd.key] = f"<{' | '.join(fd.options)}>"
             else:
@@ -124,14 +160,74 @@ class MultiForm(Eigenform):
                 url=self.url,
                 body=body,
                 instruction=f"Set all fields for {self.label}. All fields are optional; omitted fields are unchanged.",
-                fields=self.fields,
+                fields=fields,
                 values=self.values,
             )
         ]
 
+    def _get_edit_affordances(self) -> list[Affordance]:
+        fields = self._effective_fields
+        affs = super()._get_edit_affordances()
+        affs.append(Affordance(
+            label="Add Field", method="POST", url=self.url,
+            body={"action": "add_field", "key": "<key>", "field_label": "<label>",
+                  "type": "<text | choice>", "options": "<comma-separated, for choice type>"},
+            instruction="Add a new field. type defaults to 'text'. options only needed for choice type.",
+        ))
+        if fields:
+            keys = " | ".join(fd.key for fd in fields)
+            affs.append(Affordance(
+                label="Remove Field", method="POST", url=self.url,
+                body={"action": "remove_field", "key": f"<{keys}>"},
+                instruction="Remove a field by key.",
+            ))
+        return affs
+
     def _handle(self, body: dict) -> dict:
+        action = body.get("action")
+
+        # Edit-mode config actions
+        if action == "add_field" and self.editable and self.edit_mode:
+            key = body.get("key", "").strip()
+            if not key or key.startswith("<"):
+                return self._error("Field key is required.", body=body)
+            existing_keys = {fd.key for fd in self._effective_fields}
+            if key in existing_keys:
+                return self._error(f"Field key '{key}' already exists.", body=body)
+            self._push_undo()
+            cfg = dict(self._effective_config)
+            new_field = {"key": key, "label": body.get("field_label", key).strip() or key,
+                         "type": body.get("type", "text").strip() or "text"}
+            if new_field["type"] not in ("text", "choice"):
+                return self._error(f"Invalid field type: {new_field['type']}. Must be 'text' or 'choice'.", body=body)
+            opts_raw = body.get("options", "")
+            if opts_raw and not opts_raw.startswith("<"):
+                new_field["options"] = [o.strip() for o in opts_raw.split(",") if o.strip()]
+            cfg["fields"] = cfg.get("fields", []) + [new_field]
+            self._store.set(self._scope, f"{self.key}.__config", cfg)
+            return self.serialize()
+
+        if action == "remove_field" and self.editable and self.edit_mode:
+            key = body.get("key", "")
+            cfg = dict(self._effective_config)
+            fields_list = cfg.get("fields", [])
+            before = len(fields_list)
+            cfg["fields"] = [f for f in fields_list if f["key"] != key]
+            if len(cfg["fields"]) == before:
+                valid = " | ".join(f["key"] for f in fields_list)
+                return self._error(f"No field with key '{key}'. Valid: {valid}", body=body)
+            self._push_undo()
+            self._store.set(self._scope, f"{self.key}.__config", cfg)
+            # Clean up stored value for removed field
+            current = dict(self.values)
+            current.pop(key, None)
+            if current:
+                self._store.set(self._scope, self.key, current)
+            return self.serialize()
+
+        # Normal value setting — use effective fields
         current = dict(self.values)
-        valid_keys = {fd.key for fd in self.fields}
+        valid_keys = {fd.key for fd in self._effective_fields}
         for key, value in body.items():
             if key in valid_keys and value != "":
                 current[key] = value

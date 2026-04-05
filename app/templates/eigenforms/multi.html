@@ -3,18 +3,47 @@
    Context:
      data  — the serialized eigenform dict
      ef    — the MultiForm instance
+     url   — the eigenform's POST URL
+     label — current label text
+     instruction — current instruction text
 #}
 {% if data.edit_mode %}
   {% include "_edit_header.html" with context %}
 
+  {# Fields list with remove buttons #}
   {% for f in data.fields %}
-    <p><strong>{{ f.label }}:</strong> {{ f.value|string }}</p>
+    <div style="display: flex; align-items: center; gap: 4px; margin: 2px 0;">
+      {{ render_btn(url, {"action": "remove_field", "key": f.key}, "x", CSS_REMOVE) }}
+      <span style="font-size: 0.9em; color: #666;">
+        <strong>{{ f.key }}</strong> ({{ f.type }}) — {{ f.label }}{% if f.options %} [{{ f.options|join(", ") }}]{% endif %}
+      </span>
+      <span style="margin-left: auto; font-size: 0.85em; color: #999;">= {{ f.value|string }}</span>
+    </div>
   {% endfor %}
+
+  {# Add field form #}
+  {% set add_tooltip = "POST " ~ url ~ " " ~ {"action": "add_field", "key": "", "field_label": "", "type": "text"}|tojson %}
+  <form style="display: flex; align-items: center; gap: 4px; margin: 4px 0; font-size: 0.9em;"
+   data-ef-submit="{{ url }}">
+    <input type="hidden" name="action" value="add_field" />
+    <input name="key" type="text" placeholder="key"
+     style="border: 1px solid #ddd; padding: 2px 4px; width: 80px;" />
+    <input name="field_label" type="text" placeholder="label"
+     style="border: 1px solid #ddd; padding: 2px 4px; width: 80px;" />
+    <select name="type" style="border: 1px solid #ddd; padding: 2px 4px;">
+      <option value="text">text</option>
+      <option value="choice">choice</option>
+    </select>
+    <input name="options" type="text" placeholder="options (comma-sep)"
+     style="border: 1px solid #ddd; padding: 2px 4px; width: 120px;" />
+    <button type="submit" class="{{ CSS_CONFIRM }}"
+     title="{{ add_tooltip }}">+</button>
+  </form>
 
   {# Mark edit affordances, render the rest #}
   {% for aff in data.affordances %}
     {% if not aff._rendered %}
-      {% if aff.body.action in ("set_label", "set_instruction") %}
+      {% if aff.body.action in ("set_label", "set_instruction", "add_field", "remove_field") %}
         {% set _ = aff.update({"_rendered": true}) %}
       {% else %}
         {{ render_aff(aff) }}

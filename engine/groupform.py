@@ -170,7 +170,7 @@ class GroupForm(Eigenform):
                 f"text/memo/boolean/date: {{}} (no config needed), "
                 f"choice: {{\"options\": [\"A\", \"B\"]}}, "
                 f"checkbox: {{\"items\": [\"X\", \"Y\"]}}, "
-                f"number: {{\"min\": 0, \"max\": 100, \"step\": 1, \"integer\": true}}, "
+                f"number: {{\"min\": 0, \"max\": 100, \"step\": 1}}, "
                 f"list: {{\"fixed_items\": [\"a\", \"b\"]}}. "
                 f"GET /types for full config schema per type."
             ),

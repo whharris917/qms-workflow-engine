@@ -17,6 +17,41 @@
   <input name="instruction" type="text" value="{{ instruction }}" placeholder="Instruction text" class="ef-edit-instr-input" title="{{ instr_tooltip }}">
   <button type="submit" class="{{ CSS_CONFIRM }}" title="{{ instr_tooltip }}">&#10003;</button>
 </form>
+
+{# Config controls #}
+<div style="margin: 2px 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 0.9em; color: #666;">
+  {# Multiline toggle #}
+  {% set ml_val = multiline %}
+  {% set ml_body = {"action": "toggle_multiline"}|tojson %}
+  {% set ml_tooltip = "POST " ~ url ~ " " ~ ml_body %}
+  {% set ml_bg = "#efffef" if ml_val else "#f8f8f8" %}
+  {% set ml_border = "#4a4" if ml_val else "#ccc" %}
+  <button data-ef-post="{{ url }}" data-ef-body="{{ ml_body }}"
+   style="cursor: pointer; font: inherit; font-size: 0.9em; border: 1px solid {{ ml_border }}; background: {{ ml_bg }}; padding: 1px 8px; border-radius: 3px;"
+   title="{{ ml_tooltip }}">multiline: {{ "on" if ml_val else "off" }}</button>
+
+  {# Min/max length inputs #}
+  {% for field_label, action, current in [
+    ("min length", "set_min_length", data.min_length if data.min_length is defined else none),
+    ("max length", "set_max_length", data.max_length if data.max_length is defined else none),
+  ] %}
+    {% set display_val = "" if current is none else current|string %}
+    {% set body_json = {"action": action, "value": display_val}|tojson %}
+    {% set tooltip = "POST " ~ url ~ " " ~ body_json %}
+    <form style="display: flex; align-items: center; gap: 2px; margin: 0;"
+     data-ef-submit="{{ url }}">
+    <input type="hidden" name="action" value="{{ action }}" />
+    <span style="font-weight: 600;">{{ field_label }}:</span>
+    <input name="value" type="text" value="{{ display_val }}"
+     placeholder="none"
+     style="font: inherit; border: 1px solid #ddd; padding: 1px 3px; margin: 0; width: 60px; text-align: center;"
+     title="{{ tooltip }}" />
+    <button type="submit" class="{{ CSS_CONFIRM }}"
+     title="{{ tooltip }}">&#10003;</button>
+    </form>
+  {% endfor %}
+</div>
+
 <p><strong>Value:</strong> {{ value|string }}</p>
 {% if has_data %}
 {% set clear_body = {"action": "clear"}|tojson %}
@@ -35,13 +70,15 @@
 {% endif %}
 {% set set_body = {"action": "set", "value": ""}|tojson %}
 {% set set_tooltip = "POST " ~ url ~ " " ~ set_body %}
-<form data-ef-submit="{{ url }}" style="display: inline;">
+<form data-ef-submit="{{ url }}">
 {% if multiline %}
   <textarea name="value" rows="4" style="width: 100%; box-sizing: border-box;" title="{{ set_tooltip }}">{{ value or "" }}</textarea>
 {% else %}
   <input name="value" type="text" title="{{ set_tooltip }}">
 {% endif %}
-  <button type="submit" title="{{ set_tooltip }}">Set {{ label }}</button>
+  <div style="margin-top: 4px;">
+    <button type="submit" title="{{ set_tooltip }}">Set {{ label }}</button>
+  </div>
 </form>
 {% if has_data %}
 {% set clear_body = {"action": "clear"}|tojson %}

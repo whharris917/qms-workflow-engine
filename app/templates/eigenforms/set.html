@@ -4,9 +4,6 @@
      data  — the serialized eigenform dict
      ef    — the SetForm instance
 #}
-<h3>{{ data.label }}</h3>
-{% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
-
 {% set affs = data.affordances %}
 {% set items = data["items"] %}
 {% set url = affs[0].url if affs else "" %}
@@ -23,6 +20,22 @@
     {% set _ = aff.update({"_rendered": true}) %}
   {% endif %}
 {% endfor %}
+
+{% if data.edit_mode %}
+  {% set label = data.label %}
+  {% set instruction = data.instruction or "" %}
+  {% include "_edit_header.html" with context %}
+
+  {# Mark edit affordances as rendered #}
+  {% for aff in affs %}
+    {% if aff.body.action in ("set_label", "set_instruction") %}
+      {% set _ = aff.update({"_rendered": true}) %}
+    {% endif %}
+  {% endfor %}
+{% else %}
+  <h3>{{ data.label }}</h3>
+  {% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
+{% endif %}
 
 {# Items as pills with remove buttons #}
 {% if items %}

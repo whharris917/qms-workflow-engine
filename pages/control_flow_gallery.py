@@ -149,7 +149,7 @@ FeatureBranch = SequenceForm(
             instruction="Estimate the effort in days.",
             min_val=1,
             max_val=90,
-            integer=True,
+            step=1,
         ),
     ],
 )

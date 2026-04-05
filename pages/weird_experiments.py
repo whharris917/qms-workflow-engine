@@ -134,7 +134,7 @@ definition = PageForm(
                                     options=["Developer", "QA", "PM", "Designer"]),
                          NumberForm(key="experience", label="Years of Experience",
                                     instruction="How many years?",
-                                    min_val=0, max_val=50, integer=True),
+                                    min_val=0, max_val=50, step=1),
                      ]),
     ],
 )

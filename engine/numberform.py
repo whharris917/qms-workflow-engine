@@ -1,4 +1,4 @@
-"""NumberForm — numeric input with min/max bounds, step, and optional integer constraint."""
+"""NumberForm — numeric input with min/max bounds, step, slider mode, and unit label."""
 
 from __future__ import annotations
 
@@ -38,7 +38,6 @@ class NumberForm(Eigenform):
     min_val: float | None = None
     max_val: float | None = None
     step: float | None = None
-    integer: bool = False
     slider: bool = False
     unit: str | None = None
 
@@ -59,8 +58,7 @@ class NumberForm(Eigenform):
             if override is not None:
                 return override
         return {"min_val": self.min_val, "max_val": self.max_val,
-                "step": self.step, "integer": self.integer,
-                "slider": self.slider, "unit": self.unit}
+                "step": self.step, "slider": self.slider, "unit": self.unit}
 
     @property
     def is_complete(self) -> bool:
@@ -73,7 +71,6 @@ class NumberForm(Eigenform):
             "min": cfg.get("min_val"),
             "max": cfg.get("max_val"),
             "step": cfg.get("step"),
-            "integer": cfg.get("integer", False),
         }
         if cfg.get("slider"):
             state["slider"] = True
@@ -84,11 +81,9 @@ class NumberForm(Eigenform):
     def get_affordances(self) -> list[Affordance]:
         cfg = self._effective_config
         min_v, max_v = cfg.get("min_val"), cfg.get("max_val")
-        step_v, int_v = cfg.get("step"), cfg.get("integer", False)
+        step_v = cfg.get("step")
         is_slider = cfg.get("slider", False)
         parts = []
-        if int_v:
-            parts.append("integer only")
         if min_v is not None:
             parts.append(f"min {min_v}")
         if max_v is not None:
@@ -134,9 +129,14 @@ class NumberForm(Eigenform):
             instruction=f"Set step size. Current: {cfg.get('step')}",
         ))
         affs.append(Affordance(
-            label="Toggle Integer", method="POST", url=self.url,
-            body={"action": "toggle_integer"},
-            instruction=f"Toggle integer-only constraint. Currently: {cfg.get('integer', False)}",
+            label="Toggle Slider", method="POST", url=self.url,
+            body={"action": "toggle_slider"},
+            instruction=f"Toggle slider display mode. Currently: {cfg.get('slider', False)}",
+        ))
+        affs.append(Affordance(
+            label="Set Unit", method="POST", url=self.url,
+            body={"action": "set_unit", "value": "<string or null>"},
+            instruction=f"Set unit label (e.g. 'kg', '%'). Current: {cfg.get('unit')}",
         ))
         return affs
 
@@ -165,20 +165,29 @@ class NumberForm(Eigenform):
             self._store.set(self._scope, f"{self.key}.__config", cfg)
             return self.serialize()
 
-        if action == "toggle_integer" and self.editable and self.edit_mode:
+        if action == "toggle_slider" and self.editable and self.edit_mode:
             self._push_undo()
             cfg = dict(self._effective_config)
-            cfg["integer"] = not cfg.get("integer", False)
+            cfg["slider"] = not cfg.get("slider", False)
+            self._store.set(self._scope, f"{self.key}.__config", cfg)
+            return self.serialize()
+
+        if action == "set_unit" and self.editable and self.edit_mode:
+            self._push_undo()
+            raw = body.get("value")
+            val = None if raw is None or raw == "" or raw == "null" else str(raw)
+            cfg = dict(self._effective_config)
+            cfg["unit"] = val
             self._store.set(self._scope, f"{self.key}.__config", cfg)
             return self.serialize()
 
         # Normal value setting — use effective config for validation
         cfg = self._effective_config
         min_v, max_v = cfg.get("min_val"), cfg.get("max_val")
-        step_v, int_v = cfg.get("step"), cfg.get("integer", False)
+        step_v = cfg.get("step")
         raw = body.get("value")
         try:
-            val = int(raw) if int_v else float(raw)
+            val = float(raw)
         except (TypeError, ValueError):
             return self._error(f"Invalid number: {raw}", body=body)
         if min_v is not None and val < min_v:

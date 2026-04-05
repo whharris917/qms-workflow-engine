@@ -30,6 +30,24 @@ class KeyValueForm(Eigenform):
     key_label: str = "Key"
     value_label: str = "Value"
 
+    def _snapshot_edit_state(self) -> dict:
+        state = super()._snapshot_edit_state()
+        state["__config"] = self._store.get(self._scope, f"{self.key}.__config")
+        return state
+
+    def _restore_edit_state(self, state: dict):
+        super()._restore_edit_state(state)
+        self._store.set(self._scope, f"{self.key}.__config", state.get("__config"))
+
+    @property
+    def _effective_config(self) -> dict:
+        """Config from store override if set, else Python defaults."""
+        if self._store is not None:
+            override = self._store.get(self._scope, f"{self.key}.__config")
+            if override is not None:
+                return override
+        return {"key_label": self.key_label, "value_label": self.value_label}
+
     @property
     def _state(self) -> dict:
         stored = self.value
@@ -49,24 +67,28 @@ class KeyValueForm(Eigenform):
         return all(e.get("key") and e.get("value") for e in entries)
 
     def _serialize_state(self) -> dict:
+        cfg = self._effective_config
         # Strip internal IDs from agent-facing output — keys are the identifier
         clean_entries = [{"key": e["key"], "value": e["value"]} for e in self.entries]
         return self._base_state() | {
             "entries": clean_entries,
-            "key_label": self.key_label,
-            "value_label": self.value_label,
+            "key_label": cfg.get("key_label", "Key"),
+            "value_label": cfg.get("value_label", "Value"),
         }
 
     def get_affordances(self) -> list[Affordance]:
+        cfg = self._effective_config
+        kl = cfg.get("key_label", "Key")
+        vl = cfg.get("value_label", "Value")
         affordances: list[Affordance] = []
         affordances.append(KVAddAffordance(
             label="Add Entry",
             method="POST",
             url=self.url,
-            body={"action": "add", "key": f"<{self.key_label}>", "value": f"<{self.value_label}>"},
+            body={"action": "add", "key": f"<{kl}>", "value": f"<{vl}>"},
             instruction=f"Add a new key-value pair.",
-            key_label=self.key_label,
-            value_label=self.value_label,
+            key_label=kl,
+            value_label=vl,
         ))
         if self.entries:
             entry_keys = " | ".join(e["key"] for e in self.entries if e.get("key"))
@@ -76,7 +98,7 @@ class KeyValueForm(Eigenform):
                     method="POST",
                     url=self.url,
                     body={"action": "edit", "key": f"<{entry_keys}>",
-                          "new_key": f"<optional new key>", "value": f"<{self.value_label}>"},
+                          "new_key": f"<optional new key>", "value": f"<{vl}>"},
                     instruction="Edit an entry by key. Include new_key to rename. Omit new_key or value to keep unchanged.",
                 ))
                 affordances.append(Affordance(
@@ -88,12 +110,40 @@ class KeyValueForm(Eigenform):
                 ))
         return affordances
 
+    def _get_edit_affordances(self) -> list[Affordance]:
+        cfg = self._effective_config
+        affs = super()._get_edit_affordances()
+        affs.append(Affordance(
+            label="Set Key Label", method="POST", url=self.url,
+            body={"action": "set_key_label", "value": "<string>"},
+            instruction=f"Set the label for keys. Current: {cfg.get('key_label', 'Key')}",
+        ))
+        affs.append(Affordance(
+            label="Set Value Label", method="POST", url=self.url,
+            body={"action": "set_value_label", "value": "<string>"},
+            instruction=f"Set the label for values. Current: {cfg.get('value_label', 'Value')}",
+        ))
+        return affs
+
     def render_from_data(self, data: dict) -> str:
         return render_template("keyvalue.html", data=data, ef=self,
                                url=self.url)
 
     def _handle(self, body: dict) -> dict:
         action = body.get("action")
+
+        # Edit-mode config actions
+        if action in ("set_key_label", "set_value_label") and self.editable and self.edit_mode:
+            self._push_undo()
+            raw = body.get("value", "").strip()
+            if not raw:
+                return self._error("Label cannot be empty", body=body)
+            cfg = dict(self._effective_config)
+            field = "key_label" if action == "set_key_label" else "value_label"
+            cfg[field] = raw
+            self._store.set(self._scope, f"{self.key}.__config", cfg)
+            return self.serialize()
+
         state = self._state
 
         if action == "add":

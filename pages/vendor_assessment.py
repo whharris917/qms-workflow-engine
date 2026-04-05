@@ -109,13 +109,13 @@ definition = PageForm(
         # === Section 2: Performance ratings ===
         NumberForm(key="quality_rating", label="Quality Rating",
                    instruction="Rate the vendor's quality system (1-5).",
-                   min_val=1, max_val=5, integer=True),
+                   min_val=1, max_val=5, step=1),
         NumberForm(key="delivery_rating", label="Delivery Reliability Rating",
                    instruction="Rate the vendor's delivery track record (1-5).",
-                   min_val=1, max_val=5, integer=True),
+                   min_val=1, max_val=5, step=1),
         NumberForm(key="pricing_rating", label="Pricing Competitiveness Rating",
                    instruction="Rate the vendor's pricing relative to market (1-5).",
-                   min_val=1, max_val=5, integer=True),
+                   min_val=1, max_val=5, step=1),
         NumberForm(key="confidence_level", label="Assessment Confidence",
                   instruction="How confident are you in the accuracy of this assessment?",
                   min_val=0, max_val=100, step=5, slider=True, unit="%"),
@@ -123,7 +123,7 @@ definition = PageForm(
         # === Section 3: Financial ===
         NumberForm(key="proposed_credit_limit", label="Proposed Credit Limit ($)",
                    instruction="Recommended credit limit for purchase orders.",
-                   min_val=0, max_val=10000000, step=1000, integer=True),
+                   min_val=0, max_val=10000000, step=1000),
 
         # === Section 4: Prioritization ===
         ListForm(key="priority_factors", label="Evaluation Priority Factors",

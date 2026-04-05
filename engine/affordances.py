@@ -350,11 +350,13 @@ def _render_small_button(label: str, url: str, endpoint: str, body: dict) -> str
 
 def _render_number_input(label: str, url: str, endpoint: str, hints: dict) -> str:
     return (
-        f'<form style="display: inline" data-ef-submit="{escape(url)}">'
+        f'<form data-ef-submit="{escape(url)}">'
         f'<input name="value" type="text" inputmode="decimal" style="width: 120px;"'
         f' title="{escape(endpoint)}" />'
-        f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps({"value": ""}))}">'
+        f'<div style="margin-top: 4px;">'
+        f'<button type="submit" title="{escape(endpoint)} {escape(json.dumps({"value": ""}))}">'
         f'{escape(label)}</button>'
+        f'</div>'
         f'</form>'
     )
 
@@ -362,11 +364,13 @@ def _render_number_input(label: str, url: str, endpoint: str, hints: dict) -> st
 def _render_date_input(label: str, url: str, endpoint: str, hints: dict) -> str:
     input_type = "datetime-local" if hints.get("include_time") else "date"
     return (
-        f'<form style="display: inline" data-ef-submit="{escape(url)}">'
+        f'<form data-ef-submit="{escape(url)}">'
         f'<input name="value" type="{input_type}"'
         f' title="{escape(endpoint)}" />'
-        f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps({"value": ""}))}">'
+        f'<div style="margin-top: 4px;">'
+        f'<button type="submit" title="{escape(endpoint)} {escape(json.dumps({"value": ""}))}">'
         f'{escape(label)}</button>'
+        f'</div>'
         f'</form>'
     )
 
@@ -406,8 +410,10 @@ def _render_range_input(label: str, url: str, endpoint: str, hints: dict) -> str
         f' oninput="this.nextElementSibling.textContent=this.value"'
         f' style="width: 200px; vertical-align: middle;" />'
         f'<span style="margin-left: 8px;">{default}</span>'
-        f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps({"value": default}))}">'
+        f'<div style="margin-top: 4px;">'
+        f'<button type="submit" title="{escape(endpoint)} {escape(json.dumps({"value": default}))}">'
         f'{escape(label)}</button>'
+        f'</div>'
         f'</form>'
     )
 
@@ -418,8 +424,10 @@ def _render_textarea(label: str, url: str, endpoint: str, hints: dict) -> str:
         f'<form data-ef-submit="{escape(url)}">'
         f'<textarea name="value" rows="5" style="width: 100%; box-sizing: border-box;"{max_attr}'
         f'></textarea>'
+        f'<div style="margin-top: 4px;">'
         f'<button type="submit" title="{escape(endpoint)} {escape(json.dumps({"value": ""}))}">'
         f'{escape(label)}</button>'
+        f'</div>'
         f'</form>'
     )
 

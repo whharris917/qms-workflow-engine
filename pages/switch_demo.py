@@ -48,7 +48,7 @@ class FeatureRequest(GroupForm):
                        options=["Must Have", "Should Have", "Nice to Have"]),
             NumberForm(key="effort", label="Estimated Effort (days)",
                        instruction="Rough estimate in person-days.",
-                       min_val=1, max_val=365, integer=True),
+                       min_val=1, max_val=365, step=1),
         ], **kwargs)
 
 
