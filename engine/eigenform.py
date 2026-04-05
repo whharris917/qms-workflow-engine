@@ -492,57 +492,48 @@ class Eigenform:
 
             if self.edit_mode:
                 # Play icon — return to execution mode
-                play_svg = (
-                    '<svg viewBox="0 0 16 16" width="14" height="14" style="display:block;margin:auto;">'
-                    '<path d="M4 2.5l10 5.5-10 5.5z" fill="#856404" stroke="none"/>'
-                    '</svg>'
-                )
                 chrome_html = _chrome_btn(
                     {"action": "set_mode", "mode": "execute"},
-                    "#fff3cd", "#856404", play_svg)
+                    "#fff3cd", "#856404",
+                    '<span style="font-size:14px;line-height:1;color:#856404;">&#9654;</span>')
 
                 # Undo icon — curved arrow
                 undo_count = self._undo_depth
                 if undo_count > 0:
-                    undo_svg = (
-                        '<svg viewBox="0 0 16 16" width="14" height="14" style="display:block;margin:auto;">'
-                        '<path d="M2 6h8a3 3 0 0 1 0 6H7" fill="none" stroke="#666" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
-                        '<path d="M5 3L2 6l3 3" fill="none" stroke="#666" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
-                        '</svg>'
-                    )
                     chrome_html += _chrome_btn(
-                        {"action": "undo"}, "none", "#aaa", undo_svg,
+                        {"action": "undo"}, "none", "#aaa",
+                        '<span style="font-size:14px;line-height:1;">&#8630;</span>',
                         title=f"Undo ({undo_count})")
 
                 # Discard icon — red X
-                discard_svg = (
-                    '<svg viewBox="0 0 16 16" width="14" height="14" style="display:block;margin:auto;">'
-                    '<path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="#c00" stroke-width="2" stroke-linecap="round"/>'
-                    '</svg>'
-                )
                 chrome_html += _chrome_btn(
-                    {"action": "discard"}, "#fff0f0", "#c00", discard_svg,
+                    {"action": "discard"}, "#fff0f0", "#c00",
+                    '<span style="font-size:14px;line-height:1;color:#c00;">&#10005;</span>',
                     title="Discard all changes")
             else:
                 # Pencil icon — enter edit mode
-                pencil_svg = (
-                    '<svg viewBox="0 0 16 16" width="14" height="14" style="display:block;margin:auto;">'
-                    '<path d="M11.5 1.5l3 3-9 9H2.5v-3z" fill="none" stroke="#666" stroke-width="1.5" stroke-linejoin="round"/>'
-                    '<path d="M9.5 3.5l3 3" fill="none" stroke="#666" stroke-width="1.5"/>'
-                    '</svg>'
-                )
                 chrome_html = _chrome_btn(
-                    {"action": "set_mode", "mode": "edit"}, "none", "#aaa", pencil_svg)
+                    {"action": "set_mode", "mode": "edit"}, "none", "#aaa",
+                    '<span style="font-size:14px;line-height:1;">&#9998;</span>')
 
-            # Wrap in a flex row positioned at top-left
+            # Wrap in a flex row, floated right to sit beside the label
             chrome_html = (
-                f'<div class="ef-chrome" style="position: absolute; top: 8px; left: 12px;'
-                f' display: flex; gap: 4px;">{chrome_html}</div>'
+                f'<div class="ef-chrome">{chrome_html}</div>'
+            )
+
+        titlebar = ''
+        if chrome_html:
+            titlebar = (
+                f'<div class="ef-titlebar">'
+                f'<span class="ef-titlebar__label">{escape(self.effective_label)}</span>'
+                f'<span class="ef-titlebar__spacer"></span>'
+                f'{chrome_html}'
+                f'</div>'
             )
 
         return (
             f'<div class="{cls_str}" data-form="{self.form}" data-key="{self.key}">'
-            f'{chrome_html}'
+            f'{titlebar}'
             f'{self._render_toggle_btn(uid, inner, json_str)}'
             f'</div>'
         )

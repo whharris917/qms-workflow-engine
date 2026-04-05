@@ -23,16 +23,24 @@
 .eigenform.eigenform--editing {
     border-style: dashed;
 }
-.eigenform.eigenform--editable {
-    padding-top: 38px;
+
+/* Titlebar (label + chrome buttons) */
+.ef-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 4px;
+}
+.ef-titlebar__label {
+    display: none;  /* Default theme: label rendered by template */
+}
+.ef-titlebar__spacer {
+    display: none;  /* Default theme: no spacer, buttons stay left */
 }
 
 /* Chrome button row (edit/undo/discard, pencil) */
 .ef-chrome {
-    position: absolute;
-    top: 8px;
-    left: 12px;
-    display: flex;
+    display: inline-flex;
     gap: 4px;
 }
 .ef-chrome-btn {
@@ -44,6 +52,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    color: #666;
 }
 
 /* "See JSON" toggle */
@@ -630,9 +639,6 @@
    Default theme: left accent on data forms, no border on containers.
    Non-default themes: no prescription — theme CSS handles it. */
 body.operator-view .ef-view-toggle {
-    display: none !important;
-}
-body.operator-view .ef-chrome {
     display: none !important;
 }
 body.operator-view .ef-json-pane {

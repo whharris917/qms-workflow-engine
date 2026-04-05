@@ -8,7 +8,7 @@ body.operator-view[data-theme="sleek"] {
     font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
     font-size: 13px;
     color: #cccccc;
-    background: #262626;
+    background: #1e2a3a;
 }
 
 body.operator-view[data-theme="sleek"] #page-content {
@@ -17,15 +17,15 @@ body.operator-view[data-theme="sleek"] #page-content {
 
 /* Toolbar blends with dark background */
 body.operator-view[data-theme="sleek"] .ef-page-toolbar {
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid #555d66;
     padding-bottom: 8px;
     margin-bottom: 12px;
 }
 
 /* --- Card: data eigenforms --- */
 body.operator-view[data-theme="sleek"] .eigenform {
-    background: #2d2d30;
-    border: 1px solid #444;
+    background: #363b42;
+    border: 1px solid #000 !important;
     border-radius: 4px;
     padding: 16px 20px;
     margin: 8px 0;
@@ -38,16 +38,68 @@ body.operator-view[data-theme="sleek"] .eigenform[data-form="group"],
 body.operator-view[data-theme="sleek"] .eigenform[data-form="visibility"],
 body.operator-view[data-theme="sleek"] .eigenform[data-form="switch"],
 body.operator-view[data-theme="sleek"] .eigenform[data-form="repeater"] {
+    background: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* Titlebar: window-style title bar on data eigenform cards */
+body.operator-view[data-theme="sleek"] .eigenform > .ef-titlebar {
+    display: flex;
+    align-items: center;
+    background: #22272e;
+    border-bottom: 1px solid #444;
+    margin: -16px -20px 12px -20px;
+    padding: 6px 12px;
+    border-radius: 4px 4px 0 0;
+}
+body.operator-view[data-theme="sleek"] .ef-titlebar__spacer {
+    display: inline;
+    flex: 1;
+}
+body.operator-view[data-theme="sleek"] .ef-titlebar__label {
+    display: inline;
+    font-size: 12px;
+    font-weight: 400;
+    color: #aaa;
+    letter-spacing: 0.02em;
+}
+/* Hide duplicate labels: when titlebar is present, template h3 is redundant.
+   Also hide NavigationForm's own h3 since the tab bar serves as navigation. */
+body.operator-view[data-theme="sleek"] .eigenform h3:first-child {
+    display: none;
+}
+/* Containers: no titlebar styling */
+body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .ef-titlebar,
+body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] > .ef-titlebar,
+body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] > .ef-titlebar,
+body.operator-view[data-theme="sleek"] .eigenform[data-form="visibility"] > .ef-titlebar,
+body.operator-view[data-theme="sleek"] .eigenform[data-form="switch"] > .ef-titlebar,
+body.operator-view[data-theme="sleek"] .eigenform[data-form="repeater"] > .ef-titlebar {
     background: none;
     border: none;
-    border-radius: 0;
-    padding: 0;
     margin: 0;
+    padding: 0;
+}
+
+
+body.operator-view[data-theme="sleek"] .ef-chrome-btn {
+    color: #d29922 !important;
+    border-color: #555d66 !important;
+    background: #3e3e42 !important;
+}
+body.operator-view[data-theme="sleek"] .ef-chrome-btn:hover {
+    border-color: #ff6b6b !important;
+}
+body.operator-view[data-theme="sleek"] .ef-chrome-btn span {
+    color: inherit !important;
 }
 
 /* Completion: left accent */
 body.operator-view[data-theme="sleek"] .eigenform.eigenform--complete {
-    border-left: 2px solid #4ec9b0;
+    border-left: 2px solid #60a5fa;
 }
 body.operator-view[data-theme="sleek"] .eigenform[data-form="page"].eigenform--complete,
 body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"].eigenform--complete,
@@ -83,7 +135,7 @@ body.operator-view[data-theme="sleek"] textarea {
     font-family: inherit;
     font-size: 13px;
     color: #cccccc;
-    background: #3e3e42;
+    background: #444b53;
     border: 1px solid #555;
     border-radius: 2px;
     padding: 5px 8px;
@@ -92,7 +144,7 @@ body.operator-view[data-theme="sleek"] textarea {
 }
 body.operator-view[data-theme="sleek"] input[type="text"]:focus,
 body.operator-view[data-theme="sleek"] textarea:focus {
-    border-color: #007acc;
+    border-color: #ff6b6b;
 }
 body.operator-view[data-theme="sleek"] textarea {
     resize: vertical;
@@ -110,8 +162,8 @@ body.operator-view[data-theme="sleek"] button[data-ef-post] {
     font-family: inherit;
     font-size: 12px;
     color: #ffffff;
-    background: #0e639c;
-    border: 1px solid #1177bb;
+    background: #2563eb;;
+    border: 1px solid #3b82f6;
     border-radius: 2px;
     padding: 4px 14px;
     cursor: pointer;
@@ -119,7 +171,7 @@ body.operator-view[data-theme="sleek"] button[data-ef-post] {
 }
 body.operator-view[data-theme="sleek"] button[type="submit"]:hover,
 body.operator-view[data-theme="sleek"] button[data-ef-post]:hover {
-    background: #1177bb;
+    background: #3b82f6;
 }
 
 /* --- Affordance buttons --- */
@@ -130,13 +182,13 @@ body.operator-view[data-theme="sleek"] .ef-aff-btn {
     border-radius: 2px;
 }
 body.operator-view[data-theme="sleek"] .ef-aff-btn:hover {
-    background: #3e3e42;
-    border-color: #007acc;
+    background: #444b53;
+    border-color: #ff6b6b;
 }
 
 /* --- Tab / navigation bar --- */
 body.operator-view[data-theme="sleek"] .ef-tab-bar {
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid #555d66;
     gap: 0;
     margin-bottom: 12px;
 }
@@ -152,9 +204,116 @@ body.operator-view[data-theme="sleek"] .ef-aff-btn--tab:hover {
     color: #cccccc;
 }
 
+/* --- NavigationForm: VS Code-style tabs + content panel --- */
+
+/* Tab bar: dark strip with bottom border */
+body.operator-view[data-theme="sleek"] .ef-nav-bar {
+    background: #1e1e1e !important;
+    border-bottom: 1px solid #444 !important;
+    gap: 0 !important;
+    margin-bottom: 0 !important;
+    padding: 0 !important;
+}
+
+/* Active tab: merges into content panel below */
+body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--active {
+    color: #e0e0e0 !important;
+    background: #2b3035 !important;
+    border: 1px solid #555d66 !important;
+    border-bottom: 1px solid #2b3035 !important;
+    border-radius: 4px 4px 0 0 !important;
+    padding: 8px 16px !important;
+    margin-bottom: -1px;
+    position: relative;
+    z-index: 1;
+    font-size: 12px !important;
+}
+
+/* Inactive tabs */
+body.operator-view[data-theme="sleek"] .ef-nav-tab {
+    color: #888 !important;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    border-radius: 4px 4px 0 0 !important;
+    padding: 8px 16px !important;
+    font-size: 12px !important;
+    cursor: pointer;
+}
+body.operator-view[data-theme="sleek"] .ef-nav-tab:hover {
+    color: #cccccc !important;
+    background: #2a2a2d !important;
+}
+
+/* Content panel: connected to tab bar */
+body.operator-view[data-theme="sleek"] .ef-nav-content {
+    background: #2b3035;
+    border: 1px solid #555d66;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    padding: 16px 20px;
+}
+
+/* --- Sequence mode steps --- */
+body.operator-view[data-theme="sleek"] .ef-nav-bar--sequence {
+    padding: 6px 8px !important;
+    border-radius: 4px 4px 0 0;
+}
+body.operator-view[data-theme="sleek"] .ef-nav-step--active {
+    color: #e0e0e0 !important;
+    background: #ff6b6b !important;
+    border: none !important;
+    border-bottom: none !important;
+    border-radius: 3px !important;
+    padding: 4px 12px !important;
+    font-size: 12px !important;
+}
+body.operator-view[data-theme="sleek"] .ef-nav-step--complete {
+    color: #60a5fa !important;
+    background: #1e3a2f !important;
+    border: 1px solid #3b82f6 !important;
+    border-radius: 3px !important;
+    padding: 4px 12px !important;
+    font-size: 12px !important;
+}
+body.operator-view[data-theme="sleek"] .ef-nav-step--complete:hover {
+    background: #264d38 !important;
+}
+body.operator-view[data-theme="sleek"] .ef-nav-step--accessible,
+body.operator-view[data-theme="sleek"] .ef-nav-step--locked {
+    color: #555 !important;
+    background: #252526 !important;
+    border-radius: 3px !important;
+    padding: 4px 12px !important;
+}
+body.operator-view[data-theme="sleek"] .ef-nav-arrow {
+    color: #555 !important;
+}
+
+/* Nav buttons (Back/Next) */
+body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] .ef-aff-btn {
+    color: #cccccc;
+    background: #333;
+    border: 1px solid #555;
+}
+body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] .ef-aff-btn:hover {
+    background: #444b53;
+    border-color: #ff6b6b;
+}
+
+/* Accordion sections */
+body.operator-view[data-theme="sleek"] .ef-aff-accordion {
+    background: #1e1e1e !important;
+    color: #cccccc !important;
+    border: 1px solid #555d66;
+}
+body.operator-view[data-theme="sleek"] .ef-section-content {
+    border-left-color: #555d66;
+    padding-left: 16px;
+}
+
 /* --- Accordion --- */
 body.operator-view[data-theme="sleek"] .ef-aff-accordion {
-    background: #333337;
+    background: #444b53;
     color: #cccccc;
     border-radius: 2px;
 }
@@ -170,8 +329,8 @@ body.operator-view[data-theme="sleek"] .ef-feedback--error {
 }
 body.operator-view[data-theme="sleek"] .ef-feedback--success {
     background: #1f3c2a;
-    border-color: #2ea043;
-    color: #4ec9b0;
+    border-color: #3b82f6;
+    color: #60a5fa;
 }
 
 /* --- TextForm sleek template --- */
@@ -201,14 +360,14 @@ body.operator-view[data-theme="sleek"] .ef-feedback--success {
     font-size: 13px;
     font-family: inherit;
     color: #cccccc;
-    background: #3e3e42;
+    background: #444b53;
     border: 1px solid #555;
     border-radius: 2px;
     outline: none;
     transition: border-color 0.1s ease;
 }
 .sleek-text__input:focus {
-    border-color: #007acc;
+    border-color: #ff6b6b;
 }
 .sleek-text__input::placeholder {
     color: #777;
@@ -235,12 +394,12 @@ body.operator-view[data-theme="sleek"] .ef-feedback--success {
     transition: background 0.1s ease;
 }
 .sleek-text__btn--primary {
-    background: #0e639c;
+    background: #2563eb;;
     color: #fff;
-    border: 1px solid #1177bb;
+    border: 1px solid #3b82f6;
 }
 .sleek-text__btn--primary:hover {
-    background: #1177bb;
+    background: #3b82f6;
 }
 .sleek-text__btn--ghost {
     background: none;
@@ -254,11 +413,11 @@ body.operator-view[data-theme="sleek"] .ef-feedback--success {
 
 .sleek-text__value {
     font-size: 13px;
-    color: #4ec9b0;
+    color: #60a5fa;
     margin: 8px 0 0 0;
     padding: 6px 10px;
     background: #1e2a25;
-    border-left: 2px solid #4ec9b0;
+    border-left: 2px solid #60a5fa;
     border-radius: 0 2px 2px 0;
     font-family: 'Cascadia Code', 'Consolas', monospace;
 }
@@ -266,11 +425,11 @@ body.operator-view[data-theme="sleek"] .ef-feedback--success {
 .sleek-text__preview {
     white-space: pre-wrap;
     font-size: 13px;
-    color: #4ec9b0;
+    color: #60a5fa;
     margin: 8px 0 0 0;
     padding: 8px 10px;
     background: #1e2a25;
-    border-left: 2px solid #4ec9b0;
+    border-left: 2px solid #60a5fa;
     border-radius: 0 2px 2px 0;
     line-height: 1.4;
     font-family: 'Cascadia Code', 'Consolas', monospace;
