@@ -6,7 +6,28 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+    <button class="ef-supervisor-toggle" id="supervisor-toggle" onclick="toggleSupervisor()">Supervisor View</button>
     <div id="page-content">{{ page_html }}</div>
+    <script>
+        /* Supervisor View: suppress eigenform borders, view toggles, chrome buttons */
+        function toggleSupervisor() {
+            var active = document.body.classList.toggle('supervisor-view');
+            var btn = document.getElementById('supervisor-toggle');
+            btn.classList.toggle('ef-supervisor-toggle--active', active);
+            btn.textContent = active ? 'Operator View' : 'Supervisor View';
+            try { localStorage.setItem('supervisor-view', active ? '1' : ''); } catch(e) {}
+        }
+        (function() {
+            try {
+                if (localStorage.getItem('supervisor-view') === '1') {
+                    document.body.classList.add('supervisor-view');
+                    var btn = document.getElementById('supervisor-toggle');
+                    btn.classList.add('ef-supervisor-toggle--active');
+                    btn.textContent = 'Operator View';
+                }
+            } catch(e) {}
+        })();
+    </script>
     <script src="{{ url_for('static', filename='eigenform.js') }}"></script>
     <script>
         /* SSE: reload page when another client mutates state.

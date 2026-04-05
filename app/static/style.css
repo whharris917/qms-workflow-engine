@@ -3,6 +3,11 @@
    Extracted from inline style= attributes across 30 engine modules.
    =================================================================== */
 
+/* --- Page layout --- */
+#page-content {
+    padding: 8px 12px;
+}
+
 /* --- Eigenform wrapper (eigenform.py render()) --- */
 .ef-wrap {
     border: 2px solid #888;
@@ -587,4 +592,35 @@
 /* --- Table-specific --- */
 .ef-table-shaded {
     background: #f0f0f0;
+}
+
+/* --- Supervisor View toggle --- */
+.ef-supervisor-toggle {
+    display: inline-block;
+    font-size: 11px;
+    cursor: pointer;
+    background: #555;
+    color: white;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 3px;
+}
+.ef-supervisor-toggle--active {
+    background: #2a6;
+}
+
+/* Supervisor View: suppress borders, view toggles, chrome buttons, nesting offset */
+body.supervisor-view .eigenform {
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+body.supervisor-view .ef-view-toggle {
+    display: none !important;
+}
+body.supervisor-view .ef-chrome {
+    display: none !important;
+}
+body.supervisor-view .ef-json-pane {
+    display: none !important;
 }

@@ -423,7 +423,7 @@ class Eigenform:
             ' cursor: pointer; background: #555; color: white;'
             ' border: none; padding: 2px 6px; border-radius: 3px;'
         )
-        html = f'<select onchange=\'{onchange}\' style="{select_style}">'
+        html = f'<select class="ef-view-toggle" onchange=\'{onchange}\' style="{select_style}">'
         for i, (_, label, _, _) in enumerate(panes):
             html += f'<option value="{i}">{escape(label)}</option>'
         html += '</select>'
@@ -432,7 +432,8 @@ class Eigenform:
         for i, (pane_id, _, tag, content) in enumerate(panes):
             display = 'block' if i == 0 else 'none'
             style = f'display: {display};' + (f' {pre_style}' if tag == 'pre' else '')
-            html += f'<{tag} id="{pane_id}" style="{style}">{content}</{tag}>'
+            cls = ' class="ef-json-pane"' if tag == 'pre' else ''
+            html += f'<{tag} id="{pane_id}"{cls} style="{style}">{content}</{tag}>'
         return html
 
     def render(self) -> str:
@@ -529,7 +530,7 @@ class Eigenform:
 
             # Wrap in a flex row positioned at top-left
             chrome_html = (
-                f'<div style="position: absolute; top: 8px; left: 12px;'
+                f'<div class="ef-chrome" style="position: absolute; top: 8px; left: 12px;'
                 f' display: flex; gap: 4px;">{chrome_html}</div>'
             )
 
