@@ -32,6 +32,7 @@ from engine.templates import render_template
 class AccordionForm(Eigenform):
     """A container with collapsible sections."""
     sections: dict[str, Eigenform] = field(default_factory=dict)
+    default_expanded: bool = True
 
     # Preserved during bind — unbound seed sections for callable matching
     _seed: dict[str, Eigenform] = field(default_factory=dict, repr=False)
@@ -53,7 +54,7 @@ class AccordionForm(Eigenform):
         return {}
 
     def _is_expanded(self, section_key: str) -> bool:
-        return self._expanded_state.get(section_key, True)
+        return self._expanded_state.get(section_key, self.default_expanded)
 
     @property
     def is_complete(self) -> bool:

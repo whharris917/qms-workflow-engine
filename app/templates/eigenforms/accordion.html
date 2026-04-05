@@ -107,7 +107,7 @@
     <div data-ef-post="{{ url }}" data-ef-body="{{ {"action": "toggle", "section": sec.key}|tojson }}"
      style="cursor: pointer; padding: 6px 8px; background: #eee; margin: 4px 0;
      border-radius: 4px; font-weight: bold; user-select: none;"
-     title="POST {{ url }} {{ {"action": "toggle", "section": sec.key}|tojson }}">{{ arrow }} {{ sec.label }}</div>
+     title="POST {{ url }} {{ {"action": "toggle", "section": sec.key}|tojson }}">{{ arrow|safe }} {{ sec.label }}</div>
 
     {% if sec.expanded %}
       <div class="ef-section-content">{{ section_html[sec.key]|safe }}</div>

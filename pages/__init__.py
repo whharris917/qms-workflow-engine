@@ -31,7 +31,7 @@ def bind_page(seed: PageForm, data_dir: Path, instance_id: str,
               label: str | None = None) -> PageForm:
     """Bind a seed to its store, producing a transient bound page."""
     bound = seed.bind(
-        data_dir=data_dir,
+        data_dir,
         scope=instance_id,
         url_prefix=f"/pages/{instance_id}",
     )

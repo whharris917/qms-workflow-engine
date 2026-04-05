@@ -49,12 +49,20 @@ class PageForm(Eigenform):
         desc["eigenforms"] = [ef.to_descriptor() for ef in self.eigenforms]
         return desc
 
-    def bind(self, data_dir: Path, scope: str, url_prefix: str) -> PageForm:
+    def bind(self, data_dir_or_store=None, scope: str = "", url_prefix: str = "",
+             *, store=None, **kwargs) -> PageForm:
         """Produce a bound copy of this page and all nested eigenforms.
 
-        Unlike other eigenforms, PageForm creates its own Store from
-        data_dir rather than receiving one. This makes the page the
-        persistence boundary — one JSON file per page.
+        Unlike other eigenforms, PageForm creates its own Store. This
+        makes the page the persistence boundary — one JSON file per page.
+
+        When called as a top-level page, data_dir_or_store is a Path and
+        the Store is created at data_dir / "{scope}.json".
+
+        When embedded as a child of another PageForm, data_dir_or_store
+        is the parent's Store. The data directory is derived from the
+        parent store's path, and an independent Store is created for the
+        embedded page.
 
         Structural persistence (Phase C): on first bind, the eigenform
         tree is serialized to __structure in the store. On subsequent
@@ -66,7 +74,18 @@ class PageForm(Eigenform):
         import copy
         from engine.registry import from_descriptor, get_registry
 
-        store = Store(data_dir / f"{scope}.json")
+        if store is not None:
+            data_dir_or_store = store
+        embedded = isinstance(data_dir_or_store, Store)
+        if embedded:
+            # Embedded: derive data_dir from parent store, use own key for isolation
+            data_dir = data_dir_or_store.path.parent
+            store = Store(data_dir / f"{scope}__{self.key}.json")
+            # Nest URL under parent's prefix
+            url_prefix = f"{url_prefix}/{self.key}"
+        else:
+            data_dir = data_dir_or_store
+            store = Store(data_dir / f"{scope}.json")
         bound = copy.deepcopy(self)
         bound._store = store
         bound._scope = scope
@@ -253,20 +272,12 @@ class PageForm(Eigenform):
                     "type": "<type>",
                     "key": "<unique_key>",
                     "label": "<label>",
-                    "config": {},
-                    "after": "<sibling_key | null>",
                 },
                 instruction=(
-                    f"Add a new eigenform to this page. "
+                    f"Add a new eigenform with default values. "
                     f"Available types: {', '.join(available)}. "
-                    f"'after' places it after the named sibling (null = append to end). "
-                    f"'config' is type-specific. Common examples: "
-                    f"text/memo/boolean/date: {{}} (no config needed), "
-                    f"choice: {{\"options\": [\"A\", \"B\"]}}, "
-                    f"checkbox: {{\"items\": [\"X\", \"Y\"]}}, "
-                    f"number: {{\"min\": 0, \"max\": 100, \"step\": 1, \"integer\": true}}, "
-                    f"list: {{\"fixed_items\": [\"a\", \"b\"]}}. "
-                    f"GET /types for full config schema per type."
+                    f"Use edit mode on the new eigenform to configure it. "
+                    f"See the Eigenform Reference Menu page for type details."
                 ),
             ))
 
@@ -358,6 +369,7 @@ class PageForm(Eigenform):
                 "body": template["body"],
                 "targets": {url: label for url, label in targets},
                 "instruction": _MERGED_INSTRUCTIONS.get(fkey, template.get("instruction", "")),
+                "_chrome_rendered": True,
             }
             page_affs.append(merged)
 

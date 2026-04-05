@@ -1,20 +1,22 @@
 """
 Page Builder — a mutable page for composing eigenform structures.
 
-Starts empty. Add eigenforms from the registry, remove, reorder.
-Build the structure first, then refine each one's content.
+Embeds the Eigenform Reference Menu for type documentation, then
+provides a mutable workspace below it. Add eigenforms from the
+registry, remove, reorder, then refine each one's content.
 """
 
 from engine.pageform import PageForm
+from pages.eigenform_reference import definition as _reference_seed
 
 definition = PageForm(
     key="page-builder",
     label="Page Builder",
     instruction=(
         "Build a page by adding eigenforms from the registry. "
-        "Start with the structure — add, remove, and reorder elements — "
-        "then refine each one's content."
+        "The Eigenform Reference Menu below documents all available types. "
+        "Add eigenforms, then use edit mode to configure them."
     ),
     mutable_structure=True,
-    eigenforms=[],
+    eigenforms=[_reference_seed],
 )
