@@ -461,8 +461,14 @@ class Eigenform:
         uid = self.uid
         json_str = escape(json.dumps(self.serialize(), indent=2))
 
-        complete_color = '#2a2' if self.is_complete else '#888'
-        edit_border = ' border-style: dashed;' if self.edit_mode else ''
+        classes = ['eigenform']
+        if self.is_complete:
+            classes.append('eigenform--complete')
+        if self.edit_mode:
+            classes.append('eigenform--editing')
+        if self.editable:
+            classes.append('eigenform--editable')
+        cls_str = ' '.join(classes)
 
         # Chrome buttons for editable eigenforms
         chrome_html = ''
@@ -535,8 +541,7 @@ class Eigenform:
             )
 
         return (
-            f'<div class="eigenform" data-form="{self.form}" data-key="{self.key}"'
-            f' style="border: 2px solid {complete_color};{edit_border} padding: {"38px" if self.editable else "30px"} 12px 12px 12px; margin: 8px 0; position: relative;">'
+            f'<div class="{cls_str}" data-form="{self.form}" data-key="{self.key}">'
             f'{chrome_html}'
             f'{self._render_toggle_btn(uid, inner, json_str)}'
             f'</div>'

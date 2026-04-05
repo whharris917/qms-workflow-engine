@@ -1,0 +1,43 @@
+{# TextForm sleek theme — modern, minimal UI. #}
+{% for aff in data.affordances %}
+{% set _ = aff.update({"_rendered": true}) %}
+{% endfor %}
+{# TextForm sleek theme — modern, minimal UI.
+   Edit mode falls back to the default template. #}
+{% if edit_mode %}
+{% include "text_human.html" %}
+{% else %}
+{% for aff in data.affordances %}
+{% set _ = aff.update({"_rendered": true}) %}
+{% endfor %}
+<div class="sleek-text">
+  <label class="sleek-text__label" for="sleek-{{ ef.uid }}">{{ label }}</label>
+  {% if instruction %}
+  <p class="sleek-text__hint">{{ instruction }}</p>
+  {% endif %}
+  <form data-ef-submit="{{ url }}" class="sleek-text__form">
+    {% if multiline %}
+    <textarea id="sleek-{{ ef.uid }}" name="value" rows="4"
+      class="sleek-text__input sleek-text__input--area"
+      placeholder="{{ label }}">{{ value or "" }}</textarea>
+    {% else %}
+    <input id="sleek-{{ ef.uid }}" name="value" type="text"
+      class="sleek-text__input"
+      placeholder="{{ label }}"
+      value="{{ value or '' }}">
+    {% endif %}
+    <div class="sleek-text__actions">
+      <button type="submit" class="sleek-text__btn sleek-text__btn--primary">Save</button>
+      {% if has_data %}
+      <button type="button" class="sleek-text__btn sleek-text__btn--ghost"
+        data-ef-post="{{ url }}" data-ef-body='{"action": "clear"}'>Clear</button>
+      {% endif %}
+    </div>
+  </form>
+  {% if multiline and value %}
+  <div class="sleek-text__preview">{{ value }}</div>
+  {% elif value %}
+  <p class="sleek-text__value">{{ value }}</p>
+  {% endif %}
+</div>
+{% endif %}

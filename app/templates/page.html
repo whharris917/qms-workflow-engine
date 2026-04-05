@@ -4,29 +4,66 @@
     <meta charset="UTF-8">
     <title>{{ title }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    {% if theme_css %}
+    <link rel="stylesheet" href="{{ url_for('static', filename=theme_css) }}">
+    {% endif %}
 </head>
 <body>
-    <button class="ef-supervisor-toggle" id="supervisor-toggle" onclick="toggleSupervisor()">Supervisor View</button>
+    <div class="ef-page-toolbar">
+        <button class="ef-supervisor-toggle" id="supervisor-toggle" onclick="toggleView()">Change to Operator View</button>
+        <select class="ef-theme-select" id="theme-select" onchange="setTheme(this.value)">
+            <option value="default">Default</option>
+            <option value="sleek">Sleek</option>
+        </select>
+    </div>
     <div id="page-content">{{ page_html }}</div>
     <script>
-        /* Supervisor View: suppress eigenform borders, view toggles, chrome buttons */
-        function toggleSupervisor() {
-            var active = document.body.classList.toggle('supervisor-view');
+        /* View toggle: Supervisor (full borders, no theme choice) vs Operator (themes available) */
+        function _applyView() {
+            var view = localStorage.getItem('ef-view') || 'supervisor';
+            var isSupervisor = (view === 'supervisor');
+            document.body.classList.toggle('supervisor-view', isSupervisor);
+            document.body.classList.toggle('operator-view', !isSupervisor);
             var btn = document.getElementById('supervisor-toggle');
-            btn.classList.toggle('ef-supervisor-toggle--active', active);
-            btn.textContent = active ? 'Operator View' : 'Supervisor View';
-            try { localStorage.setItem('supervisor-view', active ? '1' : ''); } catch(e) {}
+            btn.textContent = isSupervisor ? 'Change to Operator View' : 'Change to Supervisor View';
+            /* Apply data-theme on body for CSS targeting */
+            var theme = _getThemeCookie() || 'default';
+            if (isSupervisor) {
+                document.body.removeAttribute('data-theme');
+            } else {
+                document.body.setAttribute('data-theme', theme);
+            }
+            document.getElementById('theme-select').value = theme;
         }
-        (function() {
-            try {
-                if (localStorage.getItem('supervisor-view') === '1') {
-                    document.body.classList.add('supervisor-view');
-                    var btn = document.getElementById('supervisor-toggle');
-                    btn.classList.add('ef-supervisor-toggle--active');
-                    btn.textContent = 'Operator View';
-                }
-            } catch(e) {}
-        })();
+        function toggleView() {
+            var current = localStorage.getItem('ef-view') || 'supervisor';
+            var next = (current === 'supervisor') ? 'operator' : 'supervisor';
+            localStorage.setItem('ef-view', next);
+            var theme = _getThemeCookie() || 'default';
+            if (next === 'supervisor' && theme !== 'default') {
+                /* Switching to supervisor with non-default theme: reload as default */
+                document.cookie = 'ef-theme=default;path=/;max-age=31536000';
+                location.reload();
+            } else if (next === 'operator' && theme !== 'default') {
+                /* Switching to operator with non-default theme: reload to get themed templates */
+                location.reload();
+            } else {
+                _applyView();
+            }
+        }
+
+        /* Theme selector (operator view only): sets cookie and reloads */
+        function _getThemeCookie() {
+            var m = document.cookie.match(/(?:^|;\s*)ef-theme=(\w+)/);
+            return m ? m[1] : null;
+        }
+        function setTheme(theme) {
+            document.cookie = 'ef-theme=' + theme + ';path=/;max-age=31536000';
+            location.reload();
+        }
+
+        /* Apply on load */
+        _applyView();
     </script>
     <script src="{{ url_for('static', filename='eigenform.js') }}"></script>
     <script>

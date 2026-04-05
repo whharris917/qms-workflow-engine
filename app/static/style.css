@@ -9,15 +9,23 @@
 }
 
 /* --- Eigenform wrapper (eigenform.py render()) --- */
-.ef-wrap {
+
+/* Base: full surrounding border (Default Theme / Supervisor View) */
+.eigenform {
     border: 2px solid #888;
     padding: 30px 12px 12px 12px;
     margin: 8px 0;
     position: relative;
 }
-.ef-wrap--complete { border-color: #2a2; }
-.ef-wrap--editing  { border-style: dashed; }
-.ef-wrap--editable { padding-top: 38px; }
+.eigenform.eigenform--complete {
+    border-color: #2a2;
+}
+.eigenform.eigenform--editing {
+    border-style: dashed;
+}
+.eigenform.eigenform--editable {
+    padding-top: 38px;
+}
 
 /* Chrome button row (edit/undo/discard, pencil) */
 .ef-chrome {
@@ -594,33 +602,89 @@
     background: #f0f0f0;
 }
 
-/* --- Supervisor View toggle --- */
+/* --- Page toolbar (supervisor toggle + theme selector) --- */
+.ef-page-toolbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+.ef-theme-select,
 .ef-supervisor-toggle {
-    display: inline-block;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 11px;
     cursor: pointer;
     background: #555;
     color: white;
     border: none;
-    padding: 4px 10px;
+    padding: 0 10px;
     border-radius: 3px;
-}
-.ef-supervisor-toggle--active {
-    background: #2a6;
+    height: 24px;
+    line-height: 24px;
+    box-sizing: border-box;
+    vertical-align: middle;
 }
 
-/* Supervisor View: suppress borders, view toggles, chrome buttons, nesting offset */
-body.supervisor-view .eigenform {
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-}
-body.supervisor-view .ef-view-toggle {
+/* === Operator View ===
+   Suppresses chrome (view toggle, edit buttons, JSON pane).
+   Default theme: left accent on data forms, no border on containers.
+   Non-default themes: no prescription — theme CSS handles it. */
+body.operator-view .ef-view-toggle {
     display: none !important;
 }
-body.supervisor-view .ef-chrome {
+body.operator-view .ef-chrome {
     display: none !important;
 }
-body.supervisor-view .ef-json-pane {
+body.operator-view .ef-json-pane {
+    display: none !important;
+}
+
+/* Operator View + Default theme: left accent on data forms only */
+body.operator-view:not([data-theme]) .eigenform,
+body.operator-view[data-theme="default"] .eigenform {
+    border: none;
+    border-left: 3px solid #d0d0d0;
+    padding: 8px 12px;
+    margin: 6px 0;
+}
+body.operator-view:not([data-theme]) .eigenform.eigenform--complete,
+body.operator-view[data-theme="default"] .eigenform.eigenform--complete {
+    border-left-color: #2a2;
+}
+body.operator-view:not([data-theme]) .eigenform.eigenform--editing,
+body.operator-view[data-theme="default"] .eigenform.eigenform--editing {
+    border: 2px dashed #d0d0d0;
+    padding: 8px 12px;
+}
+body.operator-view:not([data-theme]) .eigenform.eigenform--editing.eigenform--complete,
+body.operator-view[data-theme="default"] .eigenform.eigenform--editing.eigenform--complete {
+    border-color: #2a2;
+}
+/* Containers: no border in operator default */
+body.operator-view:not([data-theme]) .eigenform[data-form="page"],
+body.operator-view:not([data-theme]) .eigenform[data-form="navigation"],
+body.operator-view:not([data-theme]) .eigenform[data-form="group"],
+body.operator-view:not([data-theme]) .eigenform[data-form="visibility"],
+body.operator-view:not([data-theme]) .eigenform[data-form="switch"],
+body.operator-view:not([data-theme]) .eigenform[data-form="repeater"],
+body.operator-view[data-theme="default"] .eigenform[data-form="page"],
+body.operator-view[data-theme="default"] .eigenform[data-form="navigation"],
+body.operator-view[data-theme="default"] .eigenform[data-form="group"],
+body.operator-view[data-theme="default"] .eigenform[data-form="visibility"],
+body.operator-view[data-theme="default"] .eigenform[data-form="switch"],
+body.operator-view[data-theme="default"] .eigenform[data-form="repeater"] {
+    border-left: none;
+    padding-left: 0;
+}
+
+/* Operator View + non-default theme: strip all eigenform borders so
+   the theme CSS starts from a clean slate */
+body.operator-view[data-theme]:not([data-theme="default"]) .eigenform {
+    border: none;
+}
+
+/* === Supervisor View ===
+   Forces Default theme. Full surrounding borders. Hides theme selector. */
+body.supervisor-view .ef-theme-select {
     display: none !important;
 }

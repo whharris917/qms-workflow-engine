@@ -7,6 +7,7 @@ from markupsafe import Markup
 
 from pages import discover_pages, bind_page
 from app.registry import InstanceRegistry
+from engine.templates import set_theme
 
 bp = Blueprint("main", __name__)
 
@@ -26,6 +27,23 @@ for key, seed in seeds.items():
 # SSE subscribers: {instance_id: [queue, ...]}
 # Connection state only — knows nothing about eigenforms
 subscribers: dict[str, list[queue.Queue]] = {}
+
+
+THEMES = {"default", "sleek"}
+THEME_CSS = {"sleek": "sleek.css"}
+
+
+@bp.before_request
+def _apply_theme():
+    theme = request.cookies.get("ef-theme")
+    set_theme(theme if theme in THEMES and theme != "default" else None)
+
+
+def _theme_css() -> str | None:
+    """Return the CSS filename for the active theme, or None."""
+    from engine.templates import get_theme
+    theme = get_theme()
+    return THEME_CSS.get(theme) if theme else None
 
 
 def get_page(instance_id: str):
@@ -130,7 +148,7 @@ def page(instance_id):
     if wants_html(request):
         html = Markup(pg.render())
         return render_template("page.html", page_html=html, title=pg.label,
-                               instance_id=instance_id)
+                               instance_id=instance_id, theme_css=_theme_css())
     if request.args.get("depth") == "shallow":
         return jsonify(_shallow_serialize(pg))
     return jsonify(pg.serialize())
@@ -188,7 +206,7 @@ def eigenform(instance_id, path):
         if wants_html(request):
             html = Markup(ef.render())
             return render_template("page.html", page_html=html, title=ef.label,
-                                   instance_id=instance_id)
+                                   instance_id=instance_id, theme_css=_theme_css())
         return jsonify(ef.serialize())
 
     # POST — mutate
