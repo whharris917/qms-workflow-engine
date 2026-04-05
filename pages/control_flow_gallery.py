@@ -2,8 +2,7 @@
 
 from engine.pageform import PageForm
 from engine.historyform import HistoryForm
-from engine.stepform import SequenceForm
-from engine.tabform import TabForm
+from engine.navigationform import NavigationForm
 from engine.textform import TextForm
 from engine.checkboxform import CheckboxForm
 from engine.choiceform import ChoiceForm
@@ -11,9 +10,9 @@ from engine.booleanform import BooleanForm
 from engine.switchform import SwitchForm
 from engine.numberform import NumberForm
 
-SequenceDemo = SequenceForm(
+SequenceDemo = NavigationForm(
     key="sequence-demo",
-    label="SequenceForm — Gated Sequential Workflow",
+    label="NavigationForm — Gated Sequential Workflow",
     instruction=(
         "A gated sequence of steps. Each step must be completed "
         "before the next unlocks. You can revisit completed steps, "
@@ -40,7 +39,7 @@ SequenceDemo = SequenceForm(
     ],
 )
 
-TechnicalReview = SequenceForm(
+TechnicalReview = NavigationForm(
     key="technical-review",
     label="Technical Review",
     instruction="Complete the technical review.",
@@ -59,7 +58,7 @@ TechnicalReview = SequenceForm(
     ],
 )
 
-BusinessReview = SequenceForm(
+BusinessReview = NavigationForm(
     key="business-review",
     label="Business Review",
     instruction="Complete the business review.",
@@ -78,17 +77,15 @@ BusinessReview = SequenceForm(
     ],
 )
 
-ParallelReviews = TabForm(
+ParallelReviews = NavigationForm(
     key="parallel-reviews",
     label="2. Parallel Reviews",
+    mode="tabs",
     instruction="Both branches must be completed. Switch freely between them.",
-    tabs={
-        "technical": TechnicalReview,
-        "business": BusinessReview,
-    },
+    steps=[TechnicalReview, BusinessReview],
 )
 
-ForkMergeDemo = SequenceForm(
+ForkMergeDemo = NavigationForm(
     key="fork-merge-demo",
     label="Fork / Merge — Parallel Branches",
     instruction=(
@@ -114,7 +111,7 @@ ForkMergeDemo = SequenceForm(
     ],
 )
 
-BugBranch = SequenceForm(
+BugBranch = NavigationForm(
     key="bug-branch",
     label="Bug Report Branch",
     instruction="Describe the bug.",
@@ -133,7 +130,7 @@ BugBranch = SequenceForm(
     ],
 )
 
-FeatureBranch = SequenceForm(
+FeatureBranch = NavigationForm(
     key="feature-branch",
     label="Feature Request Branch",
     instruction="Describe the feature.",
@@ -170,7 +167,7 @@ IssueBranch = SwitchForm(
     },
 )
 
-RoutingDemo = SequenceForm(
+RoutingDemo = NavigationForm(
     key="routing-demo",
     label="Routing — Conditional Branches",
     instruction=(

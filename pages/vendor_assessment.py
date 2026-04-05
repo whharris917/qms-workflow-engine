@@ -6,9 +6,7 @@ ChoiceForm, CheckboxForm, DateForm, BooleanForm,
 NumberForm, TextForm, ListForm, KeyValueForm, TableForm, ComputedForm.
 """
 
-from engine.accordionform import AccordionForm
 from engine.booleanform import BooleanForm
-from engine.chainform import ChainForm
 from engine.choiceform import ChoiceForm
 from engine.computedform import ComputedForm
 from engine.dateform import DateForm
@@ -19,7 +17,7 @@ from engine.multiform import FieldDescriptor, MultiForm
 from engine.numberform import NumberForm
 from engine.pageform import PageForm
 from engine.listform import ListForm
-from engine.tabform import TabForm
+from engine.navigationform import NavigationForm
 from engine.tableform import TableForm
 from engine.visibilityform import VisibilityForm
 
@@ -56,8 +54,8 @@ definition = PageForm(
     instruction="Complete all sections to qualify a new vendor for the approved vendor list.",
     eigenforms=[
         # === Section 1: Collapsible vendor details ===
-        AccordionForm(key="sections", label="Assessment Sections", sections={
-            "info": MultiForm(
+        NavigationForm(key="sections", label="Assessment Sections", mode="accordion", steps=[
+            MultiForm(
                 key="vendor_info", label="Vendor Information",
                 instruction="Provide basic vendor identification.",
                 fields=[
@@ -67,8 +65,8 @@ definition = PageForm(
                                     options=["United States", "Germany", "Japan", "China", "India", "Brazil", "Other"]),
                 ]),
 
-            "timeline": ChainForm(key="timeline", label="Assessment Timeline",
-                                  instruction="Complete each step in sequence.", steps=[
+            NavigationForm(key="timeline", label="Assessment Timeline", mode="chain",
+                        instruction="Complete each step in sequence.", steps=[
                 DateForm(key="assessment_date", label="Assessment Date",
                          instruction="When is this assessment being conducted?"),
                 DateForm(key="decision_deadline", label="Decision Deadline",
@@ -87,12 +85,12 @@ definition = PageForm(
                                                   multiline=True, min_length=50)),
             ]),
 
-            "capabilities": TabForm(key="cap_tabs", label="Capability Assessment",
-                                    instruction="Evaluate each capability area.", tabs={
-                "quality": CheckboxForm(key="quality_certs", label="Quality Certifications",
+            NavigationForm(key="cap_tabs", label="Capability Assessment", mode="tabs",
+                        instruction="Evaluate each capability area.", steps=[
+                CheckboxForm(key="quality_certs", label="Quality Certifications",
                                         instruction="Select all certifications the vendor holds.",
                                         items=["ISO 9001", "ISO 14001", "ISO 45001", "GMP", "FDA Registered", "CE Marked"]),
-                "capacity": MultiForm(key="capacity_info", label="Production Capacity",
+                MultiForm(key="capacity_info", label="Production Capacity",
                                       fields=[
                                           FieldDescriptor(key="annual_revenue", label="Annual Revenue",
                                                           instruction="Approximate annual revenue"),
@@ -100,11 +98,11 @@ definition = PageForm(
                                           FieldDescriptor(key="lead_time", label="Typical Lead Time", type="choice",
                                                           options=["< 1 week", "1-2 weeks", "2-4 weeks", "1-2 months", "> 2 months"]),
                                       ]),
-                "compliance": BooleanForm(key="sanctions_check", label="Subject to Trade Sanctions?",
-                                          instruction="Is this vendor subject to any known trade sanctions or restrictions?",
-                                          true_label="Yes", false_label="No"),
-            }),
-        }),
+                BooleanForm(key="sanctions_check", label="Subject to Trade Sanctions?",
+                            instruction="Is this vendor subject to any known trade sanctions or restrictions?",
+                            true_label="Yes", false_label="No"),
+            ]),
+        ]),
 
         # === Section 2: Performance ratings ===
         NumberForm(key="quality_rating", label="Quality Rating",

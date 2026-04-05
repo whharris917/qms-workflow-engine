@@ -7,11 +7,9 @@ working examples with instructive labels showing off each type's key features.
 
 from engine.textform import TextForm
 from engine.checkboxform import CheckboxForm
+from engine.infoform import InfoForm
 from engine.pageform import PageForm
-from engine.tabform import TabForm
-from engine.chainform import ChainForm
-from engine.stepform import SequenceForm
-from engine.accordionform import AccordionForm
+from engine.navigationform import NavigationForm
 from engine.groupform import GroupForm
 from engine.choiceform import ChoiceForm
 from engine.numberform import NumberForm
@@ -46,15 +44,15 @@ simple_values = GroupForm(
     label="Simple Value Forms",
     editable=True,
     instruction=(
-        "The building blocks. Each captures a single value and reports "
-        "is_complete when that value is set. Try setting each one — the "
-        "green border appears when complete."
+        "The building blocks of interactive content. Each captures a single "
+        "value and reports is_complete when that value is set. Try setting "
+        "each one — the green border appears when complete."
     ),
     eigenforms=[
         TextForm(
             key="text-demo",
             label="TextForm",
-            instruction="The simplest eigenform. Accepts any string. POST {\"value\": \"hello\"} to set it. This one is editable — click the pencil icon to rename it.",
+            instruction="The simplest interactive eigenform. Accepts any string. POST {\"value\": \"hello\"} to set it. This one is editable — click the pencil icon to rename it.",
             editable=True,
         ),
         TextForm(
@@ -124,6 +122,39 @@ simple_values = GroupForm(
 
 
 # ---------------------------------------------------------------------------
+# Section 1b: Static Output
+# ---------------------------------------------------------------------------
+
+display_forms = GroupForm(
+    key="display-forms",
+    label="Display Forms",
+    editable=True,
+    instruction=(
+        "Display-only eigenforms. These show information but don't capture "
+        "user input — they're always complete."
+    ),
+    eigenforms=[
+        InfoForm(
+            key="info-string-demo",
+            label="InfoForm (string)",
+            editable=True,
+            text="This is a simple read-only text display. In edit mode, you can change the text.",
+        ),
+        InfoForm(
+            key="info-dict-demo",
+            label="InfoForm (dict)",
+            editable=True,
+            text={
+                "What it does": "Read-only text display. No affordances, always complete.",
+                "String mode": "Pass a plain string for simple text.",
+                "Dict mode": "Pass a dict for labeled key-value entries (like this one).",
+            },
+        ),
+    ],
+)
+
+
+# ---------------------------------------------------------------------------
 # Section 2: Selection Forms
 # ---------------------------------------------------------------------------
 
@@ -154,7 +185,7 @@ selection_forms = GroupForm(
                 "Multi-select with explicit confirmation. Check items, then click Done. "
                 "Done with nothing checked means 'none of these apply'. "
                 "Changing items after Done requires re-confirmation. "
-                "This prevents premature auto-advance in ChainForm."
+                "This prevents premature auto-advance in chain mode."
             ),
             items=["Unit Tests", "Integration Tests", "Load Tests", "Manual QA"],
             editable=True,
@@ -445,7 +476,7 @@ container_forms = GroupForm(
     editable=True,
     instruction=(
         "Containers organize eigenforms into navigable structures. "
-        "TabForm, SequenceForm, ChainForm, and AccordionForm all implement faithful projection — "
+        "NavigationForm modes (tabs, chain, sequence, accordion) all implement faithful projection — "
         "hidden content is absent from both JSON and HTML."
     ),
     eigenforms=[
@@ -465,32 +496,34 @@ container_forms = GroupForm(
                 TextForm(key="group-child-2", label="Child 2"),
             ],
         ),
-        TabForm(
+        NavigationForm(
             key="tab-demo",
-            label="TabForm",
+            label="NavigationForm (tabs)",
+            mode="tabs",
             editable=True,
             instruction=(
                 "Tabbed container. Only the active tab appears in JSON and HTML. "
-                "Switch tabs with POST {\"tab\": \"second\"}. "
+                "Switch tabs with POST {\"step\": \"tab-b\"}. "
                 "Complete when ALL tabs are complete (not just the visible one). "
                 "Edit mode (pencil icon) enables adding, removing, and reordering tabs."
             ),
-            tabs={
-                "first": TextForm(
+            steps=[
+                TextForm(
                     key="tab-a",
                     label="First Tab Content",
                     instruction="Fill this, then switch to the second tab.",
                 ),
-                "second": TextForm(
+                TextForm(
                     key="tab-b",
                     label="Second Tab Content",
-                    instruction="Both tabs must be complete for the TabForm to be complete.",
+                    instruction="Both tabs must be complete for the container to be complete.",
                 ),
-            },
+            ],
         ),
-        ChainForm(
+        NavigationForm(
             key="chain-demo",
-            label="ChainForm",
+            label="NavigationForm (chain)",
+            mode="chain",
             editable=True,
             instruction=(
                 "Sequential wizard. Auto-advances to the first incomplete step. "
@@ -509,12 +542,12 @@ container_forms = GroupForm(
                 TextForm(key="step-3", label="Step 3: Summary", instruction="Last step. Fill to complete the chain."),
             ],
         ),
-        SequenceForm(
+        NavigationForm(
             key="sequence-demo",
-            label="SequenceForm",
+            label="NavigationForm",
             editable=True,
             instruction=(
-                "Gated sequential container — like ChainForm but without auto-advance. "
+                "Gated sequential container — like chain mode but without auto-advance. "
                 "Complete each step to unlock the next. Use the Back/Next buttons or "
                 "click completed steps in the progress bar to navigate. "
                 "Locked steps show a lock icon. "
@@ -531,27 +564,28 @@ container_forms = GroupForm(
                 TextForm(key="sf-3", label="Step 3: Description", instruction="Describe the work to complete the sequence."),
             ],
         ),
-        AccordionForm(
+        NavigationForm(
             key="accordion-demo",
-            label="AccordionForm",
+            label="NavigationForm (accordion)",
+            mode="accordion",
             editable=True,
             instruction=(
                 "Collapsible sections. Collapsed sections are omitted from JSON and HTML "
-                "(faithful projection). Toggle with POST {\"action\": \"toggle\", \"section\": \"basics\"}. "
+                "(faithful projection). Toggle with POST {\"action\": \"toggle\", \"step\": \"acc-basics\"}. "
                 "Edit mode (pencil icon) enables adding, removing, and reordering sections."
             ),
-            sections={
-                "basics": TextForm(
+            steps=[
+                TextForm(
                     key="acc-basics",
                     label="Basic Info",
                     instruction="This section starts expanded. Collapse it to hide from output.",
                 ),
-                "details": TextForm(
+                TextForm(
                     key="acc-details",
                     label="Additional Details",
                     instruction="Expand this section to interact with it.",
                 ),
-            },
+            ],
         ),
     ],
 )
@@ -929,22 +963,24 @@ definition = PageForm(
         "with working examples you can interact with. This page IS the documentation."
     ),
     eigenforms=[
-        TabForm(
+        NavigationForm(
             key="gallery",
             label="Gallery",
+            mode="tabs",
             editable=True,
-            tabs={
-                "simple": simple_values,
-                "selection": selection_forms,
-                "collections": collection_forms,
-                "lists": list_forms,
-                "tables": table_forms,
-                "containers": container_forms,
-                "conditional": conditional_forms,
-                "computed": computed_forms,
-                "actions": action_forms,
-                "showcase": showcase,
-            },
+            steps=[
+                simple_values,
+                display_forms,
+                selection_forms,
+                collection_forms,
+                list_forms,
+                table_forms,
+                container_forms,
+                conditional_forms,
+                computed_forms,
+                action_forms,
+                showcase,
+            ],
         ),
     ],
 )

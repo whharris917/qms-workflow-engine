@@ -92,9 +92,6 @@ def _build_default_registry() -> EigenformRegistry:
     from engine.booleanform import BooleanForm
     from engine.keyvalueform import KeyValueForm
     from engine.pageform import PageForm
-    from engine.tabform import TabForm
-    from engine.chainform import ChainForm
-    from engine.accordionform import AccordionForm
     from engine.groupform import GroupForm
     from engine.repeaterform import RepeaterForm
     from engine.switchform import SwitchForm
@@ -106,23 +103,28 @@ def _build_default_registry() -> EigenformRegistry:
     from engine.actionform import ActionForm
     from engine.rubikscubeform import RubiksCubeForm
     from engine.setform import SetForm
-    from engine.stepform import SequenceForm
+    from engine.navigationform import NavigationForm
     from engine.tablerunner import TableRunner
     from engine.historyform import HistoryForm
     from engine.infoform import InfoForm
     r = EigenformRegistry()
     for cls in [
         TextForm, CheckboxForm, ChoiceForm, MultiForm, ListForm, SetForm,
-        TableForm, SequenceForm, TableRunner, HistoryForm,
+        TableForm, NavigationForm, TableRunner, HistoryForm,
         NumberForm, DateForm, BooleanForm,
         KeyValueForm,
-        PageForm, TabForm, ChainForm, AccordionForm, GroupForm, RepeaterForm,
+        PageForm, GroupForm, RepeaterForm,
         SwitchForm,
         VisibilityForm, DynamicChoiceForm,
         ScoreForm, ComputedForm, ValidationForm,
         ActionForm, RubiksCubeForm, InfoForm,
     ]:
         r.register(cls)
+    # Aliases for the unified NavigationForm modes
+    r.register(NavigationForm, name="tab")
+    r.register(NavigationForm, name="chain")
+    r.register(NavigationForm, name="sequence")
+    r.register(NavigationForm, name="accordion")
     return r
 
 
@@ -164,9 +166,9 @@ registry = _RegistryProxy()
 # "list" = list of child descriptors, "dict" = dict of key->descriptor, "single" = one descriptor.
 _CHILD_FIELDS = {
     "eigenforms": "list",   # PageForm, GroupForm
-    "tabs": "dict",          # TabForm
-    "steps": "list",         # ChainForm
-    "sections": "dict",      # AccordionForm
+    "steps": "list",         # NavigationForm (all modes)
+    "tabs": "dict",          # legacy TabForm descriptors
+    "sections": "dict",      # legacy AccordionForm descriptors
     "cases": "dict",         # SwitchForm
     "template": "list",      # RepeaterForm
     "eigenform": "single",   # VisibilityForm
@@ -246,6 +248,24 @@ def from_descriptor(desc: dict, reg: EigenformRegistry | None = None,
 
     type_name = desc["type"]
     key = desc["key"]
+
+    # Migrate legacy container descriptors to unified NavigationForm
+    if type_name in ("tab", "chain", "sequence", "accordion"):
+        desc = dict(desc)  # don't mutate the original
+        if "tabs" in desc and "steps" not in desc:
+            desc["steps"] = list(desc.pop("tabs").values())
+        if "sections" in desc and "steps" not in desc:
+            desc["steps"] = list(desc.pop("sections").values())
+        config = desc.setdefault("config", {})
+        if type_name == "tab":
+            config.setdefault("mode", "tabs")
+        elif type_name == "chain":
+            config.setdefault("mode", "chain")
+        elif type_name == "sequence":
+            config.setdefault("mode", "sequence")
+        elif type_name == "accordion":
+            config.setdefault("mode", "accordion")
+        desc["type"] = type_name = "navigation"
 
     # If the seed matches at this level, use it (preserves callables)
     if seed is not None and seed.form == type_name and seed.key == key:

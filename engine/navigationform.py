@@ -1,18 +1,13 @@
-"""SequenceForm — a gated sequence of eigenforms with manual navigation.
+"""NavigationForm — unified container with four display modes.
 
-Like ChainForm but without auto-advance. Steps must be completed
-in order — step N+1 is only accessible when step N is complete.
-The user manually navigates between steps using Next/Back affordances.
-Completed steps can always be revisited.
+Modes:
+    tabs:      Free access, one child visible. Classic tabbed interface.
+    chain:     Gated access, auto-advance to first incomplete. Wizard.
+    sequence:  Gated access, manual Back/Next navigation.
+    accordion: Free access, all children visible with expand/collapse.
 
-Comparison:
-    TabForm:       free access to all tabs, no ordering.
-    SequenceForm:  gated sequential access, manual navigation.
-    ChainForm:     gated sequential access, auto-advances on completion.
-
-Edit mode (when editable=True): exposes structural operations —
-add, remove, reorder steps, and toggle editability on step eigenforms.
-Structure is persisted to the store so changes survive rebinds.
+All modes share: bind, edit mode (add/remove/move/toggle_editable),
+structural persistence, snapshot/restore, is_complete.
 """
 
 from __future__ import annotations
@@ -30,19 +25,12 @@ from engine.templates import render_template
 
 
 @dataclass
-class SequenceForm(Eigenform):
-    """A gated sequence of eigenforms shown one at a time.
-
-    Navigation rules:
-    - Step 0 is always accessible.
-    - Step N is accessible when step N-1 is complete.
-    - The active step persists across page loads.
-    - Completed steps can always be revisited.
-    - No auto-advance: the user must explicitly navigate forward.
-    """
+class NavigationForm(Eigenform):
+    """A container that presents children in one of four modes."""
     steps: list[Eigenform] = field(default_factory=list)
+    mode: str = "sequence"
+    default_expanded: bool = True  # accordion mode: initial section state
 
-    # Preserved during bind — unbound seed steps for callable matching
     _seed: list[Eigenform] = field(default_factory=list, repr=False)
 
     def to_descriptor(self) -> dict:
@@ -58,7 +46,11 @@ class SequenceForm(Eigenform):
     def is_complete(self) -> bool:
         return all(ef.is_complete for ef in self.steps)
 
+    # --- Active child (single-projection modes) ---
+
     def _highest_accessible_index(self) -> int:
+        if self.mode in ("tabs", "accordion"):
+            return len(self.steps) - 1
         for i, ef in enumerate(self.steps):
             if not ef.is_complete:
                 return i
@@ -70,13 +62,27 @@ class SequenceForm(Eigenform):
     @property
     def _active_key(self) -> str | None:
         stored = self.value
-        if stored and stored in {ef.key for ef in self.steps}:
+        if stored and isinstance(stored, str) and stored in {ef.key for ef in self.steps}:
             return stored
         return None
 
     @property
     def active_step(self) -> Eigenform | None:
+        if self.mode == "accordion":
+            return None
         active_key = self._active_key
+        if self.mode == "chain":
+            # Explicit focus overrides auto-advance
+            if active_key:
+                for ef in self.steps:
+                    if ef.key == active_key:
+                        return ef
+            # Auto-advance: first incomplete
+            for ef in self.steps:
+                if not ef.is_complete:
+                    return ef
+            return self.steps[-1] if self.steps else None
+        # tabs / sequence: validate accessibility
         if active_key:
             for i, ef in enumerate(self.steps):
                 if ef.key == active_key and self._is_accessible(i):
@@ -91,6 +97,18 @@ class SequenceForm(Eigenform):
                 if ef.key == active.key:
                     return i
         return 0
+
+    # --- Accordion expanded state ---
+
+    @property
+    def _expanded_state(self) -> dict[str, bool]:
+        stored = self.value
+        if stored and isinstance(stored, dict):
+            return stored
+        return {}
+
+    def _is_expanded(self, key: str) -> bool:
+        return self._expanded_state.get(key, self.default_expanded)
 
     # --- Structural persistence ---
 
@@ -155,51 +173,109 @@ class SequenceForm(Eigenform):
         self._rebuild()
 
     def _nav_affordances(self) -> list[Affordance]:
-        """Navigation affordances — shared by both modes."""
+        """Navigation affordances — mode-dependent."""
         affordances = []
-        idx = self.active_index
         url = self.url
 
-        if idx > 0:
-            prev = self.steps[idx - 1]
-            affordances.append(SimpleButtonAffordance(
-                label=f"\u2190 Back: {prev.effective_label}",
-                method="POST",
-                url=url,
-                body={"step": prev.key},
-                instruction=f"Go back to {prev.effective_label}.",
-            ))
+        if self.mode == "tabs":
+            other = {
+                ef.key: ef.effective_label
+                for ef in self.steps
+                if ef.key != (self.active_step.key if self.active_step else None)
+            }
+            if other:
+                aff = Affordance(
+                    label="Switch Tab",
+                    method="POST", url=url,
+                    body={"step": "<step_key>"},
+                    instruction="Switch to a different tab.",
+                )
+                aff._steps = other
+                aff._chrome_rendered = True
+                affordances.append(aff)
 
-        if idx < len(self.steps) - 1 and self.steps[idx].is_complete:
-            nxt = self.steps[idx + 1]
-            affordances.append(SimpleButtonAffordance(
-                label=f"Next: {nxt.effective_label} \u2192",
-                method="POST",
-                url=url,
-                body={"step": nxt.key},
-                instruction=f"Advance to {nxt.effective_label}.",
-            ))
+        elif self.mode == "chain":
+            active = self.active_step
+            if active and active.is_complete and self._active_key is not None:
+                affordances.append(SimpleButtonAffordance(
+                    label="Continue",
+                    method="POST", url=url,
+                    body={"action": "continue"},
+                    instruction="Resume from the next incomplete step.",
+                ))
+            completed = {
+                ef.key: ef.effective_label
+                for ef in self.steps
+                if ef.is_complete
+                and ef.key != (active.key if active else None)
+            }
+            if completed:
+                aff = Affordance(
+                    label="Back to Step",
+                    method="POST", url=url,
+                    body={"step": "<step_key>"},
+                    instruction="Jump back to a completed step.",
+                )
+                aff._steps = completed
+                aff._chrome_rendered = True
+                affordances.append(aff)
 
-        active = self.active_step
-        highest = self._highest_accessible_index()
-        completed = {
-            ef.key: ef.effective_label
-            for i, ef in enumerate(self.steps)
-            if i <= highest
-            and ef.key != (active.key if active else None)
-            and ef.is_complete
-        }
-        if completed:
-            aff = Affordance(
-                label="Go to Step",
-                method="POST",
-                url=url,
-                body={"step": "<step_key>"},
-                instruction="Jump to a completed step.",
-            )
-            aff._steps = completed
-            aff._chrome_rendered = True
-            affordances.append(aff)
+        elif self.mode == "sequence":
+            idx = self.active_index
+            if idx > 0:
+                prev = self.steps[idx - 1]
+                affordances.append(SimpleButtonAffordance(
+                    label=f"\u2190 Back: {prev.effective_label}",
+                    method="POST", url=url,
+                    body={"step": prev.key},
+                    instruction=f"Go back to {prev.effective_label}.",
+                ))
+            if idx < len(self.steps) - 1 and self.steps[idx].is_complete:
+                nxt = self.steps[idx + 1]
+                affordances.append(SimpleButtonAffordance(
+                    label=f"Next: {nxt.effective_label} \u2192",
+                    method="POST", url=url,
+                    body={"step": nxt.key},
+                    instruction=f"Advance to {nxt.effective_label}.",
+                ))
+            active = self.active_step
+            highest = self._highest_accessible_index()
+            completed = {
+                ef.key: ef.effective_label
+                for i, ef in enumerate(self.steps)
+                if i <= highest
+                and ef.key != (active.key if active else None)
+                and ef.is_complete
+            }
+            if completed:
+                aff = Affordance(
+                    label="Go to Step",
+                    method="POST", url=url,
+                    body={"step": "<step_key>"},
+                    instruction="Jump to a completed step.",
+                )
+                aff._steps = completed
+                aff._chrome_rendered = True
+                affordances.append(aff)
+
+        elif self.mode == "accordion":
+            if self.steps:
+                sections = {
+                    ef.key: {
+                        "label": ef.effective_label,
+                        "expanded": self._is_expanded(ef.key),
+                    }
+                    for ef in self.steps
+                }
+                aff = Affordance(
+                    label="Toggle Section",
+                    method="POST", url=url,
+                    body={"action": "toggle", "step": "<step_key>"},
+                    instruction="Expand or collapse a section.",
+                )
+                aff._sections = sections
+                aff._chrome_rendered = True
+                affordances.append(aff)
 
         return affordances
 
@@ -224,7 +300,7 @@ class SequenceForm(Eigenform):
                 "after": "<sibling_key | null>",
             },
             instruction=(
-                f"Add a new step to this sequence. "
+                f"Add a new step. "
                 f"Available types: {', '.join(available)}. "
                 f"'after' places it after the named sibling (null = append to end)."
             ),
@@ -236,7 +312,7 @@ class SequenceForm(Eigenform):
                 method="POST",
                 url=self.url,
                 body={"action": "remove_step", "key": ef.key},
-                instruction=f"Remove the '{ef.key}' step and its data.",
+                instruction=f"Remove '{ef.key}' and its data.",
             ))
             state = "editable" if ef.editable else "not editable"
             affs.append(SimpleButtonAffordance(
@@ -336,6 +412,11 @@ class SequenceForm(Eigenform):
         structure = self._get_structure()
         structure = [d for d in structure if d["key"] != key]
         self._save_structure(structure)
+
+        # If the removed step was active, reset
+        if self._active_key == key:
+            self._store.delete(self._scope, self.key)
+
         self._rebuild()
         return self.serialize()
 
@@ -392,18 +473,30 @@ class SequenceForm(Eigenform):
         return self.serialize()
 
     def _handle(self, body: dict) -> dict:
-        """Handle step navigation or structural actions."""
         action = body.get("action", "")
 
-        # Navigation works in both modes
+        # --- Navigation ---
+        if self.mode == "accordion" and action == "toggle":
+            step_key = body.get("step")
+            if step_key and step_key in {ef.key for ef in self.steps}:
+                state = dict(self._expanded_state)
+                state[step_key] = not self._is_expanded(step_key)
+                self._store.set(self._scope, self.key, state)
+            return self.serialize()
+
+        if self.mode == "chain" and action == "continue":
+            self._store.set(self._scope, self.key, None)
+            return self.serialize()
+
         step_key = body.get("step")
-        if step_key:
+        if step_key and self.mode != "accordion":
             for i, ef in enumerate(self.steps):
                 if ef.key == step_key and self._is_accessible(i):
                     self._store.set(self._scope, self.key, step_key)
                     break
             return self.serialize()
 
+        # --- Structural (edit mode) ---
         if self.edit_mode:
             if action == "add_step":
                 self._push_undo()
@@ -423,25 +516,42 @@ class SequenceForm(Eigenform):
     # --- Serialization ---
 
     def _serialize_state(self) -> dict:
-        active = self.active_step
-        highest = self._highest_accessible_index()
-        return self._base_state() | {
-            "active_step": active.key if active else None,
-            "progress": [
-                {
+        state = self._base_state()
+        state["mode"] = self.mode
+
+        if self.mode == "accordion":
+            state["step_keys"] = [ef.key for ef in self.steps]
+        else:
+            active = self.active_step
+            state["active_step"] = active.key if active else None
+            progress = []
+            highest = self._highest_accessible_index()
+            for i, ef in enumerate(self.steps):
+                entry = {
                     "key": ef.key,
                     "label": ef.effective_label,
                     "complete": ef.is_complete,
-                    "accessible": i <= highest,
                 }
-                for i, ef in enumerate(self.steps)
-            ],
-        }
+                if self.mode in ("sequence", "chain"):
+                    entry["accessible"] = i <= highest
+                progress.append(entry)
+            state["progress"] = progress
+
+        return state
 
     def _serialize_full(self) -> dict:
         state = super()._serialize_full()
-        active = self.active_step
-        state["eigenform"] = active.serialize() if active else None
+        if self.mode == "accordion":
+            state["sections"] = {}
+            for ef in self.steps:
+                expanded = self._is_expanded(ef.key)
+                entry = {"expanded": expanded}
+                if expanded:
+                    entry["eigenform"] = ef.serialize()
+                state["sections"][ef.key] = entry
+        else:
+            active = self.active_step
+            state["eigenform"] = active.serialize() if active else None
         return state
 
     def get_affordances(self) -> list[Affordance]:
@@ -451,11 +561,64 @@ class SequenceForm(Eigenform):
 
     def render_from_data(self, data: dict) -> str:
         from engine.registry import get_registry
-        active_key = data.get("active_step")
+
         step_items = []
-        for i, ef in enumerate(self.steps):
-            step_items.append({"key": ef.key, "label": ef.effective_label, "is_active": ef.key == active_key, "editable": ef.editable, "index": i, "complete": ef.is_complete, "accessible": self._is_accessible(i)})
-        active = self.active_step
-        active_html = active.render() if active else ""
+        if self.mode == "accordion":
+            section_html = {}
+            for i, ef in enumerate(self.steps):
+                expanded = self._is_expanded(ef.key) if not data.get("edit_mode") else self._is_expanded(ef.key)
+                step_items.append({
+                    "key": ef.key, "label": ef.effective_label,
+                    "expanded": expanded, "editable": ef.editable, "index": i,
+                })
+                if expanded:
+                    section_html[ef.key] = ef.render()
+            active_html = ""
+        else:
+            section_html = {}
+            active_key = data.get("active_step")
+            for i, ef in enumerate(self.steps):
+                item = {
+                    "key": ef.key, "label": ef.effective_label,
+                    "is_active": ef.key == active_key, "editable": ef.editable,
+                    "index": i, "complete": ef.is_complete,
+                }
+                if self.mode in ("sequence", "chain"):
+                    item["accessible"] = self._is_accessible(i)
+                step_items.append(item)
+            active = self.active_step
+            active_html = active.render() if active else ""
+
         available_types = sorted(get_registry().available()) if data.get("edit_mode") else []
-        return render_template("step.html", data=data, ef=self, url=self.url, label=data.get("label", ""), instruction=data.get("instruction") or "", active_html=active_html, step_items=step_items, available_types=available_types)
+        return render_template(
+            "navigation.html",
+            data=data, ef=self, url=self.url, mode=self.mode,
+            label=data.get("label", ""),
+            instruction=data.get("instruction") or "",
+            step_items=step_items,
+            active_html=active_html,
+            section_html=section_html,
+            available_types=available_types,
+        )
+
+    def handle_action(self, key: str, body: dict) -> bool:
+        if key == self.key:
+            self.handle(body)
+            return True
+        if self.mode == "accordion":
+            # Route to any child
+            for ef in self.steps:
+                if ef.key == key:
+                    ef.handle(body)
+                    return True
+                if hasattr(ef, 'handle_action') and ef.handle_action(key, body):
+                    return True
+        else:
+            active = self.active_step
+            if active and active.key == key:
+                active.handle(body)
+                # Chain mode: clear focus so auto-advance resumes
+                if self.mode == "chain":
+                    self._store.set(self._scope, self.key, None)
+                return True
+        return False
