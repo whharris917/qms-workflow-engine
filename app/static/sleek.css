@@ -206,19 +206,81 @@ body.operator-view[data-theme="sleek"] .ef-aff-btn--tab:hover {
     color: #cccccc;
 }
 
-/* --- NavigationForm: VS Code-style tabs + content panel --- */
+/* --- NavigationForm: default = vertical tabs in left margin --- */
 
-/* Tab bar: dark strip with bottom border */
+body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] {
+    position: relative !important;
+}
 body.operator-view[data-theme="sleek"] .ef-nav-bar {
-    background: #1e1e1e !important;
-    border-bottom: 1px solid #444 !important;
-    gap: 0 !important;
-    margin-bottom: 0 !important;
-    padding: 0 !important;
+    position: absolute;
+    right: 100%;
+    top: 0;
+    width: 10vw;
+    max-width: 160px;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2px !important;
+    padding: 0 12px 0 0 !important;
+    margin: 0 !important;
+    background: none !important;
+    border: none !important;
+    text-align: right;
+}
+body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--active {
+    color: #e0e0e0 !important;
+    background: none !important;
+    border: none !important;
+    border-right: 2px solid #60a5fa !important;
+    border-radius: 0 !important;
+    padding: 4px 10px !important;
+    font-size: 12px !important;
+    font-weight: 600;
+    text-align: right;
+    margin: 0;
+}
+body.operator-view[data-theme="sleek"] .ef-nav-tab {
+    color: #666 !important;
+    background: none !important;
+    border: none !important;
+    border-right: 2px solid transparent !important;
+    border-radius: 0 !important;
+    padding: 4px 10px !important;
+    font-size: 12px !important;
+    cursor: pointer;
+    text-align: right;
+}
+body.operator-view[data-theme="sleek"] .ef-nav-tab:hover {
+    color: #cccccc !important;
+    background: none !important;
+    border-right-color: #555d66 !important;
+}
+body.operator-view[data-theme="sleek"] .ef-nav-content {
+    background: none;
+    border: none;
+    border-radius: 0;
+    padding: 0;
 }
 
-/* Active tab: merges into content panel below */
-body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--active {
+/* --- Nested NavigationForm: horizontal VS Code tabs --- */
+
+body.operator-view[data-theme="sleek"] .ef-nav-content .eigenform[data-form="navigation"] {
+    position: static !important;
+}
+body.operator-view[data-theme="sleek"] .ef-nav-content .ef-nav-bar {
+    position: static;
+    width: auto;
+    max-width: none;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap;
+    gap: 0 !important;
+    padding: 0 !important;
+    margin-bottom: 0 !important;
+    background: #1e1e1e !important;
+    border-bottom: 1px solid #444 !important;
+    text-align: left;
+}
+body.operator-view[data-theme="sleek"] .ef-nav-content .ef-nav-tab.ef-nav-tab--active {
     color: #e0e0e0 !important;
     background: #2b3035 !important;
     border: 1px solid #555d66 !important;
@@ -229,10 +291,10 @@ body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--active {
     position: relative;
     z-index: 1;
     font-size: 12px !important;
+    font-weight: normal;
+    text-align: left;
 }
-
-/* Inactive tabs */
-body.operator-view[data-theme="sleek"] .ef-nav-tab {
+body.operator-view[data-theme="sleek"] .ef-nav-content .ef-nav-tab {
     color: #888 !important;
     background: transparent !important;
     border: 1px solid transparent !important;
@@ -240,14 +302,13 @@ body.operator-view[data-theme="sleek"] .ef-nav-tab {
     padding: 8px 16px !important;
     font-size: 12px !important;
     cursor: pointer;
+    text-align: left;
 }
-body.operator-view[data-theme="sleek"] .ef-nav-tab:hover {
+body.operator-view[data-theme="sleek"] .ef-nav-content .ef-nav-tab:hover {
     color: #cccccc !important;
     background: #2a2a2d !important;
 }
-
-/* Content panel: connected to tab bar */
-body.operator-view[data-theme="sleek"] .ef-nav-content {
+body.operator-view[data-theme="sleek"] .ef-nav-content .ef-nav-content {
     background: #2b3035;
     border: 1px solid #555d66;
     border-top: none;
