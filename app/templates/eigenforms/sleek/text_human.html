@@ -11,7 +11,6 @@
 {% set _ = aff.update({"_rendered": true}) %}
 {% endfor %}
 <div class="sleek-text">
-  <label class="sleek-text__label" for="sleek-{{ ef.uid }}">{{ label }}</label>
   {% if instruction %}
   <p class="sleek-text__hint">{{ instruction }}</p>
   {% endif %}

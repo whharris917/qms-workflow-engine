@@ -135,7 +135,8 @@
       {% if step.is_active %}
         <span class="ef-nav-tab ef-nav-tab--active" style="font-weight: bold; padding: 2px 8px; border-bottom: 2px solid #333;">{{ step.label }}</span>
       {% else %}
-        <button class="ef-nav-tab" data-ef-post="{{ url }}" data-ef-body="{{ {"step": step.key}|tojson }}" style="cursor: pointer; font-size: 12px; padding: 2px 8px; border: none; background: none;">{{ step.label }}</button>
+        {{ render_btn(url, {"step": step.key}, step.label,
+            "ef-nav-tab") }}
       {% endif %}
     {% endfor %}
     </div>

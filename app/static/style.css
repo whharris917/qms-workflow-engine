@@ -190,6 +190,15 @@
     font-weight: bold;
 }
 
+/* Navigation tab buttons (default view) */
+.ef-nav-tab {
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 8px;
+    border: none;
+    background: none;
+}
+
 /* Accordion toggle header */
 .ef-aff-accordion {
     cursor: pointer;
@@ -427,21 +436,44 @@
 }
 
 /* --- Feedback banners --- */
-.ef-feedback--error {
-    background: #fff0f0;
-    border: 1px solid #c00;
-    padding: 4px 8px;
+.ef-feedback {
+    padding: 8px 12px;
     margin: 4px 0;
-    border-radius: 3px;
-    color: #c00;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.ef-feedback--error {
+    background: #fdecea;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
 }
 .ef-feedback--success {
-    background: #efffef;
-    border: 1px solid #4a4;
-    padding: 4px 8px;
-    margin: 4px 0;
+    background: #edf7ed;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+.ef-feedback__target {
+    opacity: 0.7;
+}
+.ef-feedback__meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.ef-feedback__timestamp {
+    opacity: 0.5;
+    font-size: 0.85em;
+}
+.ef-feedback__dismiss {
+    cursor: pointer;
+    font-size: 11px;
+    padding: 1px 6px;
+    background: transparent;
+    border: 1px solid #c88;
+    color: #721c24;
     border-radius: 3px;
-    color: #2a2;
 }
 
 /* N/A text */

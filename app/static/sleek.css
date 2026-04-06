@@ -13,6 +13,8 @@ body.operator-view[data-theme="sleek"] {
 
 body.operator-view[data-theme="sleek"] #page-content {
     max-width: none;
+    padding-left: 12%;
+    padding-right: 12%;
 }
 
 /* Toolbar blends with dark background */
@@ -325,9 +327,13 @@ body.operator-view[data-theme="sleek"] .ef-feedback--error {
     color: #f48771;
 }
 body.operator-view[data-theme="sleek"] .ef-feedback--success {
-    background: #1f3c2a;
+    background: #1a2a3c;
     border-color: #3b82f6;
     color: #60a5fa;
+}
+body.operator-view[data-theme="sleek"] .ef-feedback__dismiss {
+    border-color: #be3434;
+    color: #f48771;
 }
 
 /* --- TextForm sleek template --- */
@@ -413,7 +419,7 @@ body.operator-view[data-theme="sleek"] .ef-feedback--success {
     color: #60a5fa;
     margin: 8px 0 0 0;
     padding: 6px 10px;
-    background: #1e2a25;
+    background: #1a2535;
     border-left: 2px solid #60a5fa;
     border-radius: 0 2px 2px 0;
     font-family: 'Cascadia Code', 'Consolas', monospace;
@@ -425,7 +431,7 @@ body.operator-view[data-theme="sleek"] .ef-feedback--success {
     color: #60a5fa;
     margin: 8px 0 0 0;
     padding: 8px 10px;
-    background: #1e2a25;
+    background: #1a2535;
     border-left: 2px solid #60a5fa;
     border-radius: 0 2px 2px 0;
     line-height: 1.4;
@@ -547,13 +553,13 @@ body.operator-view[data-theme="sleek"] .ef-feedback--success {
 }
 
 .sleek-list__btn--save {
-    color: #4ade80;
+    color: #60a5fa;
     font-size: 13px;
     width: 20px;
     height: 20px;
 }
 .sleek-list__btn--save:hover {
-    color: #86efac;
+    color: #93c5fd;
 }
 
 .sleek-list__btn--arrow {
@@ -649,7 +655,7 @@ body.operator-view[data-theme="sleek"] .ef-feedback--success {
 }
 
 .sleek-list__btn--add {
-    color: #4ade80;
+    color: #60a5fa;
     font-size: 16px;
     font-weight: 300;
     width: 22px;
@@ -659,8 +665,8 @@ body.operator-view[data-theme="sleek"] .ef-feedback--success {
     background: #444b53;
 }
 .sleek-list__btn--add:hover {
-    border-color: #4ade80;
-    background: #2a3a2e;
+    border-color: #60a5fa;
+    background: #1e2a3a;
 }
 
 .sleek-list__extra-affs {
@@ -971,15 +977,15 @@ body.operator-view[data-theme="sleek"] .ef-feedback--success {
 }
 .sleek-table__btn--add-row {
     font-size: 11px;
-    color: #4ade80;
+    color: #60a5fa;
     padding: 2px 8px;
     border: 1px solid #555;
     border-radius: 2px;
     background: #444b53;
 }
 .sleek-table__btn--add-row:hover {
-    border-color: #4ade80;
-    background: #2a3a2e;
+    border-color: #60a5fa;
+    background: #1e2a3a;
 }
 
 /* Data cells */
