@@ -1,8 +1,8 @@
 {# Sleek theme eigenform wrapper.
 
    Data forms: dark card with titlebar (label + chrome).
-   Containers: transparent, no card, chrome buttons only (no label in titlebar).
-   GroupForm: no titlebar at all (sidebar in group.html handles label).
+   NavigationForm / GroupForm: titlebar extends into LEFT margin (tab bar territory).
+   Other containers: transparent, no card, chrome buttons only.
    No hidden elements — the template simply doesn't emit what isn't needed.
 
    Context: same as wrapper.html
@@ -11,7 +11,7 @@
 #}
 {% set cls_str = classes|join(" ") %}
 {% if is_container and form == "navigation" %}
-{# --- NavigationForm: titlebar header like data forms --- #}
+{# --- NavigationForm: titlebar extends left --- #}
 <div class="{{ cls_str }}" data-form="{{ form }}" data-key="{{ key }}">
 {% if editable %}
 <div class="ef-titlebar">

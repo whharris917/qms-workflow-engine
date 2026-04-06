@@ -1,7 +1,8 @@
 {# GroupForm — Sleek theme.
 
-   Renders label, instruction, and affordances in a right-margin sidebar,
-   with children in the main column. Edit mode falls back to default.
+   Renders like a single-tab NavigationForm. The tab bar contains the label,
+   instruction, and chrome — no separate titlebar.
+   Edit mode falls back to the default template.
 
    Context: same as group.html (data, ef, url, label, instruction,
             children_html, child_items, available_types)
@@ -9,41 +10,33 @@
 {% if data.edit_mode %}
   {% include "group.html" %}
 {% else %}
-  {% set has_label = label %}
-  {% set has_instruction = instruction %}
-  {% set has_affs = false %}
-  {% for aff in data.affordances %}
-    {% if not aff._rendered %}
-      {% set has_affs = true %}
+  <h3>{{ data.label }}</h3>
+
+  <div class="ef-nav-bar ef-group-bar">
+    <span class="ef-nav-tab ef-nav-tab--active">{{ data.label }}</span>
+    <span class="ef-group-bar__spacer"></span>
+    {% if ef.editable %}
+    <div class="ef-chrome">
+    {% if data.edit_mode %}
+      <button data-ef-post="{{ url }}" data-ef-body='{"action":"set_mode","mode":"execute"}' class="ef-chrome-btn" title="Run"><span>&#9654;</span></button>
+      {% if ef._undo_depth > 0 %}
+      <button data-ef-post="{{ url }}" data-ef-body='{"action":"undo"}' class="ef-chrome-btn" title="Undo ({{ ef._undo_depth }})"><span>&#8630;</span></button>
+      {% endif %}
+      <button data-ef-post="{{ url }}" data-ef-body='{"action":"discard"}' class="ef-chrome-btn" title="Discard"><span>&#10005;</span></button>
+    {% else %}
+      <button data-ef-post="{{ url }}" data-ef-body='{"action":"set_mode","mode":"edit"}' class="ef-chrome-btn" title="Edit"><span>&#9998;</span></button>
     {% endif %}
-  {% endfor %}
-  {% set show_sidebar = has_label or has_instruction or has_affs %}
-
-  {% if show_sidebar %}
-  <div class="sleek-group">
-    <div class="sleek-group__content">
-      {% for html in children_html %}{{ html|safe }}{% endfor %}
     </div>
-    <div class="sleek-group__sidebar">
-      {% if label %}
-        <div class="sleek-group__label">{{ label }}</div>
-      {% endif %}
-      {% if instruction %}
-        <div class="sleek-group__instruction">{{ instruction }}</div>
-      {% endif %}
-      {% for aff in data.affordances %}
-        {% if not aff._rendered %}
-          {{ render_aff(aff) }}
-          {% set _ = aff.update({"_rendered": true}) %}
-        {% endif %}
-      {% endfor %}
-    </div>
+    {% endif %}
   </div>
-  {% else %}
+  <div class="ef-nav-content">
+    {% if instruction %}
+      <div class="ef-group-instruction">{{ instruction }}</div>
+    {% endif %}
     {% for html in children_html %}{{ html|safe }}{% endfor %}
-  {% endif %}
+  </div>
 
-  {# Safety net: mark any remaining affordances rendered #}
+  {# Mark affordances rendered — chrome is inline above #}
   {% for aff in data.affordances %}
     {% if not aff._rendered %}
       {% set _ = aff.update({"_rendered": true}) %}
