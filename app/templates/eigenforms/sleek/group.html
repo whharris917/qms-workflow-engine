@@ -1,0 +1,52 @@
+{# GroupForm — Sleek theme.
+
+   Renders label, instruction, and affordances in a right-margin sidebar,
+   with children in the main column. Edit mode falls back to default.
+
+   Context: same as group.html (data, ef, url, label, instruction,
+            children_html, child_items, available_types)
+#}
+{% if data.edit_mode %}
+  {% include "group.html" %}
+{% else %}
+  {% set has_label = label %}
+  {% set has_instruction = instruction %}
+  {% set has_affs = false %}
+  {% for aff in data.affordances %}
+    {% if not aff._rendered %}
+      {% set has_affs = true %}
+    {% endif %}
+  {% endfor %}
+  {% set show_sidebar = has_label or has_instruction or has_affs %}
+
+  {% if show_sidebar %}
+  <div class="sleek-group">
+    <div class="sleek-group__content">
+      {% for html in children_html %}{{ html|safe }}{% endfor %}
+    </div>
+    <div class="sleek-group__sidebar">
+      {% if label %}
+        <div class="sleek-group__label">{{ label }}</div>
+      {% endif %}
+      {% if instruction %}
+        <div class="sleek-group__instruction">{{ instruction }}</div>
+      {% endif %}
+      {% for aff in data.affordances %}
+        {% if not aff._rendered %}
+          {{ render_aff(aff) }}
+          {% set _ = aff.update({"_rendered": true}) %}
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+    {% for html in children_html %}{{ html|safe }}{% endfor %}
+  {% endif %}
+
+  {# Safety net: mark any remaining affordances rendered #}
+  {% for aff in data.affordances %}
+    {% if not aff._rendered %}
+      {% set _ = aff.update({"_rendered": true}) %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
