@@ -1,0 +1,114 @@
+{# NavigationForm — Sleek theme.
+
+   All modes render with the same structure: vertical tab bar + content panel.
+   Tab states (active, complete, locked) vary by mode.
+   Accordion renders all expanded sections in the content panel.
+   Edit mode falls back to the default template.
+
+   Context: same as navigation.html (data, ef, url, mode, label, instruction,
+            step_items, active_html, section_html, available_types)
+#}
+{% if data.edit_mode %}
+  {% include "navigation.html" %}
+{% else %}
+  <h3>{{ data.label }}</h3>
+
+  {% if mode == "tabs" %}
+    <div class="ef-nav-bar">
+    {% for step in step_items %}
+      {% if step.is_active %}
+        <span class="ef-nav-tab ef-nav-tab--active">{{ step.label }}</span>
+      {% else %}
+        {{ render_btn(url, {"step": step.key}, step.label, "ef-nav-tab") }}
+      {% endif %}
+    {% endfor %}
+    </div>
+
+  {% elif mode == "chain" %}
+    {% set progress = data.progress|default([]) %}
+    {% set active_key = data.active_step %}
+    <div class="ef-nav-bar">
+    {% for step in progress %}
+      {% if step.key == active_key %}
+        <span class="ef-nav-tab ef-nav-tab--active">{{ step.label }}</span>
+      {% elif step.complete %}
+        {{ render_btn(url, {"step": step.key}, step.label, "ef-nav-tab ef-nav-tab--complete") }}
+      {% else %}
+        <span class="ef-nav-tab ef-nav-tab--locked">&#128274; {{ step.label }}</span>
+      {% endif %}
+    {% endfor %}
+    {# Continue button inside tab bar #}
+    {% for aff in data.affordances %}
+      {% if aff.body.action == "continue" and not aff._rendered %}
+        <div class="ef-nav-tab--continue">{{ render_aff(aff) }}</div>
+      {% endif %}
+    {% endfor %}
+    </div>
+
+  {% elif mode == "sequence" %}
+    {% set progress = data.progress|default([]) %}
+    {% set active_key = data.active_step %}
+    <div class="ef-nav-bar">
+    {% for step in progress %}
+      {% if step.key == active_key %}
+        <span class="ef-nav-tab ef-nav-tab--active">{{ step.label }}</span>
+      {% elif step.complete %}
+        {{ render_btn(url, {"step": step.key}, step.label, "ef-nav-tab ef-nav-tab--complete") }}
+      {% elif step.accessible|default(false) %}
+        <span class="ef-nav-tab ef-nav-tab--accessible">{{ step.label }}</span>
+      {% else %}
+        <span class="ef-nav-tab ef-nav-tab--locked">&#128274; {{ step.label }}</span>
+      {% endif %}
+    {% endfor %}
+    {# Back/Next buttons inside tab bar #}
+    {% set nav_affs = [] %}
+    {% for aff in data.affordances %}
+      {% set lbl = aff.label|default("") %}
+      {% if lbl.startswith("\u2190") or lbl.startswith("Next") %}
+        {% if nav_affs.append(aff) %}{% endif %}
+      {% endif %}
+    {% endfor %}
+    {% if nav_affs %}
+      <div class="ef-nav-tab--buttons">
+      {% for aff in nav_affs %}{{ render_aff(aff) }}{% endfor %}
+      </div>
+    {% endif %}
+    </div>
+
+  {% elif mode == "accordion" %}
+    <div class="ef-nav-bar">
+    {% for step in step_items %}
+      {% if step.expanded %}
+        {{ render_btn(url, {"action": "toggle", "step": step.key}, step.label, "ef-nav-tab ef-nav-tab--active") }}
+      {% else %}
+        {{ render_btn(url, {"action": "toggle", "step": step.key}, step.label, "ef-nav-tab") }}
+      {% endif %}
+    {% endfor %}
+    </div>
+  {% endif %}
+
+  {# Content panel #}
+  {% if mode == "accordion" %}
+    <div class="ef-nav-content">
+    {% for step in step_items %}
+      {% if step.expanded and step.key in section_html %}
+        {{ section_html[step.key]|safe }}
+      {% endif %}
+    {% endfor %}
+    {% if not step_items|selectattr("expanded")|list %}
+      <div class="ef-empty-state">Select a section from the sidebar.</div>
+    {% endif %}
+    </div>
+  {% elif active_html %}
+    <div class="ef-nav-content">{{ active_html|safe }}</div>
+  {% endif %}
+
+  {# Remaining affordances #}
+  <div class="ef-remaining-affs">
+  {% for aff in data.affordances %}
+    {% if not aff._rendered %}
+      {{ render_aff(aff) }}
+    {% endif %}
+  {% endfor %}
+  </div>
+{% endif %}

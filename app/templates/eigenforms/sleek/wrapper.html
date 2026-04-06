@@ -36,7 +36,7 @@
 {% elif is_container %}
 {# --- Other containers: transparent, minimal --- #}
 <div class="{{ cls_str }}" data-form="{{ form }}" data-key="{{ key }}">
-{% if editable and form != "group" %}
+{% if editable %}
 <div class="ef-chrome">
 {% if edit_mode %}
   <button data-ef-post="{{ url }}" data-ef-body="{{ {"action": "set_mode", "mode": "execute"}|tojson }}" class="ef-chrome-btn" title="POST {{ url }} {{ {"action": "set_mode", "mode": "execute"}|tojson }}"><span>&#9654;</span></button>

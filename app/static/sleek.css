@@ -211,36 +211,38 @@ body.operator-view[data-theme="sleek"] .ef-aff-btn--tab:hover {
     color: #cccccc;
 }
 
-/* --- NavigationForm / GroupForm: default = vertical sidebar in left margin --- */
+/* --- NavigationForm / GroupForm: vertical tabs inline --- */
 
+/* Flex row: tab bar on left, content on right */
 body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"],
 body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] {
-    position: relative !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0 !important;
 }
 
-/* NavigationForm titlebar: extends left to cover tab bar */
-body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] > .ef-titlebar {
+/* Titlebar spans full width above the tab bar + content row */
+body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] > .ef-titlebar,
+body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] > .ef-titlebar {
     display: flex;
     align-items: center;
-    background: #22272e;
-    border-bottom: 1px solid #444;
+    background: #1e1e1e;
+    border-bottom: none;
     border-radius: 4px 4px 0 0;
     padding: 6px 12px;
-    margin: 0 0 0 calc(-1 * min(10vw, 160px));
+    margin: 0;
+    width: 100%;
+    flex-basis: 100%;
+    box-sizing: border-box;
 }
 body.operator-view[data-theme="sleek"] .ef-titlebar__instruction {
     font-size: 11px;
     color: #666;
-    margin-left: calc(min(10vw, 160px) - 12px);
+    margin-left: 10px;
 }
 
-/* Tab bar: dark strip in left margin, matching horizontal tab design language */
+/* Tab bar: vertical column, inline */
 body.operator-view[data-theme="sleek"] .ef-nav-bar {
-    position: absolute;
-    right: 100%;
-    top: auto;
-    width: 10vw;
-    max-width: 160px;
     display: flex !important;
     flex-direction: column !important;
     gap: 0 !important;
@@ -249,8 +251,10 @@ body.operator-view[data-theme="sleek"] .ef-nav-bar {
     background: #1e1e1e !important;
     border: none !important;
     border-right: 1px solid #444 !important;
-    border-radius: 4px 0 0 4px;
+    border-radius: 0 0 0 4px;
     text-align: right;
+    flex-shrink: 0;
+    min-width: 120px;
 }
 body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--active {
     color: #e0e0e0 !important;
@@ -279,114 +283,71 @@ body.operator-view[data-theme="sleek"] .ef-nav-tab:hover {
     color: #cccccc !important;
     background: #2a2a2d !important;
 }
-/* Content panel: connects to active tab */
+/* Content panel: fills remaining space beside tab bar */
 body.operator-view[data-theme="sleek"] .ef-nav-content {
     background: #2b3035;
     border: 1px solid #555d66;
     border-left: none;
-    border-radius: 0 4px 4px 0;
+    border-top: none;
+    border-radius: 0 0 4px 0;
     padding: 16px 20px;
+    flex: 1;
+    min-width: 0;
+}
+/* Remaining affordances span full width below the tab bar + content row */
+body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] > .ef-remaining-affs,
+body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] > .ef-remaining-affs {
+    flex-basis: 100%;
 }
 
-/* --- Nested NavigationForm / GroupForm: horizontal VS Code tabs --- */
+/* --- Tab states for all NavigationForm modes --- */
 
-body.operator-view[data-theme="sleek"] .ef-nav-content .eigenform[data-form="navigation"],
-body.operator-view[data-theme="sleek"] .ef-nav-content .eigenform[data-form="group"] {
-    position: static !important;
-}
-body.operator-view[data-theme="sleek"] .ef-nav-content .eigenform[data-form="navigation"] > .ef-titlebar {
-    margin-left: 0;
-}
-body.operator-view[data-theme="sleek"] .ef-nav-content .ef-titlebar__instruction {
-    margin-left: 10px;
-}
-body.operator-view[data-theme="sleek"] .ef-nav-content .ef-nav-bar {
-    position: static;
-    width: auto;
-    max-width: none;
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: wrap;
-    gap: 0 !important;
-    padding: 0 !important;
-    margin-bottom: 0 !important;
-    background: #1e1e1e !important;
-    border-bottom: 1px solid #444 !important;
-    text-align: left;
-}
-body.operator-view[data-theme="sleek"] .ef-nav-content .ef-nav-tab.ef-nav-tab--active {
-    color: #e0e0e0 !important;
-    background: #2b3035 !important;
-    border: 1px solid #555d66 !important;
-    border-bottom: 1px solid #2b3035 !important;
-    border-radius: 4px 4px 0 0 !important;
-    padding: 8px 16px !important;
-    margin-bottom: -1px;
-    position: relative;
-    z-index: 1;
-    font-size: 12px !important;
-    font-weight: normal;
-    text-align: left;
-}
-body.operator-view[data-theme="sleek"] .ef-nav-content .ef-nav-tab {
-    color: #888 !important;
+/* Complete tabs: blue accent */
+body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--complete {
+    color: #60a5fa !important;
     background: transparent !important;
     border: 1px solid transparent !important;
-    border-radius: 4px 4px 0 0 !important;
+    border-radius: 4px 0 0 4px !important;
     padding: 8px 16px !important;
     font-size: 12px !important;
     cursor: pointer;
-    text-align: left;
+    text-align: right;
 }
-body.operator-view[data-theme="sleek"] .ef-nav-content .ef-nav-tab:hover {
-    color: #cccccc !important;
+body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--complete:hover {
     background: #2a2a2d !important;
 }
-body.operator-view[data-theme="sleek"] .ef-nav-content .ef-nav-content {
-    background: #2b3035;
-    border: 1px solid #555d66;
-    border-top: none;
-    border-radius: 0 0 4px 4px;
-    padding: 16px 20px;
-}
-
-/* --- Sequence mode steps --- */
-body.operator-view[data-theme="sleek"] .ef-nav-bar--sequence {
-    padding: 6px 8px !important;
-    border-radius: 4px 4px 0 0;
-}
-body.operator-view[data-theme="sleek"] .ef-nav-step--active {
-    color: #e0e0e0 !important;
-    background: #ff6b6b !important;
-    border: none !important;
-    border-bottom: none !important;
-    border-radius: 3px !important;
-    padding: 4px 12px !important;
+/* Accessible tabs: dimmed */
+body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--accessible {
+    color: #666 !important;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    border-radius: 4px 0 0 4px !important;
+    padding: 8px 16px !important;
     font-size: 12px !important;
+    text-align: right;
 }
-body.operator-view[data-theme="sleek"] .ef-nav-step--complete {
-    color: #60a5fa !important;
-    background: #1e3a2f !important;
-    border: 1px solid #3b82f6 !important;
-    border-radius: 3px !important;
-    padding: 4px 12px !important;
+/* Locked tabs: greyed out */
+body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--locked {
+    color: #555 !important;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    border-radius: 4px 0 0 4px !important;
+    padding: 8px 16px !important;
     font-size: 12px !important;
+    text-align: right;
 }
-body.operator-view[data-theme="sleek"] .ef-nav-step--complete:hover {
-    background: #264d38 !important;
+/* Continue / Back / Next buttons inside tab bar */
+body.operator-view[data-theme="sleek"] .ef-nav-tab--continue,
+body.operator-view[data-theme="sleek"] .ef-nav-tab--buttons {
+    padding: 8px 12px;
+    margin-top: auto;
 }
-body.operator-view[data-theme="sleek"] .ef-nav-step--accessible,
-body.operator-view[data-theme="sleek"] .ef-nav-step--locked {
-    color: #555 !important;
-    background: #252526 !important;
-    border-radius: 3px !important;
-    padding: 4px 12px !important;
+body.operator-view[data-theme="sleek"] .ef-nav-tab--buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
-body.operator-view[data-theme="sleek"] .ef-nav-arrow {
-    color: #555 !important;
-}
-
-/* Nav buttons (Back/Next) */
+/* Nav affordance buttons */
 body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] .ef-aff-btn {
     color: #cccccc;
     background: #333;
@@ -397,16 +358,33 @@ body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] .ef-af
     border-color: #ff6b6b;
 }
 
-/* --- GroupForm bar: instruction + chrome inline with the single tab --- */
+/* --- GroupForm bar: horizontal row with label tab + spacer + chrome --- */
 
 body.operator-view[data-theme="sleek"] .ef-group-bar {
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
     align-items: center;
+    border-right: none !important;
+    border-bottom: 1px solid #444 !important;
+    border-radius: 4px 4px 0 0 !important;
+    min-width: auto;
+    width: 100% !important;
+    flex-basis: 100%;
 }
 body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] > .ef-nav-content {
     background: #424850;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    border-left: 1px solid #555d66;
 }
 body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] .ef-nav-tab.ef-nav-tab--active {
     background: #424850 !important;
+    border-radius: 4px 4px 0 0 !important;
+    border-right: 1px solid #555d66 !important;
+    border-bottom: 1px solid #424850 !important;
+    margin-bottom: -1px;
+    margin-right: 0;
+    text-align: left;
 }
 body.operator-view[data-theme="sleek"] .ef-group-instruction {
     font-size: 12px;
@@ -414,49 +392,22 @@ body.operator-view[data-theme="sleek"] .ef-group-instruction {
     margin-bottom: 12px;
     line-height: 1.5;
 }
-body.operator-view[data-theme="sleek"] .ef-group-bar__spacer {
-    flex: 1;
-}
-body.operator-view[data-theme="sleek"] .ef-group-bar .ef-chrome {
-    display: flex;
-    gap: 4px;
-    padding: 4px 8px;
-}
 
-/* Nested GroupForm bar: instruction + chrome flow horizontally with the tab */
-body.operator-view[data-theme="sleek"] .ef-nav-content .ef-group-bar {
-    position: static;
-    width: auto;
-    max-width: none;
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap;
-    background: #1e1e1e !important;
-    border-bottom: 1px solid #444 !important;
-    border-right: none !important;
+/* --- GroupForm as direct child of NavigationForm: dissolve into parent --- */
+
+body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] > .ef-nav-content > .eigenform[data-form="group"] {
+    display: block !important;
+}
+/* Hide the tab bar entirely */
+body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] > .ef-nav-content > .eigenform[data-form="group"] > .ef-group-bar {
+    display: none !important;
+}
+/* Strip content panel styling — children render directly */
+body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] > .ef-nav-content > .eigenform[data-form="group"] > .ef-nav-content {
+    background: none !important;
+    border: none !important;
     border-radius: 0 !important;
-    text-align: left;
-}
-body.operator-view[data-theme="sleek"] .ef-nav-content .ef-group-bar .ef-nav-tab {
-    text-align: left;
-}
-
-/* --- Accordion --- */
-body.operator-view[data-theme="sleek"] .ef-aff-accordion {
-    background: #22272e;
-    color: #aaaaaa;
-    border: 1px solid #333;
-    border-radius: 3px;
-}
-body.operator-view[data-theme="sleek"] .ef-aff-accordion:hover {
-    background: #282d35;
-    color: #cccccc;
-    border-color: #444;
-}
-body.operator-view[data-theme="sleek"] .ef-section-content {
-    border-left: none;
-    padding-left: 16px;
-    margin-bottom: 8px;
+    padding: 0 !important;
 }
 
 /* --- Feedback banners --- */
