@@ -47,6 +47,18 @@ body.operator-view[data-theme="sleek"] .eigenform[data-form="repeater"] {
     margin: 0 !important;
 }
 
+/* PageForm: separator after header */
+body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > h2 + p {
+    padding-bottom: 12px;
+    border-bottom: 1px solid #cccccc;
+    margin-bottom: 16px;
+}
+body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > h2:not(:has(+ p)) {
+    padding-bottom: 12px;
+    border-bottom: 1px solid #cccccc;
+    margin-bottom: 16px;
+}
+
 /* Titlebar: window-style title bar on data eigenform cards */
 body.operator-view[data-theme="sleek"] .eigenform > .ef-titlebar {
     display: flex;
@@ -68,27 +80,16 @@ body.operator-view[data-theme="sleek"] .ef-titlebar__label {
     color: #aaa;
     letter-spacing: 0.02em;
 }
-/* Hide duplicate labels: when titlebar is present, template h3 is redundant.
-   Also hide NavigationForm's own h3 since the tab bar serves as navigation. */
+/* Hide duplicate labels/instructions: titlebar or sidebar handles them */
+body.operator-view[data-theme="sleek"] .eigenform > h3,
 body.operator-view[data-theme="sleek"] .eigenform h3:first-child {
     display: none;
 }
-/* Containers: no titlebar styling */
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .ef-titlebar,
-body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] > .ef-titlebar,
-body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] > .ef-titlebar,
-body.operator-view[data-theme="sleek"] .eigenform[data-form="visibility"] > .ef-titlebar,
-body.operator-view[data-theme="sleek"] .eigenform[data-form="switch"] > .ef-titlebar,
-body.operator-view[data-theme="sleek"] .eigenform[data-form="repeater"] > .ef-titlebar {
-    background: none;
-    border: none;
-    margin: 0;
-    padding: 0;
-}
-/* GroupForm: hide titlebar label (sidebar handles it), keep chrome buttons */
-body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] > .ef-titlebar .ef-titlebar__label {
+body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] > h3 + p {
     display: none;
 }
+/* Note: container titlebar rules removed — sleek/wrapper.html does not emit
+   titlebars for containers, so no CSS override is needed. */
 
 
 body.operator-view[data-theme="sleek"] .ef-chrome-btn {
@@ -210,65 +211,92 @@ body.operator-view[data-theme="sleek"] .ef-aff-btn--tab:hover {
     color: #cccccc;
 }
 
-/* --- NavigationForm: default = vertical tabs in left margin --- */
+/* --- NavigationForm: default = vertical sidebar in left margin --- */
 
 body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] {
     position: relative !important;
 }
+
+/* NavigationForm titlebar: extends left to cover tab bar */
+body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] > .ef-titlebar {
+    display: flex;
+    align-items: center;
+    background: #22272e;
+    border-bottom: 1px solid #444;
+    border-radius: 4px 4px 0 0;
+    padding: 6px 12px;
+    margin: 0 0 0 calc(-1 * min(10vw, 160px));
+}
+body.operator-view[data-theme="sleek"] .ef-titlebar__instruction {
+    font-size: 11px;
+    color: #666;
+    margin-left: calc(min(10vw, 160px) - 12px);
+}
+
+/* Tab bar: dark strip in left margin, matching horizontal tab design language */
 body.operator-view[data-theme="sleek"] .ef-nav-bar {
     position: absolute;
     right: 100%;
-    top: 0;
+    top: auto;
     width: 10vw;
     max-width: 160px;
     display: flex !important;
     flex-direction: column !important;
-    gap: 2px !important;
-    padding: 0 12px 0 0 !important;
+    gap: 0 !important;
+    padding: 0 !important;
     margin: 0 !important;
-    background: none !important;
+    background: #1e1e1e !important;
     border: none !important;
+    border-right: 1px solid #444 !important;
+    border-radius: 4px 0 0 4px;
     text-align: right;
 }
 body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--active {
     color: #e0e0e0 !important;
-    background: none !important;
-    border: none !important;
-    border-right: 2px solid #60a5fa !important;
-    border-radius: 0 !important;
-    padding: 4px 10px !important;
+    background: #2b3035 !important;
+    border: 1px solid #555d66 !important;
+    border-right: 1px solid #2b3035 !important;
+    border-radius: 4px 0 0 4px !important;
+    padding: 8px 16px !important;
     font-size: 12px !important;
-    font-weight: 600;
     text-align: right;
-    margin: 0;
+    margin-right: -1px;
+    position: relative;
+    z-index: 1;
 }
 body.operator-view[data-theme="sleek"] .ef-nav-tab {
-    color: #666 !important;
-    background: none !important;
-    border: none !important;
-    border-right: 2px solid transparent !important;
-    border-radius: 0 !important;
-    padding: 4px 10px !important;
+    color: #888 !important;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    border-radius: 4px 0 0 4px !important;
+    padding: 8px 16px !important;
     font-size: 12px !important;
     cursor: pointer;
     text-align: right;
 }
 body.operator-view[data-theme="sleek"] .ef-nav-tab:hover {
     color: #cccccc !important;
-    background: none !important;
-    border-right-color: #555d66 !important;
+    background: #2a2a2d !important;
 }
+/* Content panel: connects to active tab */
 body.operator-view[data-theme="sleek"] .ef-nav-content {
-    background: none;
-    border: none;
-    border-radius: 0;
-    padding: 0;
+    background: #2b3035;
+    border: 1px solid #555d66;
+    border-left: none;
+    border-radius: 0 4px 4px 0;
+    padding: 16px 20px;
 }
 
 /* --- Nested NavigationForm: horizontal VS Code tabs --- */
 
 body.operator-view[data-theme="sleek"] .ef-nav-content .eigenform[data-form="navigation"] {
     position: static !important;
+}
+body.operator-view[data-theme="sleek"] .ef-nav-content .eigenform[data-form="navigation"] > .ef-titlebar {
+    margin-left: 0;
+}
+body.operator-view[data-theme="sleek"] .ef-nav-content .ef-titlebar__instruction {
+    margin-left: 10px;
 }
 body.operator-view[data-theme="sleek"] .ef-nav-content .ef-nav-bar {
     position: static;
@@ -845,7 +873,7 @@ body.operator-view[data-theme="sleek"] .ef-feedback__dismiss {
     justify-content: center;
     gap: 4px;
     padding: 3px 6px;
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid #cccccc;
 }
 
 .sleek-table__col-id {
