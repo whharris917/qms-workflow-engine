@@ -11,12 +11,12 @@
 #}
 {% set cls_str = classes|join(" ") %}
 {% if is_container and form == "navigation" %}
-{# --- NavigationForm: titlebar extends left --- #}
+{# --- NavigationForm: titlebar always visible, chrome conditional on editable --- #}
 <div class="{{ cls_str }}" data-form="{{ form }}" data-key="{{ key }}">
-{% if editable %}
 <div class="ef-titlebar">
 <span class="ef-titlebar__label">{{ label }}</span>
 <span class="ef-titlebar__spacer"></span>
+{% if editable %}
 <div class="ef-chrome">
 {% if edit_mode %}
   <button data-ef-post="{{ url }}" data-ef-body="{{ {"action": "set_mode", "mode": "execute"}|tojson }}" class="ef-chrome-btn" title="POST {{ url }} {{ {"action": "set_mode", "mode": "execute"}|tojson }}"><span>&#9654;</span></button>
@@ -28,8 +28,8 @@
   <button data-ef-post="{{ url }}" data-ef-body="{{ {"action": "set_mode", "mode": "edit"}|tojson }}" class="ef-chrome-btn" title="POST {{ url }} {{ {"action": "set_mode", "mode": "edit"}|tojson }}"><span>&#9998;</span></button>
 {% endif %}
 </div>
-</div>
 {% endif %}
+</div>
 {% if instruction %}<div class="ef-nav-instruction">{{ instruction }}</div>{% endif %}
 {{ inner|safe }}
 </div>
