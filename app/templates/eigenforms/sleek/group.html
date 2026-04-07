@@ -1,7 +1,7 @@
 {# GroupForm — Sleek theme.
 
-   Renders like a single-tab NavigationForm. The tab bar contains the label;
-   chrome is handled by the wrapper.
+   Renders like a single-tab NavigationForm. The tab bar contains the label
+   and chrome buttons (edit/undo/discard).
    Edit mode falls back to the default template.
 
    Context: same as group.html (data, ef, url, label, instruction,
@@ -14,6 +14,12 @@
 
   <div class="ef-nav-bar ef-group-bar">
     <span class="ef-nav-tab ef-nav-tab--active">{{ data.label }}</span>
+    <span class="ef-titlebar__spacer"></span>
+    {% if ef.editable %}
+    <div class="ef-chrome">
+      <button data-ef-post="{{ url }}" data-ef-body="{{ {"action": "set_mode", "mode": "edit"}|tojson }}" class="ef-chrome-btn" title="POST {{ url }} {{ {"action": "set_mode", "mode": "edit"}|tojson }}"><span>&#9998;</span></button>
+    </div>
+    {% endif %}
   </div>
   <div class="ef-nav-content">
     {% if instruction %}
@@ -22,7 +28,7 @@
     {% for html in children_html %}{{ html|safe }}{% endfor %}
   </div>
 
-  {# Mark affordances rendered — wrapper handles chrome #}
+  {# Mark affordances rendered — chrome handled above #}
   {% for aff in data.affordances %}
     {% if not aff._rendered %}
       {% set _ = aff.update({"_rendered": true}) %}

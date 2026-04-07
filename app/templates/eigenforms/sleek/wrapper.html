@@ -16,7 +16,6 @@
 {% if editable %}
 <div class="ef-titlebar">
 <span class="ef-titlebar__label">{{ label }}</span>
-{% if instruction %}<span class="ef-titlebar__instruction">{{ instruction }}</span>{% endif %}
 <span class="ef-titlebar__spacer"></span>
 <div class="ef-chrome">
 {% if edit_mode %}
@@ -31,6 +30,12 @@
 </div>
 </div>
 {% endif %}
+{% if instruction %}<div class="ef-nav-instruction">{{ instruction }}</div>{% endif %}
+{{ inner|safe }}
+</div>
+{% elif is_container and form == "group" %}
+{# --- GroupForm: chrome sits in the group bar (rendered by group template) --- #}
+<div class="{{ cls_str }}" data-form="{{ form }}" data-key="{{ key }}">
 {{ inner|safe }}
 </div>
 {% elif is_container %}
@@ -52,12 +57,12 @@
 {{ inner|safe }}
 </div>
 {% else %}
-{# --- Data form wrapper: card with titlebar --- #}
+{# --- Data form wrapper: card with titlebar (always) --- #}
 <div class="{{ cls_str }}" data-form="{{ form }}" data-key="{{ key }}">
-{% if editable %}
 <div class="ef-titlebar">
 <span class="ef-titlebar__label">{{ label }}</span>
 <span class="ef-titlebar__spacer"></span>
+{% if editable %}
 <div class="ef-chrome">
 {% if edit_mode %}
   <button data-ef-post="{{ url }}" data-ef-body="{{ {"action": "set_mode", "mode": "execute"}|tojson }}" class="ef-chrome-btn" title="POST {{ url }} {{ {"action": "set_mode", "mode": "execute"}|tojson }}"><span>&#9654;</span></button>
@@ -69,8 +74,8 @@
   <button data-ef-post="{{ url }}" data-ef-body="{{ {"action": "set_mode", "mode": "edit"}|tojson }}" class="ef-chrome-btn" title="POST {{ url }} {{ {"action": "set_mode", "mode": "edit"}|tojson }}"><span>&#9998;</span></button>
 {% endif %}
 </div>
-</div>
 {% endif %}
+</div>
 {{ inner|safe }}
 </div>
 {% endif %}

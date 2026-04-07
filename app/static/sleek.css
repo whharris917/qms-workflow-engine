@@ -30,7 +30,7 @@ body.operator-view[data-theme="sleek"] .eigenform {
     border: 1px solid #000 !important;
     border-radius: 4px;
     padding: 16px 20px;
-    margin: 8px 0;
+    margin: 16px 0;
 }
 
 /* Containers and PageForm: transparent, no card */
@@ -44,6 +44,9 @@ body.operator-view[data-theme="sleek"] .eigenform[data-form="repeater"] {
     border: none !important;
     border-radius: 0 !important;
     padding: 0 !important;
+    margin: 16px 0 !important;
+}
+body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] {
     margin: 0 !important;
 }
 
@@ -211,19 +214,10 @@ body.operator-view[data-theme="sleek"] .ef-aff-btn--tab:hover {
     color: #cccccc;
 }
 
-/* --- NavigationForm / GroupForm: vertical tabs inline --- */
+/* --- NavigationForm: horizontal tabs (default) --- */
 
-/* Flex row: tab bar on left, content on right */
-body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"],
-body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    gap: 0 !important;
-}
-
-/* Titlebar spans full width above the tab bar + content row */
-body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] > .ef-titlebar,
-body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] > .ef-titlebar {
+/* Titlebar for NavigationForm */
+body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] > .ef-titlebar {
     display: flex;
     align-items: center;
     background: #1e1e1e;
@@ -231,120 +225,117 @@ body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] > .ef-title
     border-radius: 4px 4px 0 0;
     padding: 6px 12px;
     margin: 0;
-    width: 100%;
-    flex-basis: 100%;
-    box-sizing: border-box;
 }
-body.operator-view[data-theme="sleek"] .ef-titlebar__instruction {
-    font-size: 11px;
-    color: #666;
-    margin-left: 10px;
+/* NavigationForm instruction: sits between titlebar and nav bar, enclosed by content border */
+body.operator-view[data-theme="sleek"] .ef-nav-instruction {
+    font-size: 12px;
+    color: #888;
+    padding: 8px 12px;
+    background: none;
+    line-height: 1.4;
+    border-left: 1px solid #555d66;
+    border-right: 1px solid #555d66;
 }
 
-/* Tab bar: vertical column, inline */
+/* Tab bar: horizontal row with bottom border, enclosed by content border */
 body.operator-view[data-theme="sleek"] .ef-nav-bar {
     display: flex !important;
-    flex-direction: column !important;
+    flex-direction: row !important;
+    flex-wrap: wrap;
     gap: 0 !important;
     padding: 0 !important;
     margin: 0 !important;
     background: #1e1e1e !important;
     border: none !important;
-    border-right: 1px solid #444 !important;
-    border-radius: 0 0 0 4px;
-    text-align: right;
-    flex-shrink: 0;
-    min-width: 120px;
+    border-left: 1px solid #555d66 !important;
+    border-right: 1px solid #555d66 !important;
+    border-bottom: 1px solid #444 !important;
+    border-radius: 0;
 }
-body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--active {
-    color: #e0e0e0 !important;
-    background: #2b3035 !important;
-    border: 1px solid #555d66 !important;
-    border-right: 1px solid #2b3035 !important;
-    border-radius: 4px 0 0 4px !important;
-    padding: 8px 16px !important;
-    font-size: 12px !important;
-    text-align: right;
-    margin-right: -1px;
-    position: relative;
-    z-index: 1;
-}
+/* Tabs: horizontal style with bottom-border active indicator */
 body.operator-view[data-theme="sleek"] .ef-nav-tab {
     color: #888 !important;
     background: transparent !important;
-    border: 1px solid transparent !important;
-    border-radius: 4px 0 0 4px !important;
+    border: none !important;
+    border-bottom: 2px solid transparent !important;
+    border-radius: 0 !important;
     padding: 8px 16px !important;
     font-size: 12px !important;
     cursor: pointer;
-    text-align: right;
+    text-align: center;
 }
 body.operator-view[data-theme="sleek"] .ef-nav-tab:hover {
     color: #cccccc !important;
     background: #2a2a2d !important;
 }
-/* Content panel: fills remaining space beside tab bar */
+body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--active {
+    color: #e0e0e0 !important;
+    background: #424850 !important;
+    border: none !important;
+    border-bottom: 2px solid #424850 !important;
+    border-radius: 0 !important;
+    padding: 8px 16px !important;
+    font-size: 12px !important;
+    text-align: center;
+    margin-bottom: -1px;
+    position: relative;
+    z-index: 1;
+}
+/* Content panel: below the tab bar */
 body.operator-view[data-theme="sleek"] .ef-nav-content {
-    background: #2b3035;
+    background: #424850;
     border: 1px solid #555d66;
-    border-left: none;
     border-top: none;
-    border-radius: 0 0 4px 0;
+    border-radius: 0 0 4px 4px;
     padding: 16px 20px;
-    flex: 1;
-    min-width: 0;
-}
-/* Remaining affordances span full width below the tab bar + content row */
-body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] > .ef-remaining-affs,
-body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] > .ef-remaining-affs {
-    flex-basis: 100%;
 }
 
-/* --- Tab states for all NavigationForm modes --- */
+/* --- Tab states (horizontal) --- */
 
-/* Complete tabs: blue accent */
 body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--complete {
     color: #60a5fa !important;
     background: transparent !important;
-    border: 1px solid transparent !important;
-    border-radius: 4px 0 0 4px !important;
+    border: none !important;
+    border-bottom: 2px solid transparent !important;
+    border-radius: 0 !important;
     padding: 8px 16px !important;
     font-size: 12px !important;
     cursor: pointer;
-    text-align: right;
+    text-align: center;
 }
 body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--complete:hover {
     background: #2a2a2d !important;
 }
-/* Accessible tabs: dimmed */
 body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--accessible {
     color: #666 !important;
     background: transparent !important;
-    border: 1px solid transparent !important;
-    border-radius: 4px 0 0 4px !important;
+    border: none !important;
+    border-bottom: 2px solid transparent !important;
+    border-radius: 0 !important;
     padding: 8px 16px !important;
     font-size: 12px !important;
-    text-align: right;
+    text-align: center;
 }
-/* Locked tabs: greyed out */
 body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--locked {
     color: #555 !important;
     background: transparent !important;
-    border: 1px solid transparent !important;
-    border-radius: 4px 0 0 4px !important;
+    border: none !important;
+    border-bottom: 2px solid transparent !important;
+    border-radius: 0 !important;
     padding: 8px 16px !important;
     font-size: 12px !important;
-    text-align: right;
+    text-align: center;
 }
+
 /* Continue / Back / Next buttons inside tab bar */
 body.operator-view[data-theme="sleek"] .ef-nav-tab--continue,
 body.operator-view[data-theme="sleek"] .ef-nav-tab--buttons {
     padding: 8px 12px;
-    margin-top: auto;
+    margin-left: auto;
 }
 body.operator-view[data-theme="sleek"] .ef-nav-tab--buttons {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 4px;
 }
 /* Nav affordance buttons */
@@ -358,8 +349,116 @@ body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] .ef-af
     border-color: #ff6b6b;
 }
 
-/* --- GroupForm bar: horizontal row with label tab + spacer + chrome --- */
+/* === PageForm > NavigationForm: vertical sidebar === */
 
+body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0 !important;
+}
+/* Titlebar and instruction span full width above the sidebar + content row */
+body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-titlebar,
+body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-instruction {
+    width: 100%;
+    flex-basis: 100%;
+    box-sizing: border-box;
+}
+/* Tab bar: vertical column on the left */
+body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-bar {
+    flex-direction: column !important;
+    border-bottom: none !important;
+    border-left: 1px solid #555d66 !important;
+    border-right: 1px solid #444 !important;
+    border-radius: 0 0 0 4px;
+    text-align: right;
+    flex-shrink: 0;
+    min-width: 120px;
+}
+/* Active tab: left-rounded, merges into content panel */
+body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-bar > .ef-nav-tab.ef-nav-tab--active {
+    background: #2b3035 !important;
+    border: 1px solid #555d66 !important;
+    border-right: 1px solid #2b3035 !important;
+    border-bottom: 1px solid transparent !important;
+    border-radius: 4px 0 0 4px !important;
+    text-align: right;
+    margin-right: -1px;
+    margin-bottom: 0;
+    position: relative;
+    z-index: 1;
+}
+/* All tabs: left-aligned vertical style */
+body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-bar > .ef-nav-tab {
+    border: 1px solid transparent !important;
+    border-bottom: none !important;
+    border-radius: 4px 0 0 4px !important;
+    text-align: right;
+}
+body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-bar > .ef-nav-tab.ef-nav-tab--complete {
+    border: 1px solid transparent !important;
+    border-bottom: none !important;
+    border-radius: 4px 0 0 4px !important;
+    text-align: right;
+}
+body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-bar > .ef-nav-tab.ef-nav-tab--accessible {
+    border: 1px solid transparent !important;
+    border-bottom: none !important;
+    border-radius: 4px 0 0 4px !important;
+    text-align: right;
+}
+body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-bar > .ef-nav-tab.ef-nav-tab--locked {
+    border: 1px solid transparent !important;
+    border-bottom: none !important;
+    border-radius: 4px 0 0 4px !important;
+    text-align: right;
+}
+/* Content panel: fills remaining space beside sidebar — darker than nested navs */
+body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-content {
+    background: #2b3035;
+    border-left: none;
+    border-top: none;
+    border-radius: 0 0 4px 0;
+    flex: 1;
+    min-width: 0;
+}
+/* Remaining affordances span full width */
+body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-remaining-affs {
+    flex-basis: 100%;
+}
+/* Continue / Back / Next: push to bottom in vertical bar */
+body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-bar > .ef-nav-tab--continue,
+body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-bar > .ef-nav-tab--buttons {
+    margin-top: auto;
+    margin-left: 0;
+}
+body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-bar > .ef-nav-tab--buttons {
+    flex-direction: column;
+}
+
+/* --- GroupForm: flex wrap for bar + content layout --- */
+
+body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0 !important;
+}
+body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] > .ef-titlebar {
+    display: flex;
+    align-items: center;
+    background: #1e1e1e;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    padding: 6px 12px;
+    margin: 0;
+    width: 100%;
+    flex-basis: 100%;
+    box-sizing: border-box;
+}
+body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] > .ef-remaining-affs {
+    flex-basis: 100%;
+}
+
+/* GroupForm bar: horizontal row with label tab + spacer + chrome */
 body.operator-view[data-theme="sleek"] .ef-group-bar {
     flex-direction: row !important;
     flex-wrap: nowrap !important;
@@ -370,6 +469,7 @@ body.operator-view[data-theme="sleek"] .ef-group-bar {
     min-width: auto;
     width: 100% !important;
     flex-basis: 100%;
+    padding-right: 12px !important;
 }
 body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] > .ef-nav-content {
     background: #424850;
