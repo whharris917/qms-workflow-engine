@@ -1,15 +1,106 @@
 {# NavigationForm — Sleek theme.
 
-   All modes render with the same structure: vertical tab bar + content panel.
+   All modes render with the same structure: nav bar + content panel.
    Tab states (active, complete, locked) vary by mode.
    Accordion renders all expanded sections in the content panel.
-   Edit mode falls back to the default template.
+   Edit mode renders inline controls within each tab element.
 
    Context: same as navigation.html (data, ef, url, mode, label, instruction,
             step_items, active_html, section_html, available_types)
 #}
 {% if data.edit_mode %}
-  {% include "navigation.html" %}
+  <h3>{{ data.label }}</h3>
+
+  {# Mark structural + nav affordances as rendered #}
+  {% for aff in data.affordances %}
+    {% set action = aff.body.action|default("") %}
+    {% if action in ("set_label", "set_instruction", "add_step", "remove_step",
+                      "move_step", "toggle_editable", "toggle", "continue")
+                      or aff.body.step is defined
+                      or aff.steps is defined or aff.sections is defined %}
+      {% set _ = aff.update({"_rendered": true}) %}
+    {% endif %}
+  {% endfor %}
+
+  {# Editable label + instruction #}
+  {% include "_edit_header.html" with context %}
+
+  {# Add Step toolbar #}
+  <div class="sleek-edit-toolbar">
+    <form class="sleek-edit-toolbar__form" data-ef-submit="{{ url }}">
+      <input type="hidden" name="action" value="add_step" />
+      <select name="type" class="sleek-edit-toolbar__select">
+        <option value="">-- type --</option>
+        {% for t in available_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+      </select>
+      <input name="key" type="text" placeholder="key" class="sleek-edit-toolbar__input" />
+      <input name="label" type="text" placeholder="Label" class="sleek-edit-toolbar__input" />
+      <button type="submit" class="sleek-edit-toolbar__btn">+ Add</button>
+    </form>
+  </div>
+
+  {# Nav bar with inline edit controls per tab #}
+  <div class="ef-nav-bar">
+  {% for step in step_items %}
+    <div class="sleek-edit-tab{% if step.is_active %} sleek-edit-tab--active{% endif %}">
+      {% if step.is_active %}
+        <span class="sleek-edit-tab__label">{{ step.label }}</span>
+      {% else %}
+        {{ render_btn(url, {"step": step.key}, step.label, "sleek-edit-tab__label sleek-edit-tab__label--link") }}
+      {% endif %}
+      <span class="sleek-edit-tab__key">{{ step.key }}</span>
+      <span class="sleek-edit-tab__controls">
+        {% if step.index > 0 %}
+          {{ render_btn(url, {"action": "move_step", "key": step.key, "position": step.index - 1},
+              "&#9650;", "sleek-edit-btn") }}
+        {% endif %}
+        {% if step.index < step_items|length - 1 %}
+          {{ render_btn(url, {"action": "move_step", "key": step.key, "position": step.index + 1},
+              "&#9660;", "sleek-edit-btn") }}
+        {% endif %}
+        {% if step.editable %}
+          {{ render_btn(url, {"action": "toggle_editable", "key": step.key},
+              "&#9998;", "sleek-edit-btn sleek-edit-btn--active") }}
+        {% else %}
+          {{ render_btn(url, {"action": "toggle_editable", "key": step.key},
+              "&#9998;", "sleek-edit-btn") }}
+        {% endif %}
+        {{ render_btn(url, {"action": "remove_step", "key": step.key},
+            "&#10005;", "sleek-edit-btn sleek-edit-btn--danger") }}
+      </span>
+    </div>
+  {% endfor %}
+  </div>
+
+  {% if not step_items %}
+    <div class="ef-empty-state">No steps yet. Use the toolbar above to add one.</div>
+  {% endif %}
+
+  {# Content panel #}
+  {% if mode == "accordion" %}
+    <div class="ef-nav-content">
+    {% for step in step_items %}
+      {% if step.expanded and step.key in section_html %}
+        {{ section_html[step.key]|safe }}
+      {% endif %}
+    {% endfor %}
+    {% if not step_items|selectattr("expanded")|list %}
+      <div class="ef-empty-state">Select a section to expand.</div>
+    {% endif %}
+    </div>
+  {% elif active_html %}
+    <div class="ef-nav-content">{{ active_html|safe }}</div>
+  {% endif %}
+
+  {# Remaining affordances #}
+  <div class="ef-remaining-affs">
+  {% for aff in data.affordances %}
+    {% if not aff._rendered %}
+      {{ render_aff(aff) }}
+    {% endif %}
+  {% endfor %}
+  </div>
+
 {% else %}
   <h3>{{ data.label }}</h3>
 

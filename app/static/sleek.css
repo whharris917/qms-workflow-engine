@@ -456,6 +456,15 @@ body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform
     flex-direction: column;
 }
 
+/* Vertical sidebar edit mode: toolbar and header span full width above sidebar split */
+body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform--editing[data-form="navigation"] > .sleek-edit-toolbar,
+body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform--editing[data-form="navigation"] > .ef-edit-label-form,
+body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform--editing[data-form="navigation"] > .ef-edit-instr-form {
+    width: 100%;
+    flex-basis: 100%;
+    box-sizing: border-box;
+}
+
 /* --- GroupForm: flex wrap for bar + content layout --- */
 
 body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] {
@@ -520,6 +529,163 @@ body.operator-view[data-theme="sleek"] .ef-group-instruction {
     line-height: 1.5;
 }
 
+
+/* --- NavigationForm edit mode --- */
+
+/* Edit toolbar: add step form */
+body.operator-view[data-theme="sleek"] .sleek-edit-toolbar {
+    padding: 8px 12px;
+    background: #1e1e1e;
+    border-left: 1px solid #555d66;
+    border-right: 1px solid #555d66;
+    border-bottom: 1px solid #444;
+}
+body.operator-view[data-theme="sleek"] .sleek-edit-toolbar__form {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+body.operator-view[data-theme="sleek"] .sleek-edit-toolbar__select,
+body.operator-view[data-theme="sleek"] .sleek-edit-toolbar__input {
+    background: #2b3035;
+    color: #ccc;
+    border: 1px solid #444;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-family: inherit;
+}
+body.operator-view[data-theme="sleek"] .sleek-edit-toolbar__btn {
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    padding: 4px 12px;
+    font-size: 12px;
+    cursor: pointer;
+}
+body.operator-view[data-theme="sleek"] .sleek-edit-toolbar__btn:hover {
+    background: #3b82f6;
+}
+
+/* Edit tab: each step rendered as a tab with inline controls */
+body.operator-view[data-theme="sleek"] .sleek-edit-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border: 1px solid #444;
+    border-bottom: 2px solid transparent;
+    border-radius: 4px 4px 0 0;
+    font-size: 12px;
+    background: transparent;
+}
+body.operator-view[data-theme="sleek"] .sleek-edit-tab--active {
+    background: #424850;
+    border-bottom-color: #424850;
+}
+body.operator-view[data-theme="sleek"] .sleek-edit-tab__label {
+    color: #e0e0e0;
+    font-weight: bold;
+    white-space: nowrap;
+}
+body.operator-view[data-theme="sleek"] .sleek-edit-tab__label--link {
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    padding: 0;
+    font: inherit;
+    font-weight: bold;
+    color: #888;
+    text-decoration: none;
+}
+body.operator-view[data-theme="sleek"] .sleek-edit-tab__label--link:hover {
+    color: #ccc;
+}
+body.operator-view[data-theme="sleek"] .sleek-edit-tab__key {
+    font-family: monospace;
+    font-size: 10px;
+    color: #666;
+    margin-right: auto;
+}
+body.operator-view[data-theme="sleek"] .sleek-edit-tab__controls {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+}
+
+/* Edit control buttons (move, edit toggle, remove) */
+body.operator-view[data-theme="sleek"] .sleek-edit-btn {
+    cursor: pointer;
+    border: 1px solid #444;
+    background: #2b3035;
+    color: #888;
+    width: 20px;
+    height: 20px;
+    font-size: 10px;
+    padding: 0;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+body.operator-view[data-theme="sleek"] .sleek-edit-btn:hover {
+    background: #363b42;
+    color: #ccc;
+}
+body.operator-view[data-theme="sleek"] .sleek-edit-btn--active {
+    border-color: #3b82f6;
+    color: #60a5fa;
+    background: #1a2a3c;
+}
+body.operator-view[data-theme="sleek"] .sleek-edit-btn--danger {
+    color: #f48771;
+}
+body.operator-view[data-theme="sleek"] .sleek-edit-btn--danger:hover {
+    background: #3c1f1f;
+    border-color: #be3434;
+}
+
+/* Edit mode label/instruction forms */
+body.operator-view[data-theme="sleek"] .ef-edit-label-form,
+body.operator-view[data-theme="sleek"] .ef-edit-instr-form {
+    background: #1e1e1e;
+    padding: 6px 12px;
+    margin: 0;
+    border-left: 1px solid #555d66;
+    border-right: 1px solid #555d66;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+body.operator-view[data-theme="sleek"] .ef-edit-label-form {
+    border-top: 1px solid #444;
+}
+body.operator-view[data-theme="sleek"] .ef-edit-instr-form {
+    border-top: 1px solid #333;
+}
+body.operator-view[data-theme="sleek"] .sleek-edit-toolbar {
+    margin-top: 0;
+}
+body.operator-view[data-theme="sleek"] .ef-edit-label-input,
+body.operator-view[data-theme="sleek"] .ef-edit-instr-input {
+    background: #2b3035;
+    color: #ccc;
+    border: 1px solid #444;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font: inherit;
+    flex: 1;
+}
+body.operator-view[data-theme="sleek"] .ef-edit-label-input {
+    font-weight: bold;
+    font-size: 14px;
+}
+body.operator-view[data-theme="sleek"] .ef-edit-instr-input {
+    font-size: 12px;
+    color: #888;
+}
 
 /* --- Feedback banners --- */
 body.operator-view[data-theme="sleek"] .ef-feedback--error {

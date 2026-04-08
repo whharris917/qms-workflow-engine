@@ -12,7 +12,7 @@
 {% set cls_str = classes|join(" ") %}
 {% if is_container and form == "navigation" %}
 {# --- NavigationForm: titlebar always visible, chrome conditional on editable --- #}
-<div class="{{ cls_str }}" data-form="{{ form }}" data-key="{{ key }}">
+<div class="{{ cls_str }}{% if edit_mode %} eigenform--editing{% endif %}" data-form="{{ form }}" data-key="{{ key }}">
 <div class="ef-titlebar">
 <span class="ef-titlebar__label">{{ label }}</span>
 <span class="ef-titlebar__spacer"></span>
