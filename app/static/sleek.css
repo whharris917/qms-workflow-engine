@@ -216,6 +216,22 @@ body.operator-view[data-theme="sleek"] .ef-aff-btn--tab:hover {
 
 /* --- NavigationForm: horizontal tabs (default) --- */
 
+body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] {
+    border: 1px solid #1e1e1e !important;
+    border-radius: 4px !important;
+}
+body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] > .ef-remaining-affs {
+    background: #424850;
+    border-left: 1px solid #555d66;
+    border-right: 1px solid #555d66;
+    border-radius: 0 0 4px 4px;
+    padding: 8px 20px;
+    margin-top: 0;
+}
+body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] > .ef-remaining-affs:empty {
+    display: none;
+}
+
 /* Titlebar for NavigationForm */
 body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] > .ef-titlebar {
     display: flex;
@@ -287,7 +303,8 @@ body.operator-view[data-theme="sleek"] .ef-nav-content {
     background: #424850;
     border: 1px solid #555d66;
     border-top: none;
-    border-radius: 0 0 4px 4px;
+    border-bottom: none;
+    border-radius: 0;
     padding: 16px 20px;
 }
 
@@ -419,13 +436,15 @@ body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform
     background: #2b3035;
     border-left: none;
     border-top: none;
-    border-radius: 0 0 4px 0;
+    border-bottom: none;
+    border-radius: 0;
     flex: 1;
     min-width: 0;
 }
 /* Remaining affordances span full width */
 body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-remaining-affs {
     flex-basis: 100%;
+    background: #2b3035;
 }
 /* Continue / Back / Next: push to bottom in vertical bar */
 body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-bar > .ef-nav-tab--continue,
@@ -443,6 +462,8 @@ body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] {
     display: flex !important;
     flex-wrap: wrap !important;
     gap: 0 !important;
+    border: 1px solid #1e1e1e !important;
+    border-radius: 4px !important;
 }
 body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] > .ef-titlebar {
     display: flex;
