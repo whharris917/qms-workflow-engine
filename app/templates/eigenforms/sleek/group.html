@@ -1,14 +1,74 @@
 {# GroupForm — Sleek theme.
 
-   Renders like a single-tab NavigationForm. The tab bar contains the label
-   and chrome buttons (edit/undo/discard).
-   Edit mode falls back to the default template.
+   Both modes use the same structure: group bar + ef-nav-content.
+   Edit mode adds: editable label/instruction in wrapper titlebar,
+   add-eigenform toolbar below group bar, and per-child control bars
+   inside the content area.
 
    Context: same as group.html (data, ef, url, label, instruction,
             children_html, child_items, available_types)
 #}
 {% if data.edit_mode %}
-  {% include "group.html" %}
+  <h3>{{ data.label }}</h3>
+
+  {# Mark structural affordances as rendered #}
+  {% for aff in data.affordances %}
+    {% set action = aff.body.action|default("") %}
+    {% if action in ("set_label", "set_instruction", "add_eigenform", "remove_eigenform",
+                      "move_eigenform", "toggle_editable") %}
+      {% set _ = aff.update({"_rendered": true}) %}
+    {% endif %}
+  {% endfor %}
+
+  {# Editable label + instruction #}
+  {% include "_edit_header.html" with context %}
+
+  {# Add Eigenform toolbar #}
+  <div class="sleek-edit-toolbar">
+    <form class="sleek-edit-toolbar__form" data-ef-submit="{{ url }}">
+      <input type="hidden" name="action" value="add_eigenform" />
+      <select name="type" class="sleek-edit-toolbar__select">
+        <option value="">-- type --</option>
+        {% for t in available_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+      </select>
+      <input name="key" type="text" placeholder="key" class="sleek-edit-toolbar__input" />
+      <input name="label" type="text" placeholder="Label" class="sleek-edit-toolbar__input" />
+      <button type="submit" class="sleek-edit-toolbar__btn">+ Add</button>
+    </form>
+  </div>
+
+  {# Same content panel as execute mode #}
+  <div class="ef-nav-content">
+    {% for item in child_items %}
+      <div class="sleek-edit-child__bar">
+        <span class="sleek-edit-child__key">{{ item.key }}</span>
+        <span class="sleek-edit-child__spacer"></span>
+        {% if item.index > 0 %}
+          {{ render_btn(url, {"action": "move_eigenform", "key": item.key, "position": item.index - 1},
+              "&#9650;", "sleek-edit-btn") }}
+        {% endif %}
+        {% if item.index < child_items|length - 1 %}
+          {{ render_btn(url, {"action": "move_eigenform", "key": item.key, "position": item.index + 1},
+              "&#9660;", "sleek-edit-btn") }}
+        {% endif %}
+        {% if item.editable %}
+          {{ render_btn(url, {"action": "toggle_editable", "key": item.key},
+              "&#9998;", "sleek-edit-btn sleek-edit-btn--active") }}
+        {% else %}
+          {{ render_btn(url, {"action": "toggle_editable", "key": item.key},
+              "&#9998;", "sleek-edit-btn") }}
+        {% endif %}
+        {{ render_btn(url, {"action": "remove_eigenform", "key": item.key},
+            "&#10005;", "sleek-edit-btn sleek-edit-btn--danger") }}
+      </div>
+      {{ item.html|safe }}
+    {% endfor %}
+
+    {% if not child_items %}
+      <div class="ef-empty-state">No eigenforms yet. Use the toolbar above to add one.</div>
+    {% endif %}
+  </div>
+
 {% else %}
   <h3>{{ data.label }}</h3>
 

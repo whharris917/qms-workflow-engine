@@ -34,8 +34,21 @@
 {{ inner|safe }}
 </div>
 {% elif is_container and form == "group" %}
-{# --- GroupForm: chrome sits in the group bar (rendered by group template) --- #}
-<div class="{{ cls_str }}" data-form="{{ form }}" data-key="{{ key }}">
+{# --- GroupForm: execute mode chrome in group bar; edit mode chrome in titlebar --- #}
+<div class="{{ cls_str }}{% if edit_mode %} eigenform--editing{% endif %}" data-form="{{ form }}" data-key="{{ key }}">
+{% if edit_mode %}
+<div class="ef-titlebar">
+<span class="ef-titlebar__label">{{ label }}</span>
+<span class="ef-titlebar__spacer"></span>
+<div class="ef-chrome">
+  <button data-ef-post="{{ url }}" data-ef-body="{{ {"action": "set_mode", "mode": "execute"}|tojson }}" class="ef-chrome-btn" title="POST {{ url }} {{ {"action": "set_mode", "mode": "execute"}|tojson }}"><span>&#9654;</span></button>
+  {% if undo_count > 0 %}
+  <button data-ef-post="{{ url }}" data-ef-body="{{ {"action": "undo"}|tojson }}" class="ef-chrome-btn" title="Undo ({{ undo_count }})"><span>&#8630;</span></button>
+  {% endif %}
+  <button data-ef-post="{{ url }}" data-ef-body="{{ {"action": "discard"}|tojson }}" class="ef-chrome-btn" title="Discard all changes"><span>&#10005;</span></button>
+</div>
+</div>
+{% endif %}
 {{ inner|safe }}
 </div>
 {% elif is_container %}

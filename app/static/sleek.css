@@ -687,6 +687,226 @@ body.operator-view[data-theme="sleek"] .ef-edit-instr-input {
     color: #888;
 }
 
+/* --- GroupForm / container edit mode: child control bars --- */
+
+body.operator-view[data-theme="sleek"] .sleek-edit-child {
+    margin-bottom: 0;
+}
+body.operator-view[data-theme="sleek"] .sleek-edit-child__bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    background: transparent;
+    font-size: 11px;
+}
+body.operator-view[data-theme="sleek"] .sleek-edit-child__key {
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 10px;
+    color: #555;
+}
+body.operator-view[data-theme="sleek"] .sleek-edit-child__spacer {
+    flex: 1;
+}
+body.operator-view[data-theme="sleek"] .sleek-edit-child__content {
+    /* No extra padding or border — child renders at full width */
+}
+
+/* --- Edit mode: shared class overrides for default templates --- */
+
+/* Standard action buttons (confirm, remove, arrow) */
+body.operator-view[data-theme="sleek"] .ef-btn-confirm {
+    background: #1a2a3c;
+    border-color: #2563eb;
+    color: #60a5fa;
+}
+body.operator-view[data-theme="sleek"] .ef-btn-confirm:hover {
+    background: #1e3a5f;
+}
+body.operator-view[data-theme="sleek"] .ef-btn-remove {
+    background: #2b3035;
+    border-color: #444;
+    color: #f48771;
+}
+body.operator-view[data-theme="sleek"] .ef-btn-remove:hover {
+    background: #3c1f1f;
+    border-color: #be3434;
+}
+body.operator-view[data-theme="sleek"] .ef-btn-arrow {
+    background: #2b3035;
+    border-color: #444;
+    color: #888;
+}
+body.operator-view[data-theme="sleek"] .ef-btn-arrow:hover {
+    background: #363b42;
+    color: #ccc;
+}
+
+/* Generic edit input */
+body.operator-view[data-theme="sleek"] .ef-edit-input {
+    background: #2b3035;
+    color: #ccc;
+    border-color: #444;
+}
+
+/* Chrome buttons (pencil, play, undo, discard) */
+body.operator-view[data-theme="sleek"] .ef-chrome-btn {
+    color: #888;
+    background: #2b3035;
+    border-color: #444;
+}
+body.operator-view[data-theme="sleek"] .ef-chrome-btn:hover {
+    color: #ccc;
+    background: #363b42;
+}
+
+/* Container add-eigenform toolbar */
+body.operator-view[data-theme="sleek"] .ef-add-toolbar {
+    background: #1e1e1e;
+    border-color: #444;
+}
+body.operator-view[data-theme="sleek"] .ef-add-toolbar-label {
+    color: #888;
+}
+body.operator-view[data-theme="sleek"] .ef-add-toolbar-input {
+    background: #2b3035;
+    color: #ccc;
+    border: 1px solid #444;
+    border-radius: 3px;
+}
+body.operator-view[data-theme="sleek"] .ef-add-toolbar-submit {
+    background: #2563eb;
+    border-color: #3b82f6;
+    color: #fff;
+}
+body.operator-view[data-theme="sleek"] .ef-add-toolbar-submit:hover {
+    background: #3b82f6;
+}
+
+/* Empty state */
+body.operator-view[data-theme="sleek"] .ef-empty-state {
+    color: #666;
+    border-color: #444;
+}
+
+/* Accordion toggle headers */
+body.operator-view[data-theme="sleek"] .ef-aff-accordion {
+    background: #22272e;
+    color: #ccc;
+}
+
+/* Section content in edit mode */
+body.operator-view[data-theme="sleek"] .ef-section-content--edit {
+    border-color: #444;
+    background: #2b3035;
+}
+body.operator-view[data-theme="sleek"] .ef-section-content {
+    border-left-color: #444;
+}
+
+/* Edit mode tab bar (used by default navigation/group templates) */
+body.operator-view[data-theme="sleek"] .ef-tab-bar {
+    background: transparent;
+}
+
+/* Inline styles in default templates use hardcoded light colors.
+   These overrides catch common patterns via attribute selectors. */
+body.operator-view[data-theme="sleek"] input[style*="border: 1px solid #ddd"],
+body.operator-view[data-theme="sleek"] input[style*="border:1px solid #ddd"] {
+    background: #2b3035 !important;
+    color: #ccc !important;
+    border-color: #444 !important;
+}
+body.operator-view[data-theme="sleek"] select[style*="border: 1px solid #ddd"],
+body.operator-view[data-theme="sleek"] select[style*="border:1px solid #ddd"] {
+    background: #2b3035 !important;
+    color: #ccc !important;
+    border-color: #444 !important;
+}
+body.operator-view[data-theme="sleek"] div[style*="background: #f5f5f5"],
+body.operator-view[data-theme="sleek"] div[style*="background:#f5f5f5"] {
+    background: #2b3035 !important;
+    color: #ccc !important;
+}
+body.operator-view[data-theme="sleek"] div[style*="background: #fafafa"],
+body.operator-view[data-theme="sleek"] div[style*="background:#fafafa"] {
+    background: #2b3035 !important;
+    color: #ccc !important;
+}
+body.operator-view[data-theme="sleek"] div[style*="background: #f0f0f0"],
+body.operator-view[data-theme="sleek"] div[style*="background:#f0f0f0"] {
+    background: #2b3035 !important;
+    color: #ccc !important;
+}
+body.operator-view[data-theme="sleek"] button[style*="background: #f8f8f8"],
+body.operator-view[data-theme="sleek"] button[style*="background:#f8f8f8"] {
+    background: #2b3035 !important;
+    color: #888 !important;
+    border-color: #444 !important;
+}
+body.operator-view[data-theme="sleek"] button[style*="background: #efffef"],
+body.operator-view[data-theme="sleek"] button[style*="background:#efffef"] {
+    background: #1a2a3c !important;
+    color: #60a5fa !important;
+    border-color: #2563eb !important;
+}
+body.operator-view[data-theme="sleek"] button[style*="background: #f3eaff"],
+body.operator-view[data-theme="sleek"] button[style*="background:#f3eaff"] {
+    background: #1a2a3c !important;
+    color: #60a5fa !important;
+    border-color: #3b82f6 !important;
+}
+body.operator-view[data-theme="sleek"] button[style*="background: #fef8f8"],
+body.operator-view[data-theme="sleek"] button[style*="background:#fef8f8"] {
+    background: #2b1515 !important;
+    color: #f48771 !important;
+    border-color: #8b3030 !important;
+}
+body.operator-view[data-theme="sleek"] span[style*="color: #999"],
+body.operator-view[data-theme="sleek"] span[style*="color:#999"] {
+    color: #666 !important;
+}
+body.operator-view[data-theme="sleek"] span[style*="color: #aaa"],
+body.operator-view[data-theme="sleek"] span[style*="color:#aaa"] {
+    color: #666 !important;
+}
+body.operator-view[data-theme="sleek"] span[style*="color: #bbb"],
+body.operator-view[data-theme="sleek"] span[style*="color:#bbb"] {
+    color: #555 !important;
+}
+
+/* Default template inline edit containers (border: 1px solid #ddd style) */
+body.operator-view[data-theme="sleek"] div[style*="border: 1px solid #ddd"],
+body.operator-view[data-theme="sleek"] div[style*="border:1px solid #ddd"] {
+    border-color: #444 !important;
+    background: #2b3035 !important;
+    color: #ccc !important;
+}
+body.operator-view[data-theme="sleek"] div[style*="border: 1px solid #e0e0e0"],
+body.operator-view[data-theme="sleek"] div[style*="border:1px solid #e0e0e0"] {
+    border-color: #444 !important;
+    background: #2b3035 !important;
+}
+body.operator-view[data-theme="sleek"] div[style*="background: #eee"],
+body.operator-view[data-theme="sleek"] div[style*="background:#eee"] {
+    background: #22272e !important;
+    color: #ccc !important;
+}
+
+/* Pill-shaped items in default templates */
+body.operator-view[data-theme="sleek"] span[style*="background: #f0f0f0"],
+body.operator-view[data-theme="sleek"] span[style*="background:#f0f0f0"] {
+    background: #2a2f36 !important;
+    color: #ccc !important;
+    border-color: #444 !important;
+}
+body.operator-view[data-theme="sleek"] span[style*="background: #e8f5e8"],
+body.operator-view[data-theme="sleek"] span[style*="background:#e8f5e8"] {
+    background: #1a2a3c !important;
+    color: #60a5fa !important;
+    border-color: #2563eb !important;
+}
+
 /* --- Feedback banners --- */
 body.operator-view[data-theme="sleek"] .ef-feedback--error {
     background: #3c1f1f;
