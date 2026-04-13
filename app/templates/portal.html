@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Agent Portal{% endblock %}
+{% block content %}
+<h1>Agent Portal</h1>
+<p>Create and manage workflow instances. Each card represents a page type; instances are live working copies.</p>
+
+<style>
+    .portal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 1.25rem; margin-top: 1.5rem; }
+    .portal-card { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 1.25rem; }
+    .portal-card h2 { font-size: 1.1rem; margin: 0 0 0.4rem 0; }
+    .portal-card p { font-size: 0.9rem; color: #555; margin-bottom: 1rem; }
+    .portal-btn-new { display: inline-block; background: #218838; color: #fff; padding: 0.25rem 0.6rem; font-size: 0.78rem; font-weight: 500; border-radius: 4px; border: none; cursor: pointer; text-decoration: none; white-space: nowrap; transition: background 0.15s; }
+    .portal-btn-new:hover { background: #196c2e; }
+    .portal-new-wrap { display: flex; justify-content: flex-end; margin-top: 0.5rem; }
+    .portal-inst-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .portal-inst-table th { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 2px solid #eee; color: #999; font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    .portal-inst-table td { padding: 0.35rem 0.5rem; border-bottom: 1px solid #f5f5f5; }
+    .portal-inst-table tr:last-child td { border-bottom: none; }
+    .portal-inst-id { font-family: monospace; font-size: 0.8rem; color: #888; }
+    .portal-inst-actions { display: flex; gap: 0.35rem; justify-content: flex-end; }
+    .portal-btn-open { display: inline-block; background: #f0f4fa; color: #2a6bcf; font-size: 0.78rem; font-weight: 500; padding: 0.25rem 0.6rem; border-radius: 4px; border: 1px solid #d0ddf0; cursor: pointer; text-decoration: none; transition: background 0.15s; }
+    .portal-btn-open:hover { background: #dce6f5; }
+    .portal-btn-delete { display: inline-block; background: #faf0f0; color: #b33; font-size: 0.78rem; font-weight: 500; padding: 0.25rem 0.6rem; border-radius: 4px; border: 1px solid #f0d0d0; cursor: pointer; transition: background 0.15s; }
+    .portal-btn-delete:hover { background: #f5dcdc; }
+    .portal-empty { color: #999; font-size: 0.85rem; font-style: italic; padding: 0.5rem 0; }
+</style>
+
+<div class="portal-grid">
+    {% for seed in grouped_seeds %}
+    <div class="portal-card">
+        <h2>{{ seed.label }}</h2>
+        <p>{{ seed.key }}</p>
+        {% if seed.instances %}
+        <table class="portal-inst-table">
+            <thead>
+                <tr>
+                    <th>Instance</th>
+                    <th>Label</th>
+                    <th style="text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for inst in seed.instances %}
+                <tr>
+                    <td class="portal-inst-id">{{ inst.id }}</td>
+                    <td>{{ inst.label }}</td>
+                    <td>
+                        <div class="portal-inst-actions">
+                            <a href="/pages/{{ inst.id }}" class="portal-btn-open">Open</a>
+                            <form method="POST" action="/instances/{{ inst.id }}/delete" style="display:inline;">
+                                <button type="submit" class="portal-btn-delete">Delete</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="portal-empty">No instances yet.</p>
+        {% endif %}
+        <div class="portal-new-wrap">
+            <form method="POST" action="/instances" style="display:inline;">
+                <input type="hidden" name="type" value="{{ seed.key }}">
+                <button type="submit" class="portal-btn-new">+ New Instance</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -1,102 +1,104 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>{{ title }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    {% if theme_css %}
-    <link rel="stylesheet" href="{{ url_for('static', filename=theme_css) }}">
-    {% endif %}
-</head>
-<body>
-    <div class="ef-page-toolbar">
-        <button class="ef-supervisor-toggle" id="supervisor-toggle" onclick="toggleView()">Change to Operator View</button>
-        <select class="ef-theme-select" id="theme-select" onchange="setTheme(this.value)">
-            <option value="default">Default</option>
-            <option value="sleek">Sleek</option>
-        </select>
-    </div>
-    <div id="page-content">{{ page_html }}</div>
-    <script>
-        /* View toggle: Supervisor (full borders, no theme choice) vs Operator (themes available) */
-        function _applyView() {
-            var view = localStorage.getItem('ef-view') || 'supervisor';
-            var isSupervisor = (view === 'supervisor');
-            document.body.classList.toggle('supervisor-view', isSupervisor);
-            document.body.classList.toggle('operator-view', !isSupervisor);
-            var btn = document.getElementById('supervisor-toggle');
-            btn.textContent = isSupervisor ? 'Change to Operator View' : 'Change to Supervisor View';
-            /* Apply data-theme on body for CSS targeting */
-            var theme = _getThemeCookie() || 'default';
-            if (isSupervisor) {
-                document.body.removeAttribute('data-theme');
-            } else {
-                document.body.setAttribute('data-theme', theme);
-            }
-            document.getElementById('theme-select').value = theme;
-        }
-        function toggleView() {
-            var current = localStorage.getItem('ef-view') || 'supervisor';
-            var next = (current === 'supervisor') ? 'operator' : 'supervisor';
-            localStorage.setItem('ef-view', next);
-            var theme = _getThemeCookie() || 'default';
-            if (next === 'supervisor' && theme !== 'default') {
-                /* Switching to supervisor with non-default theme: reload as default */
-                document.cookie = 'ef-theme=default;path=/;max-age=31536000';
-                location.reload();
-            } else if (next === 'operator' && theme !== 'default') {
-                /* Switching to operator with non-default theme: reload to get themed templates */
-                location.reload();
-            } else {
-                _applyView();
-            }
-        }
+{% extends "base.html" %}
 
-        /* Theme selector (operator view only): sets cookie and reloads */
-        function _getThemeCookie() {
-            var m = document.cookie.match(/(?:^|;\s*)ef-theme=(\w+)/);
-            return m ? m[1] : null;
+{% block title %}{{ title }}{% endblock %}
+
+{% block head_extra %}
+{% if theme_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename=theme_css) }}">
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="ef-page-toolbar">
+    <button class="ef-supervisor-toggle" id="supervisor-toggle" onclick="toggleView()">Change to Operator View</button>
+    <select class="ef-theme-select" id="theme-select" onchange="setTheme(this.value)">
+        <option value="default">Default</option>
+        <option value="sleek">Sleek</option>
+    </select>
+</div>
+<div id="page-content">{{ page_html }}</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    /* View toggle: Supervisor (full borders, no theme choice) vs Operator (themes available) */
+    function _applyView() {
+        var view = localStorage.getItem('ef-view') || 'supervisor';
+        var isSupervisor = (view === 'supervisor');
+        document.body.classList.toggle('supervisor-view', isSupervisor);
+        document.body.classList.toggle('operator-view', !isSupervisor);
+        var btn = document.getElementById('supervisor-toggle');
+        btn.textContent = isSupervisor ? 'Change to Operator View' : 'Change to Supervisor View';
+        /* Apply data-theme on body for CSS targeting */
+        var theme = _getThemeCookie() || 'default';
+        if (isSupervisor) {
+            document.body.removeAttribute('data-theme');
+        } else {
+            document.body.setAttribute('data-theme', theme);
         }
-        function setTheme(theme) {
-            document.cookie = 'ef-theme=' + theme + ';path=/;max-age=31536000';
+        document.getElementById('theme-select').value = theme;
+    }
+    function toggleView() {
+        var current = localStorage.getItem('ef-view') || 'supervisor';
+        var next = (current === 'supervisor') ? 'operator' : 'supervisor';
+        localStorage.setItem('ef-view', next);
+        var theme = _getThemeCookie() || 'default';
+        if (next === 'supervisor' && theme !== 'default') {
+            /* Switching to supervisor with non-default theme: reload as default */
+            document.cookie = 'ef-theme=default;path=/;max-age=31536000';
             location.reload();
+        } else if (next === 'operator' && theme !== 'default') {
+            /* Switching to operator with non-default theme: reload to get themed templates */
+            location.reload();
+        } else {
+            _applyView();
         }
+    }
 
-        /* Apply on load */
-        _applyView();
-    </script>
-    <script src="{{ url_for('static', filename='eigenform.js') }}"></script>
-    <script>
-        /* SSE: reload page when another client mutates state.
-           Suppress for 500ms after this tab's own POSTs. */
-        var _selfUpdated = 0;
-        document.addEventListener('click', function(e) {
-            if (e.target.closest('[data-ef-post]')) _selfUpdated = Date.now();
-        });
-        document.addEventListener('submit', function(e) {
-            if (e.target.closest('form[data-ef-submit]')) _selfUpdated = Date.now();
-        });
-        document.addEventListener('change', function(e) {
-            if (e.target.closest('[data-ef-change]')) _selfUpdated = Date.now();
-        });
+    /* Theme selector (operator view only): sets cookie and reloads */
+    function _getThemeCookie() {
+        var m = document.cookie.match(/(?:^|;\s*)ef-theme=(\w+)/);
+        return m ? m[1] : null;
+    }
+    function setTheme(theme) {
+        document.cookie = 'ef-theme=' + theme + ';path=/;max-age=31536000';
+        location.reload();
+    }
 
-        var source = new EventSource('/pages/{{ instance_id }}/stream');
-        source.onmessage = function(event) {
-            if (Date.now() - _selfUpdated < 500) return;
-            var scrollY = window.scrollY;
-            fetch('/pages/{{ instance_id }}', {
-                headers: {'Accept': 'text/html'}
-            }).then(function(resp) {
-                return resp.text();
-            }).then(function(html) {
-                var doc = new DOMParser().parseFromString(html, 'text/html');
-                var content = doc.getElementById('page-content');
-                if (content) {
-                    document.getElementById('page-content').innerHTML = content.innerHTML;
-                    window.scrollTo(0, scrollY);
-                }
-            });
-        };
-    </script>
-</body>
-</html>
+    /* Apply on load */
+    _applyView();
+</script>
+<script src="{{ url_for('static', filename='eigenform.js') }}"></script>
+<script>
+    /* SSE: reload page when another client mutates state.
+       Suppress for 500ms after this tab's own POSTs. */
+    var _selfUpdated = 0;
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('[data-ef-post]')) _selfUpdated = Date.now();
+    });
+    document.addEventListener('submit', function(e) {
+        if (e.target.closest('form[data-ef-submit]')) _selfUpdated = Date.now();
+    });
+    document.addEventListener('change', function(e) {
+        if (e.target.closest('[data-ef-change]')) _selfUpdated = Date.now();
+    });
+
+    var source = new EventSource('/pages/{{ instance_id }}/stream');
+    source.onmessage = function(event) {
+        if (Date.now() - _selfUpdated < 500) return;
+        var scrollY = window.scrollY;
+        fetch('/pages/{{ instance_id }}', {
+            headers: {'Accept': 'text/html'}
+        }).then(function(resp) {
+            return resp.text();
+        }).then(function(html) {
+            var doc = new DOMParser().parseFromString(html, 'text/html');
+            var content = doc.getElementById('page-content');
+            if (content) {
+                document.getElementById('page-content').innerHTML = content.innerHTML;
+                window.scrollTo(0, scrollY);
+            }
+        });
+    };
+</script>
+{% endblock %}

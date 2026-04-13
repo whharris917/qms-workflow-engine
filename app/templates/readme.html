@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}README - QMS Workflow Engine{% endblock %}
+{% block content %}
+<article class="readme-content">
+    {{ content | safe }}
+</article>
+
+<style>
+    .readme-content {
+        max-width: 860px;
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 2rem;
+        line-height: 1.65;
+    }
+    .readme-content h1 { font-size: 1.6rem; margin: 0 0 1rem; color: #1a1a2e; }
+    .readme-content h2 { font-size: 1.3rem; margin: 1.75rem 0 0.75rem; color: #1a1a2e; }
+    .readme-content h3 { font-size: 1.1rem; margin: 1.5rem 0 0.5rem; color: #333; }
+    .readme-content h4 { font-size: 1rem; margin: 1.25rem 0 0.5rem; color: #555; }
+    .readme-content p { margin: 0 0 0.75rem; color: #444; }
+    .readme-content ul, .readme-content ol { margin: 0 0 0.75rem 1.5rem; color: #444; }
+    .readme-content li { margin-bottom: 0.3rem; }
+    .readme-content code {
+        background: #f0f0f0;
+        padding: 0.15em 0.35em;
+        border-radius: 3px;
+        font-size: 0.9em;
+    }
+    .readme-content pre {
+        background: #f8f8f8;
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        padding: 1rem;
+        overflow-x: auto;
+        margin: 0 0 1rem;
+    }
+    .readme-content pre code {
+        background: none;
+        padding: 0;
+    }
+    .readme-content table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 0 0 1rem;
+        font-size: 0.9rem;
+    }
+    .readme-content th, .readme-content td {
+        border: 1px solid #ddd;
+        padding: 0.5rem 0.75rem;
+        text-align: left;
+    }
+    .readme-content th {
+        background: #f5f5f5;
+        font-weight: 600;
+    }
+    .readme-content blockquote {
+        border-left: 3px solid #4a9eff;
+        padding: 0.5rem 1rem;
+        margin: 0 0 1rem;
+        background: #f8faff;
+        color: #555;
+    }
+    .readme-content hr {
+        border: none;
+        border-top: 1px solid #e0e0e0;
+        margin: 1.5rem 0;
+    }
+    .readme-content a { color: #2a6bcf; }
+    .readme-content a:hover { text-decoration: underline; }
+</style>
+{% endblock %}

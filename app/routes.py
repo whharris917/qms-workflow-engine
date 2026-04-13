@@ -2,11 +2,12 @@ import json
 import queue
 from pathlib import Path
 
-from flask import Blueprint, Response, render_template, request, jsonify, redirect
+from flask import Blueprint, Response, render_template, request, jsonify, redirect, abort
 from markupsafe import Markup
 
 from pages import discover_pages, bind_page
 from app.registry import InstanceRegistry
+from app.manual import build_manual_toc, render_md, render_md_file, QUALITY_MANUAL_DIR
 from engine.templates import set_theme
 
 bp = Blueprint("main", __name__)
@@ -80,6 +81,9 @@ def notify_subscribers(instance_id: str, data: dict):
 
 @bp.route("/")
 def index():
+    if wants_html(request):
+        return render_template("home.html", active_page="home")
+    # JSON clients get the seed/instance listing
     seed_list = [{"key": k, "label": s.label} for k, s in seeds.items()]
     instances = registry.list_instances()
     instance_list = [
@@ -87,9 +91,25 @@ def index():
          "label": info["label"], "created_at": info.get("created_at", "")}
         for iid, info in instances.items()
     ]
-    if wants_html(request):
-        return render_template("index.html", seeds=seed_list, instances=instance_list)
     return jsonify({"seeds": seed_list, "instances": instance_list})
+
+
+@bp.route("/portal")
+def portal():
+    instances = registry.list_instances()
+    # Group instances by seed type for the card grid
+    grouped = []
+    for key, seed in seeds.items():
+        seed_instances = [
+            {"id": iid, "label": info["label"], "created_at": info.get("created_at", "")}
+            for iid, info in instances.items()
+            if info["type"] == key
+        ]
+        grouped.append({"key": key, "label": seed.label, "instances": seed_instances})
+    if wants_html(request):
+        return render_template("portal.html", grouped_seeds=grouped, active_page="portal")
+    return jsonify({"seeds": [{"key": g["key"], "label": g["label"],
+                                "instances": g["instances"]} for g in grouped]})
 
 
 @bp.route("/instances", methods=["POST"])
@@ -108,7 +128,7 @@ def create_instance():
         label = seeds[type_key].label
     instance_id = registry.create_instance(type_key, label)
     if wants_html(request):
-        return redirect("/")
+        return redirect("/portal")
     return jsonify({"instance_id": instance_id, "url": f"/pages/{instance_id}",
                     "type": type_key, "label": label}), 201
 
@@ -121,7 +141,7 @@ def delete_instance(instance_id):
             return "Instance not found", 404
         return jsonify({"error": "Instance not found"}), 404
     if wants_html(request):
-        return redirect("/")
+        return redirect("/portal")
     return jsonify({"deleted": instance_id})
 
 
@@ -148,7 +168,8 @@ def page(instance_id):
     if wants_html(request):
         html = Markup(pg.render())
         return render_template("page.html", page_html=html, title=pg.label,
-                               instance_id=instance_id, theme_css=_theme_css())
+                               instance_id=instance_id, theme_css=_theme_css(),
+                               active_page="portal")
     if request.args.get("depth") == "shallow":
         return jsonify(_shallow_serialize(pg))
     return jsonify(pg.serialize())
@@ -206,7 +227,8 @@ def eigenform(instance_id, path):
         if wants_html(request):
             html = Markup(ef.render())
             return render_template("page.html", page_html=html, title=ef.label,
-                                   instance_id=instance_id, theme_css=_theme_css())
+                                   instance_id=instance_id, theme_css=_theme_css(),
+                                   active_page="portal")
         return jsonify(ef.serialize())
 
     # POST — mutate
@@ -225,3 +247,61 @@ def eigenform(instance_id, path):
             ef_state["failed_action"] = result.get("failed_action")
         return jsonify(ef_state)
     return jsonify(result)
+
+
+# ── Quality Manual ──
+
+@bp.route("/manual")
+def manual_index():
+    toc = build_manual_toc()
+    return render_template("manual_index.html", toc=toc, active_page="manual")
+
+
+@bp.route("/manual/<path:slug>")
+def manual_page(slug):
+    file_path = QUALITY_MANUAL_DIR / f"{slug}.md"
+    content = render_md(file_path, current_slug=slug)
+    if content is None:
+        abort(404)
+    toc = build_manual_toc()
+    title = file_path.stem.replace("-", " ").replace("_", " ")
+    return render_template("manual_page.html", content=content, toc=toc,
+                           page_title=title, current_slug=slug, active_page="manual")
+
+
+# ── QMS Dashboard, Workspace, Inbox ──
+
+def _list_crs() -> list[dict]:
+    """List all CR data files, sorted by ID."""
+    crs = []
+    for p in sorted(DATA_DIR.glob("CR-*.json")):
+        crs.append(json.loads(p.read_text(encoding="utf-8")))
+    return crs
+
+
+@bp.route("/qms")
+def qms():
+    return render_template("qms.html", crs=_list_crs(), active_page="qms")
+
+
+@bp.route("/workspace")
+def workspace():
+    return render_template("workspace.html", crs=_list_crs(), active_page="workspace")
+
+
+@bp.route("/inbox")
+def inbox():
+    return render_template("inbox.html", active_page="inbox")
+
+
+# ── README ──
+
+README_PATH = Path(__file__).resolve().parent.parent / "README.md"
+
+
+@bp.route("/readme")
+def readme():
+    content = render_md_file(README_PATH)
+    if content is None:
+        abort(404)
+    return render_template("readme.html", content=content, active_page="readme")

@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Home - QMS Workflow Engine{% endblock %}
+{% block content %}
+<h1>QMS Workflow Engine</h1>
+<p>Document management, execution guidance, and evidence recording &mdash; powered by eigenforms.</p>
+
+<div class="quick-start">
+    <h2>Quick Start</h2>
+    <p>Go to the Agent Portal to create workflow instances, or browse the Quality Manual for process documentation.</p>
+    <a href="/portal" class="btn-primary">Agent Portal</a>
+</div>
+
+<div class="home-grid">
+    <div class="card">
+        <h2>Quality Management System</h2>
+        <p>
+            A GMP-inspired Quality Management System for AI agent orchestration. All changes
+            flow through controlled documents &mdash; Change Records, Investigations, Variance
+            Reports &mdash; with formal review and approval gates. The QMS governs both the
+            project it controls and its own evolution.
+        </p>
+    </div>
+
+    <div class="card">
+        <h2>The Eigenform Engine</h2>
+        <p>
+            A compositional content model where every form element &mdash; from a simple text
+            field to a complex navigation container &mdash; is an eigenform. Eigenforms compose
+            recursively, persist their own state, and project both human-readable HTML and
+            agent-consumable JSON from the same source of truth.
+        </p>
+    </div>
+
+    <div class="card">
+        <h2>The Recursive Governance Loop</h2>
+        <p>
+            The QMS controls how projects are developed <em>and</em> controls its own
+            evolution through the same mechanisms. Process failures become inputs to process
+            improvement, governed by the same document control infrastructure. The system
+            learns from its own mistakes.
+        </p>
+    </div>
+
+    <div class="card">
+        <h2>At a Glance</h2>
+        <dl>
+            <dt>Document Types</dt><dd>CR, INV, VAR, ADD, VR, TP, ER</dd>
+            <dt>Workflow</dt><dd>Draft &rarr; Review &rarr; Approval &rarr; Execution &rarr; Closure</dd>
+            <dt>Agents</dt><dd>Orchestrator, QA, Technical Units, Business Unit</dd>
+            <dt>Eigenforms</dt><dd>28+ types: data, container, reactive, dynamic, wrapper</dd>
+        </dl>
+    </div>
+</div>
+
+<style>
+    .quick-start {
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-top: 1.5rem;
+    }
+    .quick-start h2 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #1a1a2e;
+        margin-bottom: 0.4rem;
+    }
+    .quick-start p {
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+    }
+    .btn-primary {
+        display: inline-block;
+        background: #2a6bcf;
+        color: #fff;
+        padding: 0.6rem 1.25rem;
+        border-radius: 6px;
+        text-decoration: none;
+        font-size: 0.95rem;
+        font-weight: 500;
+        transition: background 0.15s;
+    }
+    .btn-primary:hover {
+        background: #1a4a9e;
+    }
+    .home-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.25rem;
+        margin-top: 1.5rem;
+    }
+    .card {
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 1.25rem;
+    }
+    .card h2 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: #1a1a2e;
+    }
+    .card p {
+        font-size: 0.9rem;
+        line-height: 1.55;
+    }
+    .card dl {
+        font-size: 0.9rem;
+        line-height: 1.6;
+    }
+    .card dt {
+        font-weight: 600;
+        color: #555;
+        display: inline;
+    }
+    .card dt::after { content: ": "; }
+    .card dd {
+        display: inline;
+        margin: 0;
+    }
+    .card dd::after {
+        content: "";
+        display: block;
+    }
+</style>
+{% endblock %}
