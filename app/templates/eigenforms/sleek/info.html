@@ -1,0 +1,22 @@
+{# InfoForm sleek theme — native edit mode, default execute mode. #}
+{% if data.edit_mode %}
+{% for aff in data.affordances %}
+  {% set action = aff.body.action|default("") %}
+  {% if action in ("set_label", "set_instruction") %}
+    {% set _ = aff.update({"_rendered": true}) %}
+  {% endif %}
+{% endfor %}
+{% include "_edit_header.html" with context %}
+{% if text_html %}
+<div class="sleek-edit-child-ef">
+  {{ text_html|safe }}
+</div>
+{% endif %}
+<div class="sleek-edit-remaining">
+{% for aff in data.affordances %}
+  {% if not aff._rendered %}{{ render_aff(aff) }}{% endif %}
+{% endfor %}
+</div>
+{% else %}
+{% include "info.html" %}
+{% endif %}

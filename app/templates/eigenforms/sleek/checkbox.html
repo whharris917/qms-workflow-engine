@@ -1,0 +1,22 @@
+{# CheckboxForm sleek theme — native edit mode, default execute mode. #}
+{% if data.edit_mode %}
+{% for aff in data.affordances %}
+  {% if aff.body.action in ("set_label", "set_instruction") %}
+    {% set _ = aff.update({"_rendered": true}) %}
+  {% endif %}
+{% endfor %}
+{% include "_edit_header.html" with context %}
+<div class="sleek-edit-child-ef">
+  {{ items_html|safe }}
+</div>
+{% if data.confirmed %}
+<div class="sleek-edit-status">&#10003; Confirmed</div>
+{% endif %}
+<div class="sleek-edit-remaining">
+{% for aff in data.affordances %}
+  {% if not aff._rendered %}{{ render_aff(aff) }}{% endif %}
+{% endfor %}
+</div>
+{% else %}
+{% include "checkbox.html" %}
+{% endif %}

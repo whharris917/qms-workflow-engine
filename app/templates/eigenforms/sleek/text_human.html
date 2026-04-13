@@ -1,15 +1,37 @@
-{# TextForm sleek theme — modern, minimal UI. #}
-{% for aff in data.affordances %}
-{% set _ = aff.update({"_rendered": true}) %}
-{% endfor %}
 {# TextForm sleek theme — modern, minimal UI.
-   Edit mode falls back to the default template. #}
-{% if edit_mode %}
-{% include "text_human.html" %}
-{% else %}
+   Edit mode renders natively instead of falling back to default. #}
 {% for aff in data.affordances %}
 {% set _ = aff.update({"_rendered": true}) %}
 {% endfor %}
+{% if edit_mode %}
+{% include "_edit_header.html" with context %}
+<div class="sleek-edit-config">
+  {% set ml_body = {"action": "toggle_multiline"}|tojson %}
+  <button data-ef-post="{{ url }}" data-ef-body="{{ ml_body }}"
+    class="sleek-edit-config__toggle{% if multiline %} sleek-edit-config__toggle--on{% endif %}"
+    title="POST {{ url }} {{ ml_body }}">multiline: {{ "on" if multiline else "off" }}</button>
+  {% for field_label, action, current in [
+    ("min length", "set_min_length", data.min_length if data.min_length is defined else none),
+    ("max length", "set_max_length", data.max_length if data.max_length is defined else none),
+  ] %}
+  {% set display_val = "" if current is none else current|string %}
+  <form class="sleek-edit-config__field" data-ef-submit="{{ url }}">
+    <input type="hidden" name="action" value="{{ action }}" />
+    <span class="sleek-edit-config__label">{{ field_label }}:</span>
+    <input name="value" type="text" value="{{ display_val }}" placeholder="none"
+      class="sleek-edit-config__input" />
+    <button type="submit" class="sleek-edit-config__btn">&#10003;</button>
+  </form>
+  {% endfor %}
+</div>
+<p class="sleek-edit-value"><strong>Value:</strong> {{ value|string }}</p>
+{% if has_data %}
+<div class="sleek-edit-remaining">
+  <button data-ef-post="{{ url }}" data-ef-body='{"action": "clear"}'
+    class="sleek-edit-row__btn sleek-edit-row__btn--remove">Clear</button>
+</div>
+{% endif %}
+{% else %}
 <div class="sleek-text">
   {% if instruction %}
   <p class="sleek-text__hint">{{ instruction }}</p>

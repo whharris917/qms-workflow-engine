@@ -1,0 +1,77 @@
+{# DictionaryForm sleek theme — native edit mode, default execute mode. #}
+{% set entries = data.entries or [] %}
+{% set affs = data.affordances or [] %}
+{% set kl = data.key_label or "Key" %}
+{% set vl = data.value_label or "Value" %}
+{% if data.edit_mode %}
+{% set label = data.label %}
+{% set instruction = data.instruction or "" %}
+{% include "_edit_header.html" with context %}
+<div class="sleek-edit-config">
+  {% for field_label, action, current in [
+    ("key label", "set_key_label", kl),
+    ("value label", "set_value_label", vl),
+  ] %}
+  <form class="sleek-edit-config__field" data-ef-submit="{{ url }}">
+    <input type="hidden" name="action" value="{{ action }}" />
+    <span class="sleek-edit-config__label">{{ field_label }}:</span>
+    <input name="value" type="text" value="{{ current }}"
+      class="sleek-edit-config__input sleek-edit-config__input--wide" />
+    <button type="submit" class="sleek-edit-config__btn">&#10003;</button>
+  </form>
+  {% endfor %}
+</div>
+{% for aff in affs %}
+  {% if aff.body.action in ("edit", "remove", "add", "set_label", "set_instruction", "set_key_label", "set_value_label") %}
+    {% set _ = aff.update({"_rendered": true}) %}
+  {% endif %}
+{% endfor %}
+{% else %}
+{% for aff in affs %}
+  {% if aff.body.action in ("edit", "remove", "add") %}
+    {% set _ = aff.update({"_rendered": true}) %}
+  {% endif %}
+{% endfor %}
+{% endif %}
+{# Column headers #}
+<div class="sleek-edit-colheader">
+  <span class="sleek-edit-colheader__spacer"></span>
+  <span style="width: 120px;">{{ kl }}</span>
+  <span style="flex: 1;">{{ vl }}</span>
+</div>
+{# Existing entries #}
+{% for entry in entries %}
+{% set ekey = entry.key|string %}
+{% set eval = entry.value|string %}
+<div class="sleek-edit-row">
+  <button data-ef-post="{{ url }}" data-ef-body="{{ {"action": "remove", "key": entry.key}|tojson }}"
+    class="sleek-edit-row__btn sleek-edit-row__btn--remove" title="Remove">&#10005;</button>
+  <form style="display: contents; margin: 0;" data-ef-submit="{{ url }}">
+    <input type="hidden" name="action" value="edit" />
+    <input type="hidden" name="key" value="{{ ekey }}" />
+    <input name="new_key" type="text" value="{{ ekey }}"
+      class="sleek-edit-row__input sleek-edit-row__input--key" />
+    <input name="value" type="text" value="{{ eval }}"
+      class="sleek-edit-row__input sleek-edit-row__input--value" />
+    <button type="submit" class="sleek-edit-config__btn">&#10003;</button>
+  </form>
+</div>
+{% endfor %}
+{# Add row #}
+<div class="sleek-edit-addrow">
+  {{ BUTTON_GAP|safe }}
+  <form style="display: contents; margin: 0;" data-ef-submit="{{ url }}">
+    <input type="hidden" name="action" value="add" />
+    <input name="key" type="text" placeholder="{{ kl }}"
+      class="sleek-edit-row__input sleek-edit-row__input--key" />
+    <input name="value" type="text" placeholder="{{ vl }}"
+      class="sleek-edit-row__input sleek-edit-row__input--value" />
+    <button type="submit" class="sleek-edit-row__btn sleek-edit-row__btn--add">+</button>
+  </form>
+</div>
+{# Remaining affordances #}
+<div class="sleek-edit-remaining">
+{% for aff in affs %}
+  {% if not aff._rendered %}{{ render_aff(aff) }}{% endif %}
+{% endfor %}
+</div>

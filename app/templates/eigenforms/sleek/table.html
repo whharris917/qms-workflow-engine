@@ -1,12 +1,10 @@
 {# TableForm sleek theme — dark spreadsheet with compact controls.
-   Edit mode falls back to the default template.
+   Both edit and execute modes rendered natively.
 
    Uses raw data (col_oc, row_oc, col_items, row_items, typed_templates,
    row_groups_by_id, row_mf, col_mf, etc.) instead of pre-rendered HTML.
 #}
-{% if data.edit_mode %}
-{% include "table.html" %}
-{% else %}
+{% set in_edit = data.edit_mode %}
 {# Mark all inline affordances as rendered (we handle them ourselves) #}
 {% for aff in data.affordances %}
   {% set hints_type = aff.render_hints.type|default("") if aff.render_hints is defined else "" %}
@@ -19,8 +17,14 @@
       "set_row", "toggle_auto_chain_rows", "toggle_auto_chain_cols") %}
     {% set _ = aff.update({"_rendered": true}) %}
   {% endif %}
+  {% if in_edit and action in ("set_label", "set_instruction") %}
+    {% set _ = aff.update({"_rendered": true}) %}
+  {% endif %}
 {% endfor %}
 {% set endpoint = "POST " ~ url %}
+{% if in_edit %}
+{% include "_edit_header.html" with context %}
+{% endif %}
 <div class="sleek-table">
 {# Configuration toggles #}
 {% if config_toggles %}
@@ -251,4 +255,3 @@
 {% endfor %}
 </div>
 </div>
-{% endif %}

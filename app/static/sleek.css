@@ -920,6 +920,216 @@ body.operator-view[data-theme="sleek"] span[style*="background:#e8f5e8"] {
     border-color: #2563eb !important;
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   SLEEK EDIT MODE — unified config controls for all data eigenforms
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Config bar: sits below label/instruction edit forms */
+.sleek-edit-config {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding: 6px 12px;
+    margin: 0;
+    font-size: 12px;
+    color: #888;
+    background: #1e1e1e;
+    border-left: 1px solid #555d66;
+    border-right: 1px solid #555d66;
+    border-top: 1px solid #333;
+}
+
+/* Toggle pill: on/off boolean config */
+.sleek-edit-config__toggle {
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    padding: 2px 10px;
+    border-radius: 3px;
+    border: 1px solid #444;
+    background: #2b3035;
+    color: #888;
+    line-height: 1.4;
+}
+.sleek-edit-config__toggle:hover {
+    background: #363b42;
+    color: #ccc;
+}
+.sleek-edit-config__toggle--on {
+    background: #1a2a3c;
+    color: #60a5fa;
+    border-color: #2563eb;
+}
+.sleek-edit-config__toggle--on:hover {
+    background: #1e3a5f;
+}
+
+/* Inline config field: label + input + confirm button */
+.sleek-edit-config__field {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0;
+}
+.sleek-edit-config__label {
+    font-weight: 600;
+    color: #888;
+    white-space: nowrap;
+    font-size: 12px;
+}
+.sleek-edit-config__input {
+    background: #2b3035;
+    color: #ccc;
+    border: 1px solid #444;
+    border-radius: 3px;
+    padding: 2px 6px;
+    font: inherit;
+    font-size: 12px;
+    width: 60px;
+    text-align: center;
+}
+.sleek-edit-config__input:focus {
+    border-color: #3b82f6;
+    outline: none;
+}
+.sleek-edit-config__input--wide {
+    width: 100px;
+}
+.sleek-edit-config__btn {
+    background: #1a2a3c;
+    border: 1px solid #2563eb;
+    color: #60a5fa;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    line-height: 1.4;
+}
+.sleek-edit-config__btn:hover {
+    background: #1e3a5f;
+}
+
+/* Value display in edit mode */
+.sleek-edit-value {
+    color: #ccc;
+    margin: 8px 12px 4px;
+    font-size: 13px;
+}
+.sleek-edit-value strong {
+    color: #888;
+    font-weight: 600;
+}
+
+/* Child eigenform container (ChoiceForm options, CheckboxForm items, InfoForm text) */
+.sleek-edit-child-ef {
+    margin: 4px 0;
+    padding: 0 4px;
+}
+
+/* Status indicator (e.g., CheckboxForm "Confirmed") */
+.sleek-edit-status {
+    color: #60a5fa;
+    font-size: 12px;
+    margin: 4px 12px;
+}
+
+/* Remaining affordances area */
+.sleek-edit-remaining {
+    margin: 4px 8px 4px;
+}
+
+/* Collection rows (DictionaryForm entries, MultiForm fields) */
+.sleek-edit-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 2px 8px;
+    font-size: 12px;
+}
+.sleek-edit-row__label {
+    font-weight: 600;
+    color: #888;
+    font-size: 11px;
+}
+.sleek-edit-row__value {
+    color: #666;
+    font-size: 11px;
+    margin-left: auto;
+}
+.sleek-edit-row__input {
+    background: #2b3035;
+    color: #ccc;
+    border: 1px solid #444;
+    border-radius: 3px;
+    padding: 2px 6px;
+    font: inherit;
+    font-size: 12px;
+}
+.sleek-edit-row__input:focus {
+    border-color: #3b82f6;
+    outline: none;
+}
+.sleek-edit-row__input--key {
+    width: 120px;
+}
+.sleek-edit-row__input--value {
+    flex: 1;
+}
+.sleek-edit-row__btn {
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid #444;
+    background: #2b3035;
+    color: #888;
+    line-height: 1.4;
+}
+.sleek-edit-row__btn--add {
+    background: #1a2a3c;
+    border-color: #2563eb;
+    color: #60a5fa;
+}
+.sleek-edit-row__btn--add:hover {
+    background: #1e3a5f;
+}
+.sleek-edit-row__btn--remove {
+    background: #2b3035;
+    border-color: #444;
+    color: #f48771;
+    font-size: 11px;
+    padding: 1px 5px;
+}
+.sleek-edit-row__btn--remove:hover {
+    background: #3c1f1f;
+    border-color: #be3434;
+}
+
+/* Column headers for collection forms */
+.sleek-edit-colheader {
+    display: flex;
+    gap: 4px;
+    margin: 4px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #666;
+}
+.sleek-edit-colheader__spacer {
+    display: inline-block;
+    width: 24px;
+}
+
+/* Add-row form for collection forms */
+.sleek-edit-addrow {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 4px 8px;
+}
+
 /* --- Feedback banners --- */
 body.operator-view[data-theme="sleek"] .ef-feedback--error {
     background: #3c1f1f;
@@ -1268,6 +1478,27 @@ body.operator-view[data-theme="sleek"] .ef-feedback__dismiss {
 .sleek-list__btn--add:hover {
     border-color: #60a5fa;
     background: #1e2a3a;
+}
+
+.sleek-list__btn--pin {
+    font-size: 12px;
+    color: #555;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0 2px;
+    opacity: 0.5;
+}
+.sleek-list__btn--pin:hover {
+    opacity: 1;
+    color: #888;
+}
+.sleek-list__btn--pin-active {
+    opacity: 1;
+    color: #d29922;
+}
+.sleek-list__btn--pin-active:hover {
+    color: #f0b429;
 }
 
 .sleek-list__extra-affs {

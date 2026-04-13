@@ -1,9 +1,26 @@
 {# ListForm sleek theme — compact dark list with inline controls.
-   Edit mode falls back to the default template. #}
-{% if data.edit_mode %}
-{% include "list.html" %}
+   Both edit and execute modes rendered natively. #}
+{% set in_edit = data.edit_mode %}
+{% set affs = data.affordances or [] %}
+{% if in_edit %}
+{% for aff in affs %}
+{% set action = aff.body.action %}
+{% if action in ("move_up", "move_down", "edit", "remove", "add",
+                  "add_constraint", "remove_constraint",
+                  "toggle_fixed", "toggle_constraint_fixed",
+                  "set_label", "set_instruction", "toggle_constraints") %}
+{% set _ = aff.update({"_rendered": true}) %}
+{% endif %}
+{% endfor %}
+{% include "_edit_header.html" with context %}
+<div class="sleek-edit-config">
+  {% set ac_body = {"action": "toggle_constraints"}|tojson %}
+  <button data-ef-post="{{ url }}" data-ef-body="{{ ac_body }}"
+    class="sleek-edit-config__toggle{% if allow_constraints %} sleek-edit-config__toggle--on{% endif %}"
+    title="POST {{ url }} {{ ac_body }}">constraints: {{ "on" if allow_constraints else "off" }}</button>
+</div>
 {% else %}
-{% for aff in data.affordances or [] %}
+{% for aff in affs %}
 {% set action = aff.body.action %}
 {% if action in ("move_up", "move_down", "edit", "remove", "add",
                   "add_constraint", "remove_constraint",
@@ -11,13 +28,14 @@
 {% set _ = aff.update({"_rendered": true}) %}
 {% endif %}
 {% endfor %}
+{% endif %}
 {% set items = data["items"] or [] %}
 {% set num_items = items|length %}
 {% set endpoint = "POST " ~ url %}
 <div class="sleek-list">
   {% if data.na %}
   <p class="sleek-list__na">N/A</p>
-  {% for aff in data.affordances or [] %}
+  {% for aff in affs %}
   {% if not aff._rendered %}{{ render_aff(aff) }}{% endif %}
   {% endfor %}
   {% else %}
@@ -25,11 +43,12 @@
   {% for item in items %}
     {% set item_id = item.id %}
     {% set item_val = item.value|string %}
-    {% set is_fixed = item.fixed %}
+    {% set is_item_fixed = item.fixed %}
+    {% set is_fixed = is_item_fixed and not in_edit %}
     {% set can_up = oc.can_move_up(loop.index0, items) %}
     {% set can_down = oc.can_move_down(loop.index0, items) %}
     {% set prereqs = all_must_follow.get(item_id, []) %}
-    <div class="sleek-list__row{% if is_fixed %} sleek-list__row--fixed{% endif %}">
+    <div class="sleek-list__row{% if is_item_fixed and not in_edit %} sleek-list__row--fixed{% endif %}">
       <span class="sleek-list__ordinal">{{ loop.index }}</span>
       {% if is_fixed %}
       <span class="sleek-list__value sleek-list__value--fixed">{{ item_val }}</span>
@@ -59,9 +78,34 @@
           data-ef-post="{{ url }}" data-ef-body="{{ {"action": "remove", "id": item_id}|tojson }}"
           title="{{ endpoint }} {{ {"action": "remove", "id": item_id}|tojson }}">&times;</button>
         {% endif %}
+        {% if in_edit %}
+        <button class="sleek-list__btn sleek-list__btn--pin{% if is_item_fixed %} sleek-list__btn--pin-active{% endif %}"
+          data-ef-post="{{ url }}" data-ef-body="{{ {"action": "toggle_fixed", "id": item_id}|tojson }}"
+          title="Toggle fixed">&#128204;</button>
+        {% endif %}
       </span>
-      {% if prereqs %}
+      {% if prereqs or (allow_constraints and num_items > 1) %}
       <span class="sleek-list__prereqs">
+        {% if allow_constraints and num_items > 1 %}
+        {% set available = [] %}
+        {% for i in items %}
+        {% if i.id != item_id and i.id not in (all_must_follow.get(item_id, [])) %}
+        {% set _ = available.append(i) %}
+        {% endif %}
+        {% endfor %}
+        {% if available %}
+        <select class="sleek-list__constraint-add"
+          data-ef-change="{{ url }}"
+          data-ef-template='{{ {"action": "add_constraint", "item": item_id, "after": "__VALUE"}|tojson }}'
+          title='{{ endpoint }} {{ {"action":"add_constraint","item":item_id,"after":"..."}|tojson }}'>
+          <option value="">+dep</option>
+          {% for i in available %}
+          <option value="{{ i.id }}">{{ i.value or i.id }}</option>
+          {% endfor %}
+        </select>
+        {% endif %}
+        {% endif %}
+        {% if prereqs %}
         {% for p_id in prereqs %}
         {% set p_name = id_to_val.get(p_id, p_id) or p_id %}
         {% set is_static = (item_id, p_id) in static_pairs %}
@@ -77,32 +121,21 @@
         {% set is_effectively_fixed = false %}
         {% endif %}
         <span class="sleek-list__prereq{% if is_effectively_fixed %} sleek-list__prereq--fixed{% endif %}">{{ p_name }}
-          {%- if not is_effectively_fixed %}
+          {%- if in_edit %}
+          <button class="sleek-list__btn sleek-list__btn--pin{% if is_effectively_fixed %} sleek-list__btn--pin-active{% endif %}"
+            data-ef-post="{{ url }}" data-ef-body="{{ {"action": "toggle_constraint_fixed", "item": item_id, "after": p_id}|tojson }}"
+            title="Toggle constraint fixed" style="font-size: 9px;">&#128204;</button>
+          <button class="sleek-list__btn sleek-list__btn--pill-remove"
+            data-ef-post="{{ url }}" data-ef-body="{{ {"action": "remove_constraint", "item": item_id, "after": p_id}|tojson }}"
+            title="{{ endpoint }} {{ {"action": "remove_constraint", "item": item_id, "after": p_id}|tojson }}">&times;</button>
+          {%- elif not is_effectively_fixed %}
           <button class="sleek-list__btn sleek-list__btn--pill-remove"
             data-ef-post="{{ url }}" data-ef-body="{{ {"action": "remove_constraint", "item": item_id, "after": p_id}|tojson }}"
             title="{{ endpoint }} {{ {"action": "remove_constraint", "item": item_id, "after": p_id}|tojson }}">&times;</button>
           {%- endif %}</span>
         {% endfor %}
+        {% endif %}
       </span>
-      {% endif %}
-      {% if allow_constraints and num_items > 1 %}
-      {% set available = [] %}
-      {% for i in items %}
-      {% if i.id != item_id and i.id not in (all_must_follow.get(item_id, [])) %}
-      {% set _ = available.append(i) %}
-      {% endif %}
-      {% endfor %}
-      {% if available %}
-      <select class="sleek-list__constraint-add"
-        data-ef-change="{{ url }}"
-        data-ef-template='{{ {"action": "add_constraint", "item": item_id, "after": "__VALUE"}|tojson }}'
-        title='{{ endpoint }} {{ {"action":"add_constraint","item":item_id,"after":"..."}|tojson }}'>
-        <option value="">+dep</option>
-        {% for i in available %}
-        <option value="{{ i.id }}">{{ i.value or i.id }}</option>
-        {% endfor %}
-      </select>
-      {% endif %}
       {% endif %}
     </div>
   {% endfor %}
@@ -115,10 +148,9 @@
       title="{{ endpoint }} {{ {"action": "add", "value": ""}|tojson }}">+</button>
   </form>
   <div class="sleek-list__extra-affs">
-  {% for aff in data.affordances or [] %}
+  {% for aff in affs %}
   {% if not aff._rendered %}{{ render_aff(aff) }}{% endif %}
   {% endfor %}
   </div>
   {% endif %}
 </div>
-{% endif %}

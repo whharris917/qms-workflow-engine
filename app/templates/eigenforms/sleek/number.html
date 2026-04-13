@@ -1,0 +1,45 @@
+{# NumberForm sleek theme — native edit mode, default execute mode. #}
+{% if data.edit_mode %}
+{% for aff in data.affordances %}
+  {% if aff.body.action in ("set_label", "set_instruction", "set_min", "set_max", "set_step", "toggle_slider", "set_unit") %}
+    {% set _ = aff.update({"_rendered": true}) %}
+  {% endif %}
+{% endfor %}
+{% include "_edit_header.html" with context %}
+<div class="sleek-edit-config">
+  {% for field_label, action, field_name, val in [
+    ("min", "set_min", "value", data.min),
+    ("max", "set_max", "value", data.max),
+    ("step", "set_step", "value", data.step),
+  ] %}
+  {% set display_val = "" if val is none else val|string %}
+  <form class="sleek-edit-config__field" data-ef-submit="{{ url }}">
+    <input type="hidden" name="action" value="{{ action }}" />
+    <span class="sleek-edit-config__label">{{ field_label }}:</span>
+    <input name="{{ field_name }}" type="text" value="{{ display_val }}" placeholder="none"
+      class="sleek-edit-config__input" />
+    <button type="submit" class="sleek-edit-config__btn">&#10003;</button>
+  </form>
+  {% endfor %}
+  {% set slider_body = {"action": "toggle_slider"}|tojson %}
+  <button data-ef-post="{{ url }}" data-ef-body="{{ slider_body }}"
+    class="sleek-edit-config__toggle{% if data.slider %} sleek-edit-config__toggle--on{% endif %}"
+    title="POST {{ url }} {{ slider_body }}">slider: {{ "on" if data.slider else "off" }}</button>
+  {% set unit_val = data.unit or "" %}
+  <form class="sleek-edit-config__field" data-ef-submit="{{ url }}">
+    <input type="hidden" name="action" value="set_unit" />
+    <span class="sleek-edit-config__label">unit:</span>
+    <input name="value" type="text" value="{{ unit_val }}" placeholder="none"
+      class="sleek-edit-config__input" />
+    <button type="submit" class="sleek-edit-config__btn">&#10003;</button>
+  </form>
+</div>
+<p class="sleek-edit-value"><strong>Value:</strong> {{ (data.value if data.value is not none else "None")|string }}</p>
+<div class="sleek-edit-remaining">
+{% for aff in data.affordances %}
+  {% if not aff._rendered %}{{ render_aff(aff) }}{% endif %}
+{% endfor %}
+</div>
+{% else %}
+{% include "number.html" %}
+{% endif %}
