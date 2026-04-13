@@ -9,64 +9,51 @@
 {% endblock %}
 
 {% block content %}
-<div class="ef-page-toolbar">
-    <button class="ef-supervisor-toggle" id="supervisor-toggle" onclick="toggleView()">Change to Operator View</button>
-    <select class="ef-theme-select" id="theme-select" onchange="setTheme(this.value)">
-        <option value="default">Default</option>
-        <option value="sleek">Sleek</option>
-    </select>
-</div>
 <div id="page-content">{{ page_html }}</div>
+<div class="ef-page-footer">
+    <label class="ef-debug-toggle" id="debug-toggle">
+        <input type="checkbox" id="debug-checkbox" onchange="toggleDebug(this.checked)">
+        Debug Mode
+    </label>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    /* View toggle: Supervisor (full borders, no theme choice) vs Operator (themes available) */
-    function _applyView() {
-        var view = localStorage.getItem('ef-view') || 'supervisor';
-        var isSupervisor = (view === 'supervisor');
-        document.body.classList.toggle('supervisor-view', isSupervisor);
-        document.body.classList.toggle('operator-view', !isSupervisor);
-        var btn = document.getElementById('supervisor-toggle');
-        btn.textContent = isSupervisor ? 'Change to Operator View' : 'Change to Supervisor View';
-        /* Apply data-theme on body for CSS targeting */
-        var theme = _getThemeCookie() || 'default';
-        if (isSupervisor) {
+    /* Debug Mode toggle:
+       Off = operator-view + sleek theme (clean production look)
+       On  = supervisor-view + default theme (full borders, chrome, JSON pane) */
+    function _applyDebug() {
+        var debug = localStorage.getItem('ef-debug') === 'true';
+        document.body.classList.toggle('supervisor-view', debug);
+        document.body.classList.toggle('operator-view', !debug);
+        document.getElementById('debug-checkbox').checked = debug;
+        if (debug) {
             document.body.removeAttribute('data-theme');
         } else {
-            document.body.setAttribute('data-theme', theme);
+            document.body.setAttribute('data-theme', 'sleek');
         }
-        document.getElementById('theme-select').value = theme;
     }
-    function toggleView() {
-        var current = localStorage.getItem('ef-view') || 'supervisor';
-        var next = (current === 'supervisor') ? 'operator' : 'supervisor';
-        localStorage.setItem('ef-view', next);
-        var theme = _getThemeCookie() || 'default';
-        if (next === 'supervisor' && theme !== 'default') {
-            /* Switching to supervisor with non-default theme: reload as default */
-            document.cookie = 'ef-theme=default;path=/;max-age=31536000';
-            location.reload();
-        } else if (next === 'operator' && theme !== 'default') {
-            /* Switching to operator with non-default theme: reload to get themed templates */
+    function toggleDebug(on) {
+        var wasDebug = localStorage.getItem('ef-debug') === 'true';
+        localStorage.setItem('ef-debug', on ? 'true' : 'false');
+        /* Theme change requires server reload (templates are theme-dependent) */
+        var needsReload = (on && _getThemeCookie() !== 'default') ||
+                          (!on && _getThemeCookie() !== 'sleek');
+        document.cookie = 'ef-theme=' + (on ? 'default' : 'sleek') + ';path=/;max-age=31536000';
+        if (needsReload) {
             location.reload();
         } else {
-            _applyView();
+            _applyDebug();
         }
     }
-
-    /* Theme selector (operator view only): sets cookie and reloads */
     function _getThemeCookie() {
         var m = document.cookie.match(/(?:^|;\s*)ef-theme=(\w+)/);
         return m ? m[1] : null;
     }
-    function setTheme(theme) {
-        document.cookie = 'ef-theme=' + theme + ';path=/;max-age=31536000';
-        location.reload();
-    }
 
     /* Apply on load */
-    _applyView();
+    _applyDebug();
 </script>
 <script src="{{ url_for('static', filename='eigenform.js') }}"></script>
 <script>

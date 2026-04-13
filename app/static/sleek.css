@@ -62,6 +62,19 @@ body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > h2:not(:ha
     margin-bottom: 16px;
 }
 
+/* Data eigenform card text: match theme font sizing */
+body.operator-view[data-theme="sleek"] .eigenform h3 {
+    font-size: 13px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+}
+body.operator-view[data-theme="sleek"] .eigenform p {
+    font-size: 12px;
+    line-height: 1.5;
+    color: #aaa;
+    margin: 0 0 8px 0;
+}
+
 /* Titlebar: window-style title bar on data eigenform cards */
 body.operator-view[data-theme="sleek"] .eigenform > .ef-titlebar {
     display: flex;

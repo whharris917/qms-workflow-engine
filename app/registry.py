@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import uuid
 from pathlib import Path
 
 
@@ -53,18 +54,12 @@ class InstanceRegistry:
     def create_instance(self, type_key: str, label: str,
                         force_id: str | None = None) -> str:
         self._sync()
-        counters = self._data.setdefault("_counters", {})
         instances = self._data.setdefault("instances", {})
 
         if force_id is not None:
             instance_id = force_id
-            # Update counter to stay ahead of forced IDs
-            n = counters.get(type_key, 0)
-            counters[type_key] = max(n, 1)
         else:
-            n = counters.get(type_key, 0) + 1
-            counters[type_key] = n
-            instance_id = f"{type_key}-{n}"
+            instance_id = uuid.uuid4().hex[:8]
 
         instances[instance_id] = {
             "type": type_key,

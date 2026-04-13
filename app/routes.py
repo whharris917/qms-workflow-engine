@@ -14,20 +14,17 @@ bp = Blueprint("main", __name__)
 
 DATA_DIR = Path("data")
 
-# Seed registry — unbound definitions with no runtime state
-seeds = discover_pages()
-
 # Instance registry — tracks spawned page instances
 registry = InstanceRegistry(DATA_DIR)
-
-# Auto-migrate legacy data files whose seed key isn't already registered
-for key, seed in seeds.items():
-    if (DATA_DIR / f"{key}.json").exists() and registry.get_instance(key) is None:
-        registry.create_instance(key, seed.label, force_id=key)
 
 # SSE subscribers: {instance_id: [queue, ...]}
 # Connection state only — knows nothing about eigenforms
 subscribers: dict[str, list[queue.Queue]] = {}
+
+
+def seeds() -> dict:
+    """Discover page seeds fresh on every call."""
+    return discover_pages()
 
 
 THEMES = {"default", "sleek"}
@@ -36,7 +33,7 @@ THEME_CSS = {"sleek": "sleek.css"}
 
 @bp.before_request
 def _apply_theme():
-    theme = request.cookies.get("ef-theme")
+    theme = request.cookies.get("ef-theme", "sleek")
     set_theme(theme if theme in THEMES and theme != "default" else None)
 
 
@@ -52,7 +49,7 @@ def get_page(instance_id: str):
     info = registry.get_instance(instance_id)
     if info is None:
         return None
-    seed = seeds.get(info["type"])
+    seed = seeds().get(info["type"])
     if seed is None:
         return None
     return bind_page(seed, DATA_DIR, instance_id, label=info.get("label"))
@@ -84,7 +81,7 @@ def index():
     if wants_html(request):
         return render_template("home.html", active_page="home")
     # JSON clients get the seed/instance listing
-    seed_list = [{"key": k, "label": s.label} for k, s in seeds.items()]
+    seed_list = [{"key": k, "label": s.label} for k, s in seeds().items()]
     instances = registry.list_instances()
     instance_list = [
         {"id": iid, "url": f"/pages/{iid}", "type": info["type"],
@@ -99,7 +96,7 @@ def portal():
     instances = registry.list_instances()
     # Group instances by seed type for the card grid
     grouped = []
-    for key, seed in seeds.items():
+    for key, seed in seeds().items():
         seed_instances = [
             {"id": iid, "label": info["label"], "created_at": info.get("created_at", "")}
             for iid, info in instances.items()
@@ -120,12 +117,13 @@ def create_instance():
         body = {"type": request.form.get("type"), "label": request.form.get("label")}
     type_key = body.get("type")
     label = body.get("label")
-    if not type_key or type_key not in seeds:
+    current_seeds = seeds()
+    if not type_key or type_key not in current_seeds:
         if wants_html(request):
             return "Unknown page type", 400
         return jsonify({"error": f"Unknown type: {type_key}"}), 400
     if not label:
-        label = seeds[type_key].label
+        label = current_seeds[type_key].label
     instance_id = registry.create_instance(type_key, label)
     if wants_html(request):
         return redirect("/portal")
