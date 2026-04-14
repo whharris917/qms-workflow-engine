@@ -56,6 +56,184 @@ document.addEventListener('change', function(e) {
     if (body) _efPost(url, JSON.stringify(body));
 });
 
+/* ---------------------------------------------------------------
+ * Structural editor: drag-and-drop reorder + multi-select + group
+ * --------------------------------------------------------------- */
+
+/* Drag-and-drop reorder */
+document.addEventListener('dragstart', function(e) {
+    var tile = e.target.closest('.sleek-struct__tile');
+    if (!tile) return;
+    e.dataTransfer.setData('text/plain', tile.dataset.key);
+    e.dataTransfer.effectAllowed = 'move';
+    tile.classList.add('dragging');
+});
+
+document.addEventListener('dragend', function(e) {
+    var tile = e.target.closest('.sleek-struct__tile');
+    if (tile) tile.classList.remove('dragging');
+    _efClearDropFeedback();
+});
+
+function _efClearDropFeedback() {
+    document.querySelectorAll('.sleek-struct__drop-indicator').forEach(function(el) {
+        el.remove();
+    });
+    document.querySelectorAll('.sleek-struct__tile.drop-target').forEach(function(el) {
+        el.classList.remove('drop-target');
+    });
+}
+
+/*
+ * _efFindDropZone: find the nearest drop container (nest or top-level list)
+ * and determine whether we're hovering over a container tile.
+ */
+function _efFindDropZone(target) {
+    /* Prefer the innermost nest (for reorder within a group) */
+    var nest = target.closest('.sleek-struct__nest');
+    if (nest) return { container: nest, parent: nest.dataset.parent };
+    var list = target.closest('.sleek-struct__list');
+    if (list) return { container: list, parent: null };
+    return null;
+}
+
+document.addEventListener('dragover', function(e) {
+    var zone = _efFindDropZone(e.target);
+    if (!zone) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    _efClearDropFeedback();
+
+    var container = zone.container;
+
+    /* Check if hovering over a container tile (for reparent) */
+    var hoverTile = e.target.closest('.sleek-struct__tile--container');
+    if (hoverTile && !hoverTile.classList.contains('dragging')) {
+        var rect = hoverTile.getBoundingClientRect();
+        var zoneY = (e.clientY - rect.top) / rect.height;
+        /* Middle 60% of the tile = drop-into-container zone */
+        if (zoneY > 0.2 && zoneY < 0.8) {
+            hoverTile.classList.add('drop-target');
+            return;
+        }
+    }
+
+    /* Insertion-line reorder among sibling tiles in this container */
+    var tiles = Array.from(container.querySelectorAll(':scope > .sleek-struct__tile:not(.dragging)'));
+    var indicator = document.createElement('div');
+    indicator.className = 'sleek-struct__drop-indicator';
+    var inserted = false;
+
+    for (var i = 0; i < tiles.length; i++) {
+        var rect = tiles[i].getBoundingClientRect();
+        if (e.clientY < rect.top + rect.height / 2) {
+            container.insertBefore(indicator, tiles[i]);
+            inserted = true;
+            break;
+        }
+    }
+    if (!inserted) {
+        container.appendChild(indicator);
+    }
+});
+
+document.addEventListener('drop', function(e) {
+    var zone = _efFindDropZone(e.target);
+    if (!zone) return;
+    e.preventDefault();
+
+    var key = e.dataTransfer.getData('text/plain');
+    /* Find the page URL from the top-level list */
+    var list = e.target.closest('.sleek-struct__list') ||
+               e.target.closest('.sleek-struct__nest').closest('.sleek-struct__list');
+    var url = list.dataset.efUrl;
+
+    /* Check if dropping on a container tile (reparent) */
+    var dropTarget = document.querySelector('.sleek-struct__tile.drop-target');
+    if (dropTarget) {
+        var targetKey = dropTarget.dataset.key;
+        _efClearDropFeedback();
+        _efPost(url, JSON.stringify({
+            action: 'reparent_eigenform', key: key, target: targetKey
+        }));
+        return;
+    }
+
+    /* Reorder via insertion line */
+    var container = zone.container;
+    var indicator = container.querySelector(':scope > .sleek-struct__drop-indicator');
+    var siblings = Array.from(container.querySelectorAll(':scope > .sleek-struct__tile'));
+    var targetIndex = siblings.length;
+
+    if (indicator) {
+        var pos = 0;
+        var node = container.firstElementChild;
+        while (node && node !== indicator) {
+            if (node.classList && node.classList.contains('sleek-struct__tile')
+                && !node.classList.contains('dragging')) {
+                pos++;
+            }
+            node = node.nextElementSibling;
+        }
+        targetIndex = pos;
+        indicator.remove();
+    }
+
+    var body = { action: 'move_eigenform', key: key, position: targetIndex };
+    if (zone.parent) body.parent = zone.parent;
+
+    _efClearDropFeedback();
+    _efPost(url, JSON.stringify(body));
+});
+
+/* Multi-select tiles */
+document.addEventListener('click', function(e) {
+    var tile = e.target.closest('.sleek-struct__tile');
+    if (!tile) return;
+    /* Don't interfere with buttons inside the tile */
+    if (e.target.closest('button') || e.target.closest('[data-ef-post]')) return;
+
+    tile.classList.toggle('selected');
+    _efUpdateGroupBar(tile.closest('.sleek-struct'));
+});
+
+function _efUpdateGroupBar(editor) {
+    if (!editor) return;
+    var selected = editor.querySelectorAll('.sleek-struct__tile.selected');
+    var bar = editor.querySelector('.sleek-struct__group-bar');
+    if (bar) {
+        bar.style.display = selected.length >= 2 ? 'flex' : 'none';
+    }
+}
+
+/* Group button */
+document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.sleek-struct__group-btn');
+    if (!btn) return;
+
+    var editor = btn.closest('.sleek-struct');
+    var url = btn.dataset.efUrl;
+    var selected = editor.querySelectorAll('.sleek-struct__tile.selected');
+    if (selected.length < 2) return;
+
+    var keys = Array.from(selected).map(function(t) { return t.dataset.key; });
+    var bar = btn.closest('.sleek-struct__group-bar');
+    var groupKey = bar.querySelector('[data-field="group_key"]').value.trim();
+    var groupLabel = bar.querySelector('[data-field="group_label"]').value.trim();
+
+    if (!groupKey) {
+        bar.querySelector('[data-field="group_key"]').focus();
+        return;
+    }
+
+    _efPost(url, JSON.stringify({
+        action: 'group_eigenforms',
+        keys: keys,
+        group_key: groupKey,
+        group_label: groupLabel || groupKey
+    }));
+});
+
 function _efPost(url, body) {
     fetch(url, {
         method: 'POST',

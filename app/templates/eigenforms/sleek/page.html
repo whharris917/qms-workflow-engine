@@ -55,7 +55,7 @@
   {# Mark structural affordances as rendered #}
   {% for aff in data.affordances %}
     {% set action = aff.body.action|default("") %}
-    {% if action in ("add_eigenform", "remove_eigenform", "move_eigenform", "toggle_editable", "rebuild_from_seed") %}
+    {% if action in ("add_eigenform", "remove_eigenform", "move_eigenform", "toggle_editable", "rebuild_from_seed", "group_eigenforms", "reparent_eigenform", "ungroup_eigenform") %}
       {% set _ = aff.update({"_rendered": true}) %}
     {% endif %}
   {% endfor %}
@@ -93,6 +93,62 @@
       </div>
     </form>
   </div>
+
+  {# Recursive tile macro for the structural editor #}
+  {% macro render_tile(tile, url, depth=0) %}
+  <div class="sleek-struct__tile sleek-struct__tile--{{ tile.css }}{% if tile.children %} sleek-struct__tile--container{% endif %}"
+       draggable="true"
+       data-key="{{ tile.key }}"
+       data-index="{{ tile.index }}"
+       data-depth="{{ depth }}">
+    <span class="sleek-struct__tile-icon sleek-struct__tile-icon--{{ tile.css }}">{{ tile.icon }}</span>
+    <span class="sleek-struct__tile-type">{{ tile.type }}</span>
+    <span class="sleek-struct__tile-label">{{ tile.label }}</span>
+    <span class="sleek-struct__tile-key">{{ tile.key }}</span>
+    {% if tile.children %}
+    <button class="sleek-struct__tile-ungroup"
+            data-ef-post="{{ url }}"
+            data-ef-body='{"action":"ungroup_eigenform","key":"{{ tile.key }}"}'
+            title="Ungroup {{ tile.key }}">&#8618;</button>
+    {% endif %}
+    <button class="sleek-struct__tile-delete"
+            data-ef-post="{{ url }}"
+            data-ef-body='{"action":"remove_eigenform","key":"{{ tile.key }}"}'
+            title="Remove {{ tile.key }}">&#128465;</button>
+  </div>
+  {% if tile.children %}
+  <div class="sleek-struct__nest" data-parent="{{ tile.key }}">
+    {% for child in tile.children %}
+      {{ render_tile(child, url, depth + 1) }}
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endmacro %}
+
+  {# Structural editor — tile-based page blueprint #}
+  {% if tile_items %}
+  <details class="sleek-struct" open>
+    <summary class="sleek-struct__header">
+      <span class="sleek-struct__title">Page Structure</span>
+      <span class="sleek-struct__count">{{ tile_items|length }} eigenform{{ "s" if tile_items|length != 1 }}</span>
+    </summary>
+
+    <div class="sleek-struct__list" data-ef-url="{{ url }}">
+      {% for tile in tile_items %}
+        {{ render_tile(tile, url) }}
+      {% endfor %}
+    </div>
+
+    <div class="sleek-struct__actions">
+      <div class="sleek-struct__group-bar" style="display: none;">
+        <span class="sleek-struct__group-label">Group selected:</span>
+        <input type="text" class="sleek-struct__group-input" placeholder="group-key" data-field="group_key" />
+        <input type="text" class="sleek-struct__group-input sleek-struct__group-input--wide" placeholder="Group Label (optional)" data-field="group_label" />
+        <button class="sleek-struct__group-btn" data-ef-url="{{ url }}">Group</button>
+      </div>
+    </div>
+  </details>
+  {% endif %}
 
   {# Eigenforms with margin controls #}
   {% for item in child_items %}

@@ -328,6 +328,24 @@ class PageForm(Eigenform):
                     ),
                 ))
 
+            if len(keys) >= 2:
+                affs.append(SetValueAffordance(
+                    label="Group Eigenforms",
+                    method="POST",
+                    url=self._url_prefix,
+                    body={
+                        "action": "group_eigenforms",
+                        "keys": ["<key1>", "<key2>"],
+                        "group_key": "<group_key>",
+                        "group_label": "<group_label>",
+                    },
+                    instruction=(
+                        f"Wrap two or more eigenforms in a new GroupForm. "
+                        f"The group replaces them at the first selected position. "
+                        f"Available keys: {', '.join(keys)}."
+                    ),
+                ))
+
             if keys:
                 editable_keys = [ef.key for ef in self.eigenforms if ef.editable]
                 locked_keys = [ef.key for ef in self.eigenforms if not ef.editable]
@@ -441,12 +459,36 @@ class PageForm(Eigenform):
         from engine.registry import get_type_catalog
         children_html = [ef.render() for ef in self.eigenforms]
         child_items = []
+        tile_items = []
         type_catalog = []
         if self.mutable_structure:
             type_catalog = get_type_catalog()
+            # Build icon/css lookup from catalog
+            _icon_map = {}
+            _css_map = {}
+            for cat in type_catalog:
+                for tname, icon, _desc in cat["types"]:
+                    _icon_map[tname] = icon
+                    _css_map[tname] = cat["css"]
+
+            def _build_tile(ef, idx):
+                tile = {
+                    "key": ef.key,
+                    "index": idx,
+                    "type": ef.form,
+                    "label": ef.label or ef.key,
+                    "icon": _icon_map.get(ef.form, "?"),
+                    "css": _css_map.get(ef.form, ""),
+                    "children": [],
+                }
+                for ci, child in enumerate(ef.children):
+                    tile["children"].append(_build_tile(child, ci))
+                return tile
+
             for i, ef in enumerate(self.eigenforms):
                 child_items.append({"key": ef.key, "index": i, "html": ef.render(), "editable": ef.editable})
-        return render_template("page.html", data=data, ef=self, url=self._url_prefix, label=data.get("label", ""), instruction=data.get("instruction") or "", children_html=children_html, child_items=child_items, type_catalog=type_catalog, feedback=data.get("feedback"), mutable=self.mutable_structure)
+                tile_items.append(_build_tile(ef, i))
+        return render_template("page.html", data=data, ef=self, url=self._url_prefix, label=data.get("label", ""), instruction=data.get("instruction") or "", children_html=children_html, child_items=child_items, tile_items=tile_items, type_catalog=type_catalog, feedback=data.get("feedback"), mutable=self.mutable_structure)
 
     def find_eigenform(self, path: str) -> Eigenform | None:
         """Find an eigenform by its path (e.g., 'tabs/title')."""
@@ -502,7 +544,8 @@ class PageForm(Eigenform):
 
         if not self.mutable_structure and action in (
             "add_eigenform", "remove_eigenform", "move_eigenform",
-            "toggle_editable", "rebuild_from_seed",
+            "toggle_editable", "rebuild_from_seed", "group_eigenforms",
+            "reparent_eigenform", "ungroup_eigenform",
         ):
             return self._error("Structural mutations not enabled on this page.", action=action)
 
@@ -516,6 +559,12 @@ class PageForm(Eigenform):
             return self._move_eigenform(body)
         elif action == "toggle_editable":
             return self._toggle_editable(body)
+        elif action == "group_eigenforms":
+            return self._group_eigenforms(body)
+        elif action == "reparent_eigenform":
+            return self._reparent_eigenform(body)
+        elif action == "ungroup_eigenform":
+            return self._ungroup_eigenform(body)
 
         return self.serialize()
 
@@ -584,29 +633,53 @@ class PageForm(Eigenform):
                 self._store.clear_scope(child._scope)
             self._clear_eigenform_data(child)
 
+    def _find_eigenform_recursive(self, eigenforms: list, key: str):
+        """Find a live eigenform by key at any depth."""
+        for ef in eigenforms:
+            if ef.key == key:
+                return ef
+            found = self._find_eigenform_recursive(ef.children, key)
+            if found is not None:
+                return found
+        return None
+
     def _remove_eigenform(self, body: dict) -> dict:
         key = body.get("key")
         if not key:
             return self._error("'key' is required.", action="remove_eigenform")
 
-        # Find the live eigenform to clear its data
-        ef = next((e for e in self.eigenforms if e.key == key), None)
+        # Find the live eigenform to clear its data (search recursively)
+        ef = self._find_eigenform_recursive(self.eigenforms, key)
         if ef is None:
             return self._error(f"Eigenform '{key}' not found.", action="remove_eigenform")
 
         # Surgically clear only this eigenform's data
         self._clear_eigenform_data(ef)
 
-        # Remove from structure
         structure = self._get_structure()
-        structure = [d for d in structure if d["key"] != key]
+
+        # Find the parent container so we can sync its __structure after
+        parent_key = self._find_parent_key(structure, key)
+
+        # Remove from structure (recursive pluck)
+        removed = self._pluck_from_tree(structure, key)
+        if removed is None:
+            return self._error(f"Eigenform '{key}' not found in structure.",
+                               action="remove_eigenform")
+
         self._save_structure(structure)
+
+        # Sync parent container's stored __structure
+        if parent_key:
+            self._sync_container_structure(structure, parent_key)
+
         self._rebuild()
         return self.serialize()
 
     def _move_eigenform(self, body: dict) -> dict:
         key = body.get("key")
         position = body.get("position")
+        parent = body.get("parent")  # optional: reorder within a container
 
         if not key:
             return self._error("'key' is required.", action="move_eigenform")
@@ -619,16 +692,32 @@ class PageForm(Eigenform):
             return self._error(f"Invalid position: {position}", action="move_eigenform")
 
         structure = self._get_structure()
-        idx = next((i for i, d in enumerate(structure) if d["key"] == key), None)
-        if idx is None:
-            return self._error(f"Eigenform '{key}' not found.", action="move_eigenform")
 
-        # Remove and reinsert at new position
-        desc = structure.pop(idx)
-        position = max(0, min(position, len(structure)))
-        structure.insert(position, desc)
+        if parent:
+            # Reorder within a container's children
+            children = self._find_container_children(structure, parent)
+            if children is None:
+                return self._error(f"Container '{parent}' not found.",
+                                   action="move_eigenform")
+            idx = next((i for i, d in enumerate(children) if d["key"] == key), None)
+            if idx is None:
+                return self._error(f"Eigenform '{key}' not found in '{parent}'.",
+                                   action="move_eigenform")
+            desc = children.pop(idx)
+            position = max(0, min(position, len(children)))
+            children.insert(position, desc)
+            self._save_structure(structure)
+            self._sync_container_structure(structure, parent)
+        else:
+            # Reorder at top level
+            idx = next((i for i, d in enumerate(structure) if d["key"] == key), None)
+            if idx is None:
+                return self._error(f"Eigenform '{key}' not found.", action="move_eigenform")
+            desc = structure.pop(idx)
+            position = max(0, min(position, len(structure)))
+            structure.insert(position, desc)
+            self._save_structure(structure)
 
-        self._save_structure(structure)
         self._rebuild()
         return self.serialize()
 
@@ -651,6 +740,272 @@ class PageForm(Eigenform):
 
         self._save_structure(structure)
         self._rebuild()
+        return self.serialize()
+
+    @staticmethod
+    def _find_siblings_list(tree: list[dict], key: str) -> list[dict] | None:
+        """Find the children list that directly contains a descriptor with the given key."""
+        for desc in tree:
+            if desc["key"] == key:
+                return tree
+            for field in ("eigenforms", "steps"):
+                children = desc.get(field)
+                if isinstance(children, list):
+                    result = PageForm._find_siblings_list(children, key)
+                    if result is not None:
+                        return result
+        return None
+
+    @staticmethod
+    def _all_keys_in_tree(tree: list[dict]) -> set[str]:
+        """Collect all keys at every depth in a structure tree."""
+        keys = set()
+        for desc in tree:
+            keys.add(desc["key"])
+            for field in ("eigenforms", "steps"):
+                children = desc.get(field)
+                if isinstance(children, list):
+                    keys |= PageForm._all_keys_in_tree(children)
+        return keys
+
+    def _group_eigenforms(self, body: dict) -> dict:
+        keys = body.get("keys", [])
+        group_key = body.get("group_key")
+        group_label = body.get("group_label", group_key)
+
+        if not isinstance(keys, list) or len(keys) < 2:
+            return self._error("Select at least 2 eigenforms to group.",
+                               action="group_eigenforms")
+        if not group_key:
+            return self._error("'group_key' is required.",
+                               action="group_eigenforms")
+
+        structure = self._get_structure()
+
+        # Check key uniqueness across the whole tree
+        all_keys = self._all_keys_in_tree(structure)
+        if group_key in all_keys:
+            return self._error(f"Key '{group_key}' already exists.",
+                               action="group_eigenforms")
+
+        # Find the siblings list containing the first key
+        siblings = self._find_siblings_list(structure, keys[0])
+        if siblings is None:
+            return self._error(f"Key '{keys[0]}' not found.",
+                               action="group_eigenforms")
+
+        # Verify all selected keys are in the same siblings list
+        key_set = set(keys)
+        sibling_keys = {d["key"] for d in siblings}
+        missing = key_set - sibling_keys
+        if missing:
+            return self._error(
+                f"All selected eigenforms must share the same parent. "
+                f"Not found among siblings: {', '.join(sorted(missing))}",
+                action="group_eigenforms")
+
+        # Collect descriptors preserving order, track indices
+        indices = []
+        selected_descs = []
+        for i, desc in enumerate(siblings):
+            if desc["key"] in key_set:
+                indices.append(i)
+                selected_descs.append(desc)
+
+        # Build GroupForm descriptor wrapping the selected eigenforms
+        group_desc = {
+            "type": "group",
+            "key": group_key,
+            "label": group_label,
+            "editable": True,
+            "eigenforms": selected_descs,
+        }
+
+        # Replace: insert group at first selected position, skip originals
+        insert_pos = indices[0]
+        index_set = set(indices)
+        new_siblings = []
+        for i, desc in enumerate(siblings):
+            if i == insert_pos:
+                new_siblings.append(group_desc)
+            if i not in index_set:
+                new_siblings.append(desc)
+
+        # Mutate the list in place so the change propagates up
+        siblings[:] = new_siblings
+
+        self._save_structure(structure)
+
+        # Sync the parent container's __structure if we're nested
+        parent_key = self._find_parent_key(structure, group_key)
+        if parent_key:
+            self._sync_container_structure(structure, parent_key)
+
+        self._rebuild()
+        self._set_feedback("success", f"Grouped {len(keys)} eigenforms into '{group_key}'.")
+        return self.serialize()
+
+    # --- Recursive structure tree helpers ---
+
+    @staticmethod
+    def _pluck_from_tree(tree: list[dict], key: str) -> dict | None:
+        """Remove and return a descriptor by key from a nested structure tree."""
+        for i, desc in enumerate(tree):
+            if desc["key"] == key:
+                return tree.pop(i)
+            # Recurse into container children
+            children = desc.get("eigenforms") or desc.get("steps")
+            if isinstance(children, list):
+                found = PageForm._pluck_from_tree(children, key)
+                if found is not None:
+                    return found
+        return None
+
+    @staticmethod
+    def _find_container_children(tree: list[dict], key: str) -> list[dict] | None:
+        """Find the children list of a container descriptor by key."""
+        for desc in tree:
+            if desc["key"] == key:
+                # Return the eigenforms/steps list (create if needed)
+                for field in ("eigenforms", "steps"):
+                    if field in desc:
+                        return desc[field]
+                # Container types that use 'eigenforms'
+                if desc.get("type") in ("group", "page"):
+                    desc["eigenforms"] = desc.get("eigenforms", [])
+                    return desc["eigenforms"]
+                # NavigationForm uses 'steps'
+                if desc.get("type") in ("navigation", "tab", "chain",
+                                         "sequence", "accordion"):
+                    desc["steps"] = desc.get("steps", [])
+                    return desc["steps"]
+                return None
+            # Recurse
+            for field in ("eigenforms", "steps"):
+                children = desc.get(field)
+                if isinstance(children, list):
+                    result = PageForm._find_container_children(children, key)
+                    if result is not None:
+                        return result
+        return None
+
+    def _sync_container_structure(self, structure: list[dict], container_key: str):
+        """Sync a container's own __structure in the store from the page tree.
+
+        Editable containers (GroupForm, NavigationForm) store their own
+        __structure.  After page-level mutations that modify their children,
+        the container's stored structure must be updated to match.
+        """
+        children = self._find_container_children(structure, container_key)
+        if children is not None:
+            self._store.set(container_key, "__structure", list(children))
+
+    @staticmethod
+    def _find_parent_key(tree: list[dict], child_key: str) -> str | None:
+        """Find the key of the container that holds a given child."""
+        for desc in tree:
+            for field in ("eigenforms", "steps"):
+                children = desc.get(field)
+                if isinstance(children, list):
+                    for c in children:
+                        if c.get("key") == child_key:
+                            return desc["key"]
+                    # Recurse deeper
+                    result = PageForm._find_parent_key(children, child_key)
+                    if result is not None:
+                        return result
+        return None
+
+    def _ungroup_eigenform(self, body: dict) -> dict:
+        key = body.get("key")
+        if not key:
+            return self._error("'key' is required.", action="ungroup_eigenform")
+
+        structure = self._get_structure()
+
+        # Find the siblings list containing this container
+        siblings = self._find_siblings_list(structure, key)
+        if siblings is None:
+            return self._error(f"Eigenform '{key}' not found.",
+                               action="ungroup_eigenform")
+
+        # Find the descriptor
+        idx = next((i for i, d in enumerate(siblings) if d["key"] == key), None)
+        desc = siblings[idx]
+
+        # Get its children
+        children = desc.get("eigenforms") or desc.get("steps") or []
+        if not children and desc.get("type") not in ("group", "navigation",
+                                                      "page", "tab", "chain",
+                                                      "sequence", "accordion"):
+            return self._error(f"'{key}' is not a container.",
+                               action="ungroup_eigenform")
+
+        # Splice: replace the container with its children at the same position
+        siblings[idx:idx + 1] = list(children)
+
+        self._save_structure(structure)
+
+        # Sync the grandparent container's __structure if nested
+        grandparent = self._find_parent_key(structure, children[0]["key"]) if children else None
+        if grandparent:
+            self._sync_container_structure(structure, grandparent)
+
+        # Clean up the ungrouped container's own stored scope
+        self._store.clear_scope(key)
+
+        self._rebuild()
+        count = len(children)
+        self._set_feedback("success",
+                           f"Ungrouped '{key}': {count} eigenform{'s' if count != 1 else ''} "
+                           f"moved to parent level.")
+        return self.serialize()
+
+    def _reparent_eigenform(self, body: dict) -> dict:
+        key = body.get("key")
+        target = body.get("target")  # container key, or null for top-level
+
+        if not key:
+            return self._error("'key' is required.", action="reparent_eigenform")
+
+        structure = self._get_structure()
+
+        # Find the source parent before plucking (for store sync)
+        source_parent = self._find_parent_key(structure, key)
+
+        # Pluck the descriptor from wherever it is
+        desc = self._pluck_from_tree(structure, key)
+        if desc is None:
+            return self._error(f"Eigenform '{key}' not found.",
+                               action="reparent_eigenform")
+
+        if not target:
+            # Move to top level (append at end)
+            structure.append(desc)
+        else:
+            # Find the target container's children list
+            children = self._find_container_children(structure, target)
+            if children is None:
+                # Put it back where it was (recovery) and error
+                structure.append(desc)
+                self._save_structure(structure)
+                self._rebuild()
+                return self._error(
+                    f"Target '{target}' is not a container or not found.",
+                    action="reparent_eigenform")
+            children.append(desc)
+
+        self._save_structure(structure)
+
+        # Sync affected containers' own __structure in the store
+        if source_parent:
+            self._sync_container_structure(structure, source_parent)
+        if target:
+            self._sync_container_structure(structure, target)
+
+        self._rebuild()
+        target_label = target or "top level"
+        self._set_feedback("success", f"Moved '{key}' into '{target_label}'.")
         return self.serialize()
 
     def handle_action(self, path: str, body: dict) -> dict | None:

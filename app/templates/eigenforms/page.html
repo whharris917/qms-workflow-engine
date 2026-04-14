@@ -63,7 +63,7 @@
   {# Mark structural affordances as rendered #}
   {% for aff in data.affordances %}
     {% set action = aff.body.action|default("") %}
-    {% if action in ("add_eigenform", "remove_eigenform", "move_eigenform", "toggle_editable", "rebuild_from_seed") %}
+    {% if action in ("add_eigenform", "remove_eigenform", "move_eigenform", "toggle_editable", "rebuild_from_seed", "group_eigenforms", "reparent_eigenform", "ungroup_eigenform") %}
       {% set _ = aff.update({"_rendered": true}) %}
     {% endif %}
   {% endfor %}

@@ -921,6 +921,267 @@ body.operator-view[data-theme="sleek"] .sleek-add-ef__btn:hover {
     background: #3b82f6;
 }
 
+/* --- Structural editor: tile-based page blueprint --- */
+body.operator-view[data-theme="sleek"] .sleek-struct {
+    background: #1a1f26;
+    border: 1px solid #555d66;
+    border-radius: 6px;
+    margin-bottom: 16px;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 10px 14px;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    font-size: 12px;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__header::-webkit-details-marker {
+    display: none;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__header::before {
+    content: "\25B8";
+    font-size: 10px;
+    color: #666;
+    transition: transform 0.15s;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct[open] > .sleek-struct__header::before {
+    transform: rotate(90deg);
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__title {
+    color: #e0e0e0;
+    font-weight: 600;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__count {
+    color: #666;
+    font-size: 11px;
+}
+
+/* Tile list */
+body.operator-view[data-theme="sleek"] .sleek-struct__list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0 14px 10px;
+}
+
+/* Individual tiles */
+body.operator-view[data-theme="sleek"] .sleek-struct__tile {
+    display: grid;
+    grid-template-columns: 26px 1fr auto auto;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: #2b3035;
+    border: 1px solid #3a3f47;
+    border-left: 3px solid #3a3f47;
+    border-radius: 4px;
+    cursor: grab;
+    user-select: none;
+    transition: border-color 0.12s, background 0.12s, opacity 0.12s;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__tile:hover {
+    border-color: #555d66;
+    background: #333a42;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__tile:active {
+    cursor: grabbing;
+}
+
+/* Tile selected state */
+body.operator-view[data-theme="sleek"] .sleek-struct__tile.selected {
+    border-color: #2563eb;
+    background: #1a2744;
+    box-shadow: 0 0 0 1px #2563eb;
+}
+
+/* Tile dragging state */
+body.operator-view[data-theme="sleek"] .sleek-struct__tile.dragging {
+    opacity: 0.3;
+}
+
+/* Container drop-target highlight (drag over a group/nav to drop into it) */
+body.operator-view[data-theme="sleek"] .sleek-struct__tile.drop-target {
+    border-color: #22c55e;
+    background: #1a2f1a;
+    box-shadow: 0 0 0 1px #22c55e, 0 0 8px #22c55e40;
+}
+
+/* Drop indicator line */
+body.operator-view[data-theme="sleek"] .sleek-struct__drop-indicator {
+    height: 2px;
+    background: #3b82f6;
+    border-radius: 1px;
+    margin: 2px 0;
+    box-shadow: 0 0 4px #3b82f680;
+}
+
+/* Tile icon */
+body.operator-view[data-theme="sleek"] .sleek-struct__tile-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    background: #363b42;
+    font-size: 15px;
+    line-height: 1;
+    color: #999;
+}
+
+/* Category accent colors — left border + icon tint */
+body.operator-view[data-theme="sleek"] .sleek-struct__tile--input { border-left-color: #3b82f6; }
+body.operator-view[data-theme="sleek"] .sleek-struct__tile-icon--input { color: #60a5fa; }
+body.operator-view[data-theme="sleek"] .sleek-struct__tile--collections { border-left-color: #22c55e; }
+body.operator-view[data-theme="sleek"] .sleek-struct__tile-icon--collections { color: #4ade80; }
+body.operator-view[data-theme="sleek"] .sleek-struct__tile--containers { border-left-color: #a855f7; }
+body.operator-view[data-theme="sleek"] .sleek-struct__tile-icon--containers { color: #c084fc; }
+body.operator-view[data-theme="sleek"] .sleek-struct__tile--reactive { border-left-color: #f59e0b; }
+body.operator-view[data-theme="sleek"] .sleek-struct__tile-icon--reactive { color: #fbbf24; }
+body.operator-view[data-theme="sleek"] .sleek-struct__tile--display { border-left-color: #14b8a6; }
+body.operator-view[data-theme="sleek"] .sleek-struct__tile-icon--display { color: #2dd4bf; }
+
+/* Tile text */
+body.operator-view[data-theme="sleek"] .sleek-struct__tile-type {
+    font-size: 11px;
+    font-family: "SFMono-Regular", "Cascadia Code", "Consolas", monospace;
+    color: #888;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__tile-label {
+    font-size: 12px;
+    color: #e0e0e0;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__tile-key {
+    font-size: 10px;
+    font-family: "SFMono-Regular", "Cascadia Code", "Consolas", monospace;
+    color: #555;
+    padding: 1px 5px;
+    background: #1e2228;
+    border-radius: 3px;
+}
+
+/* Container tile indicator */
+body.operator-view[data-theme="sleek"] .sleek-struct__tile--container {
+    border-bottom-left-radius: 4px 4px;
+    border-bottom-right-radius: 0;
+}
+
+/* Nested children */
+body.operator-view[data-theme="sleek"] .sleek-struct__nest {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-left: 22px;
+    padding: 4px 0 4px 12px;
+    border-left: 2px solid #3a3f47;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__nest .sleek-struct__tile {
+    font-size: 11px;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__nest .sleek-struct__tile-icon {
+    width: 22px;
+    height: 22px;
+    font-size: 13px;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__nest .sleek-struct__tile {
+    grid-template-columns: 22px 1fr auto auto;
+    padding: 4px 8px;
+}
+
+/* Tile action buttons (ungroup, delete) */
+body.operator-view[data-theme="sleek"] .sleek-struct__tile-ungroup {
+    background: none;
+    border: none;
+    color: #555;
+    cursor: pointer;
+    font-size: 15px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    opacity: 0;
+    transition: opacity 0.12s, color 0.12s;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__tile:hover .sleek-struct__tile-ungroup {
+    opacity: 1;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__tile-ungroup:hover {
+    color: #c084fc;
+    background: #2a1a3a;
+}
+
+/* Tile delete button */
+body.operator-view[data-theme="sleek"] .sleek-struct__tile-delete {
+    background: none;
+    border: none;
+    color: #555;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    opacity: 0;
+    transition: opacity 0.12s, color 0.12s;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__tile:hover .sleek-struct__tile-delete {
+    opacity: 1;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__tile-delete:hover {
+    color: #e55;
+    background: #2a1a1a;
+}
+
+/* Group action bar */
+body.operator-view[data-theme="sleek"] .sleek-struct__actions {
+    padding: 0 14px 10px;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__group-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    background: #22272e;
+    border: 1px solid #2563eb40;
+    border-radius: 4px;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__group-label {
+    font-size: 12px;
+    color: #60a5fa;
+    font-weight: 600;
+    white-space: nowrap;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__group-input {
+    background: #2b3035;
+    color: #ccc;
+    border: 1px solid #444;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-family: inherit;
+    width: 120px;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__group-input--wide {
+    flex: 1;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__group-btn {
+    background: #2563eb;
+    color: #fff;
+    border: none;
+    border-radius: 3px;
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__group-btn:hover {
+    background: #3b82f6;
+}
+
 /* --- Mutable PageForm: per-eigenform margin controls --- */
 body.operator-view[data-theme="sleek"] .sleek-page-child {
     position: relative;
