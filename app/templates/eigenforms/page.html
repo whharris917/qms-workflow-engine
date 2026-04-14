@@ -68,20 +68,25 @@
     {% endif %}
   {% endfor %}
 
-  {# Add Eigenform toolbar #}
+  {# Add Eigenform toolbar — categorized type selector #}
   <div class="ef-add-toolbar">
   <form class="ef-add-toolbar-form" data-ef-submit="{{ url }}">
     <input type="hidden" name="action" value="add_eigenform" />
     <div><label class="ef-add-toolbar-label">Type</label>
     <select name="type" class="ef-add-toolbar-input">
-      <option value="">-- select type --</option>
-      {% for t in available_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+      <option value="">— choose a type —</option>
+      {% for cat in type_catalog %}
+      <optgroup label="{{ cat.name }} — {{ cat.hint }}">
+        {% for type_name, icon, desc in cat.types %}<option value="{{ type_name }}">{{ icon }} {{ type_name }} — {{ desc }}</option>
+        {% endfor %}
+      </optgroup>
+      {% endfor %}
     </select></div>
     <div><label class="ef-add-toolbar-label">Key</label>
     <input name="key" type="text" placeholder="unique-key"
       class="ef-add-toolbar-input" style="width: 140px;" /></div>
     <div><label class="ef-add-toolbar-label">Label</label>
-    <input name="label" type="text" placeholder="Display Label"
+    <input name="label" type="text" placeholder="Display Label (optional)"
       class="ef-add-toolbar-input" style="width: 160px;" /></div>
     <button type="submit" class="ef-add-toolbar-submit">+ Add</button>
   </form></div>

@@ -229,6 +229,87 @@ def describe_types(reg: EigenformRegistry | None = None) -> dict:
     return result
 
 
+# ---------------------------------------------------------------------------
+# Type Catalog — categorized type reference for the Add Eigenform UI.
+#
+# Each category groups related types with one-line descriptions.  Types that
+# don't make sense on a mutable page are excluded: page (not embeddable),
+# rubikscube (showcase), tablerunner (requires sibling table), and aliases
+# (tab/chain/sequence/accordion → use navigation + mode config;
+# keyvalue → use dictionary).
+# ---------------------------------------------------------------------------
+
+TYPE_CATALOG: list[dict] = [
+    {
+        "name": "Input",
+        "hint": "Collect a single value from the user.",
+        "css": "input",
+        "types": [
+            ("text",     "T",  "Free-form text. Single-line or multiline."),
+            ("number",   "#",  "Numeric with min/max/step. Optional slider mode."),
+            ("date",     "\u25F7", "Date or datetime with optional bounds."),
+            ("boolean",  "\u25D1", "Yes/no toggle with custom labels."),
+            ("choice",   "\u25C9", "Single selection from a list of options."),
+            ("checkbox", "\u2611", "Multi-select from a list of options."),
+            ("multi",    "\u25A4", "Multiple named fields grouped under one form."),
+        ],
+    },
+    {
+        "name": "Collections",
+        "hint": "Manage ordered lists, sets, or tables of items.",
+        "css": "collections",
+        "types": [
+            ("list",       "\u2630", "Ordered list with add/edit/remove/reorder and ordering constraints."),
+            ("set",        "{ }",    "Unordered collection of unique items."),
+            ("dictionary", "\u21C4", "Dynamic key-value pairs."),
+            ("table",      "\u25A6", "Rows and columns with typed cells, constraints, and reordering."),
+        ],
+    },
+    {
+        "name": "Containers",
+        "hint": "Organize eigenforms into navigable structures.",
+        "css": "containers",
+        "types": [
+            ("group",      "\u25A2", "Named container for grouping related eigenforms."),
+            ("navigation", "\u2B12", "Tabs, wizard chain, gated sequence, or accordion. Set mode in config."),
+            ("repeater",   "\u29C9", "Stamps template eigenforms per dynamic entry."),
+        ],
+    },
+    {
+        "name": "Reactive",
+        "hint": "Conditional behavior, derived values, and validation.",
+        "css": "reactive",
+        "types": [
+            ("switch",        "\u2442", "Selects between subtrees based on a sibling's value."),
+            ("visibility",    "\u25D0", "Shows or hides a child based on a condition."),
+            ("dynamicchoice", "\u25C8", "Choice whose options depend on a sibling's value."),
+            ("computed",      "\u0192", "Read-only value derived from other eigenforms."),
+            ("score",         "\u2605", "Auto-grading from an answer key."),
+            ("validation",    "\u2713", "Cross-field validation rules (pass/fail)."),
+        ],
+    },
+    {
+        "name": "Display & Actions",
+        "hint": "Read-only content and imperative triggers.",
+        "css": "display",
+        "types": [
+            ("info",    "\u2139", "Read-only text display. Always complete."),
+            ("action",  "\u25B6", "Button with preconditions, confirmation, and side effects."),
+            ("history", "\u29D6", "Wraps an eigenform with append-only change history."),
+        ],
+    },
+]
+
+
+def get_type_catalog() -> list[dict]:
+    """Return the canonical type catalog for the Add Eigenform UI.
+
+    Returns a list of category dicts, each with 'name', 'hint', and
+    'types' (list of (type_name, description) tuples).
+    """
+    return TYPE_CATALOG
+
+
 def from_descriptor(desc: dict, reg: EigenformRegistry | None = None,
                     seed: "Eigenform | None" = None) -> "Eigenform":
     """Reconstruct an eigenform from a structural descriptor.

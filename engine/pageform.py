@@ -268,11 +268,19 @@ class PageForm(Eigenform):
         )
 
         if self.mutable_structure:
-            from engine.registry import get_registry
-            reg = get_registry()
-            available = reg.available()
+            from engine.registry import get_type_catalog
+            from engine.affordances import AddEigenformAffordance
 
-            affs.append(SetValueAffordance(
+            # Build structured catalog for agent JSON
+            catalog = get_type_catalog()
+            catalog_dict = {}
+            for cat in catalog:
+                heading = f"{cat['name']} \u2014 {cat['hint']}"
+                catalog_dict[heading] = {
+                    t: desc for t, _icon, desc in cat["types"]
+                }
+
+            affs.append(AddEigenformAffordance(
                 label="Add Eigenform",
                 method="POST",
                 url=self._url_prefix,
@@ -283,11 +291,12 @@ class PageForm(Eigenform):
                     "label": "<label>",
                 },
                 instruction=(
-                    f"Add a new eigenform with default values. "
-                    f"Available types: {', '.join(available)}. "
-                    f"Use edit mode on the new eigenform to configure it. "
-                    f"See the Eigenform Reference Menu page for type details."
+                    "Add a new eigenform to this page. Pick a type from the "
+                    "catalog, provide a unique key (lowercase, hyphens allowed), "
+                    "and an optional display label. After adding, use edit mode "
+                    "on the new eigenform to configure type-specific settings."
                 ),
+                type_catalog=catalog_dict,
             ))
 
             keys = [ef.key for ef in self.eigenforms]
@@ -429,15 +438,15 @@ class PageForm(Eigenform):
                 self._collect_floatable(nested, merge_groups)
 
     def render_from_data(self, data: dict) -> str:
-        from engine.registry import get_registry
+        from engine.registry import get_type_catalog
         children_html = [ef.render() for ef in self.eigenforms]
         child_items = []
-        available_types = []
+        type_catalog = []
         if self.mutable_structure:
-            available_types = sorted(get_registry().available())
+            type_catalog = get_type_catalog()
             for i, ef in enumerate(self.eigenforms):
                 child_items.append({"key": ef.key, "index": i, "html": ef.render(), "editable": ef.editable})
-        return render_template("page.html", data=data, ef=self, url=self._url_prefix, label=data.get("label", ""), instruction=data.get("instruction") or "", children_html=children_html, child_items=child_items, available_types=available_types, feedback=data.get("feedback"), mutable=self.mutable_structure)
+        return render_template("page.html", data=data, ef=self, url=self._url_prefix, label=data.get("label", ""), instruction=data.get("instruction") or "", children_html=children_html, child_items=child_items, type_catalog=type_catalog, feedback=data.get("feedback"), mutable=self.mutable_structure)
 
     def find_eigenform(self, path: str) -> Eigenform | None:
         """Find an eigenform by its path (e.g., 'tabs/title')."""

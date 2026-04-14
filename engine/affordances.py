@@ -109,6 +109,29 @@ class SimpleButtonAffordance(Affordance):
         return {"type": "button"}
 
 
+class AddEigenformAffordance(Affordance):
+    """Affordance for adding an eigenform to a mutable page.
+
+    Carries a structured type_catalog that appears in the agent-facing
+    JSON, giving agents a categorized reference of available types.
+    """
+
+    def __init__(self, label: str, method: str, url: str, body: dict,
+                 instruction: str | None = None,
+                 type_catalog: dict | None = None):
+        super().__init__(label=label, method=method, url=url, body=body, instruction=instruction)
+        self.type_catalog = type_catalog or {}
+
+    def serialize(self) -> dict:
+        result = super().serialize()
+        if self.type_catalog:
+            result["type_catalog"] = self.type_catalog
+        return result
+
+    def _render_hints(self) -> dict:
+        return {"type": "add_eigenform"}
+
+
 class AddConstraintAffordance(Affordance):
     """An affordance that adds an ordering constraint between two items."""
 

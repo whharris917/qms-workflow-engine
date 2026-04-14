@@ -60,17 +60,37 @@
     {% endif %}
   {% endfor %}
 
-  {# Add Eigenform toolbar — reuses sleek-edit-toolbar classes #}
-  <div class="sleek-edit-toolbar">
-    <form class="sleek-edit-toolbar__form" data-ef-submit="{{ url }}">
+  {# Add Eigenform — card-based type picker #}
+  <div class="sleek-add-ef">
+    <form class="sleek-add-ef__form" data-ef-submit="{{ url }}">
       <input type="hidden" name="action" value="add_eigenform" />
-      <select name="type" class="sleek-edit-toolbar__select">
-        <option value="">-- type --</option>
-        {% for t in available_types %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
-      </select>
-      <input name="key" type="text" placeholder="key" class="sleek-edit-toolbar__input" style="width: 140px;" />
-      <input name="label" type="text" placeholder="Label" class="sleek-edit-toolbar__input" style="width: 160px;" />
-      <button type="submit" class="sleek-edit-toolbar__btn">+ Add</button>
+
+      <div class="sleek-add-ef__catalog">
+        {% for cat in type_catalog %}
+        <details class="sleek-add-ef__category" open>
+          <summary class="sleek-add-ef__category-header">
+            <span class="sleek-add-ef__category-name">{{ cat.name }}</span>
+            <span class="sleek-add-ef__category-hint">{{ cat.hint }}</span>
+          </summary>
+          <div class="sleek-add-ef__grid">
+            {% for type_name, icon, desc in cat.types %}
+            <label class="sleek-add-ef__card sleek-add-ef__card--{{ cat.css }}" data-type="{{ type_name }}">
+              <input type="radio" name="type" value="{{ type_name }}" class="sleek-add-ef__radio" />
+              <span class="sleek-add-ef__card-icon">{{ icon }}</span>
+              <span class="sleek-add-ef__card-name">{{ type_name }}</span>
+              <span class="sleek-add-ef__card-desc">{{ desc }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </details>
+        {% endfor %}
+      </div>
+
+      <div class="sleek-add-ef__footer">
+        <input name="key" type="text" placeholder="unique-key" class="sleek-add-ef__input" />
+        <input name="label" type="text" placeholder="Display Label (optional)" class="sleek-add-ef__input sleek-add-ef__input--wide" />
+        <button type="submit" class="sleek-add-ef__btn">+ Add</button>
+      </div>
     </form>
   </div>
 
