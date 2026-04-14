@@ -634,14 +634,15 @@ body.operator-view[data-theme="sleek"] .sleek-edit-btn {
     border: 1px solid #444;
     background: #2b3035;
     color: #888;
-    width: 20px;
-    height: 20px;
-    font-size: 10px;
+    width: 24px;
+    height: 24px;
+    font-size: 14px;
     padding: 0;
     border-radius: 3px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    line-height: 1;
 }
 body.operator-view[data-theme="sleek"] .sleek-edit-btn:hover {
     background: #363b42;
@@ -653,11 +654,11 @@ body.operator-view[data-theme="sleek"] .sleek-edit-btn--active {
     background: #1a2a3c;
 }
 body.operator-view[data-theme="sleek"] .sleek-edit-btn--danger {
-    color: #f48771;
+    font-size: 17px;
 }
 body.operator-view[data-theme="sleek"] .sleek-edit-btn--danger:hover {
-    background: #3c1f1f;
-    border-color: #be3434;
+    background: #363b42;
+    color: #ccc;
 }
 
 /* Edit mode label/instruction forms */
@@ -725,6 +726,32 @@ body.operator-view[data-theme="sleek"] .sleek-edit-child__content {
     /* No extra padding or border — child renders at full width */
 }
 
+/* --- Mutable PageForm: per-eigenform margin controls --- */
+body.operator-view[data-theme="sleek"] .sleek-page-child {
+    position: relative;
+}
+body.operator-view[data-theme="sleek"] .sleek-page-child__controls {
+    position: absolute;
+    top: 0;
+    right: -36px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding-top: 4px;
+}
+
+/* Rebuild from Seed button (mutable PageForm) */
+body.operator-view[data-theme="sleek"] .sleek-page-rebuild {
+    width: auto;
+    height: auto;
+    padding: 3px 10px;
+    font-size: 11px;
+    color: #666;
+}
+body.operator-view[data-theme="sleek"] .sleek-page-rebuild:hover {
+    color: #aaa;
+}
+
 /* --- Edit mode: shared class overrides for default templates --- */
 
 /* Standard action buttons (confirm, remove, arrow) */
@@ -767,6 +794,12 @@ body.operator-view[data-theme="sleek"] .ef-chrome-btn {
     color: #888;
     background: #2b3035;
     border-color: #444;
+    font-size: 14px;
+    line-height: 1;
+}
+body.operator-view[data-theme="sleek"] .ef-chrome-btn span {
+    font-size: inherit;
+    line-height: 1;
 }
 body.operator-view[data-theme="sleek"] .ef-chrome-btn:hover {
     color: #ccc;

@@ -271,6 +271,8 @@ def from_descriptor(desc: dict, reg: EigenformRegistry | None = None,
 
     # If the seed matches at this level, use it (preserves callables)
     if seed is not None and seed.form == type_name and seed.key == key:
+        # Apply descriptor overrides that may differ from the seed
+        seed.editable = bool(desc.get("editable"))
         return seed
 
     # Construct from registry + descriptor

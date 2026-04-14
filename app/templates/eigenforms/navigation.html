@@ -50,31 +50,25 @@
       {% set arrow = "&#9660;" if step.expanded else "&#9654;" %}
       <div style="display: flex; align-items: center; gap: 4px; padding: 4px 8px; background: #fafafa; border: 1px solid #e0e0e0; border-radius: 4px; margin-bottom: {{ '0' if step.expanded else '4' }}px;{{ ' border-bottom-left-radius: 0; border-bottom-right-radius: 0;' if step.expanded else '' }} font-size: 12px;">
         {{ render_btn(url, {"action": "toggle", "step": step.key},
-            arrow,
-            "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 22px; height: 22px; font-size: 10px; padding: 0;") }}
+            arrow, "ef-icon-btn") }}
         <span style="font-weight: bold; flex: 1;">{{ step.label }}<span style="font-family: monospace; font-weight: normal; font-size: 10px; color: #999; margin-left: 6px;">{{ step.key }}</span></span>
         {% if step.index > 0 %}
           {{ render_btn(url, {"action": "move_step", "key": step.key, "position": step.index - 1},
-              "&#9650;",
-              "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 18px; height: 18px; font-size: 8px; padding: 0;") }}
+              "&#9650;", "ef-icon-btn") }}
         {% endif %}
         {% if step.index < step_items|length - 1 %}
           {{ render_btn(url, {"action": "move_step", "key": step.key, "position": step.index + 1},
-              "&#9660;",
-              "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 18px; height: 18px; font-size: 8px; padding: 0;") }}
+              "&#9660;", "ef-icon-btn") }}
         {% endif %}
         {% if step.editable %}
           {{ render_btn(url, {"action": "toggle_editable", "key": step.key},
-              "&#9998;",
-              "cursor: pointer; border: 1px solid #86c; background: #f3eaff; width: 18px; height: 18px; font-size: 10px; padding: 0; color: #639;") }}
+              "&#128275;", "ef-icon-btn ef-icon-btn--active") }}
         {% else %}
           {{ render_btn(url, {"action": "toggle_editable", "key": step.key},
-              "&#9998;",
-              "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 18px; height: 18px; font-size: 10px; padding: 0; color: #aaa;") }}
+              "&#128274;", "ef-icon-btn") }}
         {% endif %}
         {{ render_btn(url, {"action": "remove_step", "key": step.key},
-            "&#10005;",
-            "cursor: pointer; border: 1px solid #dcc; background: #fef8f8; width: 18px; height: 18px; font-size: 9px; padding: 0; color: #c00;") }}
+            "&#128465;", "ef-icon-btn ef-icon-btn--danger") }}
       </div>
       {% if step.expanded and step.key in section_html %}
         <div class="ef-section-content--edit">{{ section_html[step.key]|safe }}</div>
@@ -95,26 +89,21 @@
         {% endif %}
         {% if step.index > 0 %}
           {{ render_btn(url, {"action": "move_step", "key": step.key, "position": step.index - 1},
-              "&#9664;",
-              "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 18px; height: 18px; font-size: 8px; padding: 0;") }}
+              "&#9664;", "ef-icon-btn") }}
         {% endif %}
         {% if step.index < step_items|length - 1 %}
           {{ render_btn(url, {"action": "move_step", "key": step.key, "position": step.index + 1},
-              "&#9654;",
-              "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 18px; height: 18px; font-size: 8px; padding: 0;") }}
+              "&#9654;", "ef-icon-btn") }}
         {% endif %}
         {% if step.editable %}
           {{ render_btn(url, {"action": "toggle_editable", "key": step.key},
-              "&#9998;",
-              "cursor: pointer; border: 1px solid #86c; background: #f3eaff; width: 18px; height: 18px; font-size: 10px; padding: 0; color: #639;") }}
+              "&#128275;", "ef-icon-btn ef-icon-btn--active") }}
         {% else %}
           {{ render_btn(url, {"action": "toggle_editable", "key": step.key},
-              "&#9998;",
-              "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 18px; height: 18px; font-size: 10px; padding: 0; color: #aaa;") }}
+              "&#128274;", "ef-icon-btn") }}
         {% endif %}
         {{ render_btn(url, {"action": "remove_step", "key": step.key},
-            "&#10005;",
-            "cursor: pointer; border: 1px solid #dcc; background: #fef8f8; width: 18px; height: 18px; font-size: 9px; padding: 0; color: #c00;") }}
+            "&#128465;", "ef-icon-btn ef-icon-btn--danger") }}
       </div>
     {% endfor %}
     </div>

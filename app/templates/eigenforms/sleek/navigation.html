@@ -60,13 +60,13 @@
         {% endif %}
         {% if step.editable %}
           {{ render_btn(url, {"action": "toggle_editable", "key": step.key},
-              "&#9998;", "sleek-edit-btn sleek-edit-btn--active") }}
+              "&#128275;", "sleek-edit-btn sleek-edit-btn--active") }}
         {% else %}
           {{ render_btn(url, {"action": "toggle_editable", "key": step.key},
-              "&#9998;", "sleek-edit-btn") }}
+              "&#128274;", "sleek-edit-btn") }}
         {% endif %}
         {{ render_btn(url, {"action": "remove_step", "key": step.key},
-            "&#10005;", "sleek-edit-btn sleek-edit-btn--danger") }}
+            "&#128465;", "sleek-edit-btn sleek-edit-btn--danger") }}
       </span>
     </div>
   {% endfor %}

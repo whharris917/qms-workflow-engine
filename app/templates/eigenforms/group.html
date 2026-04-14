@@ -48,31 +48,25 @@
         <span class="ef-item-ctrl-spacer"></span>
         {% if item.index > 0 %}
           {{ render_btn(url, {"action": "move_eigenform", "key": item.key, "position": item.index - 1},
-              "&#9650;",
-              "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 22px; height: 22px; font-size: 9px; padding: 0;") }}
+              "&#9650;", "ef-icon-btn") }}
         {% else %}
           <span class="ef-item-ctrl-placeholder"></span>
         {% endif %}
         {% if item.index < child_items|length - 1 %}
           {{ render_btn(url, {"action": "move_eigenform", "key": item.key, "position": item.index + 1},
-              "&#9660;",
-              "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 22px; height: 22px; font-size: 9px; padding: 0;") }}
+              "&#9660;", "ef-icon-btn") }}
         {% else %}
           <span class="ef-item-ctrl-placeholder"></span>
         {% endif %}
-        {# Editable toggle #}
         {% if item.editable %}
           {{ render_btn(url, {"action": "toggle_editable", "key": item.key},
-              "&#9998;",
-              "cursor: pointer; border: 1px solid #86c; background: #f3eaff; width: 22px; height: 22px; font-size: 11px; padding: 0; color: #639;") }}
+              "&#128275;", "ef-icon-btn ef-icon-btn--active") }}
         {% else %}
           {{ render_btn(url, {"action": "toggle_editable", "key": item.key},
-              "&#9998;",
-              "cursor: pointer; border: 1px solid #ccc; background: #f8f8f8; width: 22px; height: 22px; font-size: 11px; padding: 0; color: #aaa;") }}
+              "&#128274;", "ef-icon-btn") }}
         {% endif %}
         {{ render_btn(url, {"action": "remove_eigenform", "key": item.key},
-            "&#10005;",
-            "cursor: pointer; border: 1px solid #dcc; background: #fef8f8; width: 22px; height: 22px; font-size: 10px; padding: 0; color: #c00; margin-left: 4px;") }}
+            "&#128465;", "ef-icon-btn ef-icon-btn--danger") }}
       </div>
       <div class="ef-item-content">{{ item.html|safe }}</div>
     </div>

@@ -53,13 +53,13 @@
         {% endif %}
         {% if item.editable %}
           {{ render_btn(url, {"action": "toggle_editable", "key": item.key},
-              "&#9998;", "sleek-edit-btn sleek-edit-btn--active") }}
+              "&#128275;", "sleek-edit-btn sleek-edit-btn--active") }}
         {% else %}
           {{ render_btn(url, {"action": "toggle_editable", "key": item.key},
-              "&#9998;", "sleek-edit-btn") }}
+              "&#128274;", "sleek-edit-btn") }}
         {% endif %}
         {{ render_btn(url, {"action": "remove_eigenform", "key": item.key},
-            "&#10005;", "sleek-edit-btn sleek-edit-btn--danger") }}
+            "&#128465;", "sleek-edit-btn sleek-edit-btn--danger") }}
       </div>
       {{ item.html|safe }}
     {% endfor %}

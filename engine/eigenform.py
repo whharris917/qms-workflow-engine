@@ -449,14 +449,14 @@ class Eigenform:
             form=self.form,
             key=self.key,
             uid=self.uid,
-            label=escape(self.effective_label),
+            label=self.effective_label,
             instruction=self.effective_instruction or "",
             editable=self.editable,
             edit_mode=self.edit_mode,
             undo_count=self._undo_depth,
-            url=escape(self.url),
+            url=self.url,
             inner=inner,
-            json_str=escape(json.dumps(self.serialize(), indent=2)),
+            json_str=json.dumps(self.serialize(), indent=2, ensure_ascii=False),
             is_container=self.form in self._CONTAINER_FORMS,
         )
 

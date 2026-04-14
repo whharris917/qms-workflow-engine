@@ -100,6 +100,9 @@ class PageForm(Eigenform):
         if stored_structure is None:
             # First bind: write seed structure to store
             structure = [ef.to_descriptor() for ef in bound._seed]
+            if bound.mutable_structure:
+                for desc in structure:
+                    desc["editable"] = True
             store.set(scope, "__structure", structure)
             source = bound._seed
         else:
@@ -160,6 +163,9 @@ class PageForm(Eigenform):
 
         # Rewrite structure from seed
         structure = [ef.to_descriptor() for ef in self._seed]
+        if self.mutable_structure:
+            for desc in structure:
+                desc["editable"] = True
         self._store.set(self._scope, "__structure", structure)
 
         # Rebind from seed
@@ -222,6 +228,9 @@ class PageForm(Eigenform):
         elif action == "move_eigenform":
             self._set_feedback("success",
                                f"Moved '{body.get('key', '?')}' to position {body.get('position', '?')}.")
+        elif action == "toggle_editable":
+            self._set_feedback("success",
+                               f"Toggled editability for '{body.get('key', '?')}'.")
         elif action == "clear":
             self._set_feedback("success", "Page cleared.")
         return result
@@ -307,6 +316,25 @@ class PageForm(Eigenform):
                     instruction=(
                         f"Move an eigenform to a new position (0-based index). "
                         f"Current order: {', '.join(keys)}."
+                    ),
+                ))
+
+            if keys:
+                editable_keys = [ef.key for ef in self.eigenforms if ef.editable]
+                locked_keys = [ef.key for ef in self.eigenforms if not ef.editable]
+                parts = []
+                if editable_keys:
+                    parts.append(f"Editable: {', '.join(editable_keys)}")
+                if locked_keys:
+                    parts.append(f"Locked: {', '.join(locked_keys)}")
+                affs.append(SetValueAffordance(
+                    label="Toggle Editable",
+                    method="POST",
+                    url=self._url_prefix,
+                    body={"action": "toggle_editable", "key": "<key>"},
+                    instruction=(
+                        f"Toggle whether an eigenform is editable. "
+                        f"Valid keys: {', '.join(keys)}. {'. '.join(parts)}."
                     ),
                 ))
 
@@ -408,7 +436,7 @@ class PageForm(Eigenform):
         if self.mutable_structure:
             available_types = sorted(get_registry().available())
             for i, ef in enumerate(self.eigenforms):
-                child_items.append({"key": ef.key, "index": i, "html": ef.render()})
+                child_items.append({"key": ef.key, "index": i, "html": ef.render(), "editable": ef.editable})
         return render_template("page.html", data=data, ef=self, url=self._url_prefix, label=data.get("label", ""), instruction=data.get("instruction") or "", children_html=children_html, child_items=child_items, available_types=available_types, feedback=data.get("feedback"), mutable=self.mutable_structure)
 
     def find_eigenform(self, path: str) -> Eigenform | None:
@@ -464,7 +492,8 @@ class PageForm(Eigenform):
             return self.serialize()
 
         if not self.mutable_structure and action in (
-            "add_eigenform", "remove_eigenform", "move_eigenform", "rebuild_from_seed",
+            "add_eigenform", "remove_eigenform", "move_eigenform",
+            "toggle_editable", "rebuild_from_seed",
         ):
             return self._error("Structural mutations not enabled on this page.", action=action)
 
@@ -476,6 +505,8 @@ class PageForm(Eigenform):
             return self._remove_eigenform(body)
         elif action == "move_eigenform":
             return self._move_eigenform(body)
+        elif action == "toggle_editable":
+            return self._toggle_editable(body)
 
         return self.serialize()
 
@@ -587,6 +618,27 @@ class PageForm(Eigenform):
         desc = structure.pop(idx)
         position = max(0, min(position, len(structure)))
         structure.insert(position, desc)
+
+        self._save_structure(structure)
+        self._rebuild()
+        return self.serialize()
+
+    def _toggle_editable(self, body: dict) -> dict:
+        key = body.get("key")
+        if not key:
+            return self._error("'key' is required.", action="toggle_editable")
+
+        structure = self._get_structure()
+        found = False
+        for desc in structure:
+            if desc["key"] == key:
+                desc["editable"] = not desc.get("editable", False)
+                found = True
+                break
+
+        if not found:
+            return self._error(f"Eigenform '{key}' not found.",
+                               action="toggle_editable")
 
         self._save_structure(structure)
         self._rebuild()
