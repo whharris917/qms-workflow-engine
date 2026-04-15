@@ -2350,3 +2350,299 @@ body.operator-view[data-theme="sleek"] .ef-feedback__dismiss {
 .sleek-table__extra-affs {
     margin-top: 6px;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   BUILDER LAYOUT — "MS Paint" two-panel page editor
+   ═══════════════════════════════════════════════════════════ */
+
+body.operator-view[data-theme="sleek"] .builder {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 0;
+    min-height: calc(100vh - 80px);
+    margin: -2rem;              /* Bleed into .content padding */
+}
+
+/* ── Left: Type Palette ── */
+body.operator-view[data-theme="sleek"] .builder__palette {
+    background: #14181e;
+    border-right: 1px solid #2a2f36;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+body.operator-view[data-theme="sleek"] .builder__palette-header {
+    padding: 14px 14px 10px;
+    border-bottom: 1px solid #2a2f36;
+    flex-shrink: 0;
+}
+body.operator-view[data-theme="sleek"] .builder__palette-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #7f8fa6;
+}
+body.operator-view[data-theme="sleek"] .builder__palette-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 10px;
+}
+
+/* Category sections in palette */
+body.operator-view[data-theme="sleek"] .builder__cat {
+    margin-bottom: 4px;
+}
+body.operator-view[data-theme="sleek"] .builder__cat-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 6px;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    font-size: 11px;
+}
+body.operator-view[data-theme="sleek"] .builder__cat-header::-webkit-details-marker {
+    display: none;
+}
+body.operator-view[data-theme="sleek"] .builder__cat-header::before {
+    content: "\25B8";
+    font-size: 9px;
+    color: #555;
+    transition: transform 0.15s;
+}
+body.operator-view[data-theme="sleek"] .builder__cat[open] > .builder__cat-header::before {
+    transform: rotate(90deg);
+}
+body.operator-view[data-theme="sleek"] .builder__cat-name {
+    color: #888;
+    font-weight: 600;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* Type items in palette */
+body.operator-view[data-theme="sleek"] .builder__cat-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 2px 0 6px 10px;
+}
+body.operator-view[data-theme="sleek"] .builder__type {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: 4px;
+    border-left: 2px solid #3a3f47;
+    cursor: grab;
+    user-select: none;
+    transition: background 0.1s, border-color 0.1s;
+}
+body.operator-view[data-theme="sleek"] .builder__type:hover {
+    background: #1e2430;
+}
+body.operator-view[data-theme="sleek"] .builder__type:active {
+    cursor: grabbing;
+}
+body.operator-view[data-theme="sleek"] .builder__type.dragging {
+    opacity: 0.4;
+}
+body.operator-view[data-theme="sleek"] .builder__type-icon {
+    font-size: 14px;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+}
+body.operator-view[data-theme="sleek"] .builder__type-name {
+    font-size: 11px;
+    font-family: "SFMono-Regular", "Cascadia Code", "Consolas", monospace;
+    color: #b0b0b0;
+}
+
+/* Palette category accent colors */
+body.operator-view[data-theme="sleek"] .builder__type--input       { border-left-color: #3b82f6; }
+body.operator-view[data-theme="sleek"] .builder__type--input .builder__type-icon { color: #60a5fa; }
+body.operator-view[data-theme="sleek"] .builder__type--collections  { border-left-color: #22c55e; }
+body.operator-view[data-theme="sleek"] .builder__type--collections .builder__type-icon { color: #4ade80; }
+body.operator-view[data-theme="sleek"] .builder__type--containers   { border-left-color: #a855f7; }
+body.operator-view[data-theme="sleek"] .builder__type--containers .builder__type-icon { color: #c084fc; }
+body.operator-view[data-theme="sleek"] .builder__type--reactive     { border-left-color: #f59e0b; }
+body.operator-view[data-theme="sleek"] .builder__type--reactive .builder__type-icon { color: #fbbf24; }
+body.operator-view[data-theme="sleek"] .builder__type--display      { border-left-color: #14b8a6; }
+body.operator-view[data-theme="sleek"] .builder__type--display .builder__type-icon { color: #2dd4bf; }
+
+/* ── Right: Canvas ── */
+body.operator-view[data-theme="sleek"] .builder__canvas {
+    display: flex;
+    flex-direction: column;
+    background: #1a1f26;
+    overflow-y: auto;
+}
+body.operator-view[data-theme="sleek"] .builder__canvas-header {
+    padding: 16px 24px 8px;
+    border-bottom: 1px solid #2a2f36;
+    flex-shrink: 0;
+}
+body.operator-view[data-theme="sleek"] .builder__canvas-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #e0e0e0;
+    margin: 0;
+}
+body.operator-view[data-theme="sleek"] .builder__canvas-instr {
+    font-size: 13px;
+    color: #888;
+    margin: 4px 0 0;
+}
+
+/* Canvas body — the workspace / drop zone */
+body.operator-view[data-theme="sleek"] .builder__canvas-body {
+    flex: 1;
+    padding: 16px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 200px;
+}
+
+/* Canvas accepts drops — visual feedback */
+body.operator-view[data-theme="sleek"] .builder__canvas-body.drop-active {
+    background: #1a2230;
+    outline: 2px dashed #3b82f640;
+    outline-offset: -2px;
+}
+
+/* Individual canvas items (tile + content) */
+body.operator-view[data-theme="sleek"] .builder__item {
+    background: #22272e;
+    border: 1px solid #3a3f47;
+    border-radius: 6px;
+    overflow: hidden;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+body.operator-view[data-theme="sleek"] .builder__item:hover {
+    border-color: #555d66;
+}
+body.operator-view[data-theme="sleek"] .builder__item.selected {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 1px #2563eb;
+}
+body.operator-view[data-theme="sleek"] .builder__item.dragging {
+    opacity: 0.3;
+}
+
+/* Tile bar inside canvas item — reuse sleek-struct tile styles but flatten */
+body.operator-view[data-theme="sleek"] .builder__item > .sleek-struct__tile {
+    border: none;
+    border-radius: 0;
+    background: #2b3035;
+    border-bottom: 1px solid #3a3f47;
+}
+body.operator-view[data-theme="sleek"] .builder__item > .sleek-struct__tile:hover {
+    background: #333a42;
+}
+
+/* Collapsible item body */
+body.operator-view[data-theme="sleek"] .builder__item-body {
+    padding: 12px 16px;
+    transition: max-height 0.2s ease, padding 0.2s ease, opacity 0.15s ease;
+    overflow: hidden;
+}
+body.operator-view[data-theme="sleek"] .builder__item-body[data-collapsed="true"] {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
+}
+
+/* Per-item action strip */
+body.operator-view[data-theme="sleek"] .builder__item-actions {
+    display: flex;
+    gap: 4px;
+    padding: 6px 10px;
+    background: #1e2228;
+    border-top: 1px solid #2a2f36;
+    opacity: 0;
+    transition: opacity 0.12s;
+}
+body.operator-view[data-theme="sleek"] .builder__item:hover .builder__item-actions {
+    opacity: 1;
+}
+
+/* Action buttons (shared) */
+body.operator-view[data-theme="sleek"] .builder__action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    color: #888;
+    font-size: 11px;
+    padding: 3px 8px;
+    cursor: pointer;
+    transition: color 0.1s, background 0.1s, border-color 0.1s;
+    font-family: inherit;
+}
+body.operator-view[data-theme="sleek"] .builder__action-btn:hover {
+    color: #ccc;
+    background: #2b3035;
+    border-color: #444;
+}
+body.operator-view[data-theme="sleek"] .builder__action-btn--active {
+    color: #60a5fa;
+}
+body.operator-view[data-theme="sleek"] .builder__action-btn--danger:hover {
+    color: #e55;
+    background: #2a1a1a;
+    border-color: #5a2020;
+}
+body.operator-view[data-theme="sleek"] .builder__action-btn--subtle {
+    color: #555;
+    font-size: 11px;
+}
+body.operator-view[data-theme="sleek"] .builder__action-btn--subtle:hover {
+    color: #999;
+}
+
+/* Empty canvas state */
+body.operator-view[data-theme="sleek"] .builder__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 60px 20px;
+    color: #555;
+    text-align: center;
+}
+body.operator-view[data-theme="sleek"] .builder__empty-icon {
+    font-size: 48px;
+    opacity: 0.4;
+}
+body.operator-view[data-theme="sleek"] .builder__empty-text {
+    font-size: 14px;
+    color: #666;
+}
+
+/* Canvas footer */
+body.operator-view[data-theme="sleek"] .builder__canvas-footer {
+    padding: 8px 24px 16px;
+    border-top: 1px solid #2a2f36;
+    flex-shrink: 0;
+}
+body.operator-view[data-theme="sleek"] .builder__footer-row {
+    display: flex;
+    gap: 8px;
+    padding-top: 6px;
+}
+
+/* Nested tiles within canvas items (containers) */
+body.operator-view[data-theme="sleek"] .builder__item > .sleek-struct__nest {
+    margin-left: 16px;
+    padding: 4px 0 4px 10px;
+    border-left: 2px solid #3a3f47;
+}

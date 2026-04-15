@@ -618,11 +618,15 @@ class PageForm(Eigenform):
             desc["config"] = config
 
         # Insert into structure (already fetched above for key uniqueness)
+        position = body.get("position")
         if after:
             idx = next((i for i, d in enumerate(structure) if d["key"] == after), None)
             if idx is None:
                 return self._error(f"Sibling '{after}' not found.", action="add_eigenform")
             structure.insert(idx + 1, desc)
+        elif position is not None:
+            pos = max(0, min(int(position), len(structure)))
+            structure.insert(pos, desc)
         else:
             structure.append(desc)
 

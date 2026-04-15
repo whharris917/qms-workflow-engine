@@ -1,16 +1,17 @@
-{# PageForm — Sleek theme.
+{# PageForm — Sleek theme (Builder layout).
 
-   Reuses sleek-edit-toolbar (add bar), sleek-edit-child__bar + sleek-edit-btn
-   (per-eigenform controls), and sleek-edit-btn (rebuild). Feedback banners
-   inherit from ef-feedback CSS.
+   Two-panel "Paint" layout for mutable pages:
+     Left:  Type palette (draggable source cards)
+     Right: Canvas (structural tiles + rendered eigenforms)
 
-   Context: same as page.html (data, ef, url, label, instruction,
-            children_html, child_items, available_types, feedback, mutable)
+   Non-mutable pages render as simple stacked children.
+
+   Context: data, ef, url, label, instruction,
+            children_html, child_items, available_types, feedback, mutable
 #}
-<h2>{{ data.label }}</h2>
-{% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
 
-{# Feedback banners #}
+{# ── Feedback banners (shared by both modes) ── #}
+{% macro render_feedback(feedback, data) %}
 {% if feedback %}
   {% set affs = data.affordances|default([]) %}
   {% set dismiss_affs = {} %}
@@ -45,11 +46,45 @@
       <span class="ef-feedback__timestamp">{{ succ.timestamp|default("") }}</span>
     </div>
   {% endif %}
-
-  {% if feedback.errors or succ %}
-    <div style="margin-bottom: 8px;"></div>
-  {% endif %}
 {% endif %}
+{% endmacro %}
+
+{# ── Recursive tile macro ── #}
+{% macro render_tile(tile, url, depth=0) %}
+<div class="sleek-struct__tile sleek-struct__tile--{{ tile.css }}{% if tile.is_container %} sleek-struct__tile--container{% endif %}"
+     draggable="true"
+     data-key="{{ tile.key }}"
+     data-index="{{ tile.index }}"
+     data-depth="{{ depth }}">
+  <span class="sleek-struct__tile-icon sleek-struct__tile-icon--{{ tile.css }}">{{ tile.icon }}</span>
+  <span class="sleek-struct__tile-type">{{ tile.type }}</span>
+  <span class="sleek-struct__tile-label">{{ tile.label }}</span>
+  <span class="sleek-struct__tile-key">{{ tile.key }}</span>
+  {% if tile.is_container %}
+  <button class="sleek-struct__tile-ungroup"
+          data-ef-post="{{ url }}"
+          data-ef-body='{"action":"ungroup_eigenform","key":"{{ tile.key }}"}'
+          title="Ungroup {{ tile.key }}">&#8618;</button>
+  {% endif %}
+  {% if depth > 0 %}
+  <button class="sleek-struct__tile-eject"
+          data-ef-post="{{ url }}"
+          data-ef-body='{"action":"move_eigenform","key":"{{ tile.key }}","position":999}'
+          title="Move to top level">&#8599;</button>
+  {% endif %}
+  <button class="sleek-struct__tile-delete"
+          data-ef-post="{{ url }}"
+          data-ef-body='{"action":"remove_eigenform","key":"{{ tile.key }}"}'
+          title="Remove {{ tile.key }}">&#128465;</button>
+</div>
+{% if tile.is_container %}
+<div class="sleek-struct__nest" data-parent="{{ tile.key }}">
+  {% for child in tile.children %}
+    {{ render_tile(child, url, depth + 1) }}
+  {% endfor %}
+</div>
+{% endif %}
+{% endmacro %}
 
 {% if mutable %}
   {# Mark structural affordances as rendered #}
@@ -60,131 +95,113 @@
     {% endif %}
   {% endfor %}
 
-  {# Add Eigenform — one-click type picker #}
-  <div class="sleek-add-ef">
-    <div class="sleek-add-ef__catalog">
-      {% for cat in type_catalog %}
-      <details class="sleek-add-ef__category" open>
-        <summary class="sleek-add-ef__category-header">
-          <span class="sleek-add-ef__category-name">{{ cat.name }}</span>
-          <span class="sleek-add-ef__category-hint">{{ cat.hint }}</span>
-        </summary>
-        <div class="sleek-add-ef__grid">
-          {% for type_name, icon, desc in cat.types %}
-          <button class="sleek-add-ef__card sleek-add-ef__card--{{ cat.css }}"
-                  data-type="{{ type_name }}"
-                  data-ef-add="{{ url }}">
-            <span class="sleek-add-ef__card-icon">{{ icon }}</span>
-            <span class="sleek-add-ef__card-name">{{ type_name }}</span>
-            <span class="sleek-add-ef__card-desc">{{ desc }}</span>
-          </button>
+  {# ══════════════════════════════════════════════════════
+     BUILDER LAYOUT — two-panel workspace
+     ══════════════════════════════════════════════════════ #}
+  <div class="builder">
+
+    {# ── Left: Type Palette ── #}
+    <div class="builder__palette">
+      <div class="builder__palette-header">
+        <span class="builder__palette-title">Eigenforms</span>
+      </div>
+      <div class="builder__palette-scroll">
+        {% for cat in type_catalog %}
+        <details class="builder__cat" open>
+          <summary class="builder__cat-header">
+            <span class="builder__cat-name">{{ cat.name }}</span>
+          </summary>
+          <div class="builder__cat-list">
+            {% for type_name, icon, desc in cat.types %}
+            <div class="builder__type builder__type--{{ cat.css }}"
+                 draggable="true"
+                 data-ef-palette-type="{{ type_name }}"
+                 data-ef-add="{{ url }}"
+                 title="{{ desc }}">
+              <span class="builder__type-icon">{{ icon }}</span>
+              <span class="builder__type-name">{{ type_name }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </details>
+        {% endfor %}
+      </div>
+    </div>
+
+    {# ── Right: Canvas ── #}
+    <div class="builder__canvas">
+      {# Page header #}
+      <div class="builder__canvas-header">
+        <h2 class="builder__canvas-title">{{ data.label }}</h2>
+        {% if data.instruction %}<p class="builder__canvas-instr">{{ data.instruction }}</p>{% endif %}
+        {{ render_feedback(feedback, data) }}
+      </div>
+
+      {# Canvas body — drop zone for tiles and palette items #}
+      <div class="builder__canvas-body sleek-struct__list" data-ef-url="{{ url }}">
+        {% if child_items %}
+          {% for item in child_items %}
+            {# Each canvas item: tile header + collapsible content #}
+            <div class="builder__item" data-key="{{ item.key }}">
+              {# Tile bar (drag handle + info + actions) #}
+              {{ render_tile(tile_items[loop.index0], url) }}
+              {# Rendered eigenform content (collapsible) #}
+              <div class="builder__item-body" data-collapsed="false">
+                {{ item.html|safe }}
+              </div>
+              {# Per-item controls strip #}
+              <div class="builder__item-actions">
+                {% if item.index > 0 %}
+                  {{ render_btn(url, {"action": "move_eigenform", "key": item.key, "position": item.index - 1},
+                      "&#9650; Up", "builder__action-btn") }}
+                {% endif %}
+                {% if item.index < child_items|length - 1 %}
+                  {{ render_btn(url, {"action": "move_eigenform", "key": item.key, "position": item.index + 1},
+                      "&#9660; Down", "builder__action-btn") }}
+                {% endif %}
+                {% if item.editable %}
+                  {{ render_btn(url, {"action": "toggle_editable", "key": item.key},
+                      "&#128275; Unlocked", "builder__action-btn builder__action-btn--active") }}
+                {% else %}
+                  {{ render_btn(url, {"action": "toggle_editable", "key": item.key},
+                      "&#128274; Locked", "builder__action-btn") }}
+                {% endif %}
+                {{ render_btn(url, {"action": "remove_eigenform", "key": item.key},
+                    "&#128465; Remove", "builder__action-btn builder__action-btn--danger") }}
+              </div>
+            </div>
           {% endfor %}
-        </div>
-      </details>
-      {% endfor %}
-    </div>
-  </div>
-
-  {# Recursive tile macro for the structural editor #}
-  {% macro render_tile(tile, url, depth=0) %}
-  <div class="sleek-struct__tile sleek-struct__tile--{{ tile.css }}{% if tile.is_container %} sleek-struct__tile--container{% endif %}"
-       draggable="true"
-       data-key="{{ tile.key }}"
-       data-index="{{ tile.index }}"
-       data-depth="{{ depth }}">
-    <span class="sleek-struct__tile-icon sleek-struct__tile-icon--{{ tile.css }}">{{ tile.icon }}</span>
-    <span class="sleek-struct__tile-type">{{ tile.type }}</span>
-    <span class="sleek-struct__tile-label">{{ tile.label }}</span>
-    <span class="sleek-struct__tile-key">{{ tile.key }}</span>
-    {% if tile.is_container %}
-    <button class="sleek-struct__tile-ungroup"
-            data-ef-post="{{ url }}"
-            data-ef-body='{"action":"ungroup_eigenform","key":"{{ tile.key }}"}'
-            title="Ungroup {{ tile.key }}">&#8618;</button>
-    {% endif %}
-    {% if depth > 0 %}
-    <button class="sleek-struct__tile-eject"
-            data-ef-post="{{ url }}"
-            data-ef-body='{"action":"move_eigenform","key":"{{ tile.key }}","position":999}'
-            title="Move to top level">&#8599;</button>
-    {% endif %}
-    <button class="sleek-struct__tile-delete"
-            data-ef-post="{{ url }}"
-            data-ef-body='{"action":"remove_eigenform","key":"{{ tile.key }}"}'
-            title="Remove {{ tile.key }}">&#128465;</button>
-  </div>
-  {% if tile.is_container %}
-  <div class="sleek-struct__nest" data-parent="{{ tile.key }}">
-    {% for child in tile.children %}
-      {{ render_tile(child, url, depth + 1) }}
-    {% endfor %}
-  </div>
-  {% endif %}
-  {% endmacro %}
-
-  {# Structural editor — tile-based page blueprint #}
-  {% if tile_items %}
-  <details class="sleek-struct" open>
-    <summary class="sleek-struct__header">
-      <span class="sleek-struct__title">Page Structure</span>
-      <span class="sleek-struct__count">{{ tile_items|length }} eigenform{{ "s" if tile_items|length != 1 }}</span>
-    </summary>
-
-    <div class="sleek-struct__list" data-ef-url="{{ url }}">
-      {% for tile in tile_items %}
-        {{ render_tile(tile, url) }}
-      {% endfor %}
-    </div>
-
-    <div class="sleek-struct__actions">
-      <div class="sleek-struct__group-bar" style="display: none;">
-        <span class="sleek-struct__group-label">Group selected:</span>
-        <input type="text" class="sleek-struct__group-input" placeholder="group-key" data-field="group_key" />
-        <input type="text" class="sleek-struct__group-input sleek-struct__group-input--wide" placeholder="Group Label (optional)" data-field="group_label" />
-        <button class="sleek-struct__group-btn" data-ef-url="{{ url }}">Group</button>
-      </div>
-    </div>
-  </details>
-  {% endif %}
-
-  {# Eigenforms with margin controls #}
-  {% for item in child_items %}
-    <div class="sleek-page-child">
-      {{ item.html|safe }}
-      <div class="sleek-page-child__controls">
-        {% if item.index > 0 %}
-          {{ render_btn(url, {"action": "move_eigenform", "key": item.key, "position": item.index - 1},
-              "&#9650;", "sleek-edit-btn") }}
-        {% endif %}
-        {% if item.index < child_items|length - 1 %}
-          {{ render_btn(url, {"action": "move_eigenform", "key": item.key, "position": item.index + 1},
-              "&#9660;", "sleek-edit-btn") }}
-        {% endif %}
-        {% if item.editable %}
-          {{ render_btn(url, {"action": "toggle_editable", "key": item.key},
-              "&#128275;", "sleek-edit-btn sleek-edit-btn--active") }}
         {% else %}
-          {{ render_btn(url, {"action": "toggle_editable", "key": item.key},
-              "&#128274;", "sleek-edit-btn") }}
+          <div class="builder__empty">
+            <span class="builder__empty-icon">&#128466;</span>
+            <span class="builder__empty-text">Drag an eigenform from the palette to start building</span>
+          </div>
         {% endif %}
-        {{ render_btn(url, {"action": "remove_eigenform", "key": item.key},
-            "&#128465;", "sleek-edit-btn sleek-edit-btn--danger") }}
+      </div>
+
+      {# Canvas footer #}
+      <div class="builder__canvas-footer">
+        <div class="sleek-struct__group-bar" style="display: none;">
+          <span class="sleek-struct__group-label">Group selected:</span>
+          <input type="text" class="sleek-struct__group-input" placeholder="group-key" data-field="group_key" />
+          <input type="text" class="sleek-struct__group-input sleek-struct__group-input--wide" placeholder="Group Label (optional)" data-field="group_label" />
+          <button class="sleek-struct__group-btn" data-ef-url="{{ url }}">Group</button>
+        </div>
+        <div class="builder__footer-row">
+          {{ render_btn(url, {"action": "rebuild_from_seed"},
+              "&#8634; Rebuild from Seed",
+              "builder__action-btn builder__action-btn--subtle") }}
+        </div>
       </div>
     </div>
-  {% endfor %}
 
-  {% if not child_items %}
-    <div class="ef-empty-state">No eigenforms yet. Use the toolbar above to add one.</div>
-  {% endif %}
-
-  {# Rebuild from seed #}
-  <div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #363b42;">
-    {{ render_btn(url, {"action": "rebuild_from_seed"},
-        "&#8634; Rebuild from Seed",
-        "sleek-edit-btn sleek-page-rebuild") }}
-  </div>
+  </div>{# /.builder #}
 
 {% else %}
+  {# Non-mutable: simple stacked rendering #}
+  <h2>{{ data.label }}</h2>
+  {% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
+  {{ render_feedback(feedback, data) }}
   {% for html in children_html %}{{ html|safe }}{% endfor %}
 {% endif %}
 
