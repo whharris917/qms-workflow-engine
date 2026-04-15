@@ -799,23 +799,19 @@ body.operator-view[data-theme="sleek"] .sleek-add-ef__card {
     border-left: 3px solid #3a3f47;
     border-radius: 4px;
     cursor: pointer;
+    font-family: inherit;
+    text-align: left;
     transition: border-color 0.12s, background 0.12s;
 }
 body.operator-view[data-theme="sleek"] .sleek-add-ef__card:hover {
     border-color: #555d66;
     background: #333a42;
 }
-body.operator-view[data-theme="sleek"] .sleek-add-ef__card:has(input:checked) {
+body.operator-view[data-theme="sleek"] .sleek-add-ef__card:active {
     background: #1a2744;
     border-color: #2563eb;
     box-shadow: 0 0 0 1px #2563eb;
 }
-body.operator-view[data-theme="sleek"] .sleek-add-ef__radio {
-    position: absolute;
-    opacity: 0;
-    pointer-events: none;
-}
-
 /* Icon glyph */
 body.operator-view[data-theme="sleek"] .sleek-add-ef__card-icon {
     grid-row: 1 / 3;
@@ -831,7 +827,7 @@ body.operator-view[data-theme="sleek"] .sleek-add-ef__card-icon {
     color: #999;
     transition: background 0.12s, color 0.12s;
 }
-body.operator-view[data-theme="sleek"] .sleek-add-ef__card:has(input:checked) .sleek-add-ef__card-icon {
+body.operator-view[data-theme="sleek"] .sleek-add-ef__card:active .sleek-add-ef__card-icon {
     background: #1e3a5f;
 }
 
@@ -842,9 +838,6 @@ body.operator-view[data-theme="sleek"] .sleek-add-ef__card-name {
     color: #e0e0e0;
     font-family: "SFMono-Regular", "Cascadia Code", "Consolas", monospace;
     align-self: end;
-}
-body.operator-view[data-theme="sleek"] .sleek-add-ef__card:has(input:checked) .sleek-add-ef__card-name {
-    color: #60a5fa;
 }
 body.operator-view[data-theme="sleek"] .sleek-add-ef__card-desc {
     font-size: 11px;
@@ -883,42 +876,6 @@ body.operator-view[data-theme="sleek"] .sleek-add-ef__card--display {
 }
 body.operator-view[data-theme="sleek"] .sleek-add-ef__card--display .sleek-add-ef__card-icon {
     color: #2dd4bf;
-}
-
-/* Footer: key + label + add button */
-body.operator-view[data-theme="sleek"] .sleek-add-ef__footer {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    padding-top: 10px;
-    border-top: 1px solid #333;
-}
-body.operator-view[data-theme="sleek"] .sleek-add-ef__input {
-    background: #2b3035;
-    color: #ccc;
-    border: 1px solid #444;
-    border-radius: 3px;
-    padding: 5px 8px;
-    font-size: 12px;
-    font-family: inherit;
-    width: 140px;
-}
-body.operator-view[data-theme="sleek"] .sleek-add-ef__input--wide {
-    flex: 1;
-}
-body.operator-view[data-theme="sleek"] .sleek-add-ef__btn {
-    background: #2563eb;
-    color: #fff;
-    border: none;
-    border-radius: 3px;
-    padding: 6px 16px;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    white-space: nowrap;
-}
-body.operator-view[data-theme="sleek"] .sleek-add-ef__btn:hover {
-    background: #3b82f6;
 }
 
 /* --- Structural editor: tile-based page blueprint --- */
@@ -1113,6 +1070,26 @@ body.operator-view[data-theme="sleek"] .sleek-struct__tile:hover .sleek-struct__
 body.operator-view[data-theme="sleek"] .sleek-struct__tile-ungroup:hover {
     color: #c084fc;
     background: #2a1a3a;
+}
+
+/* Tile eject button (move to top level) */
+body.operator-view[data-theme="sleek"] .sleek-struct__tile-eject {
+    background: none;
+    border: none;
+    color: #555;
+    cursor: pointer;
+    font-size: 15px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    opacity: 0;
+    transition: opacity 0.12s, color 0.12s;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__tile:hover .sleek-struct__tile-eject {
+    opacity: 1;
+}
+body.operator-view[data-theme="sleek"] .sleek-struct__tile-eject:hover {
+    color: #60a5fa;
+    background: #1a2a3a;
 }
 
 /* Tile delete button */

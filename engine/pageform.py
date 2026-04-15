@@ -222,7 +222,7 @@ class PageForm(Eigenform):
         elif action in self._PAGE_ACTION_MESSAGES:
             self._set_feedback("success", self._PAGE_ACTION_MESSAGES[action])
         elif action == "add_eigenform":
-            self._set_feedback("success", f"Added '{body.get('key', '?')}'.")
+            self._set_feedback("success", f"Added {body.get('label', body.get('type', '?'))} ({body.get('key', '?')}).")
         elif action == "remove_eigenform":
             self._set_feedback("success", f"Removed '{body.get('key', '?')}'.")
         elif action == "move_eigenform":
@@ -287,14 +287,13 @@ class PageForm(Eigenform):
                 body={
                     "action": "add_eigenform",
                     "type": "<type>",
-                    "key": "<unique_key>",
-                    "label": "<label>",
+                    "key": "<optional - auto-generated from type if omitted>",
+                    "label": "<optional - auto-generated from type if omitted>",
                 },
                 instruction=(
-                    "Add a new eigenform to this page. Pick a type from the "
-                    "catalog, provide a unique key (lowercase, hyphens allowed), "
-                    "and an optional display label. After adding, use edit mode "
-                    "on the new eigenform to configure type-specific settings."
+                    "Add a new eigenform to this page. Only 'type' is required "
+                    "— key and label are auto-generated if omitted. After adding, "
+                    "use edit mode to configure type-specific settings."
                 ),
                 type_catalog=catalog_dict,
             ))
@@ -472,6 +471,7 @@ class PageForm(Eigenform):
                     _css_map[tname] = cat["css"]
 
             def _build_tile(ef, idx):
+                from engine.eigenform import Eigenform as EF
                 tile = {
                     "key": ef.key,
                     "index": idx,
@@ -480,6 +480,7 @@ class PageForm(Eigenform):
                     "icon": _icon_map.get(ef.form, "?"),
                     "css": _css_map.get(ef.form, ""),
                     "children": [],
+                    "is_container": ef.form in EF._CONTAINER_FORMS,
                 }
                 for ci, child in enumerate(ef.children):
                     tile["children"].append(_build_tile(child, ci))
@@ -572,13 +573,11 @@ class PageForm(Eigenform):
         from engine.registry import get_registry, validate_config
 
         type_name = body.get("type")
-        key = body.get("key")
-        label = body.get("label", key)
         config = body.get("config", {})
         after = body.get("after")
 
-        if not type_name or not key:
-            return self._error("Both 'type' and 'key' are required.", action="add_eigenform")
+        if not type_name:
+            return self._error("'type' is required.", action="add_eigenform")
 
         reg = get_registry()
         if type_name not in reg:
@@ -586,9 +585,24 @@ class PageForm(Eigenform):
                                f"Unknown type: {type_name}. Available: {', '.join(reg.available())}",
                                action="add_eigenform")
 
-        existing_keys = {ef.key for ef in self.eigenforms}
-        if key in existing_keys:
+        # Collect all existing keys (at every depth) for uniqueness
+        structure = self._get_structure()
+        existing_keys = self._all_keys_in_tree(structure)
+
+        # Auto-generate key if not provided
+        key = body.get("key", "").strip()
+        if not key:
+            n = 1
+            while f"{type_name}-{n}" in existing_keys:
+                n += 1
+            key = f"{type_name}-{n}"
+        elif key in existing_keys:
             return self._error(f"Key '{key}' already exists.", action="add_eigenform")
+
+        # Auto-generate label if not provided
+        label = body.get("label", "").strip()
+        if not label:
+            label = type_name.replace("dynamicchoice", "dynamic choice").title()
 
         # Validate config before persisting
         if config:
@@ -603,8 +617,7 @@ class PageForm(Eigenform):
         if config:
             desc["config"] = config
 
-        # Insert into structure
-        structure = self._get_structure()
+        # Insert into structure (already fetched above for key uniqueness)
         if after:
             idx = next((i for i, d in enumerate(structure) if d["key"] == after), None)
             if idx is None:
@@ -615,6 +628,9 @@ class PageForm(Eigenform):
 
         self._save_structure(structure)
         self._rebuild()
+        # Expose generated key/label back to caller for feedback messages
+        body.setdefault("key", key)
+        body.setdefault("label", label)
         return self.serialize()
 
     def _clear_eigenform_data(self, ef: Eigenform):
@@ -709,14 +725,16 @@ class PageForm(Eigenform):
             self._save_structure(structure)
             self._sync_container_structure(structure, parent)
         else:
-            # Reorder at top level
-            idx = next((i for i, d in enumerate(structure) if d["key"] == key), None)
-            if idx is None:
+            # Move to top level — pluck from wherever it currently lives
+            source_parent = self._find_parent_key(structure, key)
+            desc = self._pluck_from_tree(structure, key)
+            if desc is None:
                 return self._error(f"Eigenform '{key}' not found.", action="move_eigenform")
-            desc = structure.pop(idx)
             position = max(0, min(position, len(structure)))
             structure.insert(position, desc)
             self._save_structure(structure)
+            if source_parent:
+                self._sync_container_structure(structure, source_parent)
 
         self._rebuild()
         return self.serialize()

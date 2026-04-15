@@ -60,43 +60,34 @@
     {% endif %}
   {% endfor %}
 
-  {# Add Eigenform — card-based type picker #}
+  {# Add Eigenform — one-click type picker #}
   <div class="sleek-add-ef">
-    <form class="sleek-add-ef__form" data-ef-submit="{{ url }}">
-      <input type="hidden" name="action" value="add_eigenform" />
-
-      <div class="sleek-add-ef__catalog">
-        {% for cat in type_catalog %}
-        <details class="sleek-add-ef__category" open>
-          <summary class="sleek-add-ef__category-header">
-            <span class="sleek-add-ef__category-name">{{ cat.name }}</span>
-            <span class="sleek-add-ef__category-hint">{{ cat.hint }}</span>
-          </summary>
-          <div class="sleek-add-ef__grid">
-            {% for type_name, icon, desc in cat.types %}
-            <label class="sleek-add-ef__card sleek-add-ef__card--{{ cat.css }}" data-type="{{ type_name }}">
-              <input type="radio" name="type" value="{{ type_name }}" class="sleek-add-ef__radio" />
-              <span class="sleek-add-ef__card-icon">{{ icon }}</span>
-              <span class="sleek-add-ef__card-name">{{ type_name }}</span>
-              <span class="sleek-add-ef__card-desc">{{ desc }}</span>
-            </label>
-            {% endfor %}
-          </div>
-        </details>
-        {% endfor %}
-      </div>
-
-      <div class="sleek-add-ef__footer">
-        <input name="key" type="text" placeholder="unique-key" class="sleek-add-ef__input" />
-        <input name="label" type="text" placeholder="Display Label (optional)" class="sleek-add-ef__input sleek-add-ef__input--wide" />
-        <button type="submit" class="sleek-add-ef__btn">+ Add</button>
-      </div>
-    </form>
+    <div class="sleek-add-ef__catalog">
+      {% for cat in type_catalog %}
+      <details class="sleek-add-ef__category" open>
+        <summary class="sleek-add-ef__category-header">
+          <span class="sleek-add-ef__category-name">{{ cat.name }}</span>
+          <span class="sleek-add-ef__category-hint">{{ cat.hint }}</span>
+        </summary>
+        <div class="sleek-add-ef__grid">
+          {% for type_name, icon, desc in cat.types %}
+          <button class="sleek-add-ef__card sleek-add-ef__card--{{ cat.css }}"
+                  data-type="{{ type_name }}"
+                  data-ef-add="{{ url }}">
+            <span class="sleek-add-ef__card-icon">{{ icon }}</span>
+            <span class="sleek-add-ef__card-name">{{ type_name }}</span>
+            <span class="sleek-add-ef__card-desc">{{ desc }}</span>
+          </button>
+          {% endfor %}
+        </div>
+      </details>
+      {% endfor %}
+    </div>
   </div>
 
   {# Recursive tile macro for the structural editor #}
   {% macro render_tile(tile, url, depth=0) %}
-  <div class="sleek-struct__tile sleek-struct__tile--{{ tile.css }}{% if tile.children %} sleek-struct__tile--container{% endif %}"
+  <div class="sleek-struct__tile sleek-struct__tile--{{ tile.css }}{% if tile.is_container %} sleek-struct__tile--container{% endif %}"
        draggable="true"
        data-key="{{ tile.key }}"
        data-index="{{ tile.index }}"
@@ -105,18 +96,24 @@
     <span class="sleek-struct__tile-type">{{ tile.type }}</span>
     <span class="sleek-struct__tile-label">{{ tile.label }}</span>
     <span class="sleek-struct__tile-key">{{ tile.key }}</span>
-    {% if tile.children %}
+    {% if tile.is_container %}
     <button class="sleek-struct__tile-ungroup"
             data-ef-post="{{ url }}"
             data-ef-body='{"action":"ungroup_eigenform","key":"{{ tile.key }}"}'
             title="Ungroup {{ tile.key }}">&#8618;</button>
+    {% endif %}
+    {% if depth > 0 %}
+    <button class="sleek-struct__tile-eject"
+            data-ef-post="{{ url }}"
+            data-ef-body='{"action":"move_eigenform","key":"{{ tile.key }}","position":999}'
+            title="Move to top level">&#8599;</button>
     {% endif %}
     <button class="sleek-struct__tile-delete"
             data-ef-post="{{ url }}"
             data-ef-body='{"action":"remove_eigenform","key":"{{ tile.key }}"}'
             title="Remove {{ tile.key }}">&#128465;</button>
   </div>
-  {% if tile.children %}
+  {% if tile.is_container %}
   <div class="sleek-struct__nest" data-parent="{{ tile.key }}">
     {% for child in tile.children %}
       {{ render_tile(child, url, depth + 1) }}

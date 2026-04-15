@@ -22,6 +22,17 @@ document.addEventListener('click', function(e) {
     _efPost(el.getAttribute('data-ef-post'), el.getAttribute('data-ef-body'));
 });
 
+/* One-click add eigenform (sleek theme) */
+document.addEventListener('click', function(e) {
+    var el = e.target.closest('[data-ef-add]');
+    if (!el) return;
+    e.preventDefault();
+    _efPost(el.getAttribute('data-ef-add'), JSON.stringify({
+        action: 'add_eigenform',
+        type: el.getAttribute('data-type')
+    }));
+});
+
 /* Form submissions — body built from named form fields */
 document.addEventListener('submit', function(e) {
     var form = e.target.closest('form[data-ef-submit]');
