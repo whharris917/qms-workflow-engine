@@ -2,15 +2,15 @@
 
    Two-panel "Paint" layout for mutable pages:
      Left:  Type palette (draggable source cards)
-     Right: Canvas (structural tiles + rendered eigenforms)
+     Right: Canvas — schematic block diagram of the page tree
 
    Non-mutable pages render as simple stacked children.
 
    Context: data, ef, url, label, instruction,
-            children_html, child_items, available_types, feedback, mutable
+            children_html, child_items, tile_items, type_catalog, feedback, mutable
 #}
 
-{# ── Feedback banners (shared by both modes) ── #}
+{# ── Feedback banners ── #}
 {% macro render_feedback(feedback, data) %}
 {% if feedback %}
   {% set affs = data.affordances|default([]) %}
@@ -20,7 +20,6 @@
       {% set _ = dismiss_affs.update({aff.body.target|default(""): aff}) %}
     {% endif %}
   {% endfor %}
-
   {% for err in feedback.errors|default([]) %}
     {% set target = err.target|default("") %}
     {% set dismiss_html = "" %}
@@ -37,7 +36,6 @@
       </span>
     </div>
   {% endfor %}
-
   {% set succ = feedback.success %}
   {% if succ %}
     {% set target = succ.target|default("") %}
@@ -49,54 +47,93 @@
 {% endif %}
 {% endmacro %}
 
-{# ── Recursive tile macro ── #}
-{% macro render_tile(tile, url, depth=0) %}
-<div class="sleek-struct__tile sleek-struct__tile--{{ tile.css }}{% if tile.is_container %} sleek-struct__tile--container{% endif %}"
-     draggable="true"
-     data-key="{{ tile.key }}"
-     data-index="{{ tile.index }}"
-     data-depth="{{ depth }}">
-  <span class="sleek-struct__tile-icon sleek-struct__tile-icon--{{ tile.css }}">{{ tile.icon }}</span>
-  <span class="sleek-struct__tile-type">{{ tile.type }}</span>
-  <span class="sleek-struct__tile-label">{{ tile.label }}</span>
-  <span class="sleek-struct__tile-key">{{ tile.key }}</span>
-  {% if tile.is_container %}
-  <button class="sleek-struct__tile-ungroup"
-          data-ef-post="{{ url }}"
-          data-ef-body='{"action":"ungroup_eigenform","key":"{{ tile.key }}"}'
-          title="Ungroup {{ tile.key }}">&#8618;</button>
-  {% endif %}
-  {% if depth > 0 %}
-  <button class="sleek-struct__tile-eject"
-          data-ef-post="{{ url }}"
-          data-ef-body='{"action":"move_eigenform","key":"{{ tile.key }}","position":999}'
-          title="Move to top level">&#8599;</button>
-  {% endif %}
-  <button class="sleek-struct__tile-delete"
-          data-ef-post="{{ url }}"
-          data-ef-body='{"action":"remove_eigenform","key":"{{ tile.key }}"}'
-          title="Remove {{ tile.key }}">&#128465;</button>
-</div>
+{# ── Recursive BLOCK macro — the core of the schematic canvas ──
+
+   Renders each eigenform as a visual block.  Leaf blocks are compact
+   single-row bars.  Container blocks have a header bar + a body area
+   that visually wraps their child blocks (the "lego" nesting).
+
+   tile: {key, index, type, label, icon, css, is_container, children[]}
+#}
+{% macro render_block(tile, url, depth=0) %}
 {% if tile.is_container %}
-<div class="sleek-struct__nest" data-parent="{{ tile.key }}">
-  {% for child in tile.children %}
-    {{ render_tile(child, url, depth + 1) }}
-  {% endfor %}
-</div>
+  {# ── Container block: header + nested child zone ── #}
+  <div class="blk blk--container blk--{{ tile.css }}"
+       data-key="{{ tile.key }}" data-index="{{ tile.index }}" data-depth="{{ depth }}">
+    <div class="blk__head" draggable="true" data-key="{{ tile.key }}">
+      <span class="blk__icon blk__icon--{{ tile.css }}">{{ tile.icon }}</span>
+      <span class="blk__type">{{ tile.type }}</span>
+      <span class="blk__label">{{ tile.label }}</span>
+      <span class="blk__key">{{ tile.key }}</span>
+      <span class="blk__actions">
+        <button class="blk__btn blk__btn--ungroup"
+                data-ef-post="{{ url }}"
+                data-ef-body='{"action":"ungroup_eigenform","key":"{{ tile.key }}"}'
+                title="Ungroup">&#8618;</button>
+        {% if depth > 0 %}
+        <button class="blk__btn blk__btn--eject"
+                data-ef-post="{{ url }}"
+                data-ef-body='{"action":"move_eigenform","key":"{{ tile.key }}","position":999}'
+                title="Eject to top level">&#8599;</button>
+        {% endif %}
+        <button class="blk__btn blk__btn--delete"
+                data-ef-post="{{ url }}"
+                data-ef-body='{"action":"remove_eigenform","key":"{{ tile.key }}"}'
+                title="Remove">&#128465;</button>
+      </span>
+    </div>
+    <div class="blk__children sleek-struct__nest" data-parent="{{ tile.key }}">
+      {% for child in tile.children %}
+        {{ render_block(child, url, depth + 1) }}
+      {% endfor %}
+      {% if not tile.children %}
+        <div class="blk__empty-slot">drop here</div>
+      {% endif %}
+    </div>
+  </div>
+{% else %}
+  {# ── Leaf block: single compact bar ── #}
+  <div class="blk blk--leaf blk--{{ tile.css }}"
+       draggable="true"
+       data-key="{{ tile.key }}" data-index="{{ tile.index }}" data-depth="{{ depth }}">
+    <span class="blk__icon blk__icon--{{ tile.css }}">{{ tile.icon }}</span>
+    <span class="blk__type">{{ tile.type }}</span>
+    <span class="blk__label">{{ tile.label }}</span>
+    <span class="blk__key">{{ tile.key }}</span>
+    <span class="blk__actions">
+      {% if depth > 0 %}
+      <button class="blk__btn blk__btn--eject"
+              data-ef-post="{{ url }}"
+              data-ef-body='{"action":"move_eigenform","key":"{{ tile.key }}","position":999}'
+              title="Eject to top level">&#8599;</button>
+      {% endif %}
+      <button class="blk__btn blk__btn--delete"
+              data-ef-post="{{ url }}"
+              data-ef-body='{"action":"remove_eigenform","key":"{{ tile.key }}"}'
+              title="Remove">&#128465;</button>
+    </span>
+  </div>
 {% endif %}
 {% endmacro %}
+
+{# ── Standard page header (both mutable and non-mutable) ── #}
+<h2>{{ data.label }}</h2>
+{% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
+{{ render_feedback(feedback, data) }}
 
 {% if mutable %}
   {# Mark structural affordances as rendered #}
   {% for aff in data.affordances %}
     {% set action = aff.body.action|default("") %}
-    {% if action in ("add_eigenform", "remove_eigenform", "move_eigenform", "toggle_editable", "rebuild_from_seed", "group_eigenforms", "reparent_eigenform", "ungroup_eigenform") %}
+    {% if action in ("add_eigenform", "remove_eigenform", "move_eigenform", "toggle_editable", "group_eigenforms", "reparent_eigenform", "ungroup_eigenform") %}
       {% set _ = aff.update({"_rendered": true}) %}
     {% endif %}
   {% endfor %}
 
   {# ══════════════════════════════════════════════════════
-     BUILDER LAYOUT — two-panel workspace
+     BUILDER — two-panel schematic editor
+     Slots between the page header/feedback and the
+     rendered eigenforms below.
      ══════════════════════════════════════════════════════ #}
   <div class="builder">
 
@@ -128,58 +165,22 @@
       </div>
     </div>
 
-    {# ── Right: Canvas ── #}
+    {# ── Right: Schematic Canvas ── #}
     <div class="builder__canvas">
-      {# Page header #}
-      <div class="builder__canvas-header">
-        <h2 class="builder__canvas-title">{{ data.label }}</h2>
-        {% if data.instruction %}<p class="builder__canvas-instr">{{ data.instruction }}</p>{% endif %}
-        {{ render_feedback(feedback, data) }}
-      </div>
-
-      {# Canvas body — drop zone for tiles and palette items #}
       <div class="builder__canvas-body sleek-struct__list" data-ef-url="{{ url }}">
-        {% if child_items %}
-          {% for item in child_items %}
-            {# Each canvas item: tile header + collapsible content #}
-            <div class="builder__item" data-key="{{ item.key }}">
-              {# Tile bar (drag handle + info + actions) #}
-              {{ render_tile(tile_items[loop.index0], url) }}
-              {# Rendered eigenform content (collapsible) #}
-              <div class="builder__item-body" data-collapsed="false">
-                {{ item.html|safe }}
-              </div>
-              {# Per-item controls strip #}
-              <div class="builder__item-actions">
-                {% if item.index > 0 %}
-                  {{ render_btn(url, {"action": "move_eigenform", "key": item.key, "position": item.index - 1},
-                      "&#9650; Up", "builder__action-btn") }}
-                {% endif %}
-                {% if item.index < child_items|length - 1 %}
-                  {{ render_btn(url, {"action": "move_eigenform", "key": item.key, "position": item.index + 1},
-                      "&#9660; Down", "builder__action-btn") }}
-                {% endif %}
-                {% if item.editable %}
-                  {{ render_btn(url, {"action": "toggle_editable", "key": item.key},
-                      "&#128275; Unlocked", "builder__action-btn builder__action-btn--active") }}
-                {% else %}
-                  {{ render_btn(url, {"action": "toggle_editable", "key": item.key},
-                      "&#128274; Locked", "builder__action-btn") }}
-                {% endif %}
-                {{ render_btn(url, {"action": "remove_eigenform", "key": item.key},
-                    "&#128465; Remove", "builder__action-btn builder__action-btn--danger") }}
-              </div>
-            </div>
+        {% if tile_items %}
+          {% for tile in tile_items %}
+            {{ render_block(tile, url) }}
           {% endfor %}
         {% else %}
           <div class="builder__empty">
             <span class="builder__empty-icon">&#128466;</span>
-            <span class="builder__empty-text">Drag an eigenform from the palette to start building</span>
+            <span class="builder__empty-text">Drag eigenforms from the palette to start building</span>
           </div>
         {% endif %}
       </div>
 
-      {# Canvas footer #}
+      {# Group bar (appears on multi-select) #}
       <div class="builder__canvas-footer">
         <div class="sleek-struct__group-bar" style="display: none;">
           <span class="sleek-struct__group-label">Group selected:</span>
@@ -187,25 +188,16 @@
           <input type="text" class="sleek-struct__group-input sleek-struct__group-input--wide" placeholder="Group Label (optional)" data-field="group_label" />
           <button class="sleek-struct__group-btn" data-ef-url="{{ url }}">Group</button>
         </div>
-        <div class="builder__footer-row">
-          {{ render_btn(url, {"action": "rebuild_from_seed"},
-              "&#8634; Rebuild from Seed",
-              "builder__action-btn builder__action-btn--subtle") }}
-        </div>
       </div>
     </div>
 
   </div>{# /.builder #}
-
-{% else %}
-  {# Non-mutable: simple stacked rendering #}
-  <h2>{{ data.label }}</h2>
-  {% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
-  {{ render_feedback(feedback, data) }}
-  {% for html in children_html %}{{ html|safe }}{% endfor %}
 {% endif %}
 
-{# Remaining non-structural affordances (Reset Page, etc.) #}
+{# ── Rendered eigenforms (the actual page content) ── #}
+{% for html in children_html %}{{ html|safe }}{% endfor %}
+
+{# Remaining non-structural affordances (Reset Page, Rebuild from Seed, etc.) #}
 <div class="ef-remaining-affs">
 {% for aff in data.affordances %}
   {% if not aff._rendered %}

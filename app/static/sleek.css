@@ -2359,17 +2359,16 @@ body.operator-view[data-theme="sleek"] .builder {
     display: grid;
     grid-template-columns: 220px 1fr;
     gap: 0;
-    min-height: calc(100vh - 80px);
-    margin: -2rem;              /* Bleed into .content padding */
+    border: 1px solid #2a2f36;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 24px;
 }
 
 /* ── Left: Type Palette ── */
 body.operator-view[data-theme="sleek"] .builder__palette {
     background: #14181e;
     border-right: 1px solid #2a2f36;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
 }
 body.operator-view[data-theme="sleek"] .builder__palette-header {
     padding: 14px 14px 10px;
@@ -2384,8 +2383,6 @@ body.operator-view[data-theme="sleek"] .builder__palette-title {
     color: #7f8fa6;
 }
 body.operator-view[data-theme="sleek"] .builder__palette-scroll {
-    flex: 1;
-    overflow-y: auto;
     padding: 8px 10px;
 }
 
@@ -2481,30 +2478,14 @@ body.operator-view[data-theme="sleek"] .builder__canvas {
     background: #1a1f26;
     overflow-y: auto;
 }
-body.operator-view[data-theme="sleek"] .builder__canvas-header {
-    padding: 16px 24px 8px;
-    border-bottom: 1px solid #2a2f36;
-    flex-shrink: 0;
-}
-body.operator-view[data-theme="sleek"] .builder__canvas-title {
-    font-size: 18px;
-    font-weight: 600;
-    color: #e0e0e0;
-    margin: 0;
-}
-body.operator-view[data-theme="sleek"] .builder__canvas-instr {
-    font-size: 13px;
-    color: #888;
-    margin: 4px 0 0;
-}
 
 /* Canvas body — the workspace / drop zone */
 body.operator-view[data-theme="sleek"] .builder__canvas-body {
     flex: 1;
-    padding: 16px 24px;
+    padding: 20px 24px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     min-height: 200px;
 }
 
@@ -2515,64 +2496,193 @@ body.operator-view[data-theme="sleek"] .builder__canvas-body.drop-active {
     outline-offset: -2px;
 }
 
-/* Individual canvas items (tile + content) */
-body.operator-view[data-theme="sleek"] .builder__item {
-    background: #22272e;
-    border: 1px solid #3a3f47;
-    border-radius: 6px;
-    overflow: hidden;
-    transition: border-color 0.15s, box-shadow 0.15s;
+/* ── Schematic blocks (.blk) ── */
+
+/* Shared block base */
+body.operator-view[data-theme="sleek"] .blk {
+    border-radius: 5px;
+    transition: border-color 0.12s, box-shadow 0.12s, opacity 0.12s;
 }
-body.operator-view[data-theme="sleek"] .builder__item:hover {
-    border-color: #555d66;
-}
-body.operator-view[data-theme="sleek"] .builder__item.selected {
-    border-color: #2563eb;
+body.operator-view[data-theme="sleek"] .blk.selected {
+    border-color: #2563eb !important;
     box-shadow: 0 0 0 1px #2563eb;
 }
-body.operator-view[data-theme="sleek"] .builder__item.dragging {
-    opacity: 0.3;
+body.operator-view[data-theme="sleek"] .blk.dragging {
+    opacity: 0.25;
 }
 
-/* Tile bar inside canvas item — reuse sleek-struct tile styles but flatten */
-body.operator-view[data-theme="sleek"] .builder__item > .sleek-struct__tile {
-    border: none;
-    border-radius: 0;
-    background: #2b3035;
-    border-bottom: 1px solid #3a3f47;
-}
-body.operator-view[data-theme="sleek"] .builder__item > .sleek-struct__tile:hover {
-    background: #333a42;
-}
-
-/* Collapsible item body */
-body.operator-view[data-theme="sleek"] .builder__item-body {
-    padding: 12px 16px;
-    transition: max-height 0.2s ease, padding 0.2s ease, opacity 0.15s ease;
-    overflow: hidden;
-}
-body.operator-view[data-theme="sleek"] .builder__item-body[data-collapsed="true"] {
-    max-height: 0;
-    padding-top: 0;
-    padding-bottom: 0;
-    opacity: 0;
-}
-
-/* Per-item action strip */
-body.operator-view[data-theme="sleek"] .builder__item-actions {
+/* ── Leaf block: compact single-row bar ── */
+body.operator-view[data-theme="sleek"] .blk--leaf {
     display: flex;
-    gap: 4px;
-    padding: 6px 10px;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    background: #272c34;
+    border: 1px solid #3a3f47;
+    border-left: 3px solid #3a3f47;
+    cursor: grab;
+    user-select: none;
+}
+body.operator-view[data-theme="sleek"] .blk--leaf:hover {
+    border-color: #555d66;
+    border-left-color: inherit;
+    background: #2e343c;
+}
+body.operator-view[data-theme="sleek"] .blk--leaf:active {
+    cursor: grabbing;
+}
+
+/* ── Container block: header bar + child zone ── */
+body.operator-view[data-theme="sleek"] .blk--container {
+    border: 1px solid #3a3f47;
+    border-left: 3px solid #3a3f47;
     background: #1e2228;
-    border-top: 1px solid #2a2f36;
+}
+body.operator-view[data-theme="sleek"] .blk--container:hover {
+    border-color: #555d66;
+    border-left-color: inherit;
+}
+
+/* Container header bar */
+body.operator-view[data-theme="sleek"] .blk__head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    background: #272c34;
+    border-bottom: 1px solid #3a3f47;
+    border-radius: 4px 4px 0 0;
+    cursor: grab;
+    user-select: none;
+}
+body.operator-view[data-theme="sleek"] .blk__head:hover {
+    background: #2e343c;
+}
+body.operator-view[data-theme="sleek"] .blk__head:active {
+    cursor: grabbing;
+}
+
+/* Container child zone */
+body.operator-view[data-theme="sleek"] .blk__children {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 8px 10px 10px 14px;
+    margin: 0;
+    border-left: none;
+    min-height: 32px;
+}
+
+/* Empty slot inside empty containers */
+body.operator-view[data-theme="sleek"] .blk__empty-slot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    border: 1px dashed #3a3f47;
+    border-radius: 4px;
+    color: #555;
+    font-size: 11px;
+    font-style: italic;
+}
+
+/* ── Block innards (icon, type, label, key, actions) ── */
+body.operator-view[data-theme="sleek"] .blk__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    background: #363b42;
+    font-size: 15px;
+    line-height: 1;
+    color: #999;
+    flex-shrink: 0;
+}
+body.operator-view[data-theme="sleek"] .blk__type {
+    font-size: 11px;
+    font-family: "SFMono-Regular", "Cascadia Code", "Consolas", monospace;
+    color: #777;
+    flex-shrink: 0;
+}
+body.operator-view[data-theme="sleek"] .blk__label {
+    font-size: 12px;
+    color: #d0d0d0;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+body.operator-view[data-theme="sleek"] .blk__key {
+    font-size: 10px;
+    font-family: "SFMono-Regular", "Cascadia Code", "Consolas", monospace;
+    color: #555;
+    padding: 1px 6px;
+    background: #1a1e24;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+body.operator-view[data-theme="sleek"] .blk__actions {
+    display: flex;
+    gap: 2px;
+    margin-left: auto;
+    flex-shrink: 0;
     opacity: 0;
     transition: opacity 0.12s;
 }
-body.operator-view[data-theme="sleek"] .builder__item:hover .builder__item-actions {
+body.operator-view[data-theme="sleek"] .blk:hover > .blk__actions,
+body.operator-view[data-theme="sleek"] .blk__head:hover .blk__actions {
     opacity: 1;
 }
 
-/* Action buttons (shared) */
+/* Action buttons inside blocks */
+body.operator-view[data-theme="sleek"] .blk__btn {
+    background: none;
+    border: none;
+    color: #555;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: color 0.1s, background 0.1s;
+    line-height: 1;
+}
+body.operator-view[data-theme="sleek"] .blk__btn--delete:hover {
+    color: #e55;
+    background: #2a1a1a;
+}
+body.operator-view[data-theme="sleek"] .blk__btn--ungroup:hover {
+    color: #c084fc;
+    background: #2a1a3a;
+}
+body.operator-view[data-theme="sleek"] .blk__btn--eject:hover {
+    color: #60a5fa;
+    background: #1a2a3a;
+}
+
+/* ── Category accent colors on blocks ── */
+body.operator-view[data-theme="sleek"] .blk--input        { border-left-color: #3b82f6; }
+body.operator-view[data-theme="sleek"] .blk--input .blk__icon { color: #60a5fa; }
+body.operator-view[data-theme="sleek"] .blk--collections   { border-left-color: #22c55e; }
+body.operator-view[data-theme="sleek"] .blk--collections .blk__icon { color: #4ade80; }
+body.operator-view[data-theme="sleek"] .blk--containers    { border-left-color: #a855f7; }
+body.operator-view[data-theme="sleek"] .blk--containers .blk__icon { color: #c084fc; }
+body.operator-view[data-theme="sleek"] .blk--reactive      { border-left-color: #f59e0b; }
+body.operator-view[data-theme="sleek"] .blk--reactive .blk__icon { color: #fbbf24; }
+body.operator-view[data-theme="sleek"] .blk--display       { border-left-color: #14b8a6; }
+body.operator-view[data-theme="sleek"] .blk--display .blk__icon { color: #2dd4bf; }
+
+/* Container accent: tint the child zone background too */
+body.operator-view[data-theme="sleek"] .blk--containers > .blk__children { background: #1c1a24; }
+body.operator-view[data-theme="sleek"] .blk--reactive > .blk__children   { background: #1e1c18; }
+
+/* ── Drop indicator (reused from structural editor) ── */
+/* sleek-struct__drop-indicator already defined above — reused here */
+
+/* ── Builder action buttons (footer) ── */
 body.operator-view[data-theme="sleek"] .builder__action-btn {
     display: inline-flex;
     align-items: center;
@@ -2591,14 +2701,6 @@ body.operator-view[data-theme="sleek"] .builder__action-btn:hover {
     color: #ccc;
     background: #2b3035;
     border-color: #444;
-}
-body.operator-view[data-theme="sleek"] .builder__action-btn--active {
-    color: #60a5fa;
-}
-body.operator-view[data-theme="sleek"] .builder__action-btn--danger:hover {
-    color: #e55;
-    background: #2a1a1a;
-    border-color: #5a2020;
 }
 body.operator-view[data-theme="sleek"] .builder__action-btn--subtle {
     color: #555;
@@ -2640,9 +2742,4 @@ body.operator-view[data-theme="sleek"] .builder__footer-row {
     padding-top: 6px;
 }
 
-/* Nested tiles within canvas items (containers) */
-body.operator-view[data-theme="sleek"] .builder__item > .sleek-struct__nest {
-    margin-left: 16px;
-    padding: 4px 0 4px 10px;
-    border-left: 2px solid #3a3f47;
-}
+/* (preview section removed — eigenforms render inline below builder) */
