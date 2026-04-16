@@ -70,6 +70,10 @@ document.addEventListener('change', function(e) {
  * Builder: palette drag (add from type palette to canvas)
  * --------------------------------------------------------------- */
 
+/* Drag context — stashed on dragstart, read during dragover
+   (dataTransfer.getData() is blocked during dragover for security). */
+var _efDragCtx = null;
+
 document.addEventListener('dragstart', function(e) {
     var type = e.target.closest('[data-ef-palette-type]');
     if (!type) return;
@@ -77,11 +81,15 @@ document.addEventListener('dragstart', function(e) {
     e.dataTransfer.setData('application/ef-url', type.dataset.efAdd);
     e.dataTransfer.effectAllowed = 'copy';
     type.classList.add('dragging');
+    _efDragCtx = { palette: true, type: type.dataset.efPaletteType,
+                   url: type.dataset.efAdd };
 });
 
 document.addEventListener('dragend', function(e) {
     var type = e.target.closest('[data-ef-palette-type]');
     if (type) type.classList.remove('dragging');
+    _efDragCtx = null;
+    _efHideDragTooltip();
 });
 
 /* ---------------------------------------------------------------
@@ -115,6 +123,7 @@ document.addEventListener('dragstart', function(e) {
     e.dataTransfer.setData('text/plain', blk.dataset.key);
     e.dataTransfer.effectAllowed = 'move';
     blk.classList.add('dragging');
+    _efDragCtx = { palette: false, key: blk.dataset.key };
 });
 
 /* Drag-and-drop: end */
@@ -126,6 +135,8 @@ document.addEventListener('dragend', function(e) {
         if (blk) blk.classList.remove('dragging');
     }
     _efClearDropFeedback();
+    _efDragCtx = null;
+    _efHideDragTooltip();
     document.querySelectorAll('.builder__canvas-body.drop-active').forEach(function(el) {
         el.classList.remove('drop-active');
     });
@@ -138,6 +149,23 @@ function _efClearDropFeedback() {
     document.querySelectorAll('.blk.drop-target').forEach(function(el) {
         el.classList.remove('drop-target');
     });
+}
+
+/* Drag tooltip — shows the POST body that would execute on release */
+var _efDragTip = null;
+function _efShowDragTooltip(x, y, url, body) {
+    if (!_efDragTip) {
+        _efDragTip = document.createElement('div');
+        _efDragTip.className = 'ef-drag-tooltip';
+        document.body.appendChild(_efDragTip);
+    }
+    _efDragTip.textContent = 'POST ' + url + ' ' + JSON.stringify(body);
+    _efDragTip.style.left = (x + 16) + 'px';
+    _efDragTip.style.top = (y + 16) + 'px';
+    _efDragTip.style.display = 'block';
+}
+function _efHideDragTooltip() {
+    if (_efDragTip) _efDragTip.style.display = 'none';
 }
 
 /*
@@ -156,7 +184,7 @@ function _efFindDropZone(target) {
 /* Drag-and-drop: over */
 document.addEventListener('dragover', function(e) {
     var zone = _efFindDropZone(e.target);
-    if (!zone) return;
+    if (!zone) { _efHideDragTooltip(); return; }
     e.preventDefault();
 
     var isPalette = e.dataTransfer.types.indexOf('application/ef-type') !== -1;
@@ -170,6 +198,8 @@ document.addEventListener('dragover', function(e) {
     }
 
     var container = zone.container;
+    var ctx = _efDragCtx;
+    var tipUrl = ctx ? (ctx.url || (container.closest('.sleek-struct__list') || {}).dataset.efUrl || '') : '';
 
     /* Reparent: hovering over a container block's header (middle 60%) */
     if (!isPalette) {
@@ -181,6 +211,11 @@ document.addEventListener('dragover', function(e) {
                 var zoneY = (e.clientY - rect.top) / rect.height;
                 if (zoneY > 0.2 && zoneY < 0.8) {
                     hoverBlock.classList.add('drop-target');
+                    if (ctx && !ctx.palette) {
+                        _efShowDragTooltip(e.clientX, e.clientY, tipUrl,
+                            {action: 'reparent_eigenform', key: ctx.key,
+                             target: hoverBlock.dataset.key});
+                    }
                     return;
                 }
             }
@@ -193,23 +228,44 @@ document.addEventListener('dragover', function(e) {
     ));
     var indicator = document.createElement('div');
     indicator.className = 'sleek-struct__drop-indicator';
-    var inserted = false;
+    var insertIdx = siblings.length;
 
     for (var i = 0; i < siblings.length; i++) {
         var rect = siblings[i].getBoundingClientRect();
         if (e.clientY < rect.top + rect.height / 2) {
             container.insertBefore(indicator, siblings[i]);
-            inserted = true;
+            insertIdx = i;
             break;
         }
     }
-    if (!inserted) {
+    if (insertIdx === siblings.length) {
         container.appendChild(indicator);
+    }
+
+    /* Show drag tooltip with the would-be POST body */
+    if (ctx) {
+        var body;
+        if (ctx.palette) {
+            body = {action: 'add_eigenform', type: ctx.type, position: insertIdx};
+        } else if (zone.parent) {
+            var isChild = container.querySelector(':scope > .blk[data-key="' + ctx.key + '"]');
+            if (!isChild) {
+                body = {action: 'reparent_eigenform', key: ctx.key, target: zone.parent};
+            } else {
+                body = {action: 'move_eigenform', key: ctx.key, position: insertIdx};
+                body.parent = zone.parent;
+            }
+        } else {
+            body = {action: 'move_eigenform', key: ctx.key, position: insertIdx};
+        }
+        _efShowDragTooltip(e.clientX, e.clientY, tipUrl, body);
     }
 });
 
 /* Drag-and-drop: drop */
 document.addEventListener('drop', function(e) {
+    _efDragCtx = null;
+    _efHideDragTooltip();
     var zone = _efFindDropZone(e.target);
     if (!zone) return;
     e.preventDefault();
@@ -358,6 +414,27 @@ document.addEventListener('click', function(e) {
     }));
 });
 
+/* Synthesize POST-body tooltips on every element whose POST body
+   is deterministic at render time.  Covers two protocols:
+     1. data-ef-post + data-ef-body  (static-body buttons)
+     2. data-ef-add  + data-ef-palette-type  (palette one-click add)
+   Input-dependent protocols (forms, change, group) are left alone
+   since their bodies depend on user input at interaction time. */
+function _efSyncTooltips() {
+    document.querySelectorAll('[data-ef-post][data-ef-body]').forEach(function(el) {
+        el.setAttribute('title',
+            'POST ' + el.getAttribute('data-ef-post') +
+            ' ' + el.getAttribute('data-ef-body'));
+    });
+    document.querySelectorAll('[data-ef-add][data-ef-palette-type]').forEach(function(el) {
+        el.setAttribute('title',
+            'POST ' + el.getAttribute('data-ef-add') +
+            ' {"action":"add_eigenform","type":"' +
+            el.getAttribute('data-ef-palette-type') + '"}');
+    });
+}
+_efSyncTooltips();
+
 function _efPost(url, body) {
     fetch(url, {
         method: 'POST',
@@ -372,5 +449,6 @@ function _efPost(url, body) {
         var scrollY = window.scrollY;
         document.getElementById('page-content').innerHTML = html;
         window.scrollTo(0, scrollY);
+        _efSyncTooltips();
     });
 }

@@ -975,6 +975,24 @@ body.operator-view[data-theme="sleek"] .sleek-struct__drop-indicator {
     box-shadow: 0 0 4px #3b82f680;
 }
 
+/* Drag tooltip — shows the POST body that would execute on release */
+.ef-drag-tooltip {
+    position: fixed;
+    display: none;
+    pointer-events: none;
+    z-index: 10000;
+    max-width: 500px;
+    padding: 4px 8px;
+    font: 11px/1.4 monospace;
+    color: #e6edf3;
+    background: #1c2128;
+    border: 1px solid #444c56;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    box-shadow: 0 2px 8px #00000060;
+}
+
 /* Tile icon */
 body.operator-view[data-theme="sleek"] .sleek-struct__tile-icon {
     display: flex;
