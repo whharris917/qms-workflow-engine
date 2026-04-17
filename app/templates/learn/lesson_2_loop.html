@@ -1,0 +1,134 @@
+{% extends "learn/_lesson_base.html" %}
+
+{% set lesson_num = 2 %}
+{% set lesson_title = "The Core Loop" %}
+{% set lesson_objective = "Trace a single request from browser click to updated DOM. Four stages: Define, Bind, Serve, Handle. Understand why the server holds no long-lived in-memory state." %}
+{% set prev_url = "/learn/hello" %}
+{% set prev_title = "Hello, Component" %}
+{% set next_url = "/learn/data" %}
+{% set next_title = "Where Data Lives" %}
+
+{% block lesson_content %}
+
+<h2>Four stages, one cycle</h2>
+<p>
+    Every request to the engine walks the same four-stage loop. Understanding this loop is most of what you need to understand the engine.
+</p>
+
+<pre class="lesson-code">  <span class="v">1. DEFINE</span>  &rarr;  <span class="v">2. BIND</span>  &rarr;  <span class="v">3. SERVE</span>  &rarr;  <span class="v">4. HANDLE</span>  &rarr;  (back to 1)</pre>
+
+<p>
+    After Handle, the next request starts again from Define. The server holds no long-lived in-memory component tree &mdash; every request rebuilds the tree from the seed plus the Store. That sounds expensive; it is not, because the trees are small and the JSON file reads are fast.
+</p>
+
+<p>
+    The reason for this design: <strong>the Store is the only source of truth for mutable state</strong>. There is no cache to invalidate, no session to reconcile. Every request sees the same authoritative state the last request wrote.
+</p>
+
+<h2>1. Define</h2>
+<p>
+    The seed definition you wrote in Lesson 1 lives in <code>pages/hello.py</code>. At the top of every request, the engine re-imports the <code>pages/</code> directory and looks for your <code>definition</code> variable. No restart needed when you edit a page; <em>the next request picks it up</em>.
+</p>
+
+<p>
+    A seed has structure but no identity. <code>TextComponent(key="name", label="Your name")</code> describes &ldquo;a field called <em>name</em>&rdquo;, but it does not know whose name, or what value is currently stored. It is a template.
+</p>
+
+<h2>2. Bind</h2>
+<p>
+    Binding attaches the seed to a <strong>Store</strong> &mdash; a per-instance JSON file at <code>data/{instance_id}.json</code> &mdash; and produces a <em>live tree of bound components</em>. Each child gets its scope (the namespace in which its key is unique) and URL prefix (where its HTTP routes live).
+</p>
+
+<pre class="lesson-code"><span class="c"># roughly what bind() does</span>
+page = PageComponent(key=<span class="s">"hello"</span>, components=[TextComponent(key=<span class="s">"name"</span>)])
+bound = page.bind(data_dir=Path(<span class="s">"data"</span>), scope=<span class="s">"hello-1"</span>)
+<span class="c"># Now bound.components[0] has a Store reference and can read/write its value.</span></pre>
+
+<p>
+    After bind, the tree is a working instance. Each component has a path like <code>/pages/hello-1/name</code> that uniquely addresses it. Each one can produce JSON or HTML on demand.
+</p>
+
+<h2>3. Serve</h2>
+<p>
+    Two content types, same tree. For a browser: walk the tree, render each component to HTML via its Jinja template, stitch into a page. For an agent: walk the tree, call <code>serialize()</code> on each component, return the dict tree as JSON.
+</p>
+
+<p>
+    The serve step is pure &mdash; no mutation happens. It is a function of (descriptor, Store, Accept header) &rarr; response.
+</p>
+
+<pre class="lesson-code"><span class="c"># Pseudocode for the GET handler</span>
+<span class="k">def</span> <span class="v">get_page</span>(instance_id, accept):
+    seed = discover_pages()[seed_key]
+    bound = seed.bind(data_dir, scope=instance_id)
+    <span class="k">if</span> accept == <span class="s">"text/html"</span>:
+        <span class="k">return</span> bound.render()
+    <span class="k">else</span>:
+        <span class="k">return</span> bound.serialize()</pre>
+
+<h2>4. Handle</h2>
+<p>
+    A user clicks &ldquo;Save&rdquo;. The browser POSTs a JSON body describing the action: <code>{"action": "set_value", "value": "Alex"}</code>. The server receives the POST, binds a fresh tree, walks to the target component by URL path, and calls its <code>_handle(body)</code> method.
+</p>
+
+<p>
+    <code>_handle()</code> is where each component type implements its own dispatch logic. TextComponent recognizes <code>set_value</code>, validates the input, writes to the Store, and returns the updated state. The response is the full re-serialized page, and the browser&rsquo;s <code>morphdom</code> helper diffs it against the current DOM and mutates only what changed.
+</p>
+
+<pre class="lesson-code"><span class="c"># TextComponent._handle, roughly</span>
+<span class="k">def</span> <span class="v">_handle</span>(self, body):
+    <span class="k">if</span> body[<span class="s">"action"</span>] == <span class="s">"set_value"</span>:
+        value = body[<span class="s">"value"</span>]
+        <span class="k">if</span> self.min_length <span class="k">and</span> len(value) &lt; self.min_length:
+            <span class="k">return</span> self._error(<span class="s">"Too short"</span>)
+        self._store.put(self._scope, self.key, <span class="s">"value"</span>, value)
+        <span class="k">return</span> self.serialize()</pre>
+
+<h2>The full trip</h2>
+<p>
+    Concretely, a user typing &ldquo;Alex&rdquo; and clicking Save does this:
+</p>
+
+<ol>
+    <li>Browser fires <code>POST /pages/hello-1/name</code> with body <code>{"action": "set_value", "value": "Alex"}</code>.</li>
+    <li>Server reads the URL, calls <code>discover_pages()</code>, grabs the <code>hello</code> seed, binds to <code>data/hello-1.json</code>.</li>
+    <li>Server walks the bound tree by path (<code>name</code> is a direct child), finds the TextComponent.</li>
+    <li>TextComponent <code>_handle</code> validates, writes <code>"Alex"</code> to the Store.</li>
+    <li>Server re-serializes the whole page (cheap), returns HTML.</li>
+    <li>Browser&rsquo;s <code>component.js</code> receives the response, calls <code>morphdom</code>, which diffs the old DOM against the new and mutates only the changed nodes.</li>
+    <li>User sees their new value. Focus, scroll position, any open <code>&lt;details&gt;</code> tags &mdash; all preserved because morphdom only touched what changed.</li>
+</ol>
+
+<div class="lesson-callout note">
+    <strong>Notice what is NOT in that list.</strong> No session cookies. No server-side cache invalidation. No client-side state reconciliation. The Store JSON is the truth; the DOM is a projection of it; morphdom makes the projection feel live. This is the whole architecture.
+</div>
+
+<h2>Why statelessness matters</h2>
+<p>
+    Because the engine builds a fresh tree every request, two things fall out for free:
+</p>
+
+<ul>
+    <li><strong>Hot reloading.</strong> Edit <code>pages/hello.py</code>, save, refresh &mdash; no server restart. The next request re-reads the file.</li>
+    <li><strong>Horizontal scaling.</strong> Any request can go to any server. There is no sticky-session requirement. The Store is just a file; swap it for a database later without changing the component logic.</li>
+</ul>
+
+<p>
+    The cost is the per-request overhead of reading a small JSON file and rebuilding a Python object tree. For the QMS workload (hundreds of components, not millions), this is fine.
+</p>
+
+<div class="lesson-takeaways">
+    <h3>What you learned</h3>
+    <ul>
+        <li><span class="lesson-chip">Core</span> Every request walks four stages: Define (read seeds), Bind (attach Store + produce live tree), Serve (render or serialize), Handle (mutate on POST).</li>
+        <li><span class="lesson-chip">Core</span> The server holds no long-lived component tree. The Store JSON file is the source of truth.</li>
+        <li><span class="lesson-chip">Core</span> GETs are pure; POSTs mutate. Handling a POST produces a new full re-serialization; the browser morphs its DOM to match.</li>
+        <li><span class="lesson-chip">Tip</span> &ldquo;Restart needed?&rdquo; &mdash; only for new component types. Editing a page definition, reloading in the browser is enough.</li>
+    </ul>
+</div>
+
+<p style="margin-top: 1.5rem;">
+    Next: the tree has three kinds of data &mdash; configuration, mutable state, and derived values. Each lives in a different place. Lesson 3 explains the categories and the rule that tells you which is which.
+</p>
+
+{% endblock %}

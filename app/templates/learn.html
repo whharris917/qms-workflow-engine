@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}Learning Portal · QMS Workflow Engine{% endblock %}
+
+{% block head_extra %}
+<style>
+    .learn-wrap { max-width: 920px; margin: 0 auto; }
+    .learn-hero {
+        background: linear-gradient(135deg, #1a2a3c 0%, #0f1a28 100%);
+        color: #f5f7fa;
+        padding: 2.5rem 2rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+        border: 1px solid #2a3a4c;
+    }
+    .learn-hero h1 {
+        color: #f5f7fa;
+        font-size: 2rem;
+        margin-bottom: 0.4rem;
+    }
+    .learn-hero .subtitle {
+        color: #8aa0b8;
+        font-size: 1.05rem;
+        margin-bottom: 1rem;
+    }
+    .learn-hero p {
+        color: #c8d4e0;
+        font-size: 0.95rem;
+        line-height: 1.65;
+        max-width: 640px;
+        margin: 0;
+    }
+    .learn-intro {
+        background: #fff;
+        padding: 1.5rem 1.75rem;
+        border-radius: 6px;
+        border: 1px solid #e5e7eb;
+        margin-bottom: 2rem;
+    }
+    .learn-intro h2 {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #475569;
+        margin-bottom: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    .learn-intro ul {
+        margin: 0 0 0 1.1rem;
+        color: #475569;
+        font-size: 0.95rem;
+        line-height: 1.7;
+    }
+    .learn-intro code {
+        background: #f1f5f9;
+        padding: 0.1rem 0.35rem;
+        border-radius: 3px;
+        font-size: 0.88em;
+        color: #1e40af;
+    }
+    .lesson-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.85rem;
+    }
+    .lesson-card {
+        display: grid;
+        grid-template-columns: 60px 1fr auto;
+        gap: 1.1rem;
+        align-items: center;
+        background: #fff;
+        padding: 1.1rem 1.5rem;
+        border-radius: 6px;
+        border: 1px solid #e5e7eb;
+        text-decoration: none;
+        color: inherit;
+        transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+    }
+    .lesson-card:hover {
+        border-color: #3b82f6;
+        transform: translateX(3px);
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
+    }
+    .lesson-num {
+        font-size: 1.9rem;
+        font-weight: 300;
+        color: #cbd5e1;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+    }
+    .lesson-card:hover .lesson-num { color: #3b82f6; }
+    .lesson-body h3 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 0.25rem;
+    }
+    .lesson-body p {
+        font-size: 0.9rem;
+        color: #64748b;
+        margin: 0;
+        line-height: 1.5;
+    }
+    .lesson-go {
+        color: #3b82f6;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+    .learn-next {
+        margin-top: 2.5rem;
+        padding: 1.25rem 1.5rem;
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        border-radius: 6px;
+        color: #78350f;
+        font-size: 0.95rem;
+        line-height: 1.6;
+    }
+    .learn-next strong { color: #451a03; }
+    .learn-next a { color: #b45309; font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="learn-wrap">
+
+    <div class="learn-hero">
+        <h1>Learning Portal</h1>
+        <div class="subtitle">A guided tour of the QMS Workflow Engine, one lesson at a time.</div>
+        <p>
+            These lessons walk through how the engine works from the ground up &mdash; building a first component, tracing a request through the core loop, composing pages, and seeing why the same URL serves humans and AI agents identically. Start at Lesson 1 if you&rsquo;re new.
+        </p>
+    </div>
+
+    <div class="learn-intro">
+        <h2>Before you start</h2>
+        <ul>
+            <li>You can run the engine locally with <code>python run.py</code> &mdash; the lessons reference live demo pages you can click through while reading.</li>
+            <li>Each lesson is ~5 minutes of reading plus optional hands-on time. Lessons build on each other; read in order the first time.</li>
+            <li>This is the gentle introduction. For the deep theory see <a href="/framing">/framing</a>; for the full reference see <a href="/readme">/readme</a>; for an interactive tour of every component type see the <a href="/portal">Agent Portal</a> (launch a <em>Component Gallery</em> instance).</li>
+        </ul>
+    </div>
+
+    <div class="lesson-grid">
+
+        <a class="lesson-card" href="/learn/hello">
+            <div class="lesson-num">1</div>
+            <div class="lesson-body">
+                <h3>Hello, Component</h3>
+                <p>Build the smallest possible page from scratch. See how a Python file in <code>pages/</code> becomes a live URL.</p>
+            </div>
+            <div class="lesson-go">Start &rarr;</div>
+        </a>
+
+        <a class="lesson-card" href="/learn/loop">
+            <div class="lesson-num">2</div>
+            <div class="lesson-body">
+                <h3>The Core Loop</h3>
+                <p>Four stages: Define, Bind, Serve, Handle. Trace a single request from browser click to updated DOM.</p>
+            </div>
+            <div class="lesson-go">Start &rarr;</div>
+        </a>
+
+        <a class="lesson-card" href="/learn/data">
+            <div class="lesson-num">3</div>
+            <div class="lesson-body">
+                <h3>Where Data Lives</h3>
+                <p>Props, State, and Derived &mdash; three categories every field belongs to, and the rule that tells you which.</p>
+            </div>
+            <div class="lesson-go">Start &rarr;</div>
+        </a>
+
+        <a class="lesson-card" href="/learn/compose">
+            <div class="lesson-num">4</div>
+            <div class="lesson-body">
+                <h3>Composing Pages</h3>
+                <p>Containers, children, keys, and scope. Build a tabbed page with four components and watch state flow.</p>
+            </div>
+            <div class="lesson-go">Start &rarr;</div>
+        </a>
+
+        <a class="lesson-card" href="/learn/humans-and-agents">
+            <div class="lesson-num">5</div>
+            <div class="lesson-body">
+                <h3>Humans and Agents</h3>
+                <p>Affordances, HATEOAS, faithful projection. Why the same page drives a browser and an AI agent from a single URL.</p>
+            </div>
+            <div class="lesson-go">Start &rarr;</div>
+        </a>
+
+    </div>
+
+    <div class="learn-next">
+        <strong>After these lessons</strong> you&rsquo;ll have the mental model for most of the engine. The next step up is <a href="/framing">/framing</a> &mdash; the conceptual reference covering props/state/derived, reconciliation, affordance flotation (portals), and the controlled-vs-uncontrolled boundary. Then <a href="/readme">/readme</a> for the full API and component-type catalog.
+    </div>
+
+</div>
+{% endblock %}

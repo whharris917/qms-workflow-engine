@@ -1,0 +1,198 @@
+{% extends "learn/_lesson_base.html" %}
+
+{% set lesson_num = 4 %}
+{% set lesson_title = "Composing Pages" %}
+{% set lesson_objective = "Containers, children, keys, and scope. Build a tabbed page with four components and see how state flows through a tree." %}
+{% set prev_url = "/learn/data" %}
+{% set prev_title = "Where Data Lives" %}
+{% set next_url = "/learn/humans-and-agents" %}
+{% set next_title = "Humans and Agents" %}
+
+{% block lesson_content %}
+
+<h2>Containers hold children</h2>
+<p>
+    Every component is either a <em>leaf</em> (a single input like TextComponent) or a <em>container</em> (PageComponent, NavigationComponent, GroupComponent, RepeaterComponent, SwitchComponent). Containers hold other components and delegate behavior down the tree.
+</p>
+
+<p>
+    The simplest container is <code>PageComponent</code> &mdash; which you already used. It takes a <code>components=[...]</code> argument: a list of children rendered in order. That&rsquo;s the whole API.
+</p>
+
+<h3>NavigationComponent — tabs, wizards, sequences, accordions</h3>
+<p>
+    The most common non-page container is <code>NavigationComponent</code>. It unifies what other frameworks split into four separate widgets:
+</p>
+
+<ul>
+    <li><code>mode="tabs"</code> &mdash; free-access tabs, one visible at a time</li>
+    <li><code>mode="chain"</code> &mdash; gated wizard, each step unlocks the next, auto-advance on completion</li>
+    <li><code>mode="sequence"</code> &mdash; gated wizard with manual Back/Next buttons</li>
+    <li><code>mode="accordion"</code> &mdash; all sections visible with expand/collapse</li>
+</ul>
+
+<p>
+    Same class, four behaviors, set by a single prop. The child shape is the same in all cases: a list of components passed as <code>steps=[...]</code>.
+</p>
+
+<pre class="lesson-code"><span class="c"># pages/survey.py</span>
+<span class="k">from</span> engine.pagecomponent <span class="k">import</span> PageComponent
+<span class="k">from</span> engine.navigationcomponent <span class="k">import</span> NavigationComponent
+<span class="k">from</span> engine.textcomponent <span class="k">import</span> TextComponent
+<span class="k">from</span> engine.choicecomponent <span class="k">import</span> ChoiceComponent
+<span class="k">from</span> engine.booleancomponent <span class="k">import</span> BooleanComponent
+
+definition = PageComponent(
+    key=<span class="s">"survey"</span>,
+    label=<span class="s">"Quick Survey"</span>,
+    components=[
+        NavigationComponent(
+            key=<span class="s">"tabs"</span>,
+            mode=<span class="s">"tabs"</span>,
+            steps=[
+                TextComponent(key=<span class="s">"name"</span>, label=<span class="s">"Name"</span>),
+                ChoiceComponent(
+                    key=<span class="s">"role"</span>, label=<span class="s">"Role"</span>,
+                    options=[<span class="s">"Engineer"</span>, <span class="s">"Designer"</span>, <span class="s">"PM"</span>, <span class="s">"Other"</span>],
+                ),
+                BooleanComponent(
+                    key=<span class="s">"subscribe"</span>, label=<span class="s">"Subscribe to updates?"</span>,
+                ),
+            ],
+        ),
+    ],
+)</pre>
+
+<p>
+    Save as <code>pages/survey.py</code>, spawn an instance from the Agent Portal, and you&rsquo;ll have a three-tab page. Clicking between tabs just flips the active-tab state; each tab&rsquo;s content stays filled in.
+</p>
+
+<h2>Keys and scope</h2>
+
+<p>
+    Every component has a <strong>key</strong> &mdash; a string identifier unique within its containing scope. Keys are how the engine routes requests, how components find their own state in the Store, and how reconciliation matches seed entries to descriptor entries across reloads.
+</p>
+
+<p>
+    The <strong>scope</strong> is the namespace in which a key must be unique. Each container sets the scope for its children:
+</p>
+
+<pre class="lesson-code">  PageComponent(key=<span class="s">"survey"</span>)                  <span class="c"># scope for children: &quot;survey&quot;</span>
+  └─ NavigationComponent(key=<span class="s">"tabs"</span>)            <span class="c"># scope for children: &quot;tabs&quot;</span>
+     ├─ TextComponent(key=<span class="s">"name"</span>)               <span class="c"># full path: survey &gt; tabs &gt; name</span>
+     ├─ ChoiceComponent(key=<span class="s">"role"</span>)
+     └─ BooleanComponent(key=<span class="s">"subscribe"</span>)</pre>
+
+<p>
+    Two siblings may not share a key within the same scope (collisions silently overwrite state). Two components in different scopes can share a key with no conflict; the scope distinguishes them. That&rsquo;s why you can have a <code>name</code> field inside every tab of a repeated structure &mdash; each tab is its own scope.
+</p>
+
+<p>
+    Keys also become URL path segments. A POST to the <code>subscribe</code> field goes to <code>/pages/survey-1/tabs/subscribe</code>. The engine walks the path by key at request time to find the target component.
+</p>
+
+<div class="lesson-callout note">
+    <strong>Rule of thumb.</strong> Keys are URL-safe lowercase identifiers (hyphens and underscores are fine, spaces are not). Pick keys that make sense in a URL path.
+</div>
+
+<h2>Sibling-reading components</h2>
+<p>
+    Several component types read values from their siblings. This is where the engine&rsquo;s reactivity lives.
+</p>
+
+<ul>
+    <li><strong><code>VisibilityComponent</code></strong> &mdash; wraps a child and shows/hides it based on a sibling&rsquo;s value</li>
+    <li><strong><code>SwitchComponent</code></strong> &mdash; picks one of several named subtrees to render, keyed on a sibling&rsquo;s value</li>
+    <li><strong><code>DynamicChoiceComponent</code></strong> &mdash; a Choice whose available options depend on a sibling&rsquo;s value</li>
+    <li><strong><code>ComputedComponent</code></strong> &mdash; read-only display of a value computed from siblings</li>
+    <li><strong><code>ValidationComponent</code></strong> &mdash; cross-field rules (&ldquo;end date must be after start date&rdquo;)</li>
+    <li><strong><code>ScoreComponent</code></strong> &mdash; auto-grades against an answer key</li>
+</ul>
+
+<p>
+    Each takes a <code>depends_on</code> argument pointing at a sibling by key. Under the hood this is a <code>SiblingRef</code>, validated at bind time so typos and moves raise a clear error instead of silently breaking.
+</p>
+
+<pre class="lesson-code"><span class="c"># Example: show a follow-up only if role is &quot;Other&quot;</span>
+components=[
+    ChoiceComponent(
+        key=<span class="s">"role"</span>, label=<span class="s">"Role"</span>,
+        options=[<span class="s">"Engineer"</span>, <span class="s">"Designer"</span>, <span class="s">"Other"</span>],
+    ),
+    VisibilityComponent(
+        key=<span class="s">"other-detail"</span>,
+        depends_on=<span class="s">"role"</span>,              <span class="c"># sibling key</span>
+        predicate=<span class="k">lambda</span> v: v == <span class="s">"Other"</span>, <span class="c"># show only when...</span>
+        component=TextComponent(key=<span class="s">"detail"</span>, label=<span class="s">"Please specify"</span>),
+    ),
+]</pre>
+
+<p>
+    When <code>role</code> is anything but <code>"Other"</code>, the wrapped TextComponent does not render in HTML <em>and</em> does not appear in the JSON serialization. This is <strong>faithful projection</strong>, the subject of Lesson 5.
+</p>
+
+<h2>Dynamic repetition — RepeaterComponent</h2>
+
+<p>
+    When the number of children is not known at seed time (&ldquo;let the user add N line items&rdquo;), <code>RepeaterComponent</code> stamps a template per dynamic entry.
+</p>
+
+<pre class="lesson-code"><span class="c"># A page with a button to add line items</span>
+RepeaterComponent(
+    key=<span class="s">"items"</span>,
+    label=<span class="s">"Line items"</span>,
+    template=[
+        TextComponent(key=<span class="s">"description"</span>, label=<span class="s">"Description"</span>),
+        NumberComponent(key=<span class="s">"quantity"</span>, label=<span class="s">"Qty"</span>, min_val=<span class="n">1</span>),
+    ],
+)</pre>
+
+<p>
+    Each added entry gets a unique compound scope (<code>items/entry-abc123</code>) so its children&rsquo;s keys are isolated. The template is the shape; the Store holds as many copies as the user has created.
+</p>
+
+<h2>Groups — named compositions</h2>
+
+<p>
+    When a particular composition is reused across pages, wrap it in a <code>GroupComponent</code> subclass. A GroupComponent has its own class identity in the registry, so instances can be spawned by type name at runtime.
+</p>
+
+<pre class="lesson-code"><span class="c"># A reusable Contact block</span>
+<span class="k">class</span> Contact(GroupComponent):
+    form = <span class="s">"contact"</span>  <span class="c"># registry identifier</span>
+
+    <span class="k">def</span> <span class="v">__init__</span>(self, key, label):
+        <span class="k">super</span>().__init__(
+            key=key, label=label,
+            components=[
+                TextComponent(key=<span class="s">"name"</span>, label=<span class="s">"Name"</span>),
+                TextComponent(key=<span class="s">"email"</span>, label=<span class="s">"Email"</span>),
+            ],
+        )</pre>
+
+<p>
+    Then anywhere: <code>Contact(key="primary", label="Primary contact")</code>. Same API as the built-ins.
+</p>
+
+<h2>Try it live</h2>
+
+<div class="lesson-callout try">
+    <strong>Try it.</strong> In the Agent Portal, spawn a <em>Component Gallery</em> instance and click through the Containers tab &mdash; you&rsquo;ll see all four NavigationComponent modes, GroupComponent, RepeaterComponent, VisibilityComponent, and SwitchComponent demonstrated side by side with their seed code visible.
+</div>
+
+<div class="lesson-takeaways">
+    <h3>What you learned</h3>
+    <ul>
+        <li><span class="lesson-chip">Core</span> Containers hold children via <code>components=[...]</code>, <code>steps=[...]</code>, <code>template=[...]</code>, <code>cases={...}</code> &mdash; the parameter name depends on container type, the shape is the same.</li>
+        <li><span class="lesson-chip">Core</span> Keys are unique within scope; each container defines its children&rsquo;s scope. Paths through the tree become URLs.</li>
+        <li><span class="lesson-chip">Core</span> NavigationComponent does four behaviors with one class; pick the mode via prop.</li>
+        <li><span class="lesson-chip">Core</span> Sibling-reading components (Visibility, Switch, Computed, Validation, Score, DynamicChoice) express cross-field reactivity via <code>depends_on</code>.</li>
+        <li><span class="lesson-chip">Tip</span> See the <a href="/portal">Agent Portal</a> &rarr; <em>Component Gallery</em> for live examples of every container pattern.</li>
+    </ul>
+</div>
+
+<p style="margin-top: 1.5rem;">
+    Next: you&rsquo;ve built a page that renders fine in a browser. But everything you&rsquo;ve built also works from the command line via JSON, with the exact same URLs. Lesson 5 explains why that matters, and what <em>faithful projection</em> means precisely.
+</p>
+
+{% endblock %}

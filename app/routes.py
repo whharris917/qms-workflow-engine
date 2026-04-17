@@ -160,6 +160,33 @@ def framing():
     return render_template("framing.html", active_page="framing")
 
 
+# Learning Portal — progressive tutorial pages.
+# Each lesson is a hand-rolled HTML template extending learn/_lesson_base.html.
+# The slug maps to a template file under app/templates/learn/.
+_LEARN_LESSONS = {
+    "hello":             "learn/lesson_1_hello.html",
+    "loop":              "learn/lesson_2_loop.html",
+    "data":              "learn/lesson_3_data.html",
+    "compose":           "learn/lesson_4_compose.html",
+    "humans-and-agents": "learn/lesson_5_humans_and_agents.html",
+}
+
+
+@bp.route("/learn")
+def learn_index():
+    """Learning Portal landing page — lesson grid + intro."""
+    return render_template("learn.html", active_page="learn")
+
+
+@bp.route("/learn/<slug>")
+def learn_lesson(slug):
+    """Individual lesson pages. Slug maps to a template file in learn/."""
+    template = _LEARN_LESSONS.get(slug)
+    if template is None:
+        abort(404)
+    return render_template(template, active_page="learn")
+
+
 @bp.route("/portal")
 def portal():
     instances = registry.list_instances()

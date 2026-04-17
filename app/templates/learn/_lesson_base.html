@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% block title %}{{ lesson_title }} · Learning Portal{% endblock %}
+
+{% block head_extra %}
+<style>
+    .lesson-wrap { max-width: 760px; margin: 0 auto; }
+
+    .lesson-breadcrumb {
+        font-size: 0.85rem;
+        color: #64748b;
+        margin-bottom: 1rem;
+    }
+    .lesson-breadcrumb a {
+        color: #3b82f6;
+        text-decoration: none;
+    }
+    .lesson-breadcrumb a:hover { text-decoration: underline; }
+
+    .lesson-header {
+        padding-bottom: 1.25rem;
+        border-bottom: 1px solid #e5e7eb;
+        margin-bottom: 1.75rem;
+    }
+    .lesson-num-label {
+        display: inline-block;
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #3b82f6;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 0.35rem;
+    }
+    .lesson-header h1 {
+        font-size: 1.9rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 0.5rem;
+    }
+    .lesson-objective {
+        font-size: 1.05rem;
+        color: #475569;
+        line-height: 1.55;
+        font-style: italic;
+    }
+
+    .lesson-body h2 {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #1e293b;
+        margin-top: 2rem;
+        margin-bottom: 0.75rem;
+    }
+    .lesson-body h3 {
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: #334155;
+        margin-top: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+    .lesson-body p {
+        color: #334155;
+        font-size: 0.98rem;
+        line-height: 1.7;
+        margin-bottom: 0.85rem;
+    }
+    .lesson-body ul, .lesson-body ol {
+        margin: 0 0 1rem 1.4rem;
+        color: #334155;
+        font-size: 0.98rem;
+        line-height: 1.7;
+    }
+    .lesson-body li { margin-bottom: 0.35rem; }
+    .lesson-body strong { color: #0f172a; }
+    .lesson-body em { color: #475569; }
+    .lesson-body code {
+        background: #f1f5f9;
+        padding: 0.1rem 0.35rem;
+        border-radius: 3px;
+        font-size: 0.88em;
+        color: #1e40af;
+        font-family: "SF Mono", Monaco, Consolas, monospace;
+    }
+    .lesson-body a { color: #3b82f6; }
+
+    .lesson-code {
+        background: #0f172a;
+        color: #e2e8f0;
+        padding: 1.1rem 1.25rem;
+        border-radius: 5px;
+        font-family: "SF Mono", Monaco, Consolas, monospace;
+        font-size: 0.85rem;
+        line-height: 1.55;
+        overflow-x: auto;
+        margin: 1rem 0;
+        white-space: pre;
+    }
+    .lesson-code .c { color: #7c8ba0; font-style: italic; }   /* comments */
+    .lesson-code .k { color: #c792ea; }   /* keywords */
+    .lesson-code .s { color: #a5d6a7; }   /* strings */
+    .lesson-code .n { color: #82aaff; }   /* numbers / literals */
+    .lesson-code .v { color: #f5d67b; }   /* variable / identifier */
+
+    .lesson-callout {
+        padding: 1rem 1.25rem;
+        border-radius: 5px;
+        margin: 1.25rem 0;
+        font-size: 0.95rem;
+        line-height: 1.6;
+    }
+    .lesson-callout strong { color: #0f172a; }
+    .lesson-callout.note {
+        background: #eff6ff;
+        border-left: 3px solid #3b82f6;
+        color: #1e3a8a;
+    }
+    .lesson-callout.try {
+        background: #f0fdf4;
+        border-left: 3px solid #22c55e;
+        color: #14532d;
+    }
+    .lesson-callout.warn {
+        background: #fff7ed;
+        border-left: 3px solid #f97316;
+        color: #7c2d12;
+    }
+    .lesson-callout.note strong,
+    .lesson-callout.try strong,
+    .lesson-callout.warn strong { color: inherit; }
+
+    .lesson-takeaways {
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        padding: 1.25rem 1.5rem;
+        border-radius: 6px;
+        margin-top: 2.5rem;
+    }
+    .lesson-takeaways h3 {
+        margin-top: 0;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #475569;
+    }
+    .lesson-takeaways ul { margin-bottom: 0; }
+
+    .lesson-nav {
+        display: flex;
+        justify-content: space-between;
+        align-items: stretch;
+        gap: 1rem;
+        margin-top: 2.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid #e5e7eb;
+    }
+    .lesson-nav-btn {
+        flex: 1;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 0.9rem 1.1rem;
+        text-decoration: none;
+        color: inherit;
+        transition: border-color 0.15s, transform 0.1s;
+    }
+    .lesson-nav-btn:hover {
+        border-color: #3b82f6;
+        transform: translateY(-1px);
+    }
+    .lesson-nav-btn .dir {
+        font-size: 0.75rem;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+    .lesson-nav-btn .label {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #1e293b;
+        margin-top: 0.25rem;
+    }
+    .lesson-nav-btn.prev { text-align: left; }
+    .lesson-nav-btn.next { text-align: right; }
+    .lesson-nav-btn.disabled {
+        opacity: 0.35;
+        pointer-events: none;
+    }
+
+    .lesson-chip {
+        display: inline-block;
+        background: #dbeafe;
+        color: #1e40af;
+        padding: 0.15rem 0.5rem;
+        border-radius: 10px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        margin-right: 0.3rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="lesson-wrap">
+
+    <div class="lesson-breadcrumb">
+        <a href="/learn">Learning Portal</a> &rsaquo; Lesson {{ lesson_num }}
+    </div>
+
+    <div class="lesson-header">
+        <span class="lesson-num-label">Lesson {{ lesson_num }}</span>
+        <h1>{{ lesson_title }}</h1>
+        <p class="lesson-objective">{{ lesson_objective }}</p>
+    </div>
+
+    <div class="lesson-body">
+        {% block lesson_content %}{% endblock %}
+    </div>
+
+    <div class="lesson-nav">
+        {% if prev_url %}
+        <a class="lesson-nav-btn prev" href="{{ prev_url }}">
+            <div class="dir">&larr; Previous</div>
+            <div class="label">{{ prev_title }}</div>
+        </a>
+        {% else %}
+        <span class="lesson-nav-btn prev disabled">
+            <div class="dir">&larr; Previous</div>
+            <div class="label">&mdash;</div>
+        </span>
+        {% endif %}
+        {% if next_url %}
+        <a class="lesson-nav-btn next" href="{{ next_url }}">
+            <div class="dir">Next &rarr;</div>
+            <div class="label">{{ next_title }}</div>
+        </a>
+        {% else %}
+        <a class="lesson-nav-btn next" href="/learn">
+            <div class="dir">Back to</div>
+            <div class="label">Learning Portal</div>
+        </a>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

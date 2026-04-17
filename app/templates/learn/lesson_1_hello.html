@@ -1,0 +1,116 @@
+{% extends "learn/_lesson_base.html" %}
+
+{% set lesson_num = 1 %}
+{% set lesson_title = "Hello, Component" %}
+{% set lesson_objective = "Build the smallest possible interactive page. See how a Python file becomes a live URL with a JSON API and HTML view." %}
+{% set prev_url = "" %}
+{% set prev_title = "" %}
+{% set next_url = "/learn/loop" %}
+{% set next_title = "The Core Loop" %}
+
+{% block lesson_content %}
+
+<h2>The smallest interactive page</h2>
+<p>
+    Here is a complete page definition. One file, eight lines, a fully working interactive form.
+</p>
+
+<pre class="lesson-code"><span class="c"># pages/hello.py</span>
+<span class="k">from</span> engine.pagecomponent <span class="k">import</span> PageComponent
+<span class="k">from</span> engine.textcomponent <span class="k">import</span> TextComponent
+
+definition = PageComponent(
+    key=<span class="s">"hello"</span>,
+    label=<span class="s">"Hello Page"</span>,
+    components=[
+        TextComponent(key=<span class="s">"name"</span>, label=<span class="s">"Your name"</span>),
+    ],
+)</pre>
+
+<p>
+    Save that as <code>pages/hello.py</code>. Start the server with <code>python run.py</code>. Open the Agent Portal, click &ldquo;New&rdquo; next to the <em>Hello Page</em> card, and you&rsquo;ll be looking at your first running page.
+</p>
+
+<div class="lesson-callout note">
+    <strong>No HTML, no JSON schema, no route declaration.</strong> The page was <em>defined</em> &mdash; the engine handles rendering, routing, serialization, and persistence. This is the shape of every page.
+</div>
+
+<h2>What you just built</h2>
+<p>
+    Two Python imports, two class instantiations. Let&rsquo;s name what each piece is.
+</p>
+
+<ul>
+    <li><strong><code>PageComponent</code></strong> &mdash; the top-level container. Every page starts with one. It owns the Store (the JSON file where this page&rsquo;s state lives) and hands it down to children.</li>
+    <li><strong><code>TextComponent</code></strong> &mdash; a single text input. Has a <code>key</code> (how it&rsquo;s identified inside this page), a <code>label</code> (what humans see), and optional configuration like <code>multiline</code> or <code>min_length</code>.</li>
+    <li><strong><code>components=[...]</code></strong> &mdash; the container&rsquo;s children. Add more TextComponents, or other component types, and they appear in the rendered page in order.</li>
+</ul>
+
+<p>
+    The variable must be named <code>definition</code>. The engine auto-discovers every file in <code>pages/</code> and looks for that name. The file&rsquo;s key (<code>"hello"</code>) becomes the seed identifier in the Agent Portal.
+</p>
+
+<h2>See it both ways</h2>
+
+<p>
+    With the page open in your browser, try this: in the address bar, keep the URL but change the browser&rsquo;s <code>Accept</code> header to <code>application/json</code> (or just use <code>curl</code>):
+</p>
+
+<pre class="lesson-code"><span class="c"># Human view (browser default)</span>
+GET /pages/hello-1
+Accept: text/html
+
+<span class="c"># Agent view</span>
+GET /pages/hello-1
+Accept: application/json</pre>
+
+<p>
+    Same URL. Different response shape. Same state. This is the property that makes the engine different from a typical web framework: <strong>one definition produces two surfaces</strong>, and they agree on every action you can take. Lesson 5 covers why that matters.
+</p>
+
+<div class="lesson-callout try">
+    <strong>Try it.</strong> Type a name into the field and click &ldquo;Save&rdquo;. The value is persisted to <code>data/hello-1.json</code>. Refresh the page &mdash; your name is still there. Reload the server &mdash; still there. The engine is stateless in memory; the Store is the source of truth.
+</div>
+
+<h2>A small addition</h2>
+<p>
+    One more component, one more line. Add a checkbox for preferences:
+</p>
+
+<pre class="lesson-code"><span class="c"># pages/hello.py</span>
+<span class="k">from</span> engine.pagecomponent <span class="k">import</span> PageComponent
+<span class="k">from</span> engine.textcomponent <span class="k">import</span> TextComponent
+<span class="k">from</span> engine.checkboxcomponent <span class="k">import</span> CheckboxComponent
+
+definition = PageComponent(
+    key=<span class="s">"hello"</span>,
+    label=<span class="s">"Hello Page"</span>,
+    components=[
+        TextComponent(key=<span class="s">"name"</span>, label=<span class="s">"Your name"</span>),
+        CheckboxComponent(
+            key=<span class="s">"preferences"</span>,
+            label=<span class="s">"Preferences"</span>,
+            options=[<span class="s">"Email me"</span>, <span class="s">"Follow updates"</span>, <span class="s">"Send notifications"</span>],
+        ),
+    ],
+)</pre>
+
+<p>
+    Save. Reload the page in your browser (no server restart needed &mdash; <code>pages/</code> is auto-discovered every request). The checkbox appears. Each component is isolated: changing one doesn&rsquo;t affect the other. Each one persists its own state under its own key in the Store.
+</p>
+
+<div class="lesson-takeaways">
+    <h3>What you learned</h3>
+    <ul>
+        <li><span class="lesson-chip">Core</span> A page is a Python file in <code>pages/</code> exporting <code>definition = PageComponent(...)</code>.</li>
+        <li><span class="lesson-chip">Core</span> The engine auto-discovers pages, routes requests, renders HTML and JSON, and persists state &mdash; you just describe the tree.</li>
+        <li><span class="lesson-chip">Core</span> Every component has a <code>key</code> (identity within its container) and participates in the same interaction model regardless of type.</li>
+        <li><span class="lesson-chip">Tip</span> Page state lives in <code>data/{instance_id}.json</code>. You can inspect it or delete it to reset.</li>
+    </ul>
+</div>
+
+<p style="margin-top: 1.5rem;">
+    Next: you built a page and saw it render. But <em>what actually happens</em> between your browser click and the server&rsquo;s response? Lesson 2 traces the core request loop.
+</p>
+
+{% endblock %}
