@@ -1,0 +1,244 @@
+{% extends "learn/_lesson_base.html" %}
+
+{% set lesson_num = 8 %}
+{% set lesson_title = "Mutation Mechanics" %}
+{% set lesson_objective = "Edit mode, config mutations, mutable pages, and structural actions. How the same descriptor-as-truth design supports runtime editing, add/remove/reorder operations, and self-modifying pages." %}
+{% set prev_url = "/learn/reconciliation" %}
+{% set prev_title = "Reconciliation and the Descriptor" %}
+{% set next_url = "" %}
+{% set next_title = "" %}
+
+{% block lesson_content %}
+
+<h2>Two axes of mutation</h2>
+
+<p>
+    The engine distinguishes two kinds of changes to a page:
+</p>
+
+<ul>
+    <li><strong>Prop mutation</strong> &mdash; changing a field of a component (label, mode, min_length, multiline). The tree shape stays the same; a descriptor entry gets rewritten.</li>
+    <li><strong>Structural mutation</strong> &mdash; changing the tree itself (adding, removing, moving, reparenting, grouping children). The descriptor grows, shrinks, or reshapes.</li>
+</ul>
+
+<p>
+    Both flow through the same mechanism: <em>the descriptor changes, the next bind reads the new descriptor, the page renders differently</em>. No in-memory tree is &ldquo;edited&rdquo; &mdash; the Store is the truth, and the next request produces a tree matching whatever the Store now says.
+</p>
+
+<h2>Edit mode — the ✏ pencil pattern</h2>
+
+<p>
+    Every component has an <code>editable</code> flag. When it&rsquo;s <code>True</code>, the wrapper renders a pencil toggle (✏) in the component&rsquo;s chrome. Clicking the pencil enters edit mode; clicking ▶ returns to execution mode.
+</p>
+
+<p>
+    Edit mode changes the affordance surface. The label and instruction become inline editable inputs. Type-specific config (like <code>multiline</code> on TextComponent, <code>min_val</code>/<code>max_val</code> on NumberComponent) appears as a config panel. Containers gain add/remove/reorder controls. Nothing about the component&rsquo;s <em>state</em> changes; only its props can be adjusted.
+</p>
+
+<pre class="lesson-code"><span class="c"># A TextComponent that can be edited at runtime</span>
+TextComponent(
+    key=<span class="s">"name"</span>,
+    label=<span class="s">"Your name"</span>,
+    editable=<span class="k">True</span>,         <span class="c"># show the pencil toggle</span>
+    multiline=<span class="k">False</span>,
+    min_length=<span class="n">2</span>,
+)</pre>
+
+<p>
+    With <code>editable=True</code>, the user can rename the label, flip <code>multiline</code>, change <code>min_length</code>. All of these are prop changes; the underlying Python class is untouched. The edits persist to the parent&rsquo;s <code>__structure</code> descriptor and survive reloads.
+</p>
+
+<h2>The two mutation APIs</h2>
+
+<p>
+    Props split into two groups: top-level fields (<code>label</code>, <code>instruction</code>, <code>editable</code>) and type-specific config (<code>multiline</code>, <code>min_val</code>, <code>mode</code>, etc.). The engine exposes a helper for each.
+</p>
+
+<pre class="lesson-code"><span class="c"># Top-level field — writes to the descriptor&#39;s top-level scalars</span>
+self._set_my_field(<span class="s">"label"</span>, <span class="s">"Full name"</span>)
+
+<span class="c"># Type-specific config — writes to descriptor.config</span>
+self._set_my_config(<span class="s">"multiline"</span>, <span class="k">True</span>)
+self._set_my_config(<span class="s">"min_length"</span>, <span class="n">3</span>)</pre>
+
+<p>
+    Both helpers do three things in sequence:
+</p>
+
+<ol>
+    <li><strong>Validate the type.</strong> The value must match the dataclass annotation (simple types, <code>X | None</code>, <code>Literal[...]</code>). Mismatches raise <code>TypeError</code> at the boundary &mdash; before any persisted state is corrupted.</li>
+    <li><strong>Update the parent&rsquo;s descriptor.</strong> The parent container&rsquo;s <code>__structure</code> entry for this child gets the new value written into its scalar fields or its <code>config</code> sub-dict.</li>
+    <li><strong>Update the runtime instance.</strong> <code>setattr(self, name, value)</code> so the current request&rsquo;s tree reflects the change before serialize/render runs.</li>
+</ol>
+
+<p>
+    Step 3 matters because mutation often happens during <code>_handle()</code> of a POST, and the response serialization runs in the same request. Without <code>setattr</code>, the response would still show the old value; the user would wonder if their change took.
+</p>
+
+<div class="lesson-callout note">
+    <strong>You never mutate <code>self.label</code> directly.</strong> Always go through <code>_set_my_field</code> / <code>_set_my_config</code>. Direct attribute assignment updates the instance but not the descriptor, so the change is lost on the next bind. It&rsquo;s the runtime-only mistake that reconciliation quietly fixes by reverting.
+</div>
+
+<h2>Mutable pages — structure as state</h2>
+
+<p>
+    Edit mode changes props. <strong>Mutable pages</strong> let the user change the tree shape itself &mdash; adding, removing, moving, reparenting components at runtime. Toggled at the page level:
+</p>
+
+<pre class="lesson-code">PageComponent(
+    key=<span class="s">"builder"</span>,
+    label=<span class="s">"Page Builder"</span>,
+    mutable_structure=<span class="k">True</span>,   <span class="c"># enables structural editing</span>
+    components=[],               <span class="c"># can start empty</span>
+)</pre>
+
+<p>
+    When <code>mutable_structure=True</code>, the page gains a toolbar and a structural editor. A type palette lets the user pick a component class; a canvas shows the current tree; drag-and-drop reorders children, reparents across containers, or groups selected items together.
+</p>
+
+<p>
+    Each interaction produces an action POST that the PageComponent&rsquo;s <code>_handle()</code> dispatches. The server-side actions are:
+</p>
+
+<ul>
+    <li><code>add_component</code> &mdash; insert a new component by type name, at a position</li>
+    <li><code>remove_component</code> &mdash; delete by key, surgically cleaning state from the Store</li>
+    <li><code>move_component</code> &mdash; reorder within or between containers</li>
+    <li><code>reparent_component</code> &mdash; drop into a new container</li>
+    <li><code>group_components</code> &mdash; wrap selected siblings in a new GroupComponent</li>
+    <li><code>ungroup_component</code> &mdash; splice a GroupComponent&rsquo;s children into its parent</li>
+    <li><code>rebuild_from_seed</code> &mdash; wipe <code>__structure</code>, start fresh from the Python definition</li>
+</ul>
+
+<p>
+    Each action mutates <code>__structure</code>. The next request rebinds, reconciliation reads the new structure, the tree renders accordingly. The seed definition doesn&rsquo;t change; the <em>instance</em> deviates from the seed, and the deviation is persisted in the descriptor.
+</p>
+
+<h3>Surgical state cleanup</h3>
+
+<p>
+    When a component is removed, any state it owned should be cleaned up &mdash; otherwise the Store grows forever with orphaned entries. <code>remove_component</code> walks the subtree being removed, collects every key at every scope, and calls <code>Store.delete()</code> on each. The Store provides a <code>delete_scope()</code> convenience for dropping an entire scope tree at once.
+</p>
+
+<pre class="lesson-code"><span class="c"># Pseudocode for what remove_component does</span>
+<span class="k">def</span> <span class="v">_remove_component</span>(self, key):
+    target = self._find_in_tree(key)
+    self._clear_subtree_state(target)        <span class="c"># Store.delete for each descendant</span>
+    self._pluck_from_structure(key)          <span class="c"># remove from __structure</span>
+    <span class="k">return</span> self.serialize()                   <span class="c"># updated page state</span></pre>
+
+<h3>The Page Builder</h3>
+
+<p>
+    <code>pages/mutable_demo.py</code> is the canonical example of a mutable page. It starts empty, has a type palette on the left, and a schematic canvas in the middle showing the current tree. The <em>Page Builder</em> page in the Agent Portal is a more polished version that embeds the Component Reference Menu inside it &mdash; so you can browse type docs and drag types onto your page in the same view.
+</p>
+
+<h2>Self-modifying pages — structural actions from ActionComponent</h2>
+
+<p>
+    One more piece. Mutable pages give the <em>user</em> power to reshape the tree. Self-modifying pages let the <em>page itself</em> reshape in response to user interaction, under its own logic.
+</p>
+
+<p>
+    An <code>ActionComponent</code> can return <code>structural_actions</code> from its <code>_handle()</code> in addition to its own state. PageComponent intercepts those structural actions, applies them to <code>__structure</code>, and the page reshapes on the next serialize.
+</p>
+
+<pre class="lesson-code"><span class="c"># An ActionComponent that adds a follow-up question when triggered</span>
+ActionComponent(
+    key=<span class="s">"add-followup"</span>,
+    label=<span class="s">"Add follow-up question"</span>,
+    on_trigger=<span class="k">lambda</span> state: {
+        <span class="s">"structural_actions"</span>: [
+            {
+                <span class="s">"action"</span>: <span class="s">"add_component"</span>,
+                <span class="s">"type"</span>: <span class="s">"text"</span>,
+                <span class="s">"key"</span>: <span class="k">f</span><span class="s">"followup-{counter}"</span>,
+                <span class="s">"label"</span>: <span class="s">"Tell us more"</span>,
+                <span class="s">"position"</span>: -<span class="n">1</span>,
+            },
+        ],
+    },
+)</pre>
+
+<p>
+    The engine supports this in the Survey Builder demo (<code>pages/mutable_demo.py</code>). A user answers a question; the ActionComponent fires; a new question materializes below it. The &ldquo;fractal complexity plan&rdquo; in the project history (Phase E) made this possible.
+</p>
+
+<div class="lesson-callout warn">
+    <strong>Use sparingly.</strong> Self-modifying pages are expressive but hard to reason about &mdash; the tree you see in the seed is not the tree at runtime. Reach for mutable pages when you need it (form builders, dashboards with variable content), reach for regular pages when you don&rsquo;t. Static beats dynamic when static suffices.
+</div>
+
+<h2>Undo and snapshots</h2>
+
+<p>
+    Edit mode maintains a per-component undo stack. Each mutation is snapshotted before it runs, and the ↩ chrome button pops the stack. A ✕ discard button restores the initial snapshot from when edit mode was entered &mdash; throwing away all edits and exiting edit mode.
+</p>
+
+<p>
+    Undo is local to the component in edit mode, not a global page-level operation. That&rsquo;s a deliberate scoping choice: global undo would need to capture structural history across the whole tree, and the payoff didn&rsquo;t justify the complexity. Per-component edit undo handles the common case cleanly.
+</p>
+
+<h2>What changes when</h2>
+
+<p>
+    Putting it all together, here&rsquo;s the mutation matrix:
+</p>
+
+<pre class="lesson-code">  USER ACTION              WHAT CHANGES                WHERE IT LIVES
+  ───────────────────────  ──────────────────────────  ─────────────────
+  Type into a text box     State (current value)       Store at key scope
+  Click pencil             editable flag (prop)        parent __structure
+  Edit label inline        label field (prop)          parent __structure
+  Flip multiline toggle    config.multiline (prop)     parent __structure
+  Drag new component in    Tree shape (structure)      parent __structure
+  Drag component out       Tree shape (structure)      parent __structure + cleanup
+  Click action button      Maybe structural_actions    varies
+  Refresh browser          Nothing (GET is pure)       Store unchanged</pre>
+
+<p>
+    All four columns of &ldquo;where&rdquo; resolve to one thing: some JSON file on disk. That&rsquo;s why the engine&rsquo;s resilience to crashes, restarts, and hot reloads is free &mdash; there&rsquo;s nothing transient to lose.
+</p>
+
+<div class="lesson-callout try">
+    <strong>Try it.</strong> In the Agent Portal, spawn a <em>Page Builder</em> instance. Drag a TextComponent from the palette onto the canvas. Type a label. Drag a NavigationComponent in. Group two children together. Each action&rsquo;s POST body is visible as a tooltip on the button &mdash; you can see the structural-action protocol directly. Open <code>data/{instance}.json</code> and watch <code>__structure</code> change.
+</div>
+
+<div class="lesson-takeaways">
+    <h3>What you learned</h3>
+    <ul>
+        <li><span class="lesson-chip">Core</span> Prop mutation changes the descriptor&rsquo;s scalars; structural mutation changes the descriptor&rsquo;s shape. Both flow through the Store; the next bind reads the result.</li>
+        <li><span class="lesson-chip">Core</span> <code>_set_my_field</code> (top-level) and <code>_set_my_config</code> (type-specific) are the two mutation APIs. Both validate types at the boundary.</li>
+        <li><span class="lesson-chip">Core</span> <code>mutable_structure=True</code> on a PageComponent enables add/remove/move/reparent/group/ungroup via a structural editor and a public action protocol.</li>
+        <li><span class="lesson-chip">Core</span> ActionComponent can return <code>structural_actions</code> from its handler, enabling self-modifying pages where user interaction reshapes the tree.</li>
+        <li><span class="lesson-chip">Core</span> Edit mode keeps per-component undo via snapshot stacks. Discard restores the initial snapshot and exits edit mode.</li>
+        <li><span class="lesson-chip">Tip</span> Everything on-disk. No transient in-memory state, no sticky sessions, no crash-recovery concerns. Reliability falls out of the design.</li>
+    </ul>
+</div>
+
+<h2>Where to from here</h2>
+
+<p>
+    You&rsquo;ve now seen the whole engine, both in outline and in mechanics:
+</p>
+
+<ul>
+    <li><strong>Fundamentals</strong> (Lessons 1&ndash;5): defining pages, the core loop, where data lives, composition, the human/agent duality.</li>
+    <li><strong>Deep Dives</strong> (Lessons 6&ndash;8): affordance generation and parity enforcement, reconciliation, mutation mechanics.</li>
+</ul>
+
+<p>
+    From here:
+</p>
+
+<ul>
+    <li><a href="/framing">/framing</a> &mdash; conceptual reference as a single document. Vocabulary map, design-plan arc, non-borrowings.</li>
+    <li><a href="/readme">/readme</a> &mdash; the full API reference and per-type catalog.</li>
+    <li><a href="/deepdive">/deepdive</a> &mdash; the engine&rsquo;s self-analysis. Where the gaps are, what&rsquo;s next.</li>
+    <li><a href="/portal">/portal</a> &mdash; live pages. Spawn a Component Gallery or Page Builder instance and build something.</li>
+</ul>
+
+<p>
+    The most useful thing to do at this point is to build a page. Copy an existing seed in <code>pages/</code>, change it, and see what happens. The engine is designed for experimentation &mdash; edits to a page file are picked up on the next request, and corrupted state is always recoverable by editing the Store JSON or deleting the instance.
+</p>
+
+{% endblock %}

@@ -1,0 +1,268 @@
+{% extends "learn/_lesson_base.html" %}
+
+{% set lesson_num = 6 %}
+{% set lesson_title = "Affordances, Rendering, and Parity Tests" %}
+{% set lesson_objective = "How affordances are generated, how they become rendered HTML and agent JSON, and how parity tests guarantee the two surfaces stay aligned. The mechanics behind faithful projection." %}
+{% set prev_url = "/learn/humans-and-agents" %}
+{% set prev_title = "Humans and Agents" %}
+{% set next_url = "/learn/reconciliation" %}
+{% set next_title = "Reconciliation and the Descriptor" %}
+
+{% block lesson_content %}
+
+<h2>Where an affordance comes from</h2>
+
+<p>
+    In Lesson 5 an affordance looked like a dict that magically appeared in responses. It isn&rsquo;t magic. Every component generates its own affordances as part of <code>serialize()</code>, and the shape of the affordance is determined by a small class hierarchy in <code>engine/affordances.py</code>.
+</p>
+
+<pre class="lesson-code"><span class="c"># engine/affordances.py — the base dataclass</span>
+@dataclass
+<span class="k">class</span> Affordance:
+    label: str
+    method: str
+    url: str
+    body: dict = field(default_factory=dict)
+    instruction: str | <span class="k">None</span> = <span class="k">None</span>
+
+    <span class="k">def</span> <span class="v">serialize</span>(self) -&gt; dict:
+        result = {
+            <span class="s">"label"</span>: self.label,
+            <span class="s">"method"</span>: self.method,
+            <span class="s">"url"</span>: self.url,
+            <span class="s">"body"</span>: self.body,
+            <span class="s">"render_hints"</span>: self._render_hints(),
+        }
+        <span class="k">if</span> self.instruction:
+            result[<span class="s">"instruction"</span>] = self.instruction
+        <span class="k">return</span> result</pre>
+
+<p>
+    Subclasses override <code>_render_hints()</code> to tell templates how to render the affordance: a text input, a confirmation button, a simple button, a select dropdown. The hint is advisory &mdash; the rendering component is ultimately responsible for placing the affordance on the page.
+</p>
+
+<h3>A component generating its own affordances</h3>
+
+<p>
+    Here is a simplified TextComponent serialization. Notice the affordances list:
+</p>
+
+<pre class="lesson-code"><span class="c"># TextComponent.serialize(), simplified</span>
+<span class="k">def</span> <span class="v">serialize</span>(self):
+    value = self._store.get(self._scope, self.key, <span class="s">"value"</span>)
+    return {
+        <span class="s">"label"</span>: self.label,
+        <span class="s">"value"</span>: value,
+        <span class="s">"is_complete"</span>: self.is_complete,
+        <span class="s">"affordances"</span>: [
+            SetValueAffordance(
+                label=<span class="s">"Save"</span>,
+                method=<span class="s">"POST"</span>,
+                url=<span class="k">f</span><span class="s">"{self._url_prefix}/{self.key}"</span>,
+                body={<span class="s">"action"</span>: <span class="s">"set_value"</span>, <span class="s">"value"</span>: <span class="s">"&lt;value&gt;"</span>},
+                instruction=<span class="s">"Submit the text value."</span>,
+            ).serialize(),
+        ],
+    }</pre>
+
+<p>
+    Two things are happening here:
+</p>
+
+<ol>
+    <li>The component reads its own state from the Store.</li>
+    <li>The component builds an affordance list describing the actions it accepts. The URL is constructed from its own <code>_url_prefix</code> and <code>key</code>, so it always matches where the component lives in the tree.</li>
+</ol>
+
+<p>
+    Every component does this. The affordance URLs are never centrally declared; each component knows its own URL because it knows its own scope and key.
+</p>
+
+<h2>From data to HTML</h2>
+
+<p>
+    Serialization produces a dict. Rendering produces HTML. The engine&rsquo;s rule is that HTML is a pure function of the serialized dict &mdash; templates read the dict and emit markup.
+</p>
+
+<pre class="lesson-code"><span class="c"># Component.render() — always calls serialize first</span>
+<span class="k">def</span> <span class="v">render</span>(self) -&gt; str:
+    data = self._serialize_full()   <span class="c"># internal dict including render_hints</span>
+    <span class="k">return</span> self.render_from_data(data)  <span class="c"># Jinja render from the dict</span></pre>
+
+<p>
+    <code>render_from_data</code> picks the right Jinja template for the component&rsquo;s type (with optional theme override), passes the serialized data as context, and returns the rendered HTML. Code paths never diverge: the dict is the source of truth.
+</p>
+
+<h3>Two-tier serialization</h3>
+
+<p>
+    There are two serialization entry points:
+</p>
+
+<ul>
+    <li><strong><code>_serialize_full()</code></strong> &mdash; the internal dict. Includes <code>form</code>, <code>key</code>, <code>render_hints</code>, and other fields templates need for HTML rendering. Used by <code>render()</code>.</li>
+    <li><strong><code>serialize()</code></strong> &mdash; the agent-facing dict. Strips internal fields that don&rsquo;t belong in the API response. Used by the JSON endpoint.</li>
+</ul>
+
+<p>
+    This split matters because agents don&rsquo;t need <code>render_hints</code> &mdash; they&rsquo;ll never render HTML. Including those fields in the JSON would be noise. Stripping them at the <code>serialize()</code> boundary keeps the agent API clean without complicating the internal rendering code.
+</p>
+
+<h3>Templates render affordances via helpers</h3>
+
+<p>
+    Jinja templates don&rsquo;t hand-write button markup. Two helper functions in <code>engine/templates.py</code> do the work:
+</p>
+
+{% raw %}<pre class="lesson-code"><span class="c"># render_aff renders a full affordance as a labeled button or form</span>
+{{ render_aff(affordance) }}
+
+<span class="c"># render_btn renders a minimal inline button with a specified CSS class</span>
+{{ render_btn(url, body, label, css_class) }}</pre>{% endraw %}
+
+<p>
+    Both helpers produce HTML with the <code>data-c-*</code> attributes that the global delegation script (<code>component.js</code>) listens for. When a user clicks the button, the script reads the attributes, builds a POST, sends it, and morphs the response HTML into the page.
+</p>
+
+<h3>The five URL-carrying attributes</h3>
+
+<p>
+    Every clickable element that triggers a server action carries one of these attributes, each with its own handler:
+</p>
+
+<pre class="lesson-code">  data-c-post     simple POST with a pre-built JSON body
+  data-c-submit   POST with a body built from the surrounding &lt;form&gt;&#39;s inputs
+  data-c-change   POST fired on input change (select, radio, checkbox)
+  data-c-add      POST that adds a component (palette one-click)
+  data-c-url      drag-and-drop target URL (reorder, reparent)</pre>
+
+<p>
+    Parity tests walk the rendered HTML looking at exactly these attributes (and no others), so if you invent a sixth attribute you&rsquo;ll need to teach the parity extractor about it.
+</p>
+
+<h2>Affordance flotation — the portal pattern</h2>
+
+<p>
+    Some affordances are universal: every data component offers a <code>Clear</code>, every editable component offers an <code>Edit</code> mode, every container supports <code>Batch</code>. A naive serialization emits all of these on every component, producing lots of duplicated affordances at every level of the tree.
+</p>
+
+<p>
+    For agent consumers this is noise. An agent doesn&rsquo;t need twenty copies of &ldquo;Clear&rdquo; &mdash; it needs one affordance saying &ldquo;clear any of these twenty targets.&rdquo;
+</p>
+
+<p>
+    The engine handles this with <strong>affordance flotation</strong>: deeply-nested affordances marked as &ldquo;floatable&rdquo; bubble up to the PageComponent level in the agent JSON, collapsed into one parameterized affordance per action kind.
+</p>
+
+<pre class="lesson-code"><span class="c"># An affordance opts into flotation by tagging itself.</span>
+<span class="c"># In _serialize_full():</span>
+aff = ClearAffordance(label=<span class="s">"Clear"</span>, url=self._url, body={<span class="s">"action"</span>: <span class="s">"clear"</span>})
+aff[<span class="s">"_floatable"</span>] = <span class="s">"clear"</span>   <span class="c"># merge marker</span></pre>
+
+<p>
+    PageComponent walks the tree on serialization, collects every affordance carrying a <code>_floatable</code> marker, groups them by marker, strips them from children, and emits one compound affordance per group. Each compound affordance carries a structured <code>targets</code> dict mapping URLs to child labels:
+</p>
+
+<pre class="lesson-code">{
+  <span class="s">"label"</span>: <span class="s">"Clear"</span>,
+  <span class="s">"method"</span>: <span class="s">"POST"</span>,
+  <span class="s">"body"</span>: {<span class="s">"action"</span>: <span class="s">"clear"</span>},
+  <span class="s">"instruction"</span>: <span class="s">"Clear the value of a specific component. POST the URL of the target component."</span>,
+  <span class="s">"targets"</span>: {
+    <span class="s">"/pages/page-1/name"</span>:        <span class="s">"Your name"</span>,
+    <span class="s">"/pages/page-1/description"</span>: <span class="s">"Description"</span>,
+    <span class="s">"/pages/page-1/notes"</span>:       <span class="s">"Notes"</span>
+  }
+}</pre>
+
+<p>
+    The agent sees one action, the three target sites stay addressable by URL. HTML rendering is unaffected &mdash; the human UI still renders the three per-child Clear buttons where they live. Flotation is agent-tier only.
+</p>
+
+<div class="lesson-callout note">
+    <strong>This is a Portal.</strong> In React, <code>createPortal</code> renders a child into a different DOM location than where the parent would imply. Here, the same idea applies to agent-facing JSON: the affordance originates deep in the tree but surfaces at the top. Same pattern, different medium. See <a href="/framing#s2">/framing §2</a> for the full vocabulary mapping.
+</div>
+
+<h2>Parity tests — the invariant under CI</h2>
+
+<p>
+    Faithful projection is an assertion: <em>every action exposed to an agent has a clickable HTML counterpart, and vice versa</em>. A page can only claim this property if it survives a mechanical check.
+</p>
+
+<p>
+    The parity test suite lives at <code>tests/test_parity.py</code> and currently runs 72 tests across 9 categories. It binds each page definition to an isolated tmp directory (no interaction with <code>data/</code>) and compares the two surfaces.
+</p>
+
+<h3>Per-page tests (10 pages &times; 7 tests each)</h3>
+
+<ul>
+    <li><strong>Shape</strong> &mdash; every page produces <code>{affordances: [...], ...}</code> with the expected keys.</li>
+    <li><strong>No empty URLs</strong> &mdash; no non-chrome, non-disabled affordance is missing a URL.</li>
+    <li><strong>Methods declared</strong> &mdash; every affordance with a URL also has a non-empty HTTP method.</li>
+    <li><strong>Forward parity</strong> &mdash; every JSON affordance URL appears as an HTML action attribute (excluding chrome-rendered floated compounds, which are agent-JSON-only by design).</li>
+    <li><strong>Reverse parity</strong> &mdash; every clickable HTML action URL is declared somewhere in JSON. Closes the opposite direction.</li>
+    <li><strong>Action-name parity</strong> &mdash; where both sides declare an action name for the same URL, they match. Catches typos like <code>set_valeu</code> / <code>set_value</code> where the URL lines up but the body diverges.</li>
+    <li><strong>URL resolvability</strong> &mdash; every JSON affordance URL routes to a real component via <code>find_component</code>. Catches URLs that parity-match but would 404 at runtime.</li>
+</ul>
+
+<h3>Pan-page tests (2 tests)</h3>
+
+<ul>
+    <li><strong>All pages render</strong> &mdash; every page produces non-empty HTML without exception.</li>
+    <li><strong>All pages serialize</strong> &mdash; every page produces a dict with <code>affordances</code>.</li>
+</ul>
+
+<h3>How extraction works</h3>
+
+<p>
+    The test suite has two extractors, one per surface:
+</p>
+
+<ul>
+    <li><strong><code>extract_json_affordances(data)</code></strong> &mdash; recursive walk over the <code>_serialize_full()</code> output. Walks into parameterization dicts (<code>targets</code>, <code>tabs</code>, <code>sections</code>, <code>steps</code>, <code>options</code>) and synthesizes one affordance entry per target URL. This correctly treats O(N)&rarr;O(1) compound affordances as legitimately declaring all their per-target URLs.</li>
+    <li><strong><code>extract_html_actions(html)</code></strong> &mdash; HTMLParser-based scanner for the five URL-carrying attributes listed above.</li>
+</ul>
+
+<p>
+    Running parity on a new page catches issues early: a typo in the POST body shape, a forgotten <code>_floatable</code> tag, a template that emits a button but doesn&rsquo;t surface the URL in JSON. Shift-left.
+</p>
+
+<h2>Writing a new affordance</h2>
+
+<p>
+    If you need a new kind of action &mdash; say, &ldquo;Export this section as PDF&rdquo; &mdash; here&rsquo;s the shape:
+</p>
+
+<ol>
+    <li>Subclass <code>Affordance</code> in <code>engine/affordances.py</code>. Override <code>_render_hints()</code> if templates need to distinguish it.</li>
+    <li>In the component&rsquo;s <code>serialize()</code>, emit an instance of the new affordance class. Give it a label, method, URL, and body shape. Add an instruction for agents.</li>
+    <li>If the component needs to render it specially, reference <code>render_hints.type</code> in the Jinja template. Otherwise <code>render_aff</code> will produce a generic button.</li>
+    <li>In the component&rsquo;s <code>_handle()</code>, add a branch for the action name. Validate the body, mutate state, return the updated serialize().</li>
+    <li>Run parity tests. If the new affordance floats, register its merge marker in PageComponent&rsquo;s compound-affordance generator.</li>
+</ol>
+
+<p>
+    Five steps, each contained. The affordance system is designed to make new actions cheap to add without risking parity.
+</p>
+
+<div class="lesson-callout try">
+    <strong>Try it.</strong> Open a page in the engine, view it as JSON (<code>Accept: application/json</code>), and grep the response for <code>_floatable</code>. You won&rsquo;t find it &mdash; <code>serialize()</code> strips internal flags on the way out. Look at <code>_serialize_full()</code> directly (e.g., in a Python REPL) and you&rsquo;ll see them. The distinction is small but matters for parity testing.
+</div>
+
+<div class="lesson-takeaways">
+    <h3>What you learned</h3>
+    <ul>
+        <li><span class="lesson-chip">Core</span> Each component generates its own affordances in <code>serialize()</code>. URLs are built from the component&rsquo;s own scope + key.</li>
+        <li><span class="lesson-chip">Core</span> Two-tier serialization: <code>_serialize_full()</code> has internal fields for HTML rendering; <code>serialize()</code> strips them for the agent API.</li>
+        <li><span class="lesson-chip">Core</span> Five <code>data-c-*</code> attributes carry all URLs in the DOM. The parity test knows about all five.</li>
+        <li><span class="lesson-chip">Core</span> Affordance flotation is a Portal: floatable affordances bubble up to the PageComponent level in agent JSON, collapsed into parameterized compound affordances with <code>targets</code> dicts.</li>
+        <li><span class="lesson-chip">Core</span> 72 parity tests (7 per page &times; 10 pages + 2 pan-page) catch URL/method/action-name mismatches at CI time.</li>
+        <li><span class="lesson-chip">Tip</span> Read <code>tests/test_parity.py</code> end-to-end. It&rsquo;s both the enforcement mechanism and the precise spec of what parity means.</li>
+    </ul>
+</div>
+
+<p style="margin-top: 1.5rem;">
+    Next: the rendering pipeline assumes a tree has been built from a seed plus some persisted state. How exactly does that tree get reconstructed on every request? Lesson 7 covers reconciliation.
+</p>
+
+{% endblock %}

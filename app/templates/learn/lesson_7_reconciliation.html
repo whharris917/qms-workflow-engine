@@ -1,0 +1,244 @@
+{% extends "learn/_lesson_base.html" %}
+
+{% set lesson_num = 7 %}
+{% set lesson_title = "Reconciliation and the Descriptor" %}
+{% set lesson_objective = "How the engine rebuilds a live component tree from a Python seed plus a JSON descriptor on every request. The __structure field, the callable-preservation problem, and how SiblingRef keeps cross-component references honest." %}
+{% set prev_url = "/learn/affordances" %}
+{% set prev_title = "Affordances, Rendering, and Parity" %}
+{% set next_url = "/learn/mutation" %}
+{% set next_title = "Mutation Mechanics" %}
+
+{% block lesson_content %}
+
+<h2>Three trees, one concept</h2>
+
+<p>
+    There are three related but distinct trees in the engine&rsquo;s head. Keeping them apart is the key to understanding everything in this lesson.
+</p>
+
+<ul>
+    <li><strong>Seed tree</strong> &mdash; the Python definition in <code>pages/*.py</code>. Immutable at runtime. Holds callables (lambdas, validators, compute functions). Has no identity; it&rsquo;s a template.</li>
+    <li><strong>Descriptor tree</strong> &mdash; a JSON-serializable snapshot of a component tree. Lives on disk at <code>__structure</code> keys inside the Store. Can round-trip through JSON (no callables). Canonical source of truth for anything runtime-editable.</li>
+    <li><strong>Bound tree</strong> &mdash; a live, scoped, Store-connected instance tree. What <code>serialize()</code> and <code>render()</code> actually run against. Rebuilt every request.</li>
+</ul>
+
+<pre class="lesson-code">  <span class="v">pages/survey.py</span>  →   <span class="v">seed tree</span>
+                            ↓ deepcopy + apply descriptor overrides
+  <span class="v">data/survey-1.json</span>  →   <span class="v">descriptor tree</span>
+                            ↓ reconcile (from_descriptor)
+                       <span class="v">bound tree</span>
+                            ↓ bind(Store, scope, url_prefix)
+                     <span class="v">bound tree (live)</span>  →  serialize()/render()</pre>
+
+<p>
+    The operation that produces the bound tree is called <strong>reconciliation</strong>. It&rsquo;s the engine&rsquo;s equivalent of what React does between two render trees.
+</p>
+
+<h2>__structure — the on-disk descriptor</h2>
+
+<p>
+    Every container writes a <code>__structure</code> entry into its Store scope. That entry is the canonical record of what&rsquo;s in the tree, in what order, with which props.
+</p>
+
+<pre class="lesson-code"><span class="c"># data/survey-1.json — concrete shape</span>
+{
+  <span class="s">"survey"</span>: {
+    <span class="s">"__structure"</span>: {
+      <span class="s">"name"</span>: {
+        <span class="s">"type"</span>: <span class="s">"text"</span>,
+        <span class="s">"label"</span>: <span class="s">"Your name"</span>,
+        <span class="s">"config"</span>: {<span class="s">"multiline"</span>: <span class="k">false</span>, <span class="s">"min_length"</span>: <span class="n">2</span>}
+      },
+      <span class="s">"role"</span>: {
+        <span class="s">"type"</span>: <span class="s">"choice"</span>,
+        <span class="s">"label"</span>: <span class="s">"Role"</span>,
+        <span class="s">"config"</span>: {<span class="s">"options"</span>: [<span class="s">"Engineer"</span>, <span class="s">"Designer"</span>, <span class="s">"PM"</span>]}
+      }
+    },
+    <span class="s">"name"</span>:  {<span class="s">"value"</span>: <span class="s">"Alex"</span>},
+    <span class="s">"role"</span>:  {<span class="s">"value"</span>: <span class="s">"Engineer"</span>}
+  }
+}</pre>
+
+<p>
+    Two sibling shapes live under the same scope:
+</p>
+
+<ul>
+    <li><strong><code>__structure</code></strong> &mdash; the descriptor. Owns props (label, instruction, type-specific config).</li>
+    <li><strong>Each child&rsquo;s own key</strong> &mdash; owns state (the user&rsquo;s values).</li>
+</ul>
+
+<p>
+    The <code>__structure</code> entry is written whenever structure is persisted. For a static page, it&rsquo;s written once on first bind and re-read thereafter. For a mutable page (Lesson 8), <code>__structure</code> changes as the user adds, removes, or reorders components.
+</p>
+
+<h3>to_descriptor and from_descriptor</h3>
+
+<p>
+    Two functions move between the tree and its descriptor. They live on the base Component class and in <code>engine/registry.py</code>:
+</p>
+
+<pre class="lesson-code"><span class="c"># Serialize a live component into its descriptor form</span>
+descriptor = component.to_descriptor()
+
+<span class="c"># Rebuild a live component from a descriptor + optional seed</span>
+component = from_descriptor(descriptor, seed=seed)</pre>
+
+<p>
+    Containers override <code>to_descriptor</code> to include their children&rsquo;s descriptors. The result is always a plain dict tree, ready for JSON serialization.
+</p>
+
+<p>
+    <code>from_descriptor</code> is the tricky one. Its signature is:
+</p>
+
+<pre class="lesson-code"><span class="k">def</span> <span class="v">from_descriptor</span>(
+    desc: dict,
+    reg: ComponentRegistry | <span class="k">None</span> = <span class="k">None</span>,
+    seed: Component | <span class="k">None</span> = <span class="k">None</span>,
+) -&gt; Component</pre>
+
+<p>
+    The engine also exports <code>reconcile = from_descriptor</code> at the registry module level as a discoverability alias &mdash; readers arriving with a React mental model can find the operation under either name.
+</p>
+
+<h3>The algorithm</h3>
+
+<ol>
+    <li>Look up the descriptor&rsquo;s type name in the registry (<code>"text"</code> &rarr; <code>TextComponent</code>).</li>
+    <li>If a matching seed is provided (same type and key), <code>deepcopy</code> it. This preserves any callables the seed carries.</li>
+    <li>Apply the descriptor&rsquo;s scalar fields on top of the copy. The descriptor wins over seed defaults &mdash; the on-disk representation is authoritative.</li>
+    <li>Recurse into children, matching seed children by key for the deepcopy step.</li>
+</ol>
+
+<p>
+    The deepcopy step is how callables survive the JSON round-trip they can&rsquo;t actually make.
+</p>
+
+<h2>The callable-preservation problem</h2>
+
+<p>
+    Some component fields hold Python functions: <code>ComputedComponent.compute</code>, <code>DynamicChoiceComponent.options_fn</code>, <code>VisibilityComponent.predicate</code> (when given a callable). Functions can&rsquo;t serialize to JSON. The descriptor has no place for them.
+</p>
+
+<p>
+    This works fine in the normal case: the seed carries the callables, reconciliation <code>deepcopy</code>s the seed, the callables end up on the bound instance. A re-bind on the next request re-matches the seed, re-copies the callables, and the page runs forever.
+</p>
+
+<p>
+    But consider what happens when the seed stops matching. Maybe you:
+</p>
+
+<ul>
+    <li>Rename a key in <code>pages/survey.py</code> &mdash; the descriptor still has the old key.</li>
+    <li>Delete a component from the seed &mdash; the descriptor still has an entry for it.</li>
+    <li>Add a new component via structural action &mdash; the seed has no entry for that key.</li>
+</ul>
+
+<p>
+    In any of these cases, <code>from_descriptor</code> falls off the seed-match path and enters &ldquo;fresh construction&rdquo; mode: it builds the component from the registry using just the descriptor&rsquo;s config. No seed, no callables. The component renders and binds &mdash; but its callable fields are <code>None</code>. It does nothing. No warning is emitted.
+</p>
+
+<div class="lesson-callout warn">
+    <strong>This is a known silent failure mode.</strong> The mitigation today is that PageComponent threads the seed into every <code>from_descriptor</code> call during normal rebuild, so the gap only manifests when the seed and descriptor have genuinely diverged. The planned fix is to require the <code>seed</code> parameter for types declaring callable-valued fields, and return a typed diagnostic when seed-match fails &mdash; so the broken state is visible in the UI rather than silent.
+</div>
+
+<h2>SiblingRef — references that fail loudly</h2>
+
+<p>
+    A parallel problem: components that depend on siblings (<code>SwitchComponent</code>, <code>VisibilityComponent</code>, <code>DynamicChoiceComponent</code>, <code>ComputedComponent</code>, <code>ValidationComponent</code>, <code>ScoreComponent</code>, <code>ActionComponent</code>) reference those siblings by key. If a referenced sibling gets renamed or removed, the reference goes stale.
+</p>
+
+<p>
+    Before the fix, a stale reference was a silent bug: the dependent component would look up a non-existent sibling, get back <code>None</code>, and produce no output. After the fix, references are <code>SiblingRef</code> values &mdash; a <code>str</code> subclass that additionally carries an optional <code>expects</code> type assertion.
+</p>
+
+<pre class="lesson-code"><span class="k">from</span> engine.sibling_ref <span class="k">import</span> SiblingRef
+
+components=[
+    ChoiceComponent(key=<span class="s">"role"</span>, label=<span class="s">"Role"</span>, options=[<span class="s">"Engineer"</span>, <span class="s">"Other"</span>]),
+    VisibilityComponent(
+        key=<span class="s">"other-detail"</span>,
+        depends_on=SiblingRef(<span class="s">"role"</span>, expects=ChoiceComponent),
+        predicate=<span class="k">lambda</span> v: v == <span class="s">"Other"</span>,
+        component=TextComponent(key=<span class="s">"detail"</span>, label=<span class="s">"Specify"</span>),
+    ),
+]</pre>
+
+<p>
+    The sibling-reading components coerce their <code>depends_on</code> field into a <code>SiblingRef</code> at construction time &mdash; so even plain strings get the treatment. Then, after bind, <code>PageComponent._validate_sibling_refs()</code> walks the whole tree, builds a map of all available sibling keys per scope, and checks every <code>SiblingRef</code>:
+</p>
+
+<ul>
+    <li>Does the referenced key exist in the correct scope? If not, raise <code>SiblingRefError</code> with the owner&rsquo;s key, the missing target, the scope being searched, and the list of known siblings.</li>
+    <li>Does the referenced component&rsquo;s type match <code>expects</code>? If not, raise with both the expected and actual type names.</li>
+</ul>
+
+<p>
+    The error is raised during bind &mdash; before serialize, before render, before any user action. You see it immediately when a page loads, not silently days later when a conditional branch fails to fire.
+</p>
+
+<pre class="lesson-code"><span class="c"># Example error message</span>
+SiblingRefError: VisibilityComponent(key=<span class="s">"other-detail"</span>) references
+sibling <span class="s">"role"</span> (expects ChoiceComponent), but no sibling with that key
+exists in scope <span class="s">"survey"</span>.
+Known siblings: [<span class="s">"name"</span>, <span class="s">"role_choice"</span>, <span class="s">"subscribe"</span>].</pre>
+
+<h2>Field-type validation at the boundary</h2>
+
+<p>
+    One more guard. When a prop changes at runtime (via <code>_set_my_field</code> for top-level fields or <code>_set_my_config</code> for config entries), the engine validates the value against the dataclass annotation. <code>Literal["tabs","chain","sequence","accordion"]</code> on <code>NavigationComponent.mode</code> means any attempt to <code>_set_my_config("mode", "carousel")</code> raises <code>TypeError</code> citing the allowed values.
+</p>
+
+<p>
+    Supported annotations: simple types (<code>str</code>, <code>int</code>, <code>bool</code>, <code>float</code>), optional forms (<code>X | None</code> and <code>typing.Union</code>), and <code>Literal[...]</code>. Permissive on complex types (<code>Callable</code>, <code>list</code>, <code>dict</code>) so unannotated fields never raise.
+</p>
+
+<p>
+    This is the type system the engine chose not to add via a library. It costs ~60 lines on the base class, runs only at mutation boundaries, and has prevented exactly the kind of silent corruption that descriptor-driven systems are vulnerable to.
+</p>
+
+<h2>What reconciliation does NOT do</h2>
+
+<p>
+    Understanding what&rsquo;s <em>out of scope</em> sharpens what&rsquo;s in scope:
+</p>
+
+<ul>
+    <li><strong>Does not walk into the bound runtime.</strong> Reconciliation produces an <em>unbound</em> tree. Bind is a separate step.</li>
+    <li><strong>Does not validate descriptor shape.</strong> If a descriptor has an unknown key or mis-shaped children, reconciliation either fails loudly (unknown type) or silently accepts (wrong field types). The field-type validator runs at mutation boundaries, not at descriptor-load time.</li>
+    <li><strong>Does not diff two descriptors.</strong> Unlike React&rsquo;s reconciliation (which diffs old vs new render trees), this operation reconciles <em>one</em> descriptor against <em>one</em> seed. Descriptor diffing is not a concept here because the Store is the only source of truth.</li>
+</ul>
+
+<h2>Resilient bind</h2>
+
+<p>
+    If the descriptor is corrupt &mdash; truncated JSON, missing fields, malformed structure &mdash; <code>bind()</code> and <code>_rebuild()</code> catch the failure and fall back to the seed. The page renders from the Python definition as if no descriptor existed. Mutable pages can be reset by clearing the <code>__structure</code> entry entirely.
+</p>
+
+<p>
+    This falls under the &ldquo;don&rsquo;t take the whole page down&rdquo; principle established by the error boundary work in Lesson 6&rsquo;s parity of concerns. One corrupt descriptor shouldn&rsquo;t 500 a whole workflow.
+</p>
+
+<div class="lesson-callout try">
+    <strong>Try it.</strong> Open <code>data/{your-instance}.json</code> in an editor. Change the <code>label</code> on one of the <code>__structure</code> entries. Reload the page in the browser &mdash; the new label appears immediately, no server restart. That&rsquo;s reconciliation reading the descriptor you just modified. Now corrupt the JSON deliberately &mdash; delete a closing brace. Reload &mdash; the page falls back to the seed and still renders. The Store is the authority, but the seed is the safety net.
+</div>
+
+<div class="lesson-takeaways">
+    <h3>What you learned</h3>
+    <ul>
+        <li><span class="lesson-chip">Core</span> Three trees: seed (Python), descriptor (JSON on disk), bound (live, Store-connected). Reconciliation builds the bound tree from the other two.</li>
+        <li><span class="lesson-chip">Core</span> <code>__structure</code> is the canonical descriptor entry inside each container&rsquo;s Store scope.</li>
+        <li><span class="lesson-chip">Core</span> <code>from_descriptor(desc, seed=seed)</code> <code>deepcopy</code>s the seed (to preserve callables) and applies the descriptor&rsquo;s scalars on top.</li>
+        <li><span class="lesson-chip">Core</span> Callable-preservation has a known silent failure mode when the seed stops matching. <code>SiblingRef</code> + bind-time validation closes the adjacent silent mode for sibling references.</li>
+        <li><span class="lesson-chip">Core</span> Field-type validation runs at <code>_set_my_field</code> / <code>_set_my_config</code>. Supports <code>Literal[...]</code> for enum-like props.</li>
+        <li><span class="lesson-chip">Tip</span> <code>reconcile</code> is an alias for <code>from_descriptor</code>. Either name works; both resolve to the same function.</li>
+    </ul>
+</div>
+
+<p style="margin-top: 1.5rem;">
+    Next: this lesson described how a tree is reconstructed. But what actually <em>changes</em> the descriptor at runtime? Edit mode, config panels, and structural actions. Lesson 8 covers mutation mechanics end to end.
+</p>
+
+{% endblock %}

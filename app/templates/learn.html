@@ -57,6 +57,23 @@
         font-size: 0.88em;
         color: #1e40af;
     }
+    .lesson-group-label {
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #475569;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin: 1.5rem 0 0.6rem 0.25rem;
+    }
+    .lesson-group-label:first-of-type { margin-top: 0.5rem; }
+    .lesson-group-label .hint {
+        font-weight: 400;
+        color: #94a3b8;
+        text-transform: none;
+        letter-spacing: normal;
+        margin-left: 0.5rem;
+        font-size: 0.85rem;
+    }
     .lesson-grid {
         display: grid;
         grid-template-columns: 1fr;
@@ -140,6 +157,8 @@
         </ul>
     </div>
 
+    <div class="lesson-group-label">Fundamentals <span class="hint">&mdash; the mental model, in order</span></div>
+
     <div class="lesson-grid">
 
         <a class="lesson-card" href="/learn/hello">
@@ -183,6 +202,39 @@
             <div class="lesson-body">
                 <h3>Humans and Agents</h3>
                 <p>Affordances, HATEOAS, faithful projection. Why the same page drives a browser and an AI agent from a single URL.</p>
+            </div>
+            <div class="lesson-go">Start &rarr;</div>
+        </a>
+
+    </div>
+
+    <div class="lesson-group-label">Deep Dives <span class="hint">&mdash; mechanics, for when you need to extend the engine</span></div>
+
+    <div class="lesson-grid">
+
+        <a class="lesson-card" href="/learn/affordances">
+            <div class="lesson-num">6</div>
+            <div class="lesson-body">
+                <h3>Affordances, Rendering, and Parity Tests</h3>
+                <p>How each component generates affordances, how they become rendered HTML and agent JSON, and how parity tests enforce alignment of the two surfaces.</p>
+            </div>
+            <div class="lesson-go">Start &rarr;</div>
+        </a>
+
+        <a class="lesson-card" href="/learn/reconciliation">
+            <div class="lesson-num">7</div>
+            <div class="lesson-body">
+                <h3>Reconciliation and the Descriptor</h3>
+                <p>Seed vs descriptor vs bound tree. How <code>from_descriptor</code> rebuilds the live tree on every request, and how SiblingRef keeps cross-component references honest.</p>
+            </div>
+            <div class="lesson-go">Start &rarr;</div>
+        </a>
+
+        <a class="lesson-card" href="/learn/mutation">
+            <div class="lesson-num">8</div>
+            <div class="lesson-body">
+                <h3>Mutation Mechanics</h3>
+                <p>Edit mode, prop mutations, mutable pages, structural actions, self-modifying pages. How the Store becomes the single source of truth for runtime changes.</p>
             </div>
             <div class="lesson-go">Start &rarr;</div>
         </a>
