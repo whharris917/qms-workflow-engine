@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}QMS Workflow Engine — Wikipedia{% endblock %}
+{% block title %}Razem — Wikipedia{% endblock %}
 
 {% block head_extra %}
 <style>
@@ -246,18 +246,22 @@
 <div class="wiki-wrap">
 
     <div class="wiki-meta">From the internal reference library</div>
-    <h1 class="wiki-title">QMS Workflow Engine</h1>
-    <div class="wiki-subtitle">A hypothetical encyclopedia entry about this engine, written in the style of a Wikipedia article.</div>
+    <h1 class="wiki-title">Razem</h1>
+    <div class="wiki-subtitle">A hypothetical encyclopedia entry about the Razem framework, written in the style of a Wikipedia article.</div>
 
     <div class="wiki-body">
         <div class="wiki-main">
 
             <p>
-                The <strong>QMS Workflow Engine</strong> is a Python framework for building interactive workflow applications that serve humans and artificial-intelligence (AI) agents from a single source definition. Developed under the <em>Pipe Dream</em> project as part of a <a href="https://en.wikipedia.org/wiki/Good_manufacturing_practice">GMP</a>-inspired Quality Management System (QMS), it treats a web page and a machine-readable API as two projections of the same underlying state, an invariant the project refers to as <em>faithful projection</em>.<sup class="ref"><a href="#ref-1">[1]</a></sup> The framework uses a component tree as its primary abstraction, reaching a design recognizably adjacent to <a href="https://en.wikipedia.org/wiki/React_(JavaScript_library)">React</a> and similar front-end libraries despite being developed from different first principles.<sup class="ref"><a href="#ref-2">[2]</a></sup>
+                <strong>Razem</strong> (<a href="https://en.wikipedia.org/wiki/Polish_language">Polish</a>: <em>together</em>) is a Python framework for building interactive applications that serve humans and artificial-intelligence (AI) agents from a single source definition. Developed under the <em>Pipe Dream</em> project as the runtime for a <a href="https://en.wikipedia.org/wiki/Good_manufacturing_practice">GMP</a>-inspired Quality Management System, it treats a web page and a machine-readable API as two projections of the same underlying state, an invariant the project refers to as <em>faithful projection</em>.<sup class="ref"><a href="#ref-1">[1]</a></sup> Razem uses a component tree as its primary abstraction, reaching a design recognizably adjacent to <a href="https://en.wikipedia.org/wiki/React_(JavaScript_library)">React</a> and similar front-end libraries despite being developed from different first principles.<sup class="ref"><a href="#ref-2">[2]</a></sup>
             </p>
 
             <p>
-                The engine is notable for making AI agents a first-class client: every rendered button corresponds to a machine-readable <em>affordance</em> exposed at the same <a href="https://en.wikipedia.org/wiki/HATEOAS">HATEOAS</a> URL, enabling a language model to drive any workflow without a parallel API schema.<sup class="ref"><a href="#ref-3">[3]</a></sup> The alignment between the two surfaces is enforced at continuous-integration time by a parity test suite.<sup class="ref"><a href="#ref-4">[4]</a></sup>
+                Razem is notable for making AI agents a first-class client: every rendered button corresponds to a machine-readable <em>affordance</em> exposed at the same <a href="https://en.wikipedia.org/wiki/HATEOAS">HATEOAS</a> URL, enabling a language model to drive any workflow without a parallel API schema.<sup class="ref"><a href="#ref-3">[3]</a></sup> The alignment between the two surfaces is enforced at continuous-integration time by a parity test suite.<sup class="ref"><a href="#ref-4">[4]</a></sup>
+            </p>
+
+            <p>
+                Although Razem grew out of work on a quality management system, the framework itself contains no QMS-specific code and is general-purpose. The QMS it serves &mdash; internally the <em>QMS Workflow Engine</em> &mdash; is the first intended application to be built on top of Razem; the two had been conflated under a single name for most of early development before being disentangled.<sup class="ref"><a href="#ref-13">[13]</a></sup>
             </p>
 
             <p>
@@ -296,7 +300,7 @@
 
             <h2 id="history">History</h2>
             <p>
-                The engine originated as part of <em>Pipe Dream</em>, a project combining a Python-based quality management system with a downstream application called <em>Flow State</em>. The QMS was initially bootstrapped with a command-line interface for document control (change records, investigations, variance reports) but lacked a runtime for the actual workflows the QMS described.<sup class="ref"><a href="#ref-5">[5]</a></sup>
+                Razem originated as part of <em>Pipe Dream</em>, a project combining a Python-based quality management system with a downstream application called <em>Flow State</em>. The QMS was initially bootstrapped with a command-line interface for document control (change records, investigations, variance reports) but lacked a runtime for the actual workflows the QMS described.<sup class="ref"><a href="#ref-5">[5]</a></sup>
             </p>
             <p>
                 A first workflow engine, based on <a href="https://en.wikipedia.org/wiki/YAML">YAML</a> definitions and graph traversal, was prototyped in March 2026 (known internally as &ldquo;Workflow Engine v1&rdquo;). A web-based iteration followed (v2), which split handler logic across multiple implementations. In late March 2026 the codebase was deleted and rebuilt from first principles around a new abstraction the developers called the <em>eigenform</em>: a self-contained unit that rendered itself to HTML, serialized itself to JSON, and dispatched its own actions.<sup class="ref"><a href="#ref-5">[5]</a></sup>
@@ -305,14 +309,18 @@
                 The <em>eigenform</em> name, originally intended to evoke the <a href="https://en.wikipedia.org/wiki/Eigenvalues_and_eigenvectors">eigenvector</a> sense of &ldquo;preserves identity under transformation,&rdquo; was retired in April 2026 in favor of the industry-standard term <em>component</em>.<sup class="ref"><a href="#ref-6">[6]</a></sup> The project team described the original name as a path-dependent choice that obscured the architecture&rsquo;s fundamental similarity to existing component frameworks.<sup class="ref"><a href="#ref-2">[2]</a></sup>
             </p>
             <p>
-                Subsequent development focused on four &ldquo;framing passes&rdquo; aligning the engine&rsquo;s vocabulary with React conventions: naming internal invariants (props, state, derived; reconciliation), adding typed sibling references with bind-time validation, introducing render-time error boundaries, and finally renaming the base class from <code>Eigenform</code> to <code>Component</code>.<sup class="ref"><a href="#ref-1">[1]</a></sup>
+                Subsequent development focused on four &ldquo;framing passes&rdquo; aligning the framework&rsquo;s vocabulary with React conventions: naming internal invariants (props, state, derived; reconciliation), adding typed sibling references with bind-time validation, introducing render-time error boundaries, and finally renaming the base class from <code>Eigenform</code> to <code>Component</code>.<sup class="ref"><a href="#ref-1">[1]</a></sup>
+            </p>
+
+            <p>
+                Later in April 2026, the framework itself was renamed. Until that point the codebase had been referred to interchangeably as the &ldquo;QMS Workflow Engine,&rdquo; conflating the framework with its first intended application. Recognizing the naming equivalent of describing <a href="https://en.wikipedia.org/wiki/React_(JavaScript_library)">React</a> as &ldquo;Facebook JS,&rdquo; the project team separated the two identities: the framework was renamed <strong>Razem</strong> (<a href="https://en.wikipedia.org/wiki/Polish_language">Polish</a> for &ldquo;together&rdquo;), reflecting the dual-audience invariant that humans and AI agents <em>together</em> read the same self-describing page. The name <em>QMS Workflow Engine</em> was retained for the application under construction.<sup class="ref"><a href="#ref-13">[13]</a></sup>
             </p>
 
             <h2 id="architecture">Architecture</h2>
 
             <h3 id="core-loop">The core loop</h3>
             <p>
-                Every request processed by the engine walks four stages:<sup class="ref"><a href="#ref-7">[7]</a></sup>
+                Every request processed by Razem walks four stages:<sup class="ref"><a href="#ref-7">[7]</a></sup>
             </p>
             <ol>
                 <li><strong>Define</strong>. Page definitions live as Python modules in <code>pages/</code>, auto-discovered on every request. A definition exports a <em>seed</em>: an unbound tree of component instances.</li>
@@ -350,7 +358,7 @@
             <h3 id="components">Component types</h3>
             <p class="hatnote">See also: <a href="/readme">Component Reference</a>.</p>
             <p>
-                The engine ships with 26 built-in component classes registered under 31 names, covering data leaves (<code>TextComponent</code>, <code>NumberComponent</code>, <code>DateComponent</code>, <code>BooleanComponent</code>, <code>ChoiceComponent</code>, <code>CheckboxComponent</code>, <code>MultiComponent</code>), collections (<code>ListComponent</code>, <code>SetComponent</code>, <code>DictionaryComponent</code>, <code>TableComponent</code>), containers (<code>PageComponent</code>, <code>GroupComponent</code>, <code>NavigationComponent</code>, <code>RepeaterComponent</code>), reactive components (<code>SwitchComponent</code>, <code>VisibilityComponent</code>, <code>DynamicChoiceComponent</code>, <code>ComputedComponent</code>, <code>ScoreComponent</code>, <code>ValidationComponent</code>), and wrappers (<code>HistoryComponent</code>, <code>ActionComponent</code>, <code>InfoComponent</code>).<sup class="ref"><a href="#ref-9">[9]</a></sup>
+                Razem ships with 26 built-in component classes registered under 31 names, covering data leaves (<code>TextComponent</code>, <code>NumberComponent</code>, <code>DateComponent</code>, <code>BooleanComponent</code>, <code>ChoiceComponent</code>, <code>CheckboxComponent</code>, <code>MultiComponent</code>), collections (<code>ListComponent</code>, <code>SetComponent</code>, <code>DictionaryComponent</code>, <code>TableComponent</code>), containers (<code>PageComponent</code>, <code>GroupComponent</code>, <code>NavigationComponent</code>, <code>RepeaterComponent</code>), reactive components (<code>SwitchComponent</code>, <code>VisibilityComponent</code>, <code>DynamicChoiceComponent</code>, <code>ComputedComponent</code>, <code>ScoreComponent</code>, <code>ValidationComponent</code>), and wrappers (<code>HistoryComponent</code>, <code>ActionComponent</code>, <code>InfoComponent</code>).<sup class="ref"><a href="#ref-9">[9]</a></sup>
             </p>
             <p>
                 A single <code>NavigationComponent</code> class replaces what other frameworks expose as four separate widgets (tabs, wizards, sequences, accordions), switching behavior via a <code>mode</code> prop that accepts one of four <a href="https://en.wikipedia.org/wiki/Literal_type">literal</a> values.<sup class="ref"><a href="#ref-9">[9]</a></sup>
@@ -358,7 +366,7 @@
 
             <h3 id="faithful-projection">Faithful projection</h3>
             <p>
-                <em>Faithful projection</em> is the engine&rsquo;s term for the invariant that JSON and HTML views of a page describe the same state and expose the same URL surface. The property is enforced at continuous-integration time by a 72-test parity suite spanning nine test categories, including forward parity (every JSON URL appears in HTML), reverse parity (every clickable HTML URL is declared in JSON), action-name parity, URL resolvability, and structural shape tests.<sup class="ref"><a href="#ref-4">[4]</a></sup>
+                <em>Faithful projection</em> is Razem&rsquo;s term for the invariant that JSON and HTML views of a page describe the same state and expose the same URL surface. The property is enforced at continuous-integration time by a 72-test parity suite spanning nine test categories, including forward parity (every JSON URL appears in HTML), reverse parity (every clickable HTML URL is declared in JSON), action-name parity, URL resolvability, and structural shape tests.<sup class="ref"><a href="#ref-4">[4]</a></sup>
             </p>
 
             <h3 id="flotation">Affordance flotation</h3>
@@ -384,7 +392,7 @@
 
             <h2 id="philosophy">Design philosophy</h2>
             <p>
-                The engine was designed around two principles described in the project&rsquo;s architectural documentation:<sup class="ref"><a href="#ref-2">[2]</a></sup><sup class="ref"><a href="#ref-12">[12]</a></sup>
+                Razem was designed around two principles described in the project&rsquo;s architectural documentation:<sup class="ref"><a href="#ref-2">[2]</a></sup><sup class="ref"><a href="#ref-12">[12]</a></sup>
             </p>
             <ul>
                 <li><strong>Dual-consumer equivalence.</strong> Human operators and AI agents interact with the same URL, take the same actions against the same endpoints, and see equivalent representations of the same state. Neither surface is a second-class citizen.</li>
@@ -403,7 +411,7 @@
                 <dd>The operation that attaches a Store to a seed and produces a live tree. Analogous to React&rsquo;s component mount.</dd>
 
                 <dt>Component</dt>
-                <dd>The engine&rsquo;s base abstraction, previously called an <em>eigenform</em>. Each concrete component is a Python dataclass subclass (<code>TextComponent</code>, <code>NavigationComponent</code>, etc.) implementing the protocol: <code>serialize()</code>, <code>render()</code>, <code>_handle()</code>.</dd>
+                <dd>Razem&rsquo;s base abstraction, previously called an <em>eigenform</em>. Each concrete component is a Python dataclass subclass (<code>TextComponent</code>, <code>NavigationComponent</code>, etc.) implementing the protocol: <code>serialize()</code>, <code>render()</code>, <code>_handle()</code>.</dd>
 
                 <dt>Descriptor</dt>
                 <dd>A JSON-serializable snapshot of a component tree, stored at the <code>__structure</code> key inside the Store. Canonical source of truth for structure and props.</dd>
@@ -426,7 +434,7 @@
                 <thead>
                     <tr>
                         <th>Feature</th>
-                        <th>QMS Engine</th>
+                        <th>Razem</th>
                         <th>React</th>
                         <th>Phoenix LiveView</th>
                         <th>Svelte / SvelteKit</th>
@@ -506,7 +514,7 @@
                 </tbody>
             </table>
             <p>
-                The closest analogue in spirit is <a href="https://en.wikipedia.org/wiki/Phoenix_(web_framework)">Phoenix LiveView</a> &mdash; both systems maintain server-authoritative component state, use morphdom-style DOM diffing, and eschew client-side hydration. Unlike LiveView, the QMS engine treats machine agents as a peer client rather than a consumer of a separate API, and its state lives in per-instance JSON rather than in-memory server processes.<sup class="ref"><a href="#ref-2">[2]</a></sup>
+                The closest analogue in spirit is <a href="https://en.wikipedia.org/wiki/Phoenix_(web_framework)">Phoenix LiveView</a> &mdash; both systems maintain server-authoritative component state, use morphdom-style DOM diffing, and eschew client-side hydration. Unlike LiveView, Razem treats machine agents as a peer client rather than a consumer of a separate API, and its state lives in per-instance JSON rather than in-memory server processes.<sup class="ref"><a href="#ref-2">[2]</a></sup>
             </p>
 
             <h2 id="limitations">Limitations</h2>
@@ -522,9 +530,9 @@
 
             <h2 id="see-also">See also</h2>
             <ul>
-                <li><a href="/framing">Conceptual framing</a> &mdash; extended reference for the engine&rsquo;s vocabulary alignment with React.</li>
-                <li><a href="/readme">Engine README</a> &mdash; full component catalog and HTTP API reference.</li>
-                <li><a href="/deepdive">Deep Dive</a> &mdash; the engine&rsquo;s self-analysis, including open limitations.</li>
+                <li><a href="/framing">Conceptual framing</a> &mdash; extended reference for Razem&rsquo;s vocabulary alignment with React.</li>
+                <li><a href="/readme">Razem README</a> &mdash; full component catalog and HTTP API reference.</li>
+                <li><a href="/deepdive">Deep Dive</a> &mdash; the framework&rsquo;s self-analysis, including open limitations.</li>
                 <li><a href="/learn">Learning Portal</a> &mdash; progressive tutorial for new contributors.</li>
                 <li><a href="/portal">Agent Portal</a> &mdash; live instance launcher.</li>
             </ul>
@@ -532,11 +540,11 @@
             <h2 id="references">References</h2>
             <div class="wiki-refs">
                 <ol>
-                    <li id="ref-1"><a href="/framing">Conceptual Framing</a>. QMS Workflow Engine, &sect;1 (Thesis), &sect;5 (Error boundaries), &sect;8 (How we got here).</li>
+                    <li id="ref-1"><a href="/framing">Conceptual Framing</a>. Razem, &sect;1 (Thesis), &sect;5 (Error boundaries), &sect;8 (How we got here).</li>
                     <li id="ref-2"><a href="/framing#s2">Conceptual Framing &sect;2</a>, &ldquo;The Mapping.&rdquo; Compares engine vocabulary with React conventions row by row.</li>
                     <li id="ref-3"><a href="/learn/humans-and-agents">Humans and Agents</a>. Learning Portal Lesson 5. Affordances, HATEOAS, and controlled-vs-uncontrolled state.</li>
                     <li id="ref-4"><a href="/learn/affordances">Affordances, Rendering, and Parity Tests</a>. Learning Portal Lesson 6. The 72-test parity suite across 9 categories.</li>
-                    <li id="ref-5"><a href="/readme">Engine README</a>, &ldquo;History&rdquo;. Project state arc from YAML prototype to current architecture.</li>
+                    <li id="ref-5"><a href="/readme">Razem README</a>, &ldquo;History&rdquo;. Project state arc from YAML prototype to current architecture.</li>
                     <li id="ref-6"><code>docs/architecture.md</code> change log, entry for Session-2026-04-17-002. Eigenform &rarr; Component rename rationale.</li>
                     <li id="ref-7"><a href="/learn/loop">The Core Loop</a>. Learning Portal Lesson 2.</li>
                     <li id="ref-8"><a href="/learn/reconciliation">Reconciliation and the Descriptor</a>. Learning Portal Lesson 7.</li>
@@ -544,12 +552,13 @@
                     <li id="ref-10"><a href="/framing#s2">Conceptual Framing &sect;2</a>, &ldquo;Portal&rdquo; row; <code>docs/architecture.md</code> &sect;4, &ldquo;Affordance flotation.&rdquo;</li>
                     <li id="ref-11"><a href="/learn/mutation">Mutation Mechanics</a>. Learning Portal Lesson 8.</li>
                     <li id="ref-12"><a href="/deepdive">Deep Dive</a>. Self-analysis with explicit list of architectural gaps.</li>
+                    <li id="ref-13"><code>.claude/PROJECT_STATE.md</code>, &sect;1 (Where We Are Now), entry for Session-2026-04-17-003. Framework-vs-application naming decision separating Razem from the QMS Workflow Engine application.</li>
                 </ol>
             </div>
 
             <h2 id="external">External links</h2>
             <ul>
-                <li><a href="https://github.com/whharris917/qms-workflow-engine">QMS Workflow Engine repository</a> on GitHub.</li>
+                <li><a href="https://github.com/whharris917/razem">Razem repository</a> on GitHub.</li>
                 <li><a href="https://github.com/whharris917/pipe-dream">Pipe Dream project</a> &mdash; parent project including the QMS documents.</li>
             </ul>
 
@@ -563,23 +572,25 @@
             </div>
 
             <p class="wiki-retrieved">
-                Retrieved from the internal project library. Last updated: Session-2026-04-17-002.
+                Retrieved from the internal project library. Last updated: Session-2026-04-17-003.
             </p>
 
         </div><!-- /wiki-main -->
 
         <aside class="wiki-main">
             <div class="infobox">
-                <div class="ib-title">QMS Workflow Engine</div>
+                <div class="ib-title">Razem</div>
                 <div class="ib-hero">
                     <span class="icon">&#9881;</span>
                     <em>&ldquo;One definition,<br>two audiences.&rdquo;</em>
                 </div>
                 <table>
                     <tr><th>Developer</th>         <td>Pipe Dream project (<a href="https://github.com/whharris917">whharris917</a>)</td></tr>
-                    <tr><th>Initial release</th>   <td>March 25, 2026<br><small>(as <em>Eigenform</em> engine)</small></td></tr>
+                    <tr><th>Name origin</th>       <td><a href="https://en.wikipedia.org/wiki/Polish_language">Polish</a>: &ldquo;together&rdquo;</td></tr>
+                    <tr><th>Former names</th>      <td><em>Eigenform</em> (March 2026); <em>QMS Workflow Engine</em> (March&ndash;April 2026)</td></tr>
+                    <tr><th>Initial release</th>   <td>March 25, 2026<br><small>(as <em>Eigenform</em>)</small></td></tr>
                     <tr><th>Stable release</th>    <td>2026-04-17 &bull; <code>dev/content-model-unification</code></td></tr>
-                    <tr><th>Repository</th>        <td><a href="https://github.com/whharris917/qms-workflow-engine">github.com/whharris917/<wbr>qms-workflow-engine</a></td></tr>
+                    <tr><th>Repository</th>        <td><a href="https://github.com/whharris917/razem">github.com/whharris917/<wbr>razem</a></td></tr>
                     <tr><th>Written in</th>        <td><a href="https://en.wikipedia.org/wiki/Python_(programming_language)">Python</a> (3.11+)</td></tr>
                     <tr><th>Engine</th>            <td><a href="https://en.wikipedia.org/wiki/Flask_(web_framework)">Flask</a>, <a href="https://en.wikipedia.org/wiki/Jinja_(template_engine)">Jinja2</a>, <a href="https://github.com/patrick-steele-idem/morphdom">morphdom</a></td></tr>
                     <tr><th>Platform</th>          <td>Cross-platform (server-side)</td></tr>
