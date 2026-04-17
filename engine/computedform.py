@@ -19,16 +19,24 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from engine.eigenform import Eigenform
+from engine.sibling_ref import SiblingRef
 from engine.templates import render_template
 
 
 @dataclass
 class ComputedForm(Eigenform):
     """Read-only eigenform that computes a value from sibling state."""
-    depends_on: list[str] = field(default_factory=list)
+    depends_on: "list[str | SiblingRef]" = field(default_factory=list)
     compute_fn: Callable[[dict], Any] | None = None
     store_result: bool = False
     display_format: str | None = None
+
+    def __post_init__(self):
+        if self.depends_on:
+            self.depends_on = SiblingRef.coerce_many(self.depends_on)
+
+    def _sibling_refs(self) -> list[SiblingRef]:
+        return [r for r in self.depends_on if isinstance(r, SiblingRef)]
 
     @property
     def has_data(self) -> bool:

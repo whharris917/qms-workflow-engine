@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from engine.eigenform import Eigenform
+from engine.sibling_ref import SiblingRef
 from engine.templates import render_template
 
 
@@ -23,6 +24,10 @@ class ScoreForm(Eigenform):
       - callable: receives the stored value, returns bool
     """
     answer_key: dict[str, Any] = field(default_factory=dict)
+
+    def _sibling_refs(self) -> list[SiblingRef]:
+        # Keys in answer_key are implicit sibling references.
+        return [SiblingRef(k) for k in self.answer_key.keys()]
 
     @property
     def is_complete(self) -> bool:

@@ -24,14 +24,22 @@ from html import escape
 from typing import Any
 
 from engine.affordances import Affordance, SimpleButtonAffordance
+from engine.sibling_ref import SiblingRef
 from engine.store import Store
 
 
 def render_dependency_line(depends_on, url_prefix: str = "") -> str:
-    """Render a 'Depends on:' indicator for sibling-reading eigenforms."""
+    """Render a 'Depends on:' indicator for sibling-reading eigenforms.
+
+    Accepts: a sibling key (str), a SiblingRef, or a list/tuple of either.
+    """
     if not depends_on:
         return ""
-    deps = [depends_on] if isinstance(depends_on, str) else list(depends_on)
+    # Normalize to a list of string keys, accepting str, SiblingRef, or iterables thereof.
+    if isinstance(depends_on, (str, SiblingRef)):
+        deps = [str(depends_on)]
+    else:
+        deps = [str(d) for d in depends_on]
     parts = []
     for d in deps:
         path = f"{url_prefix}/{d}" if url_prefix else d
@@ -45,6 +53,169 @@ def render_dependency_line(depends_on, url_prefix: str = "") -> str:
 
 # Fields that belong to the base protocol, not type-specific config
 _BASE_FIELDS = frozenset({"key", "label", "instruction", "editable", "_store", "_scope", "_url_prefix"})
+
+
+# --- Field-type validation for _set_my_field / _set_my_config ---
+#
+# Reads the dataclass field annotation and rejects mistyped values at the
+# boundary. Supports: simple types, Optional/Union (X | None), Literal,
+# and permissive fallback for complex types (list, dict, Callable, etc.).
+# See the framing design plan §8 (Pass 2, Move 2) for the rationale.
+_TYPE_HINTS_CACHE: dict[type, dict] = {}
+
+
+def _get_type_hint(cls: type, name: str):
+    """Resolve the dataclass field annotation for `name`, caching per-class.
+
+    Returns the resolved type (e.g., `int`, `bool`, `str | None`,
+    `Literal["a","b"]`) or None if the field is not annotated.
+    """
+    import typing as _t
+    hints = _TYPE_HINTS_CACHE.get(cls)
+    if hints is None:
+        try:
+            hints = _t.get_type_hints(cls)
+        except Exception:
+            hints = {}
+        _TYPE_HINTS_CACHE[cls] = hints
+    return hints.get(name)
+
+
+def _value_matches_type(value, type_hint) -> bool:
+    """Check whether `value` is compatible with `type_hint`.
+
+    Returns True on match, on unknown/unhandled type shapes (permissive
+    fallback), or when no annotation is available. Returns False only for
+    clear mismatches of handled type shapes.
+    """
+    import typing as _t
+    if type_hint is None:
+        return True  # no annotation — permissive
+    origin = _t.get_origin(type_hint)
+    args = _t.get_args(type_hint)
+
+    # Literal["a", "b"] — value must be in args
+    if origin is _t.Literal:
+        return value in args
+
+    # Union / Optional — any branch matches.
+    # Two forms: typing.Union[X, Y] → origin is typing.Union;
+    #            X | Y (PEP 604) → origin is types.UnionType (Python 3.10+).
+    import types as _types
+    _UnionType = getattr(_types, "UnionType", None)
+    if origin is _t.Union or (_UnionType is not None and origin is _UnionType):
+        return any(_value_matches_type(value, a) for a in args)
+
+    # Concrete simple types
+    if type_hint is type(None):
+        return value is None
+    if type_hint is bool:
+        # bool is a subclass of int, so guard order matters.
+        return isinstance(value, bool)
+    if type_hint is int:
+        return isinstance(value, int) and not isinstance(value, bool)
+    if type_hint is float:
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if type_hint is str:
+        return isinstance(value, str)
+    if type_hint is list:
+        return isinstance(value, list)
+    if type_hint is dict:
+        return isinstance(value, dict)
+
+    # Parameterized generics: list[X], dict[X,Y] — check container kind only.
+    if origin in (list, tuple, set, frozenset):
+        return isinstance(value, origin)
+    if origin is dict:
+        return isinstance(value, dict)
+
+    # Bare class annotation (e.g., a dataclass type)
+    if isinstance(type_hint, type):
+        return isinstance(value, type_hint)
+
+    # Unknown / complex (Callable, ForwardRef, etc.) — permissive
+    return True
+
+
+def _render_error_card(ef, exc: Exception) -> str:
+    """Produce a structured, self-contained error card for a failed render.
+
+    Called by Eigenform.render_safely() when render() raises. The card is
+    HTML-safe and contains no affordances of its own — it is a dead-end
+    placeholder describing what failed. Siblings in the containing
+    eigenform continue to render normally.
+
+    Debug mode (Flask app.debug == True) adds a collapsible traceback.
+    Production mode shows only the exception class and message.
+
+    Defensive: if the _error_boundary.html template cannot be rendered for
+    any reason, a minimal inline fallback is returned so that the page
+    remains viewable.
+    """
+    import traceback as _tb
+    try:
+        from engine.templates import render_template
+        # Debug-mode detection that doesn't hard-fail outside Flask.
+        debug = False
+        try:
+            from flask import current_app
+            debug = bool(current_app.debug)
+        except Exception:
+            pass
+        tb_text = _tb.format_exc() if debug else ""
+        return render_template(
+            "_error_boundary.html",
+            key=getattr(ef, "key", "?"),
+            ef_type=type(ef).__name__,
+            exc_type=type(exc).__name__,
+            exc_msg=str(exc),
+            traceback=tb_text,
+        )
+    except Exception:
+        # Last-resort fallback — cannot let the error boundary itself break
+        # the page. Plain HTML, no template.
+        safe_key = escape(str(getattr(ef, "key", "?")))
+        safe_type = escape(type(ef).__name__)
+        safe_exc_type = escape(type(exc).__name__)
+        safe_exc_msg = escape(str(exc))
+        return (
+            f'<div style="border: 2px solid #c74545; background: #fff5f5; '
+            f'padding: 0.6rem 0.85rem; margin: 0.4rem 0; border-radius: 4px; '
+            f'font-family: -apple-system, sans-serif;">'
+            f'<strong style="color: #8a2727;">Render error</strong> in '
+            f'<code>{safe_type}</code> (key <code>{safe_key}</code>): '
+            f'<code>{safe_exc_type}: {safe_exc_msg}</code>'
+            f'</div>'
+        )
+
+
+def _validate_field_value(cls: type, name: str, value):
+    """Validate that `value` is compatible with the declared type of `cls.name`.
+
+    Raises TypeError with a rich message on mismatch. Passes silently on
+    match, on unknown-annotation fields, and on permissively-handled
+    complex types (see _value_matches_type).
+    """
+    import typing as _t
+    hint = _get_type_hint(cls, name)
+    if hint is None:
+        return
+    if _value_matches_type(value, hint):
+        return
+    # Build a readable hint description
+    origin = _t.get_origin(hint)
+    if origin is _t.Literal:
+        hint_desc = f"Literal{list(_t.get_args(hint))!r}"
+    else:
+        hint_desc = getattr(hint, "__name__", None) or str(hint)
+    raise TypeError(
+        f"{cls.__name__}.{name}: value {value!r} (type "
+        f"{type(value).__name__}) is not compatible with declared type "
+        f"{hint_desc}. This rejection happens at the descriptor mutation "
+        f"boundary to prevent silent type-corruption. If the value is "
+        f"coming from user input, the handler should coerce/validate it "
+        f"before calling _set_my_config."
+    )
 
 
 def _is_json_safe(val) -> bool:
@@ -75,6 +246,21 @@ class Eigenform:
     @property
     def children(self) -> list[Eigenform]:
         """Direct child eigenforms. Containers override this."""
+        return []
+
+    def _sibling_refs(self) -> list[SiblingRef]:
+        """Sibling eigenforms this one reads from.
+
+        Sibling-reading eigenforms (SwitchForm, VisibilityForm,
+        DynamicChoiceForm, ComputedForm, ValidationForm, ActionForm,
+        ScoreForm) override this to declare their dependencies as
+        SiblingRef values. PageForm collects all refs after bind and
+        validates that each referenced sibling actually exists in the
+        ref's scope — closing the silent-orphan bug where a renamed or
+        deleted sibling would leave dependents quietly broken.
+
+        Default: no refs (leaf forms and most containers).
+        """
         return []
 
     def _bind_children(self, store: Store, url_prefix: str):
@@ -120,9 +306,14 @@ class Eigenform:
         The parent's __structure is the canonical record. Also updates
         self.{name} so the runtime instance stays consistent within this
         request before the next bind.
+
+        Validates `value` against the field's declared type annotation at
+        the boundary. Raises TypeError if the value is the wrong type for
+        the field. See _validate_field_value for supported type shapes.
         """
         if self._store is None or self._scope is None:
             return
+        _validate_field_value(type(self), name, value)
         structure = self._store.get(self._scope, "__structure") or []
         for desc in structure:
             if desc.get("key") == self.key:
@@ -139,9 +330,15 @@ class Eigenform:
 
         Also updates self.{name} so the runtime instance reflects the change
         within this request.
+
+        Validates `value` against the field's declared type annotation at
+        the boundary. Raises TypeError if the value is the wrong type.
+        This closes the silent-corruption class of bugs where a bool field
+        could be set to an arbitrary string and persisted.
         """
         if self._store is None or self._scope is None:
             return
+        _validate_field_value(type(self), name, value)
         structure = self._store.get(self._scope, "__structure") or []
         for desc in structure:
             if desc.get("key") == self.key:
@@ -526,6 +723,27 @@ class Eigenform:
 # Forms that are containers (transparent wrapper, no card styling in themes)
     _CONTAINER_FORMS = {"page", "navigation", "group", "visibility", "switch", "repeater"}
 
+    def render_safely(self) -> str:
+        """Render this eigenform, catching any exception and returning an
+        error card instead of letting the exception propagate.
+
+        The React-style error boundary for this engine. Containers iterate
+        children via render_safely() rather than render() so that a broken
+        child does not kill the whole page — it appears as a visible,
+        scoped error card while siblings continue to render.
+
+        QMS alignment: failures are visible (rendered inline, not swallowed),
+        scoped (only the failing subtree is affected), and reportable (the
+        card exposes key, type, exception class, and message).
+
+        If the error-boundary template itself fails, falls back to a minimal
+        plain-text card so that nothing can make a page unviewable.
+        """
+        try:
+            return self.render()
+        except Exception as e:
+            return _render_error_card(self, e)
+
     def render(self) -> str:
         """Render this eigenform as HTML, wrapped in a themed container.
 
@@ -537,6 +755,10 @@ class Eigenform:
         The wrapper HTML is generated by a Jinja2 template (wrapper.html),
         which themes can override (e.g. sleek/wrapper.html) to control the
         full output structure without CSS hiding tricks.
+
+        Note: containers iterate children via render_safely() so that a
+        broken child is caught and displayed as an error card rather than
+        killing the whole page. See also render_safely().
         """
         from engine.templates import render_template
 

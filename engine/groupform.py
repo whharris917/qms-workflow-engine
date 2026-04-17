@@ -396,10 +396,10 @@ class GroupForm(Eigenform):
 
     def render_from_data(self, data: dict) -> str:
         from engine.registry import get_registry
-        children_html = [ef.render() for ef in self.eigenforms]
+        children_html = [ef.render_safely() for ef in self.eigenforms]
         child_items = []
         if data.get("edit_mode"):
             for i, ef in enumerate(self.eigenforms):
-                child_items.append({"key": ef.key, "editable": ef.editable, "index": i, "html": ef.render()})
+                child_items.append({"key": ef.key, "editable": ef.editable, "index": i, "html": ef.render_safely()})
         available_types = sorted(get_registry().available()) if data.get("edit_mode") else []
         return render_template("group.html", data=data, ef=self, url=self.url, label=data.get("label", ""), instruction=data.get("instruction") or "", children_html=children_html, child_items=child_items, available_types=available_types)

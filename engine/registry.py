@@ -312,19 +312,49 @@ def get_type_catalog() -> list[dict]:
 
 def from_descriptor(desc: dict, reg: EigenformRegistry | None = None,
                     seed: "Eigenform | None" = None) -> "Eigenform":
-    """Reconstruct an eigenform from a structural descriptor.
+    """Reconcile a descriptor against a seed to produce a live eigenform.
+
+    This operation is **reconciliation** — the rough equivalent of React's
+    element-tree reconciliation. It takes a JSON-serializable descriptor
+    (the on-disk source of truth for structure) and an optional Python-side
+    seed (the source of truth for callables and other non-serializable
+    behavior), and produces an unbound eigenform ready for bind().
+
+    The descriptor wins over seed defaults on scalar fields — the on-disk
+    representation is authoritative. The seed wins on callables — they
+    cannot round-trip through JSON.
 
     Args:
-        desc: descriptor dict produced by to_descriptor()
-        reg: registry for type lookup (uses default if None)
+        desc: descriptor dict produced by to_descriptor(). Holds type, key,
+              label, instruction, editable, optional config, and optional
+              children fields.
+        reg: registry for type lookup. Uses the default registry if None.
         seed: the corresponding seed eigenform from the Python definition.
-              If provided and it matches (same type and key), the seed is
-              returned directly — preserving any callables that can't be
-              serialized. If None, the eigenform is constructed fresh from
-              the registry and descriptor config.
+              If provided and matching (same type and key), the seed is
+              deepcopied and the descriptor's scalars are applied on top —
+              preserving callables from the seed. If None or mismatched,
+              the eigenform is constructed fresh from the registry and
+              descriptor config.
 
     Returns:
         An unbound Eigenform instance ready for bind().
+
+    Raises:
+        ValueError: if desc["type"] is not registered.
+
+    Callable-preservation limitation:
+        When a descriptor's type declares callable-valued fields (e.g.,
+        ComputedForm.compute, DynamicChoiceForm.options_fn) and the seed
+        is absent or does not match by (type, key), the fresh-construction
+        path cannot supply the callable. The eigenform reconciles, binds,
+        and renders — but the callable behavior is silently dropped. No
+        warning is emitted. This is a known limitation; see
+        docs/architecture.md §3.3 for mitigations and the planned fix
+        (Pass 2 of the framing design plan).
+
+    See also:
+        docs/architecture.md §3 — the full reconciliation specification.
+        reconcile — alias exported at module level for discoverability.
     """
     if reg is None:
         reg = get_registry()
@@ -388,3 +418,12 @@ def from_descriptor(desc: dict, reg: EigenformRegistry | None = None,
             kwargs[field_name] = from_descriptor(child_data, reg)
 
     return cls(**kwargs)
+
+
+# Discoverability alias. The operation from_descriptor() performs is
+# reconciliation in the React sense — walk a descriptor tree, match each
+# node against a seed tree by key, deepcopy the matched seed to preserve
+# callables, apply the descriptor's scalar overrides, recurse into children.
+# Contributors arriving with a React background can find the function
+# under either name. See docs/architecture.md §3.
+reconcile = from_descriptor

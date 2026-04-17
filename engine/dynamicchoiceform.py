@@ -20,15 +20,23 @@ from typing import Any, Callable
 from engine.affordances import Affordance, SimpleButtonAffordance
 from engine.choiceform import SelectAffordance
 from engine.eigenform import Eigenform
+from engine.sibling_ref import SiblingRef
 from engine.templates import render_template
 
 
 @dataclass
 class DynamicChoiceForm(Eigenform):
     """Single selection from a dynamically computed set of options."""
-    depends_on: str = ""
+    depends_on: "str | SiblingRef" = ""
     options_fn: Callable[[Any], list[str]] | None = None
     static_options: dict[Any, list[str]] | None = None
+
+    def __post_init__(self):
+        if self.depends_on:
+            self.depends_on = SiblingRef.coerce(self.depends_on)
+
+    def _sibling_refs(self) -> list[SiblingRef]:
+        return [self.depends_on] if isinstance(self.depends_on, SiblingRef) else []
 
     @property
     def _dep_value(self):

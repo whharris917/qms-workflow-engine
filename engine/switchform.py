@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from engine.eigenform import Eigenform, render_dependency_line
+from engine.sibling_ref import SiblingRef
 from engine.templates import render_template
 from engine.store import Store
 
@@ -22,8 +23,15 @@ class SwitchForm(Eigenform):
     If the dependency value doesn't match any case key, nothing is active
     and the SwitchForm serializes as empty / renders as a placeholder.
     """
-    depends_on: str = ""
+    depends_on: "str | SiblingRef" = ""
     cases: dict[str, Eigenform] = field(default_factory=dict)
+
+    def __post_init__(self):
+        if self.depends_on:
+            self.depends_on = SiblingRef.coerce(self.depends_on)
+
+    def _sibling_refs(self) -> list[SiblingRef]:
+        return [self.depends_on] if isinstance(self.depends_on, SiblingRef) else []
 
     def to_descriptor(self) -> dict:
         desc = super().to_descriptor()
@@ -88,7 +96,7 @@ class SwitchForm(Eigenform):
 
     def render_from_data(self, data: dict) -> str:
         active = self.active_case
-        active_html = active.render() if active else None
+        active_html = active.render_safely() if active else None
         dep_line = render_dependency_line(data.get("depends_on"), self._url_prefix)
         return render_template("switch.html", data=data, ef=self, url_prefix=self._url_prefix, active_html=active_html, dep_line=dep_line, case_keys=data.get("case_keys", []), depends_on=data.get("depends_on", ""))
 

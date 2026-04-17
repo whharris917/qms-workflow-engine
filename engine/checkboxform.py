@@ -111,7 +111,7 @@ class CheckboxForm(Eigenform):
         return affs
 
     def render_from_data(self, data: dict) -> str:
-        items_html = self._items_form.render() if data.get("edit_mode") else ""
+        items_html = self._items_form.render_safely() if data.get("edit_mode") else ""
         return render_template("checkbox.html", data=data, ef=self,
                                url=self.url, label=data["label"],
                                instruction=data.get("instruction") or "",

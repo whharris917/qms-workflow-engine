@@ -99,7 +99,7 @@ class ChoiceForm(Eigenform):
         ]
 
     def render_from_data(self, data: dict) -> str:
-        options_html = self._options_form.render() if data.get("edit_mode") else ""
+        options_html = self._options_form.render_safely() if data.get("edit_mode") else ""
         return render_template("choice.html", data=data, ef=self,
                                url=self.url, label=data["label"],
                                instruction=data.get("instruction") or "",

@@ -50,7 +50,7 @@ class EntryGroup(Eigenform):
     def render_from_data(self, data: dict) -> str:
         from markupsafe import escape as _esc
         html = f'<h4 style="margin: 4px 0;">{_esc(data["label"])}</h4>'
-        html += "".join(ef.render() for ef in self.eigenforms)
+        html += "".join(ef.render_safely() for ef in self.eigenforms)
         return html
 
     def get_affordances(self) -> list[Affordance]:
@@ -193,7 +193,7 @@ class RepeaterForm(Eigenform):
         entry_items = []
         for idx, eg in enumerate(self._entry_groups):
             entry_id = eg.key
-            entry_items.append({"id": entry_id, "index": idx, "label": f"{self.entry_label} {idx + 1}", "html": "".join(ef.render() for ef in eg.eigenforms), "remove_body": remove_affs.get(entry_id, {}).get("body")})
+            entry_items.append({"id": entry_id, "index": idx, "label": f"{self.entry_label} {idx + 1}", "html": "".join(ef.render_safely() for ef in eg.eigenforms), "remove_body": remove_affs.get(entry_id, {}).get("body")})
         return render_template("repeater.html", data=data, ef=self, url=self.url, entry_label=self.entry_label, entry_count=data.get("entry_count", 0), min_entries=self.min_entries, max_entries=self.max_entries, entry_items=entry_items)
 
     def _handle(self, body: dict) -> dict:

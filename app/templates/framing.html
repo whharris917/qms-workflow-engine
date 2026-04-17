@@ -1,0 +1,1362 @@
+{% extends "base.html" %}
+{% block title %}Conceptual Framing &mdash; QMS Workflow Engine{% endblock %}
+
+{% block head_extra %}
+<style>
+    /* Page layout */
+    .fr-wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+    }
+    .fr-hero {
+        background: linear-gradient(135deg, #1a1a2e 0%, #2a2a4a 100%);
+        color: #f5f5f5;
+        padding: 2rem 2.25rem;
+        border-radius: 10px;
+        margin-bottom: 1.5rem;
+    }
+    .fr-hero h1 {
+        font-size: 1.9rem;
+        margin-bottom: 0.35rem;
+        color: #fff;
+    }
+    .fr-hero .subtitle {
+        color: #a8b5c7;
+        font-size: 1rem;
+        margin-bottom: 1rem;
+    }
+    .fr-hero p {
+        color: #d8dfe8;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        max-width: 820px;
+    }
+    .fr-hero .claim {
+        font-size: 1.1rem;
+        font-weight: 500;
+        color: #ffd88a;
+        margin-bottom: 0.8rem;
+    }
+
+    /* Table of contents */
+    .fr-toc {
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 2rem;
+        font-size: 0.9rem;
+    }
+    .fr-toc-title {
+        font-weight: 600;
+        color: #555;
+        margin-bottom: 0.5rem;
+        font-size: 0.8rem;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+    .fr-toc ol {
+        list-style: decimal inside;
+        columns: 2;
+        column-gap: 2rem;
+        padding: 0;
+    }
+    .fr-toc li { margin-bottom: 0.3rem; }
+    .fr-toc a { color: #2a6bcf; text-decoration: none; }
+    .fr-toc a:hover { text-decoration: underline; }
+
+    /* Sections */
+    .fr-section {
+        background: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 1.75rem 2rem;
+        margin-bottom: 1.5rem;
+        scroll-margin-top: 1rem;
+    }
+    .fr-section h2 {
+        font-size: 1.35rem;
+        font-weight: 600;
+        color: #1a1a2e;
+        margin-bottom: 0.35rem;
+        display: flex;
+        align-items: baseline;
+        gap: 0.6rem;
+    }
+    .fr-section h2 .num {
+        color: #2a6bcf;
+        font-weight: 700;
+        font-size: 0.85em;
+    }
+    .fr-section .section-hook {
+        color: #777;
+        font-style: italic;
+        font-size: 0.95rem;
+        margin-bottom: 1.1rem;
+    }
+    .fr-section h3 {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #333;
+        margin-top: 1.25rem;
+        margin-bottom: 0.5rem;
+    }
+    .fr-section p {
+        font-size: 0.95rem;
+        line-height: 1.65;
+        color: #444;
+        margin-bottom: 0.85rem;
+    }
+    .fr-section ul {
+        font-size: 0.95rem;
+        line-height: 1.65;
+        color: #444;
+        margin-bottom: 0.85rem;
+        padding-left: 1.25rem;
+    }
+    .fr-section code {
+        font-family: "Consolas", "Monaco", monospace;
+        background: #f4f4f8;
+        padding: 1px 5px;
+        border-radius: 3px;
+        font-size: 0.88em;
+        color: #2a2a4a;
+    }
+
+    /* Mapping table */
+    .fr-map {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.92rem;
+        margin: 0.5rem 0 0.5rem;
+    }
+    .fr-map th {
+        text-align: left;
+        background: #f5f5f8;
+        color: #333;
+        padding: 0.6rem 0.85rem;
+        font-weight: 600;
+        border-bottom: 2px solid #e0e0e0;
+        font-size: 0.82rem;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+    }
+    .fr-map td {
+        padding: 0.65rem 0.85rem;
+        border-bottom: 1px solid #eee;
+        vertical-align: top;
+    }
+    .fr-map tr:last-child td { border-bottom: none; }
+    .fr-map tr:hover td { background: #fafbfd; }
+    .fr-map td.react { font-weight: 500; color: #1a1a2e; width: 22%; }
+    .fr-map td.eq { font-family: "Consolas", monospace; font-size: 0.88rem; color: #444; width: 30%; }
+    .fr-map td.status { width: 12%; white-space: nowrap; }
+    .fr-map td.note { color: #555; font-size: 0.88rem; }
+    .pill {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+    }
+    .pill.ok { background: #e0f3e3; color: #1e6b2e; }
+    .pill.partial { background: #fdf0d0; color: #7a5a0a; }
+    .pill.absent { background: #fae0e0; color: #8a2727; }
+    .pill.na { background: #e8e8f0; color: #555; }
+
+    /* Three-way cards: Props / State / Derived */
+    .fr-triple {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 1rem;
+        margin: 1rem 0;
+    }
+    .fr-triple-card {
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 1rem 1.1rem;
+        background: #fafbfd;
+    }
+    .fr-triple-card.props { border-top: 3px solid #4a9eff; }
+    .fr-triple-card.state { border-top: 3px solid #2e9c5e; }
+    .fr-triple-card.derived { border-top: 3px solid #d4a017; }
+    .fr-triple-card h4 {
+        font-size: 0.85rem;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        margin-bottom: 0.5rem;
+        color: #1a1a2e;
+    }
+    .fr-triple-card .lives {
+        font-family: "Consolas", monospace;
+        font-size: 0.82rem;
+        color: #2a2a4a;
+        background: #fff;
+        padding: 4px 8px;
+        border-radius: 4px;
+        border: 1px solid #e5e5e5;
+        display: inline-block;
+        margin-bottom: 0.5rem;
+    }
+    .fr-triple-card p {
+        font-size: 0.88rem;
+        line-height: 1.55;
+        color: #555;
+        margin-bottom: 0.4rem;
+    }
+    .fr-triple-card ul {
+        font-size: 0.82rem;
+        color: #666;
+        margin: 0;
+        padding-left: 1.1rem;
+    }
+    .fr-triple-card li { margin-bottom: 0.15rem; }
+
+    /* Reconciliation diagram */
+    .fr-recon {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr auto 1fr;
+        align-items: center;
+        gap: 0.6rem;
+        margin: 1.25rem 0;
+    }
+    .fr-recon-box {
+        background: #fff;
+        border: 1px solid #c0c8d0;
+        border-radius: 6px;
+        padding: 0.75rem 0.9rem;
+        text-align: center;
+    }
+    .fr-recon-box.input { border-top: 3px solid #4a9eff; }
+    .fr-recon-box.op { background: #1a1a2e; color: #fff; border: none; }
+    .fr-recon-box.output { border-top: 3px solid #2e9c5e; }
+    .fr-recon-box strong {
+        display: block;
+        font-size: 0.9rem;
+        margin-bottom: 0.2rem;
+    }
+    .fr-recon-box .hint {
+        font-size: 0.75rem;
+        color: #777;
+        font-family: "Consolas", monospace;
+    }
+    .fr-recon-box.op .hint { color: #a0aac5; }
+    .fr-recon-arrow {
+        font-size: 1.2rem;
+        color: #888;
+        font-weight: 700;
+    }
+    .fr-recon-caveat {
+        background: #fdf0d0;
+        border-left: 3px solid #d4a017;
+        padding: 0.6rem 0.85rem;
+        font-size: 0.85rem;
+        color: #614812;
+        margin-top: 0.5rem;
+        border-radius: 0 4px 4px 0;
+    }
+
+    /* Error boundary before/after */
+    .fr-beforeafter {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin: 1rem 0;
+    }
+    .fr-ba-panel {
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        padding: 0.9rem 1rem;
+        background: #fafbfd;
+    }
+    .fr-ba-panel.before { border-left: 3px solid #c74545; }
+    .fr-ba-panel.after { border-left: 3px solid #2e9c5e; }
+    .fr-ba-panel h4 {
+        font-size: 0.8rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        margin-bottom: 0.5rem;
+        color: #555;
+    }
+    .fr-ba-panel .ba-label {
+        font-weight: 600;
+        color: #333;
+        font-size: 0.92rem;
+        margin-bottom: 0.3rem;
+    }
+    .fr-ba-panel ul {
+        font-size: 0.85rem;
+        color: #555;
+        margin: 0;
+        padding-left: 1.1rem;
+    }
+
+    /* Not-borrowing cards */
+    .fr-reject {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin: 1rem 0;
+    }
+    .fr-reject-card {
+        border: 1px solid #e5e5e5;
+        border-radius: 6px;
+        padding: 0.85rem 1rem;
+        background: #fff;
+    }
+    .fr-reject-card h4 {
+        font-size: 0.95rem;
+        color: #333;
+        margin-bottom: 0.3rem;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+    .fr-reject-card h4 .x {
+        color: #c74545;
+        font-weight: 700;
+    }
+    .fr-reject-card p {
+        font-size: 0.85rem;
+        color: #666;
+        line-height: 1.55;
+        margin: 0;
+    }
+
+    /* Plan timeline */
+    .fr-plan {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+        margin: 1rem 0;
+    }
+    .fr-pass {
+        display: grid;
+        grid-template-columns: 110px 1fr auto;
+        gap: 1rem;
+        align-items: center;
+        padding: 0.85rem 1rem;
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        background: #fff;
+    }
+    .fr-pass.p1 { border-left: 4px solid #4a9eff; }
+    .fr-pass.p2 { border-left: 4px solid #2e9c5e; }
+    .fr-pass.p3 { border-left: 4px solid #d4a017; }
+    .fr-pass.p4 { border-left: 4px solid #aaa; background: #fafafa; }
+    .fr-pass-label {
+        font-weight: 700;
+        font-size: 0.82rem;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+    }
+    .fr-pass.p1 .fr-pass-label { color: #2a6bcf; }
+    .fr-pass.p2 .fr-pass-label { color: #1e6b2e; }
+    .fr-pass.p3 .fr-pass-label { color: #7a5a0a; }
+    .fr-pass.p4 .fr-pass-label { color: #777; }
+    .fr-pass-body strong {
+        display: block;
+        color: #1a1a2e;
+        margin-bottom: 0.15rem;
+        font-size: 0.95rem;
+    }
+    .fr-pass-body span {
+        color: #666;
+        font-size: 0.85rem;
+    }
+    .fr-pass-meta {
+        text-align: right;
+        font-size: 0.78rem;
+        color: #888;
+    }
+    .fr-pass-meta .effort {
+        display: block;
+        font-weight: 600;
+        color: #555;
+        margin-bottom: 0.15rem;
+    }
+    .fr-pass-meta .status {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+    }
+    .fr-pass-meta .status.ready { background: #e0f3e3; color: #1e6b2e; }
+    .fr-pass-meta .status.queued { background: #fdf0d0; color: #7a5a0a; }
+    .fr-pass-meta .status.proposed { background: #e5ecf5; color: #2a6bcf; }
+    .fr-pass-meta .status.deferred { background: #e8e8f0; color: #555; }
+    .fr-pass-meta .status.landed { background: #d4edda; color: #155724; }
+
+    /* Context parked callout */
+    .fr-park {
+        display: flex;
+        gap: 0.85rem;
+        padding: 1rem 1.25rem;
+        background: #f5f5f8;
+        border: 1px dashed #c0c0cc;
+        border-radius: 6px;
+        margin: 0.75rem 0;
+    }
+    .fr-park .icon {
+        font-size: 1.5rem;
+        color: #888;
+    }
+    .fr-park p { margin: 0; font-size: 0.9rem; }
+
+    /* Callout */
+    .fr-callout {
+        background: #f0f5fc;
+        border-left: 3px solid #4a9eff;
+        padding: 0.7rem 1rem;
+        font-size: 0.9rem;
+        color: #2a2a4a;
+        margin: 0.75rem 0;
+        border-radius: 0 4px 4px 0;
+    }
+    .fr-callout strong { color: #1a1a2e; }
+
+    /* Inline code block */
+    pre.code {
+        background: #1a1a2e;
+        color: #d8dfe8;
+        padding: 0.7rem 1rem;
+        border-radius: 5px;
+        overflow-x: auto;
+        font-family: "Consolas", "Monaco", monospace;
+        font-size: 0.83rem;
+        line-height: 1.55;
+        margin: 0.75rem 0;
+    }
+    pre.code .k { color: #a8b5ff; }
+    pre.code .s { color: #ffd88a; }
+    pre.code .c { color: #6c7a89; font-style: italic; }
+
+    /* Primer styling */
+    .fr-primer {
+        background: #fffef8;
+        border: 1px solid #e8e4d0;
+        border-left: 4px solid #d4a017;
+    }
+    .fr-primer .primer-label {
+        display: inline-block;
+        background: #d4a017;
+        color: #fff;
+        padding: 2px 10px;
+        border-radius: 10px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        margin-bottom: 0.4rem;
+    }
+    .fr-primer h3 {
+        margin-top: 1.5rem;
+        padding-top: 1.1rem;
+        border-top: 1px dashed #e8e4d0;
+        font-size: 1.05rem;
+        color: #1a1a2e;
+    }
+    .fr-primer h3:first-of-type {
+        border-top: none;
+        padding-top: 0.5rem;
+        margin-top: 0.75rem;
+    }
+
+    /* Core-loop diagram */
+    .fr-loop {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.5rem;
+        margin: 1rem 0 0.5rem;
+        position: relative;
+    }
+    .fr-loop-step {
+        background: #fff;
+        border: 1px solid #d8d4bc;
+        border-radius: 6px;
+        padding: 0.7rem 0.85rem;
+        position: relative;
+    }
+    .fr-loop-step::after {
+        content: "\2192";
+        position: absolute;
+        right: -0.65rem;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 1.2rem;
+        color: #c0a860;
+        font-weight: 700;
+        z-index: 2;
+        background: #fffef8;
+        padding: 0 2px;
+    }
+    .fr-loop-step:last-child::after { content: ""; }
+    .fr-loop-step .stage-num {
+        display: inline-block;
+        background: #d4a017;
+        color: #fff;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        text-align: center;
+        font-size: 0.75rem;
+        font-weight: 700;
+        line-height: 20px;
+        margin-right: 0.35rem;
+    }
+    .fr-loop-step strong {
+        display: inline-block;
+        font-size: 0.92rem;
+        color: #1a1a2e;
+        margin-bottom: 0.3rem;
+    }
+    .fr-loop-step p {
+        font-size: 0.82rem;
+        line-height: 1.5;
+        margin: 0;
+        color: #555;
+    }
+    .fr-loop-step code {
+        font-size: 0.82em;
+        background: #f0ecd8;
+    }
+    .fr-loop-return {
+        margin-top: 0.4rem;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.82rem;
+        color: #7a5a0a;
+        background: #faf4e0;
+        border-radius: 4px;
+        text-align: center;
+    }
+
+    /* Vocabulary definition list */
+    .fr-vocab {
+        display: grid;
+        grid-template-columns: 180px 1fr;
+        gap: 0.5rem 1rem;
+        margin: 0.75rem 0;
+        font-size: 0.92rem;
+    }
+    .fr-vocab dt {
+        font-weight: 600;
+        color: #1a1a2e;
+        padding-top: 0.2rem;
+    }
+    .fr-vocab dd {
+        margin: 0;
+        color: #444;
+        line-height: 1.55;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px dashed #e8e4d0;
+    }
+    .fr-vocab dd:last-child { border-bottom: none; }
+    .fr-vocab dt:last-of-type + dd { border-bottom: none; }
+
+    /* Type catalog */
+    .fr-types {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+        margin: 0.75rem 0;
+    }
+    .fr-types th {
+        text-align: left;
+        background: #f5f0dc;
+        color: #333;
+        padding: 0.45rem 0.75rem;
+        font-weight: 600;
+        font-size: 0.78rem;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        border-bottom: 2px solid #e8e4d0;
+    }
+    .fr-types td {
+        padding: 0.45rem 0.75rem;
+        border-bottom: 1px solid #f0ecd8;
+        vertical-align: top;
+    }
+    .fr-types td.type-name {
+        font-family: "Consolas", monospace;
+        font-weight: 600;
+        color: #1a1a2e;
+        width: 22%;
+    }
+    .fr-types td.type-role {
+        width: 18%;
+        color: #7a5a0a;
+        font-size: 0.82rem;
+        font-weight: 500;
+    }
+    .fr-types tr:last-child td { border-bottom: none; }
+
+    /* Lifecycle step-by-step narrative */
+    .fr-walkthrough {
+        background: #fff;
+        border: 1px solid #e8e4d0;
+        border-radius: 6px;
+        padding: 1rem 1.25rem;
+        margin: 0.75rem 0;
+    }
+    .fr-walkthrough h4 {
+        font-size: 0.85rem;
+        color: #7a5a0a;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        margin-bottom: 0.6rem;
+    }
+    .fr-walkthrough ol {
+        margin: 0;
+        padding-left: 1.3rem;
+    }
+    .fr-walkthrough li {
+        font-size: 0.9rem;
+        color: #444;
+        line-height: 1.6;
+        margin-bottom: 0.5rem;
+    }
+    .fr-walkthrough li strong {
+        color: #1a1a2e;
+    }
+
+    @media (max-width: 900px) {
+        .fr-triple, .fr-reject, .fr-beforeafter { grid-template-columns: 1fr; }
+        .fr-recon { grid-template-columns: 1fr; }
+        .fr-recon-arrow { transform: rotate(90deg); }
+        .fr-toc ol { columns: 1; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fr-wrap">
+
+    <div class="fr-hero">
+        <h1>Conceptual Framing</h1>
+        <div class="subtitle">A design plan for sharpening how we think and talk about the Eigenform engine</div>
+        <p>
+            The <strong>QMS Workflow Engine</strong> is a Python framework for defining interactive workflow forms that
+            render as HTML for humans and serialize as JSON for AI agents &mdash; same state, same actions, same URLs,
+            one source of truth. This page is a design plan to sharpen how we describe it.
+        </p>
+        <p class="claim">The thesis, in one sentence: the engine grew from first principles and landed closer to React than anyone planned. The concepts are already load-bearing &mdash; they just aren't named.</p>
+        <p>
+            If you already know the codebase, skip to &sect;1. If you&rsquo;re new to the engine, the
+            <a href="#s0" style="color: #ffd88a;">primer below</a> walks through the vocabulary, the core loop, and a
+            minimal example first. The rest of the page assumes the primer.
+        </p>
+    </div>
+
+    <nav class="fr-toc">
+        <div class="fr-toc-title">On this page</div>
+        <ol style="list-style-position: inside;">
+            <li style="list-style: none; font-weight: 600; color: #7a5a0a; margin-bottom: 0.4rem;"><a href="#s0">&#9733; Primer &mdash; start here if you&rsquo;re new</a></li>
+            <li><a href="#s1">Thesis</a></li>
+            <li><a href="#s2">The mapping</a></li>
+            <li><a href="#s3">Props, State, Derived</a></li>
+            <li><a href="#s4">Reconciliation</a></li>
+            <li><a href="#s5">Error boundaries</a></li>
+            <li><a href="#s6">Context (parked)</a></li>
+            <li><a href="#s7">What we&rsquo;re not borrowing</a></li>
+            <li><a href="#s8">The design plan</a></li>
+        </ol>
+    </nav>
+
+    <!-- ================================================ 0. Primer ================================================ -->
+    <section class="fr-section fr-primer" id="s0">
+        <span class="primer-label">&#9733; Primer</span>
+        <h2><span class="num">00</span> Before the comparison &mdash; what is this engine?</h2>
+        <p class="section-hook">The rest of the page assumes you know what an eigenform is, what <code>bind()</code> does, and why anyone would care. This section establishes that vocabulary from scratch. Skip it if you already know.</p>
+
+        <h3>The problem the engine solves</h3>
+        <p>
+            Most applications present different surfaces to humans and programs. A human sees a web form; a program
+            sees a REST API; a mobile client sees something in between. The three surfaces drift apart over time
+            because they are maintained separately. When an AI agent enters the picture &mdash; reading a page,
+            deciding an action, submitting a change &mdash; the drift becomes painful. Agents need structured data
+            that humans don&rsquo;t want to see; humans need layout that programs don&rsquo;t care about; both need
+            to agree about what actions are available right now.
+        </p>
+        <p>
+            The QMS Workflow Engine collapses these surfaces. A single Python definition produces an interactive
+            page that a browser renders as HTML and an AI agent consumes as JSON. The two views describe the same
+            state. The two clients take the same actions against the same URLs. When the definition changes, both
+            views update. This property is called <strong>faithful projection</strong> and is enforced at CI time
+            by a parity test that compares every URL exposed in JSON to every clickable element rendered in HTML.
+        </p>
+
+        <h3>The central idea: an <em>eigenform</em></h3>
+        <p>
+            An <strong>eigenform</strong> is a self-contained form element. A text input is an eigenform. A
+            container of tabs is an eigenform. A whole page is an eigenform. The vocabulary is uniform all the way
+            up and down. Eigenforms compose &mdash; a container eigenform holds child eigenforms, and the tree
+            itself is an eigenform.
+        </p>
+        <p>
+            The name is technical. &ldquo;Eigen&rdquo; as in &ldquo;eigenvector&rdquo; &mdash; something that
+            preserves its identity under transformation. An eigenform serializes, renders, handles actions, and
+            recomposes without losing the thing it is.
+        </p>
+        <p>Every eigenform does four things:</p>
+        <ul>
+            <li><strong>Serialize</strong> itself to JSON &mdash; current state, plus a list of available <em>affordances</em> (see below).</li>
+            <li><strong>Render</strong> itself to HTML &mdash; styled for a browser, with the same affordances exposed as buttons and forms.</li>
+            <li><strong>Handle</strong> incoming actions &mdash; a POST from either client mutates the stored state.</li>
+            <li><strong>Announce</strong> what the client can do right now &mdash; via affordances, a list of URL + POST-body pairs with human-readable hints.</li>
+        </ul>
+        <p>
+            This last property is the <strong>HATEOAS</strong> style (Hypermedia As The Engine Of Application
+            State): the server tells the client what the client can do. An agent doesn&rsquo;t need an external
+            schema. It reads the page, finds the affordances, and picks one. Human buttons and agent POSTs are
+            driven by the same affordance list.
+        </p>
+
+        <h3>The core loop</h3>
+        <p>Four stages. Every request walks the cycle.</p>
+
+        <div class="fr-loop">
+            <div class="fr-loop-step">
+                <div><span class="stage-num">1</span><strong>Define</strong></div>
+                <p>A Python file in <code>pages/</code> exports a <em>seed</em> &mdash; the structural definition of the page. No state; no identity. Re-read every request.</p>
+            </div>
+            <div class="fr-loop-step">
+                <div><span class="stage-num">2</span><strong>Bind</strong></div>
+                <p>The server attaches a per-instance JSON file (the <em>Store</em>) to the seed, producing a live tree of bound eigenforms with scoped keys.</p>
+            </div>
+            <div class="fr-loop-step">
+                <div><span class="stage-num">3</span><strong>Serve</strong></div>
+                <p>The bound tree renders to HTML (for browsers) or serializes to JSON (for agents). Both include affordances for the next action.</p>
+            </div>
+            <div class="fr-loop-step">
+                <div><span class="stage-num">4</span><strong>Handle</strong></div>
+                <p>The client POSTs an action. The server binds again, walks to the target, calls its <code>_handle()</code>, updates the Store, and responds with the new state.</p>
+            </div>
+        </div>
+        <div class="fr-loop-return">
+            &#8630; After Handle, the next request starts again from Define &mdash; the server holds no long-lived in-memory state. Every request is a fresh bind.
+        </div>
+
+        <h3>Key vocabulary</h3>
+        <p>The terms below appear throughout the rest of this page. Bookmark this section if needed.</p>
+
+        <dl class="fr-vocab">
+            <dt>Seed</dt>
+            <dd>The Python-code definition of a page&rsquo;s structure. Lives in <code>pages/*.py</code>, exported as <code>definition = PageForm(...)</code>. Immutable at runtime. Holds callables (lambdas, validators) that cannot round-trip through JSON.</dd>
+
+            <dt>Store</dt>
+            <dd>A per-instance JSON file. One file per bound page instance, at <code>data/{instance_id}.json</code>. Holds all mutable state &mdash; current values, active tab, descriptor overrides.</dd>
+
+            <dt>Bind</dt>
+            <dd>The operation that attaches a Store to a seed and recursively produces a live tree of eigenforms. Scopes each child by key. Happens on every request.</dd>
+
+            <dt>Descriptor</dt>
+            <dd>A JSON-serializable snapshot of an eigenform tree &mdash; its props (configuration values) and its children&rsquo;s descriptors. Stored as <code>__structure</code> in the Store. The canonical source of truth for any runtime-editable structure.</dd>
+
+            <dt>Key</dt>
+            <dd>A string identifier unique within a container scope. Used for routing, Store scoping, and matching descriptors to seeds. Think of it as the eigenform&rsquo;s identity.</dd>
+
+            <dt>Scope</dt>
+            <dd>The parent container&rsquo;s namespace. A child&rsquo;s Store entries are prefixed with the scope to keep siblings separated.</dd>
+
+            <dt>Affordance</dt>
+            <dd>A declared action: URL, HTTP method, POST body template (with placeholders like <code>&lt;value&gt;</code>), and a human-readable hint. Emitted identically in JSON and HTML so the two clients always see the same action list.</dd>
+
+            <dt>Faithful projection</dt>
+            <dd>The principle that HTML is a derivation of JSON &mdash; the two express the same state and the same actions. Enforced at CI time by <code>tests/test_parity.py</code>, which compares affordance URLs in JSON against <code>data-ef-*</code> attributes in HTML for every page.</dd>
+
+            <dt>HATEOAS</dt>
+            <dd>Hypermedia As The Engine Of Application State. A client discovers what it can do by reading what the server sent, not by reading external documentation. The engine exposes all actions as affordances; the client never needs a separate schema.</dd>
+
+            <dt>Handle</dt>
+            <dd>The method <code>_handle(body)</code> that each eigenform implements to process an action. Interprets the action name, mutates the Store, returns the updated state.</dd>
+
+            <dt>Container vs leaf</dt>
+            <dd>A <em>container</em> eigenform holds children (PageForm, NavigationForm, GroupForm, etc.). A <em>leaf</em> holds a primitive value (TextForm, NumberForm, BooleanForm, etc.).</dd>
+        </dl>
+
+        <h3>A minimal example</h3>
+        <p>The smallest useful page: a label plus a single text input.</p>
+
+<pre class="code"><span class="c"># pages/hello.py</span>
+<span class="k">from</span> engine.pageform <span class="k">import</span> PageForm
+<span class="k">from</span> engine.textform <span class="k">import</span> TextForm
+
+definition = PageForm(
+    key=<span class="s">"hello"</span>,
+    label=<span class="s">"Hello Page"</span>,
+    eigenforms=[
+        TextForm(key=<span class="s">"name"</span>, label=<span class="s">"Your name"</span>),
+    ],
+)</pre>
+
+        <div class="fr-walkthrough">
+            <h4>What happens on first request</h4>
+            <ol>
+                <li>Server discovers <code>pages/hello.py</code> and imports the seed.</li>
+                <li>Server calls <code>seed.bind(data_dir, scope="hello")</code>. Store is created if missing; empty.</li>
+                <li>PageForm recursively binds its children. TextForm is now a live instance scoped to <code>hello/name</code>.</li>
+                <li><strong>JSON request:</strong> <code>serialize()</code> returns <code>{key: "name", value: null, affordances: [{method: "POST", url: "/pages/hello/name", body: {action: "set_value", value: "&lt;str&gt;"}}]}</code>, wrapped by PageForm&rsquo;s own serialization.</li>
+                <li><strong>HTML request:</strong> <code>render()</code> produces a styled input with the same URL as a <code>data-ef-post</code> attribute. The parity test verifies the URL matches.</li>
+            </ol>
+            <h4>What happens when the user types &ldquo;Alice&rdquo; and submits</h4>
+            <ol>
+                <li>Browser POSTs <code>{"action": "set_value", "value": "Alice"}</code> to <code>/pages/hello/name</code>.</li>
+                <li>Server binds the seed again (fresh tree; no memoization across requests).</li>
+                <li>Server walks path <code>name</code> to locate the TextForm child, calls <code>_handle({"action": "set_value", "value": "Alice"})</code>.</li>
+                <li>TextForm writes <code>"Alice"</code> to Store key <code>hello/name</code>.</li>
+                <li>Server re-serializes the full page. Returns JSON or morphs-in HTML, depending on the client.</li>
+                <li>Next GET reads the same Store. TextForm binds with <code>value="Alice"</code>. <code>is_complete</code> returns <code>True</code>. Page reflects the update.</li>
+            </ol>
+        </div>
+
+        <p>
+            That is the entire engine. Everything else &mdash; tabs, tables, conditional visibility, cross-field
+            validation, page builders &mdash; is a variation on this loop with richer eigenform types and richer
+            affordances.
+        </p>
+
+        <h3>The type catalog, in brief</h3>
+        <p>
+            The engine ships about 28 eigenform types across six categories. The types mentioned elsewhere on this
+            page are summarized here so the references make sense.
+        </p>
+
+        <table class="fr-types">
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Category</th>
+                    <th>Role</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="type-name">PageForm</td><td class="type-role">Container (top)</td><td>The outermost container. Owns the Store binding. Every page is one PageForm.</td></tr>
+                <tr><td class="type-name">NavigationForm</td><td class="type-role">Container</td><td>Unified tabs / chain / sequence / accordion container. One class, four modes selected by the <code>mode</code> prop.</td></tr>
+                <tr><td class="type-name">GroupForm</td><td class="type-role">Container</td><td>A named grouping for reusable compositions. No special semantics; just a labeled wrapper.</td></tr>
+                <tr><td class="type-name">RepeaterForm</td><td class="type-role">Container</td><td>Stamps a template eigenform per dynamic entry. Compound-scoped children.</td></tr>
+                <tr><td class="type-name">TextForm</td><td class="type-role">Data leaf</td><td>Free-form string. Optional <code>multiline</code>, <code>min_length</code>, <code>max_length</code>.</td></tr>
+                <tr><td class="type-name">NumberForm</td><td class="type-role">Data leaf</td><td>Numeric input with optional <code>min_val</code> / <code>max_val</code> / <code>step</code> / <code>slider</code>.</td></tr>
+                <tr><td class="type-name">BooleanForm / DateForm</td><td class="type-role">Data leaf</td><td>Binary toggle / ISO date input.</td></tr>
+                <tr><td class="type-name">ChoiceForm / CheckboxForm</td><td class="type-role">Data leaf</td><td>Single-select / multi-select, each backed by an embedded ListForm for the options.</td></tr>
+                <tr><td class="type-name">ListForm / SetForm / TableForm</td><td class="type-role">Data collection</td><td>Ordered list / unique set / dynamic table with typed columns.</td></tr>
+                <tr><td class="type-name">MultiForm</td><td class="type-role">Data composite</td><td>Groups several FieldDescriptors under a single affordance.</td></tr>
+                <tr><td class="type-name">InfoForm</td><td class="type-role">Read-only display</td><td>Static text block. No interaction affordances. Always complete.</td></tr>
+                <tr><td class="type-name">ComputedForm</td><td class="type-role">Sibling-reading</td><td>Derived display computed from sibling values via a <code>compute(siblings)</code> callable.</td></tr>
+                <tr><td class="type-name">ValidationForm</td><td class="type-role">Sibling-reading</td><td>Cross-field validation rules. Produces pending / pass / fail status that can block page completion.</td></tr>
+                <tr><td class="type-name">VisibilityForm</td><td class="type-role">Reactive wrapper</td><td>Shows its child only when a predicate over siblings holds.</td></tr>
+                <tr><td class="type-name">SwitchForm</td><td class="type-role">Reactive structural</td><td>Selects one of N alternative subtrees based on a sibling&rsquo;s value.</td></tr>
+                <tr><td class="type-name">DynamicChoiceForm</td><td class="type-role">Reactive</td><td>ChoiceForm whose options depend on a sibling value via <code>options_fn</code>.</td></tr>
+                <tr><td class="type-name">ActionForm</td><td class="type-role">Imperative</td><td>A button that triggers a side effect. Can return structural actions that reshape the page.</td></tr>
+                <tr><td class="type-name">HistoryForm</td><td class="type-role">Wrapper</td><td>Wraps any eigenform with append-only change history.</td></tr>
+            </tbody>
+        </table>
+
+        <p>
+            Seven of those types &mdash; SwitchForm, VisibilityForm, DynamicChoiceForm, ComputedForm,
+            ValidationForm, ActionForm, ScoreForm &mdash; read from their siblings via a string field called
+            <code>depends_on</code>. That shadow dependency graph is one of the gaps this design plan addresses.
+        </p>
+
+        <div class="fr-callout">
+            <strong>You now have enough vocabulary to read the rest of the page.</strong> Every React-side term
+            maps to something in the list above. When you see <code>bind</code>, picture a seed meeting a Store.
+            When you see &ldquo;affordance,&rdquo; picture a URL-plus-POST-body pair that both humans and agents
+            can use. When you see <code>__structure</code>, picture the JSON snapshot of a container&rsquo;s
+            children.
+        </div>
+    </section>
+
+    <!-- ================================================ 1. Thesis ================================================ -->
+    <section class="fr-section" id="s1">
+        <h2><span class="num">01</span> Thesis</h2>
+        <p class="section-hook">The architecture grew from first principles and landed adjacent to React. That convergence is informative.</p>
+
+        <p>
+            If you read the primer, the shape should already feel familiar to anyone with React experience. A page
+            is a tree of components. Each component owns some state, receives some configuration from its parent,
+            and is responsible for rendering itself. When an input changes, a diff flows up, the tree re-renders,
+            and the DOM is updated in place. Substitute &ldquo;eigenform&rdquo; for &ldquo;component&rdquo; and the
+            mental model transfers almost verbatim.
+        </p>
+        <p>
+            The Eigenform engine was not designed to mirror React. It grew from a different set of first principles &mdash;
+            HATEOAS affordances, faithful projection, stateless server, self-describing documents &mdash; and ended up at a
+            structure that is recognizably React-shaped. Either React solved problems that also exist here, or both systems
+            converged on the same invariants. Both readings are true.
+        </p>
+
+        <p>
+            The engine is stuck with an awkward inheritance. The concepts are load-bearing but unnamed. Three costs follow.
+        </p>
+
+        <ul>
+            <li>New contributors cannot search for what to call things.</li>
+            <li>Internal documentation invents local jargon where industry jargon exists.</li>
+            <li>Design discussions re-litigate debates the React community settled a decade ago &mdash; hooks vs classes, context vs prop drilling, error boundaries, controlled vs uncontrolled.</li>
+        </ul>
+
+        <p>
+            This page is a plan with two parts: <strong>name what we already have</strong>, and <strong>close the three gaps</strong>
+            where the React mental model points at concrete missing machinery. The plan is small. It does not propose
+            rewriting the engine in React. It proposes aligning vocabulary so that the next decade of engineers &mdash; human
+            and AI &mdash; can read this codebase without first reconstructing a mental model from scratch.
+        </p>
+    </section>
+
+    <!-- ================================================ 2. The Mapping ================================================ -->
+    <section class="fr-section" id="s2">
+        <h2><span class="num">02</span> The mapping</h2>
+        <p class="section-hook">One row per React concept. Most already have an equivalent. Three do not.</p>
+
+        <table class="fr-map">
+            <thead>
+                <tr>
+                    <th>React concept</th>
+                    <th>Eigenform equivalent</th>
+                    <th>Status</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="react">Component class</td>
+                    <td class="eq">Eigenform subclass</td>
+                    <td class="status"><span class="pill ok">Present</span></td>
+                    <td class="note"><code>class TextForm(Eigenform)</code> is a component class.</td>
+                </tr>
+                <tr>
+                    <td class="react">Props</td>
+                    <td class="eq">Parent&rsquo;s <code>__structure</code> descriptor</td>
+                    <td class="status"><span class="pill ok">Present</span></td>
+                    <td class="note">Mutations via <code>_set_my_field</code> / <code>_set_my_config</code>. The recent descriptor refactor drew this line, without naming it.</td>
+                </tr>
+                <tr>
+                    <td class="react">State</td>
+                    <td class="eq">Store entries at key scope</td>
+                    <td class="status"><span class="pill ok">Present</span></td>
+                    <td class="note">Per-instance JSON file, scoped by eigenform key. <code>useState</code> with server-side persistence.</td>
+                </tr>
+                <tr>
+                    <td class="react">Derived state</td>
+                    <td class="eq"><code>is_complete</code>, <code>effective_*</code>, <code>ComputedForm.compute</code></td>
+                    <td class="status"><span class="pill ok">Present</span></td>
+                    <td class="note">Never persisted; recomputed each serialize.</td>
+                </tr>
+                <tr>
+                    <td class="react">Element tree</td>
+                    <td class="eq"><code>__structure</code> descriptor / bound tree</td>
+                    <td class="status"><span class="pill ok">Present</span></td>
+                    <td class="note">Descriptor is the serializable snapshot; bound tree is the live instantiation.</td>
+                </tr>
+                <tr>
+                    <td class="react">Reconciliation</td>
+                    <td class="eq"><code>from_descriptor(desc, seed=seed)</code></td>
+                    <td class="status"><span class="pill ok">Present</span></td>
+                    <td class="note">Walks descriptor, matches seed by key, deepcopies, applies overrides. The operation has no name in the codebase.</td>
+                </tr>
+                <tr>
+                    <td class="react">Keys</td>
+                    <td class="eq"><code>Eigenform.key</code></td>
+                    <td class="status"><span class="pill ok">Present</span></td>
+                    <td class="note">Load-bearing in routing, Store scoping, and reconciliation. Identity.</td>
+                </tr>
+                <tr>
+                    <td class="react">Children prop</td>
+                    <td class="eq"><code>eigenforms=[...]</code>, <code>steps=[...]</code>, <code>items=[...]</code></td>
+                    <td class="status"><span class="pill ok">Present</span></td>
+                    <td class="note">Container-specific parameter names; same shape.</td>
+                </tr>
+                <tr>
+                    <td class="react">Render</td>
+                    <td class="eq"><code>render()</code> via Jinja2 templates</td>
+                    <td class="status"><span class="pill ok">Present</span></td>
+                    <td class="note">Theme fallback resolution; templates override by type.</td>
+                </tr>
+                <tr>
+                    <td class="react">DOM diff</td>
+                    <td class="eq">morphdom <code>_efSwap</code></td>
+                    <td class="status"><span class="pill ok">Present</span></td>
+                    <td class="note">A small client-side library that diffs an old DOM fragment against a new one and mutates only what changed. Preserves focus, scroll, <code>&lt;details&gt;</code> state across POSTs.</td>
+                </tr>
+                <tr>
+                    <td class="react">Portal</td>
+                    <td class="eq">Affordance flotation</td>
+                    <td class="status"><span class="pill ok">Present</span></td>
+                    <td class="note">Deeply-nested affordances bubble up to the PageForm level in the agent JSON, collapsed into one parameterized affordance per action kind (e.g. one <code>clear</code> that targets any child). Keeps agent context small. HTML rendering is unaffected.</td>
+                </tr>
+                <tr>
+                    <td class="react">Controlled vs uncontrolled</td>
+                    <td class="eq">Faithful projection vs transient UI</td>
+                    <td class="status"><span class="pill ok">Present</span></td>
+                    <td class="note">Canonical data (form values, active tab) is server-owned and round-trips through the Store; ephemeral UI data (focus, scroll, partially-typed text) is client-owned and preserved by morphdom. Same boundary React draws between &ldquo;controlled&rdquo; and &ldquo;uncontrolled&rdquo; inputs.</td>
+                </tr>
+                <tr>
+                    <td class="react">Fragment</td>
+                    <td class="eq">GroupForm with no decoration</td>
+                    <td class="status"><span class="pill ok">Present</span></td>
+                    <td class="note">Implicit. A GroupForm without label/instruction is a fragment.</td>
+                </tr>
+                <tr>
+                    <td class="react">Higher-order component</td>
+                    <td class="eq">GroupForm subclassing</td>
+                    <td class="status"><span class="pill partial">Partial</span></td>
+                    <td class="note">Closest analog. Composition is supported; behavior-sharing beyond composition is not.</td>
+                </tr>
+                <tr>
+                    <td class="react">Context</td>
+                    <td class="eq">&mdash;</td>
+                    <td class="status"><span class="pill absent">Absent</span></td>
+                    <td class="note">No ancestor-to-descendant channel. Sibling refs are sibling-to-sibling.</td>
+                </tr>
+                <tr>
+                    <td class="react">Error boundary</td>
+                    <td class="eq">&mdash;</td>
+                    <td class="status"><span class="pill absent">Absent</span></td>
+                    <td class="note">Child exceptions 500 the whole page. Corrupt descriptors silently fall back to seed.</td>
+                </tr>
+                <tr>
+                    <td class="react">Custom hooks</td>
+                    <td class="eq">&mdash;</td>
+                    <td class="status"><span class="pill na">N/A</span></td>
+                    <td class="note">Python closure ergonomics do not support the hook model cleanly. See &sect;7.</td>
+                </tr>
+                <tr>
+                    <td class="react">Refs</td>
+                    <td class="eq">&mdash;</td>
+                    <td class="status"><span class="pill na">N/A</span></td>
+                    <td class="note">Deliberately rejected. Would break HATEOAS and replayability.</td>
+                </tr>
+                <tr>
+                    <td class="react">Suspense / streaming</td>
+                    <td class="eq">&mdash;</td>
+                    <td class="status"><span class="pill na">N/A</span></td>
+                    <td class="note">Solves problems we do not have &mdash; no client-side hydration model.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="fr-callout">
+            <strong>Read this table as a coverage map, not a scorecard.</strong> The &ldquo;Present&rdquo; rows show
+            how much of React&rsquo;s vocabulary already applies. The three &ldquo;Absent&rdquo; rows are the target of this plan.
+            The &ldquo;N/A&rdquo; rows are deliberate.
+        </div>
+    </section>
+
+    <!-- ========================================== 3. Props, State, Derived ========================================== -->
+    <section class="fr-section" id="s3">
+        <h2><span class="num">03</span> Props, State, Derived</h2>
+        <p class="section-hook">Every eigenform field is one of three things. No document names this yet.</p>
+
+        <p>
+            The descriptor-as-truth refactor drew React&rsquo;s most important line: <em>where does this value live?</em> Naming
+            the three categories makes an invariant readable that currently has to be induced from studying seven or eight
+            eigenforms.
+        </p>
+
+        <div class="fr-triple">
+            <div class="fr-triple-card props">
+                <h4>Props</h4>
+                <span class="lives">parent __structure descriptor</span>
+                <p>Captured at seed construction, overridable via the descriptor. Mutations flow through <code>_set_my_field</code> (top-level) or <code>_set_my_config</code> (type-specific config). The runtime instance is a projection of the descriptor, not an independent source of truth.</p>
+                <ul>
+                    <li><code>label</code>, <code>instruction</code></li>
+                    <li><code>editable</code></li>
+                    <li><code>NavigationForm.mode</code></li>
+                    <li><code>TextForm.multiline</code>, <code>min_length</code>, <code>max_length</code></li>
+                    <li><code>NumberForm.min_val</code>, <code>max_val</code></li>
+                </ul>
+            </div>
+            <div class="fr-triple-card state">
+                <h4>State</h4>
+                <span class="lives">Store at key scope</span>
+                <p>Persisted per instance, per eigenform key, in the instance JSON file. Modifications flow through <code>_handle()</code> during action dispatch. This is what a user&rsquo;s interactions actually change.</p>
+                <ul>
+                    <li>TextForm current text</li>
+                    <li>CheckboxForm selected options</li>
+                    <li>NavigationForm active tab</li>
+                    <li>ListForm ordered items</li>
+                    <li>TableForm row data</li>
+                </ul>
+            </div>
+            <div class="fr-triple-card derived">
+                <h4>Derived</h4>
+                <span class="lives">computed each serialize</span>
+                <p>A pure function of current prop + state (possibly including siblings). Never persisted. Never mutated directly. Recomputed on demand.</p>
+                <ul>
+                    <li><code>is_complete</code></li>
+                    <li><code>has_data</code></li>
+                    <li><code>ComputedForm.compute_result</code></li>
+                    <li><code>ListForm.effective_must_follow</code></li>
+                    <li>All <code>effective_*</code> properties</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="fr-callout">
+            <strong>The rule:</strong> props live in the descriptor, state lives in the Store, neither owns derived values.
+            Adding a new field? The category tells you which mutation path to use. Writing this down is a half-day doc pass.
+        </div>
+    </section>
+
+    <!-- ========================================== 4. Reconciliation ========================================== -->
+    <section class="fr-section" id="s4">
+        <h2><span class="num">04</span> Reconciliation</h2>
+        <p class="section-hook"><code>from_descriptor</code> is reconciliation. The name never appears in the codebase.</p>
+
+        <div class="fr-recon">
+            <div class="fr-recon-box input">
+                <strong>Descriptor tree</strong>
+                <div class="hint">from JSON Store</div>
+            </div>
+            <div class="fr-recon-arrow">&rarr;</div>
+            <div class="fr-recon-box op">
+                <strong>from_descriptor</strong>
+                <div class="hint">match by key, deepcopy seed, apply overrides, recurse</div>
+            </div>
+            <div class="fr-recon-arrow">&larr;</div>
+            <div class="fr-recon-box input">
+                <strong>Seed tree</strong>
+                <div class="hint">from pages/*.py</div>
+            </div>
+        </div>
+        <div class="fr-recon" style="grid-template-columns: 1fr; margin-top: -0.5rem;">
+            <div class="fr-recon-arrow" style="justify-self: center;">&darr;</div>
+            <div class="fr-recon-box output" style="max-width: 280px; justify-self: center;">
+                <strong>Bound eigenform tree</strong>
+                <div class="hint">live, serializable, renderable</div>
+            </div>
+        </div>
+
+        <p>
+            The shape matches React reconciliation with interesting differences. React diffs two render trees (previous &rarr;
+            next) and emits DOM mutations. We diff a descriptor tree against a seed tree and emit a bound Python tree. Both
+            preserve identity via keys. Both are idempotent. Both have a callable-preservation problem.
+        </p>
+
+        <div class="fr-recon-caveat">
+            <strong>The callable problem.</strong> When a seed contains <code>ComputedForm(key="score", compute=lambda s: ...)</code>,
+            the lambda cannot serialize to JSON. On reconciliation, the descriptor has no <code>compute</code>; only the seed does.
+            If the seed is missing &mdash; because the Python definition moved, the key changed, or a sibling was renamed &mdash;
+            the callable is silently dropped. The form renders but does nothing. No warning.
+        </div>
+
+        <h3>Concrete actions, small</h3>
+        <ul>
+            <li>Add a docstring to <code>from_descriptor</code> naming the operation &ldquo;reconciliation.&rdquo;</li>
+            <li>Expose <code>reconcile = from_descriptor</code> at the registry module level. Readers who know the React term find it; readers who know the local term keep working. Zero cost.</li>
+            <li>When a type declares callable-valued fields, require the <code>seed</code> parameter. Return a typed diagnostic (not <code>None</code>) when seed-match fails so broken reconciliation is visible in the UI, not silent.</li>
+        </ul>
+    </section>
+
+    <!-- ========================================== 5. Error boundaries ========================================== -->
+    <section class="fr-section" id="s5">
+        <h2><span class="num">05</span> Error boundaries</h2>
+        <p class="section-hook">The one concrete React idea with real QMS payoff. Small, high-value, backward-compatible.</p>
+
+        <p>
+            A quality system makes failures <strong>visible</strong>, <strong>scoped</strong>, and <strong>reportable</strong>.
+            React error boundaries deliver exactly that shape: a container catches exceptions from its subtree, renders a
+            structured placeholder, lets siblings continue. The eigenform engine does not do this yet.
+        </p>
+
+        <div class="fr-beforeafter">
+            <div class="fr-ba-panel before">
+                <h4>Today</h4>
+                <div class="ba-label">A child raises &rarr; the whole page 500s.</div>
+                <ul>
+                    <li>Child <code>bind()</code> exception kills the request.</li>
+                    <li>Child <code>render()</code> exception kills the request.</li>
+                    <li>Child <code>_handle()</code> exception kills the request, state possibly partial.</li>
+                    <li>Corrupt <code>__structure</code> &rarr; silent fallback to seed, no UI diagnostic.</li>
+                </ul>
+            </div>
+            <div class="fr-ba-panel after">
+                <h4>Proposed</h4>
+                <div class="ba-label">A child raises &rarr; it becomes a visible error card.</div>
+                <ul>
+                    <li><code>Eigenform.render_safely()</code> default wraps <code>render()</code> in try/except.</li>
+                    <li>Exception &rarr; structured card: key, type, exception, optional stack.</li>
+                    <li>A &ldquo;Report&rdquo; affordance files to the QMS audit log.</li>
+                    <li>Siblings render normally; page remains interactive.</li>
+                </ul>
+            </div>
+        </div>
+
+        <h3>Sketch</h3>
+<pre class="code"><span class="k">def</span> render_safely(self) -> <span class="k">str</span>:
+    <span class="k">try</span>:
+        <span class="k">return</span> self.render()
+    <span class="k">except</span> Exception <span class="k">as</span> e:
+        <span class="k">return</span> render_template(<span class="s">"_error_boundary.html"</span>,
+                               key=self.key, type=type(self).__name__,
+                               exception=e, debug=<span class="k">is_debug</span>())
+
+<span class="c"># Every container iterates render_safely() on children instead of render().</span></pre>
+
+        <h3>Effort &amp; payoff</h3>
+        <ul>
+            <li><strong>Half a day, one CR.</strong> Core is ~30 lines on the base class.</li>
+            <li><strong>Five containers</strong> get a one-line swap from <code>render()</code> to <code>render_safely()</code>.</li>
+            <li><strong>One new template</strong>: <code>_error_boundary.html</code>.</li>
+            <li><strong>Backward-compatible by construction</strong>: no exception &rarr; identical output. Existing tests unaffected.</li>
+            <li><strong>QMS alignment</strong>: traceability, scope containment, evidence &mdash; directly in engine code.</li>
+        </ul>
+    </section>
+
+    <!-- ========================================== 6. Context (parked) ========================================== -->
+    <section class="fr-section" id="s6">
+        <h2><span class="num">06</span> Context (parked)</h2>
+        <p class="section-hook">The shape is clear. The pain point is not.</p>
+
+        <p>
+            React Context solves &ldquo;an ancestor passes data to a deep descendant without prop-drilling through every
+            intermediate component.&rdquo; Hypothetical eigenform uses:
+        </p>
+
+        <table class="fr-map">
+            <thead>
+                <tr>
+                    <th>Hypothetical use</th>
+                    <th>Current state</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="react">Passing Store to children</td><td class="note">Already solved. <code>bind()</code> threads <code>_store</code>.</td></tr>
+                <tr><td class="react">Passing theme to templates</td><td class="note">Already solved. Thread-local in <code>templates.py</code> plus <code>data-theme</code> attribute.</td></tr>
+                <tr><td class="react">Passing user / permissions</td><td class="note">Does not exist yet. No authenticated user model.</td></tr>
+                <tr><td class="react">Passing validation scope</td><td class="note">Does not exist yet. ValidationForm uses sibling refs.</td></tr>
+            </tbody>
+        </table>
+
+        <div class="fr-park">
+            <div class="icon">&#9210;</div>
+            <p>
+                Adding a Context primitive today would be speculative generality. <strong>Park it.</strong> When a concrete
+                pain point arrives &mdash; most likely user/permissions once the QMS workflows come online &mdash; the shape
+                is clear: a typed provider at the container level, a <code>_context_get(ClassRef)</code> accessor at any
+                descendant depth, validated at bind time like <code>SiblingRef</code>. Half a day of work, delayed until it
+                earns its keep.
+            </p>
+        </div>
+    </section>
+
+    <!-- ========================================== 7. Not borrowing ========================================== -->
+    <section class="fr-section" id="s7">
+        <h2><span class="num">07</span> What we&rsquo;re not borrowing</h2>
+        <p class="section-hook">Four React concepts that would be bad translations. The common thread: each solves a client-side problem we don&rsquo;t have.</p>
+
+        <div class="fr-reject">
+            <div class="fr-reject-card">
+                <h4><span class="x">&#10005;</span> Hooks</h4>
+                <p>
+                    <code>useState</code>, <code>useEffect</code>, <code>useContext</code> exploit JavaScript closure
+                    ergonomics and call-order stability. A Python port would be either a fragile call-counter dict or
+                    decorator magic. Eigenform subclasses with fields plus descriptors already cover
+                    &ldquo;composable state with identity.&rdquo;
+                </p>
+            </div>
+            <div class="fr-reject-card">
+                <h4><span class="x">&#10005;</span> Functional components</h4>
+                <p>
+                    React moved from class components to function components for hook composition. Without hooks,
+                    there is no composition benefit. Class-based eigenforms are the right shape for this engine.
+                </p>
+            </div>
+            <div class="fr-reject-card">
+                <h4><span class="x">&#10005;</span> JSX</h4>
+                <p>
+                    Python seed files are our JSX &mdash; more honest for being just Python. A Python-embedded DSL
+                    would add build complexity for essentially no gain. Jinja2 on the render side is serviceable.
+                </p>
+            </div>
+            <div class="fr-reject-card">
+                <h4><span class="x">&#10005;</span> Refs</h4>
+                <p>
+                    Refs are an imperative escape hatch to the DOM. This engine has no such escape hatch by design.
+                    Actions flow through POST; state flows through Store. Adding refs would break HATEOAS and
+                    replayability.
+                </p>
+            </div>
+            <div class="fr-reject-card">
+                <h4><span class="x">&#10005;</span> Suspense / Server Components</h4>
+                <p>
+                    These solve client-side hydration and streaming problems. Our server <em>is</em> the rendering
+                    runtime; there is nothing to hydrate. Not our problem.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================== 8. The Design Plan ========================================== -->
+    <section class="fr-section" id="s8">
+        <h2><span class="num">08</span> The design plan</h2>
+        <p class="section-hook">Sequenced in priority order. Each pass is independently shippable. Total effort for Passes 1&ndash;3: ~2.5 days.</p>
+
+        <div class="fr-plan">
+            <div class="fr-pass p1">
+                <div class="fr-pass-label">Pass 1 &mdash; Naming</div>
+                <div class="fr-pass-body">
+                    <strong>Documentation and aliases only</strong>
+                    <span>Architecture doc (<a href="https://github.com/whharris917/qms-workflow-engine/blob/main/docs/architecture.md"><code>docs/architecture.md</code></a>) with Props/State/Derived, Reconciliation, Portal, Controlled vs uncontrolled. Docstring for <code>from_descriptor</code> naming "reconciliation" and lifting the callable-preservation limitation. Module-level <code>reconcile</code> alias.</span>
+                </div>
+                <div class="fr-pass-meta">
+                    <span class="effort">~1 day</span>
+                    <span class="status landed">Landed</span>
+                </div>
+            </div>
+            <div class="fr-pass p2">
+                <div class="fr-pass-label">Pass 2 &mdash; Typed composition</div>
+                <div class="fr-pass-body">
+                    <strong>SiblingRef + field-type validation + Literal enums</strong>
+                    <span>Move 1: <code>SiblingRef(key, expects=)</code> as a <code>str</code>-subclass value. Seven sibling-reading eigenforms coerce on construction. <code>PageForm._validate_sibling_refs()</code> raises <code>SiblingRefError</code> with actionable diagnostics on stale or type-mismatched refs at bind time. Move 2: <code>_set_my_field</code> / <code>_set_my_config</code> validate against the dataclass annotation (simple types, <code>X | None</code>, <code>Literal[...]</code>). Move 3: <code>NavigationForm.mode</code> and <code>FieldDescriptor.type</code> tightened to <code>Literal</code>.</span>
+                </div>
+                <div class="fr-pass-meta">
+                    <span class="effort">~1 day</span>
+                    <span class="status landed">Landed</span>
+                </div>
+            </div>
+            <div class="fr-pass p3">
+                <div class="fr-pass-label">Pass 3 &mdash; Error boundaries</div>
+                <div class="fr-pass-body">
+                    <strong>render_safely() on base class</strong>
+                    <span><code>Eigenform.render_safely()</code> wraps <code>render()</code> and returns a structured error card on failure. Eighteen child-render call sites across ten eigenform modules swapped. <code>_error_boundary.html</code> template (theme-agnostic, traceback in Flask debug mode). Defensive fallback to minimal inline HTML if the template itself fails. <code>serialize_safely()</code>, <code>bind()</code>, and <code>_handle()</code> scoping deliberately parked.</span>
+                </div>
+                <div class="fr-pass-meta">
+                    <span class="effort">~0.5 day</span>
+                    <span class="status landed">Landed</span>
+                </div>
+            </div>
+            <div class="fr-pass p4">
+                <div class="fr-pass-label">Pass 4 &mdash; Deferred</div>
+                <div class="fr-pass-body">
+                    <strong>Context primitive; composable behavior</strong>
+                    <span>Park Context until a concrete ancestor-to-descendant channel is wanted. Custom hooks / behavior mixins not pursued &mdash; Python grain doesn&rsquo;t fit.</span>
+                </div>
+                <div class="fr-pass-meta">
+                    <span class="effort">&mdash;</span>
+                    <span class="status deferred">Deferred</span>
+                </div>
+            </div>
+        </div>
+
+        <h3>The second-order effect</h3>
+        <p>
+            Every AI model has read millions of words about React. None has read this codebase. When the codebase uses
+            React-standard names for React-standard concepts, any agent arriving for the first time is productive faster.
+            The vocabulary itself becomes a documentation artifact &mdash; an invisible alignment between this engine and
+            the broader ecosystem that reads its source.
+        </p>
+
+        <div class="fr-callout">
+            <strong>The architectural investment is already paid.</strong> This plan is about harvest, not capital
+            expenditure. Pass 1 is prose. Pass 2 is queued. Pass 3 is small. The codebase is at the stage where the next
+            round of improvements is no longer &ldquo;make it work&rdquo; but &ldquo;make it clear.&rdquo;
+        </div>
+    </section>
+
+</div>
+{% endblock %}

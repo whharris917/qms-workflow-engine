@@ -262,7 +262,7 @@ class TableRunner(Eigenform):
         if active_row and self._is_row_accessible(active_row):
             rg = self._row_groups_by_id().get(active_row)
             if rg:
-                cells_html = "".join(ef.render() for ef in rg.cell_eigenforms.values())
+                cells_html = "".join(ef.render_safely() for ef in rg.cell_eigenforms.values())
         elif active_row and not self._is_row_accessible(active_row):
             prereqs = self._constraint_graph().get(active_row, [])
             locked_msg = f"This row is locked. Complete prerequisite rows first: {', '.join(prereqs)}."

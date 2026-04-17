@@ -11,11 +11,14 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from html import escape
-from typing import Any
+from typing import Any, Literal
 
 from engine.affordances import Affordance
 from engine.eigenform import Eigenform
 from engine.templates import render_template
+
+
+FieldType = Literal["text", "choice"]
 
 
 @dataclass
@@ -23,7 +26,7 @@ class FieldDescriptor:
     """A single field within a MultiForm. Not an eigenform."""
     key: str
     label: str
-    type: str = "text"  # text | choice
+    type: FieldType = "text"
     instruction: str | None = None
     options: list[str] | None = None  # for choice type
 

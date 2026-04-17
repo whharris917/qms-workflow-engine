@@ -150,6 +150,16 @@ def deepdive_eigenform(path):
     return jsonify(result)
 
 
+@bp.route("/framing")
+def framing():
+    """Conceptual framing: a design plan for sharpening the engine's vocabulary.
+
+    Hand-rolled HTML — this page is prose with tables and diagrams, not an
+    interactive form, so it bypasses the eigenform engine entirely.
+    """
+    return render_template("framing.html", active_page="framing")
+
+
 @bp.route("/portal")
 def portal():
     instances = registry.list_instances()

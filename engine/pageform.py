@@ -123,7 +123,72 @@ class PageForm(Eigenform):
             for ef in source
         ]
 
+        bound._validate_sibling_refs()
+
         return bound
+
+    def _validate_sibling_refs(self):
+        """Walk the bound tree and validate every SiblingRef resolves.
+
+        A SiblingRef(key, expects=cls) is valid if:
+          1. An eigenform with key=`key` exists in the same scope as the
+             declaring eigenform (its parent container).
+          2. If `expects` is set, that sibling is an instance of `cls`.
+
+        Raises SiblingRefError on the first unresolved reference. The error
+        message names the declaring eigenform, the scope, the missing key,
+        and the sibling keys that do exist — actionable diagnostics for the
+        usual cause (sibling renamed or deleted without updating dependents).
+
+        Call site: PageForm.bind(), after children are bound. This closes
+        the silent-orphan bug where a renamed sibling would leave its
+        dependents quietly broken.
+        """
+        from engine.sibling_ref import SiblingRef, SiblingRefError
+
+        # Build scope -> {key: eigenform} map by walking the bound tree.
+        # Only include eigenforms with a scope (bound ones).
+        scope_map: dict[str, dict[str, "Eigenform"]] = {}
+
+        def _walk(ef):
+            scope = getattr(ef, "_scope", None)
+            if scope is not None:
+                scope_map.setdefault(scope, {})[ef.key] = ef
+            for child in ef.children:
+                _walk(child)
+
+        _walk(self)
+
+        # Now walk again and validate each eigenform's sibling refs.
+        def _validate(ef):
+            refs = ef._sibling_refs()
+            if refs:
+                scope = getattr(ef, "_scope", None)
+                siblings = scope_map.get(scope, {}) if scope is not None else {}
+                for ref in refs:
+                    if ref.key not in siblings:
+                        raise SiblingRefError(
+                            owner_key=ef.key,
+                            owner_scope=str(scope) if scope is not None else "(unbound)",
+                            ref=ref,
+                            known_keys=sorted(siblings.keys()),
+                            reason="missing",
+                        )
+                    if ref.expects is not None:
+                        actual = siblings[ref.key]
+                        if not isinstance(actual, ref.expects):
+                            raise SiblingRefError(
+                                owner_key=ef.key,
+                                owner_scope=str(scope) if scope is not None else "(unbound)",
+                                ref=ref,
+                                known_keys=sorted(siblings.keys()),
+                                reason="type_mismatch",
+                                actual_type=type(actual),
+                            )
+            for child in ef.children:
+                _validate(child)
+
+        _validate(self)
 
     def _reconstruct(self, stored_structure: list[dict]) -> list[Eigenform]:
         """Reconstruct eigenform list from stored descriptors + seed."""
@@ -461,7 +526,7 @@ class PageForm(Eigenform):
 
     def render_from_data(self, data: dict) -> str:
         from engine.registry import get_type_catalog
-        children_html = [ef.render() for ef in self.eigenforms]
+        children_html = [ef.render_safely() for ef in self.eigenforms]
         child_items = []
         tile_items = []
         type_catalog = []
@@ -492,7 +557,7 @@ class PageForm(Eigenform):
                 return tile
 
             for i, ef in enumerate(self.eigenforms):
-                child_items.append({"key": ef.key, "index": i, "html": ef.render(), "editable": ef.editable})
+                child_items.append({"key": ef.key, "index": i, "html": ef.render_safely(), "editable": ef.editable})
                 tile_items.append(_build_tile(ef, i))
         return render_template("page.html", data=data, ef=self, url=self._url_prefix, label=data.get("label", ""), instruction=data.get("instruction") or "", children_html=children_html, child_items=child_items, tile_items=tile_items, type_catalog=type_catalog, feedback=data.get("feedback"), mutable=self.mutable_structure)
 

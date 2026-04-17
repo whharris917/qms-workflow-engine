@@ -90,7 +90,7 @@ class InfoForm(Eigenform):
         return []
 
     def render_from_data(self, data: dict) -> str:
-        text_html = self._text_form.render() if data.get("edit_mode") else ""
+        text_html = self._text_form.render_safely() if data.get("edit_mode") else ""
         return render_template(
             "info.html", data=data, ef=self, url=self.url,
             label=data.get("label", ""),

@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from engine.eigenform import Eigenform
+from engine.sibling_ref import SiblingRef
 from engine.templates import render_template
 
 
@@ -22,9 +23,13 @@ from engine.templates import render_template
 class ValidationRule:
     """A single cross-field validation rule."""
     name: str
-    depends_on: list[str]
+    depends_on: "list[str | SiblingRef]"
     check_fn: Callable[[dict], bool]
     message: str
+
+    def __post_init__(self):
+        if self.depends_on:
+            self.depends_on = SiblingRef.coerce_many(self.depends_on)
 
 
 @dataclass
@@ -38,6 +43,12 @@ class ValidationForm(Eigenform):
     """
     rules: list[ValidationRule] = field(default_factory=list)
     block_completion: bool = True
+
+    def _sibling_refs(self) -> list[SiblingRef]:
+        refs: list[SiblingRef] = []
+        for rule in self.rules:
+            refs.extend(r for r in rule.depends_on if isinstance(r, SiblingRef))
+        return refs
 
     @property
     def is_complete(self) -> bool:

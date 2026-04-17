@@ -870,7 +870,7 @@ class TableForm(Eigenform):
                 if col_id in templates and rg:
                     ef = rg.cell_eigenforms.get(col_id)
                     if ef:
-                        cells.append({"html": f'<td style="border: 1px solid #ccc; padding: 4px; vertical-align: top;">{ef.render()}</td>'})
+                        cells.append({"html": f'<td style="border: 1px solid #ccc; padding: 4px; vertical-align: top;">{ef.render_safely()}</td>'})
                     else:
                         cells.append({"html": '<td style="border: 1px solid #ccc; padding: 2px;"></td>'})
                 else:

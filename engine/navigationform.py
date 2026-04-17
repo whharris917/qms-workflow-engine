@@ -13,6 +13,7 @@ structural persistence, snapshot/restore, is_complete.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Literal
 
 from engine.affordances import (
     Affordance,
@@ -24,11 +25,14 @@ from engine.store import Store
 from engine.templates import render_template
 
 
+NavigationMode = Literal["tabs", "chain", "sequence", "accordion"]
+
+
 @dataclass
 class NavigationForm(Eigenform):
     """A container that presents children in one of four modes."""
     steps: list[Eigenform] = field(default_factory=list)
-    mode: str = "sequence"
+    mode: NavigationMode = "sequence"
     default_expanded: bool = True  # accordion mode: initial section state
 
     _seed: list[Eigenform] = field(default_factory=list, repr=False)
@@ -613,7 +617,7 @@ class NavigationForm(Eigenform):
                     "expanded": expanded, "editable": ef.editable, "index": i,
                 })
                 if expanded:
-                    section_html[ef.key] = ef.render()
+                    section_html[ef.key] = ef.render_safely()
             active_html = ""
         else:
             section_html = {}
@@ -628,7 +632,7 @@ class NavigationForm(Eigenform):
                     item["accessible"] = self._is_accessible(i)
                 step_items.append(item)
             active = self.active_step
-            active_html = active.render() if active else ""
+            active_html = active.render_safely() if active else ""
 
         available_types = sorted(get_registry().available()) if data.get("edit_mode") else []
         return render_template(

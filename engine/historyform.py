@@ -192,7 +192,7 @@ class HistoryForm(Eigenform):
                 snapshot_html = self._render_snapshot(snapshot)
         else:
             if self.eigenform:
-                child_html = self.eigenform.render()
+                child_html = self.eigenform.render_safely()
         return render_template("history.html", data=data, ef=self, child_html=child_html, viewing=viewing, read_only=read_only, timeline=timeline, viewing_ts=data.get("viewing_timestamp", ""), snapshot_html=snapshot_html)
 
     @staticmethod

@@ -25,6 +25,11 @@ Open `http://127.0.0.1:5000` to see the home page.
 | `/readme` | README | This document |
 | `/pages/{id}` | Eigenform Page | A live page instance with full eigenform rendering |
 
+## Documentation
+
+- **Conceptual primer and design plan**: served live at [`/framing`](http://127.0.0.1:5000/framing). Read this first if you are new to the engine — it walks through the core loop, defines the vocabulary (seed, Store, bind, descriptor, affordance), and maps eigenform concepts onto their React equivalents.
+- **Architecture reference**: [`docs/architecture.md`](docs/architecture.md). The authoritative reference for the load-bearing invariants — Props/State/Derived categories, keys and scope, reconciliation (including the callable-preservation limitation), affordance flotation, and the controlled/uncontrolled state boundary. Consult this before adding a new field, a new eigenform type, or touching the reconciliation path.
+
 ## Architecture
 
 ```

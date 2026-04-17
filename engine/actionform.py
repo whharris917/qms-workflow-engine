@@ -20,6 +20,7 @@ from typing import Any, Callable
 
 from engine.affordances import Affordance, SimpleButtonAffordance
 from engine.eigenform import Eigenform
+from engine.sibling_ref import SiblingRef
 from engine.store import Store
 from engine.templates import render_template
 
@@ -40,11 +41,18 @@ class ActionForm(Eigenform):
     """A button that executes a function with access to sibling state and the store."""
     action_label: str = "Execute"
     action_fn: Callable[[dict, Store, str], dict] | None = None
-    depends_on: list[str] = field(default_factory=list)
+    depends_on: "list[str | SiblingRef]" = field(default_factory=list)
     precondition_fn: Callable[[dict], bool] | None = None
     precondition_message: str = "Precondition not met."
     confirm: bool = False
     writes_to: list[str] = field(default_factory=list)
+
+    def __post_init__(self):
+        if self.depends_on:
+            self.depends_on = SiblingRef.coerce_many(self.depends_on)
+
+    def _sibling_refs(self) -> list[SiblingRef]:
+        return [r for r in self.depends_on if isinstance(r, SiblingRef)]
 
     @property
     def is_complete(self) -> bool:
