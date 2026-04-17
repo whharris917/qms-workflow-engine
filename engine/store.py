@@ -21,9 +21,14 @@ class Store:
         self._load()
 
     def _load(self):
-        """Read data from disk and record the file's mtime."""
+        """Read data from disk and record the file's mtime.
+
+        An empty file is treated as {} — this can arise from an
+        interrupted write, and failing to parse would wedge the page.
+        """
         if self.path.exists():
-            self._data = json.loads(self.path.read_text())
+            text = self.path.read_text()
+            self._data = json.loads(text) if text.strip() else {}
             self._mtime = self.path.stat().st_mtime
         else:
             self._data = {}
@@ -79,6 +84,10 @@ class Store:
         self._save()
 
     def _save(self):
+        # Atomic write: temp file + rename. Prevents 0-byte files when
+        # the process is killed mid-write (e.g., Flask auto-reload).
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(self._data, indent=2))
+        tmp = self.path.parent / (self.path.name + ".tmp")
+        tmp.write_text(json.dumps(self._data, indent=2))
+        tmp.replace(self.path)
         self._mtime = self.path.stat().st_mtime
