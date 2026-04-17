@@ -112,7 +112,26 @@ class NavigationForm(Eigenform):
 
     # --- Structural persistence ---
 
+    @property
+    def _effective_config(self) -> dict:
+        """Config from store override if set, else Python defaults."""
+        if self._store is not None:
+            override = self._store.get(self._scope, f"{self.key}.__config")
+            if override is not None:
+                return override
+        return {"mode": self.mode, "default_expanded": self.default_expanded}
+
     def _bind_children(self, store: Store, url_prefix: str):
+        # Apply stored config override (mode, default_expanded) before any
+        # logic that reads self.mode — otherwise serialize/render/handle
+        # would see the seed mode instead of the edited one.
+        override = store.get(self._scope, f"{self.key}.__config")
+        if override is not None:
+            if "mode" in override:
+                self.mode = override["mode"]
+            if "default_expanded" in override:
+                self.default_expanded = override["default_expanded"]
+
         self._seed = list(self.steps)
 
         if self.editable:
@@ -165,11 +184,13 @@ class NavigationForm(Eigenform):
     def _snapshot_edit_state(self) -> dict:
         state = super()._snapshot_edit_state()
         state["__children_scope"] = self._store.snapshot_scope(self.key)
+        state["__config"] = self._store.get(self._scope, f"{self.key}.__config")
         return state
 
     def _restore_edit_state(self, state: dict):
         super()._restore_edit_state(state)
         self._store.restore_scope(self.key, state.get("__children_scope", {}))
+        self._store.set(self._scope, f"{self.key}.__config", state.get("__config"))
         self._rebuild()
 
     def _nav_affordances(self) -> list[Affordance]:
@@ -286,6 +307,22 @@ class NavigationForm(Eigenform):
         from engine.registry import get_registry
         reg = get_registry()
         available = reg.available()
+
+        cfg = self._effective_config
+        current_mode = cfg.get("mode")
+        for m in ("tabs", "chain", "sequence", "accordion"):
+            is_current = m == current_mode
+            affs.append(SimpleButtonAffordance(
+                label=f"Mode: {m}" + (" (current)" if is_current else ""),
+                method="POST",
+                url=self.url,
+                body={"action": "set_nav_mode", "mode": m},
+                instruction=(
+                    f"Switch to {m} mode."
+                    + ("" if not is_current else " (Already active.)")
+                    + " Changing mode clears the current navigation value."
+                ),
+            ))
 
         affs.append(SetValueAffordance(
             label="Add Step",
@@ -510,7 +547,34 @@ class NavigationForm(Eigenform):
             elif action == "toggle_editable":
                 self._push_undo()
                 return self._toggle_editable(body)
+            elif action == "set_nav_mode":
+                self._push_undo()
+                return self._set_nav_mode(body)
 
+        return self.serialize()
+
+    def _set_nav_mode(self, body: dict) -> dict:
+        valid_modes = ("tabs", "chain", "sequence", "accordion")
+        new_mode = body.get("mode")
+        if new_mode not in valid_modes:
+            return self._error(
+                f"Invalid mode: {new_mode!r}. "
+                f"Must be one of: {', '.join(valid_modes)}.",
+                action="set_nav_mode",
+            )
+        if new_mode == self.mode:
+            return self.serialize()
+
+        cfg = dict(self._effective_config)
+        cfg["mode"] = new_mode
+        self._store.set(self._scope, f"{self.key}.__config", cfg)
+
+        # Stored self.value has a mode-specific shape (step key for
+        # tabs/chain/sequence, dict for accordion). Clear it so the
+        # new mode starts from a clean state.
+        self._store.delete(self._scope, self.key)
+
+        self.mode = new_mode
         return self.serialize()
 
     # --- Serialization ---
