@@ -4,14 +4,14 @@ import importlib
 import sys
 from pathlib import Path
 
-from engine.pageform import PageForm
+from engine.pagecomponent import PageComponent
 
 
-def discover_pages() -> dict[str, PageForm]:
+def discover_pages() -> dict[str, PageComponent]:
     """Import all page modules and return {key: unbound_definition}.
 
     Each .py file in this directory (except __init__.py) must export a
-    `definition` — an unbound PageForm. The page key comes from the
+    `definition` — an unbound PageComponent. The page key comes from the
     definition's key attribute, not the filename.
 
     The returned definitions are seeds — they hold no store binding and
@@ -43,8 +43,8 @@ def discover_pages() -> dict[str, PageForm]:
     return pages
 
 
-def bind_page(seed: PageForm, data_dir: Path, instance_id: str,
-              label: str | None = None) -> PageForm:
+def bind_page(seed: PageComponent, data_dir: Path, instance_id: str,
+              label: str | None = None) -> PageComponent:
     """Bind a seed to its store, producing a transient bound page."""
     bound = seed.bind(
         data_dir,

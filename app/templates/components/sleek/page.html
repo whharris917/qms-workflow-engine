@@ -1,0 +1,207 @@
+{# PageComponent — Sleek theme (Builder layout).
+
+   Two-panel "Paint" layout for mutable pages:
+     Left:  Type palette (draggable source cards)
+     Right: Canvas — schematic block diagram of the page tree
+
+   Non-mutable pages render as simple stacked children.
+
+   Context: data, ef, url, label, instruction,
+            children_html, child_items, tile_items, type_catalog, feedback, mutable
+#}
+
+{# ── Feedback banners ── #}
+{% macro render_feedback(feedback, data) %}
+{% if feedback %}
+  {% set affs = data.affordances|default([]) %}
+  {% set dismiss_affs = {} %}
+  {% for aff in affs %}
+    {% if aff.body.action == "dismiss_feedback" %}
+      {% set _ = dismiss_affs.update({aff.body.target|default(""): aff}) %}
+    {% endif %}
+  {% endfor %}
+  {% for err in feedback.errors|default([]) %}
+    {% set target = err.target|default("") %}
+    {% set dismiss_html = "" %}
+    {% set aff = dismiss_affs.get(target) %}
+    {% if aff %}
+      {% set _ = aff.update({"_rendered": true}) %}
+      {% set dismiss_html = render_btn(aff.url, aff.body, "&#10005;", "c-feedback__dismiss") %}
+    {% endif %}
+    <div class="c-feedback c-feedback--error">
+      <span><strong>&#10007; Error:</strong> {{ err.message }}{% if target %} <span class="c-feedback__target">({{ target }})</span>{% endif %}</span>
+      <span class="c-feedback__meta">
+        <span class="c-feedback__timestamp">{{ err.timestamp|default("") }}</span>
+        {{ dismiss_html|safe }}
+      </span>
+    </div>
+  {% endfor %}
+  {% set succ = feedback.success %}
+  {% if succ %}
+    {% set target = succ.target|default("") %}
+    <div class="c-feedback c-feedback--success">
+      <span><strong>&#10003; OK:</strong> {{ succ.message }}{% if target %} <span class="c-feedback__target">({{ target }})</span>{% endif %}</span>
+      <span class="c-feedback__timestamp">{{ succ.timestamp|default("") }}</span>
+    </div>
+  {% endif %}
+{% endif %}
+{% endmacro %}
+
+{# ── Recursive BLOCK macro — the core of the schematic canvas ──
+
+   Renders each component as a visual block.  Leaf blocks are compact
+   single-row bars.  Container blocks have a header bar + a body area
+   that visually wraps their child blocks (the "lego" nesting).
+
+   tile: {key, index, type, label, icon, css, is_container, children[]}
+#}
+{% macro render_block(tile, url, depth=0) %}
+{% if tile.is_container %}
+  {# ── Container block: header + nested child zone ── #}
+  <div class="blk blk--container blk--{{ tile.css }}"
+       data-key="{{ tile.key }}" data-index="{{ tile.index }}" data-depth="{{ depth }}">
+    <div class="blk__head" draggable="true" data-key="{{ tile.key }}">
+      <span class="blk__icon blk__icon--{{ tile.css }}">{{ tile.icon }}</span>
+      <span class="blk__type">{{ tile.type }}</span>
+      <span class="blk__label">{{ tile.label }}</span>
+      <span class="blk__key">{{ tile.key }}</span>
+      <span class="blk__actions">
+        <button class="blk__btn blk__btn--ungroup"
+                data-c-post="{{ url }}"
+                data-c-body='{"action":"ungroup_component","key":"{{ tile.key }}"}'
+                title="Ungroup">&#8618;</button>
+        {% if depth > 0 %}
+        <button class="blk__btn blk__btn--eject"
+                data-c-post="{{ url }}"
+                data-c-body='{"action":"move_component","key":"{{ tile.key }}","position":999}'
+                title="Eject to top level">&#8599;</button>
+        {% endif %}
+        <button class="blk__btn blk__btn--delete"
+                data-c-post="{{ url }}"
+                data-c-body='{"action":"remove_component","key":"{{ tile.key }}"}'
+                title="Remove">&#128465;</button>
+      </span>
+    </div>
+    <div class="blk__children sleek-struct__nest" data-parent="{{ tile.key }}">
+      {% for child in tile.children %}
+        {{ render_block(child, url, depth + 1) }}
+      {% endfor %}
+      {% if not tile.children %}
+        <div class="blk__empty-slot">drop here</div>
+      {% endif %}
+    </div>
+  </div>
+{% else %}
+  {# ── Leaf block: single compact bar ── #}
+  <div class="blk blk--leaf blk--{{ tile.css }}"
+       draggable="true"
+       data-key="{{ tile.key }}" data-index="{{ tile.index }}" data-depth="{{ depth }}">
+    <span class="blk__icon blk__icon--{{ tile.css }}">{{ tile.icon }}</span>
+    <span class="blk__type">{{ tile.type }}</span>
+    <span class="blk__label">{{ tile.label }}</span>
+    <span class="blk__key">{{ tile.key }}</span>
+    <span class="blk__actions">
+      {% if depth > 0 %}
+      <button class="blk__btn blk__btn--eject"
+              data-c-post="{{ url }}"
+              data-c-body='{"action":"move_component","key":"{{ tile.key }}","position":999}'
+              title="Eject to top level">&#8599;</button>
+      {% endif %}
+      <button class="blk__btn blk__btn--delete"
+              data-c-post="{{ url }}"
+              data-c-body='{"action":"remove_component","key":"{{ tile.key }}"}'
+              title="Remove">&#128465;</button>
+    </span>
+  </div>
+{% endif %}
+{% endmacro %}
+
+{# ── Standard page header (both mutable and non-mutable) ── #}
+<h2>{{ data.label }}</h2>
+{% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
+{{ render_feedback(feedback, data) }}
+
+{% if mutable %}
+  {# Mark structural affordances as rendered #}
+  {% for aff in data.affordances %}
+    {% set action = aff.body.action|default("") %}
+    {% if action in ("add_component", "remove_component", "move_component", "toggle_editable", "group_components", "reparent_component", "ungroup_component") %}
+      {% set _ = aff.update({"_rendered": true}) %}
+    {% endif %}
+  {% endfor %}
+
+  {# ══════════════════════════════════════════════════════
+     BUILDER — two-panel schematic editor
+     Slots between the page header/feedback and the
+     rendered components below.
+     ══════════════════════════════════════════════════════ #}
+  <div class="builder">
+
+    {# ── Left: Type Palette ── #}
+    <div class="builder__palette">
+      <div class="builder__palette-header">
+        <span class="builder__palette-title">Components</span>
+      </div>
+      <div class="builder__palette-scroll">
+        {% for cat in type_catalog %}
+        <details class="builder__cat" open>
+          <summary class="builder__cat-header">
+            <span class="builder__cat-name">{{ cat.name }}</span>
+          </summary>
+          <div class="builder__cat-list">
+            {% for type_name, icon, desc in cat.types %}
+            <div class="builder__type builder__type--{{ cat.css }}"
+                 draggable="true"
+                 data-c-palette-type="{{ type_name }}"
+                 data-c-add="{{ url }}"
+                 title="{{ desc }}">
+              <span class="builder__type-icon">{{ icon }}</span>
+              <span class="builder__type-name">{{ type_name }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </details>
+        {% endfor %}
+      </div>
+    </div>
+
+    {# ── Right: Schematic Canvas ── #}
+    <div class="builder__canvas">
+      <div class="builder__canvas-body sleek-struct__list" data-c-url="{{ url }}">
+        {% if tile_items %}
+          {% for tile in tile_items %}
+            {{ render_block(tile, url) }}
+          {% endfor %}
+        {% else %}
+          <div class="builder__empty">
+            <span class="builder__empty-icon">&#128466;</span>
+            <span class="builder__empty-text">Drag components from the palette to start building</span>
+          </div>
+        {% endif %}
+      </div>
+
+      {# Group bar (appears on multi-select) #}
+      <div class="builder__canvas-footer">
+        <div class="sleek-struct__group-bar" style="display: none;">
+          <span class="sleek-struct__group-label">Group selected:</span>
+          <input type="text" class="sleek-struct__group-input" placeholder="group-key" data-field="group_key" />
+          <input type="text" class="sleek-struct__group-input sleek-struct__group-input--wide" placeholder="Group Label (optional)" data-field="group_label" />
+          <button class="sleek-struct__group-btn" data-c-url="{{ url }}">Group</button>
+        </div>
+      </div>
+    </div>
+
+  </div>{# /.builder #}
+{% endif %}
+
+{# ── Rendered components (the actual page content) ── #}
+{% for html in children_html %}{{ html|safe }}{% endfor %}
+
+{# Remaining non-structural affordances (Reset Page, Rebuild from Seed, etc.) #}
+<div class="c-remaining-affs">
+{% for aff in data.affordances %}
+  {% if not aff._rendered %}
+    {{ render_aff(aff) }}
+  {% endif %}
+{% endfor %}
+</div>

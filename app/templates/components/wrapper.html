@@ -1,0 +1,43 @@
+{# Default component wrapper — reproduces the output of render() in Python.
+
+   Context:
+     classes     — list of CSS classes (e.g. ["component", "component--complete"])
+     form        — component type for data-form attribute
+     key         — component key for data-key attribute
+     uid         — unique ID for pane element IDs
+     label       — effective label text (escaped)
+     editable    — whether this component is editable
+     edit_mode   — whether currently in edit mode
+     undo_count  — number of undo steps available
+     url         — component POST URL (escaped)
+     inner       — rendered inner HTML (safe)
+     json_str    — escaped JSON string for the JSON pane
+#}
+{% set cls_str = classes|join(" ") %}
+<div class="{{ cls_str }}" data-form="{{ form }}" data-key="{{ key }}">
+{# --- Titlebar (only if editable) --- #}
+{% if editable %}
+<div class="c-titlebar">
+<span class="c-titlebar__label">{{ label }}</span>
+<span class="c-titlebar__spacer"></span>
+<div class="c-chrome">
+{% if edit_mode %}
+  <button data-c-post="{{ url }}" data-c-body="{{ {"action": "set_mode", "mode": "execute"}|tojson }}" class="c-chrome-btn" style="background: #fff3cd; border: 1px solid #856404;" title="POST {{ url }} {{ {"action": "set_mode", "mode": "execute"}|tojson }}"><span style="font-size:14px;line-height:1;color:#856404;">&#9654;</span></button>
+  {% if undo_count > 0 %}
+  <button data-c-post="{{ url }}" data-c-body="{{ {"action": "undo"}|tojson }}" class="c-chrome-btn" style="background: none; border: 1px solid #aaa;" title="Undo ({{ undo_count }})"><span style="font-size:14px;line-height:1;">&#8630;</span></button>
+  {% endif %}
+  <button data-c-post="{{ url }}" data-c-body="{{ {"action": "discard"}|tojson }}" class="c-chrome-btn" style="background: #fff0f0; border: 1px solid #c00;" title="Discard all changes"><span style="font-size:14px;line-height:1;color:#c00;">&#10005;</span></button>
+{% else %}
+  <button data-c-post="{{ url }}" data-c-body="{{ {"action": "set_mode", "mode": "edit"}|tojson }}" class="c-chrome-btn" style="background: none; border: 1px solid #aaa;" title="POST {{ url }} {{ {"action": "set_mode", "mode": "edit"}|tojson }}"><span style="font-size:14px;line-height:1;">&#9998;</span></button>
+{% endif %}
+</div>
+</div>
+{% endif %}
+{# --- View toggle + panes --- #}
+<select class="c-view-toggle" onchange='var ps=["c-{{ uid }}-human","c-{{ uid }}-json"],v=this.value;for(var i=0;i<ps.length;i++)document.getElementById(ps[i]).style.display=i==v?"block":"none";' style="position: absolute; top: 8px; right: 8px; font-size: 11px; cursor: pointer; background: #555; color: white; border: none; padding: 2px 6px; border-radius: 3px;">
+<option value="0">Human View</option>
+<option value="1">JSON</option>
+</select>
+<div id="c-{{ uid }}-human" style="display: block;">{{ inner|safe }}</div>
+<pre id="c-{{ uid }}-json" class="c-json-pane" style="display: none; margin: 0; white-space: pre-wrap;">{{ json_str }}</pre>
+</div>

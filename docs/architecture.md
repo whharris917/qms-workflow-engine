@@ -1,19 +1,19 @@
-# Eigenform Engine — Architecture Reference
+# Component Engine — Architecture Reference
 
 **Audience:** Engine contributors who want an authoritative reference for how
-eigenforms, descriptors, Store state, and affordances relate to one another.
+components, descriptors, Store state, and affordances relate to one another.
 For a pedagogical introduction, see [`/framing`](../app/templates/framing.html)
 or the project README.
 
 This document defines the load-bearing invariants. If you are about to add a
-field, introduce a new eigenform type, change a routing convention, or touch
+field, introduce a new component type, change a routing convention, or touch
 the reconciliation path, read the relevant section first.
 
 ---
 
 ## Table of Contents
 
-1. [Categories of eigenform data: Props, State, Derived](#1-categories-of-eigenform-data)
+1. [Categories of component data: Props, State, Derived](#1-categories-of-component-data)
 2. [Keys and scope](#2-keys-and-scope)
 3. [Reconciliation](#3-reconciliation)
 4. [Affordance flotation (Portal)](#4-affordance-flotation-portal)
@@ -22,9 +22,9 @@ the reconciliation path, read the relevant section first.
 
 ---
 
-## 1. Categories of eigenform data
+## 1. Categories of component data
 
-**Every field on every eigenform is one of three things.** Misplacing a field
+**Every field on every component is one of three things.** Misplacing a field
 into the wrong category is the single most common source of subtle bugs in
 this engine. Know the category before you touch the field.
 
@@ -35,7 +35,7 @@ overridable at runtime via the parent container's `__structure` descriptor
 entry for this child.
 
 **Canonical location:** the parent's Store at key `{parent_scope}.__structure`,
-within the child's descriptor entry. The runtime eigenform instance is a
+within the child's descriptor entry. The runtime component instance is a
 *projection* of the descriptor, not an independent source.
 
 **Mutation API:**
@@ -48,47 +48,47 @@ Both helpers mutate the descriptor in place AND `setattr` on the runtime
 instance so the live tree reflects the change before the next bind.
 
 **Examples of props:**
-| Eigenform | Props |
+| Component | Props |
 |---|---|
 | Base (all types) | `label`, `instruction`, `editable` |
-| TextForm | `multiline`, `min_length`, `max_length` |
-| NumberForm | `min_val`, `max_val`, `step`, `slider`, `unit` |
-| BooleanForm | `true_label`, `false_label` |
-| DateForm | `include_time`, `min_date`, `max_date` |
-| NavigationForm | `mode`, `default_expanded` |
-| DictionaryForm | `key_label`, `value_label` |
-| MultiForm | `fields` (list of FieldDescriptor) |
-| ListForm | `allow_constraints` |
+| TextComponent | `multiline`, `min_length`, `max_length` |
+| NumberComponent | `min_val`, `max_val`, `step`, `slider`, `unit` |
+| BooleanComponent | `true_label`, `false_label` |
+| DateComponent | `include_time`, `min_date`, `max_date` |
+| NavigationComponent | `mode`, `default_expanded` |
+| DictionaryComponent | `key_label`, `value_label` |
+| MultiComponent | `fields` (list of FieldDescriptor) |
+| ListComponent | `allow_constraints` |
 
-**Rule:** If a field is declared in the eigenform's `@dataclass` and its value
+**Rule:** If a field is declared in the component's `@dataclass` and its value
 survives across requests because the container re-applies it on bind, it is a
 prop.
 
 ### 1.2 State — lives in the Store at key scope
 
-A **state** value is the mutable content an eigenform owns directly.
-Persisted per instance, per eigenform key, in the per-instance JSON file.
+A **state** value is the mutable content a component owns directly.
+Persisted per instance, per component key, in the per-instance JSON file.
 
-**Canonical location:** the Store at entries keyed by the eigenform's scope
+**Canonical location:** the Store at entries keyed by the component's scope
 (e.g., `hello/name.__value`, `page-2/tabs.__active`).
 
-**Mutation API:** `self._handle(body)` — each eigenform implements its own
+**Mutation API:** `self._handle(body)` — each component implements its own
 action dispatch which reads the action, validates the parameters, writes to
 the Store, and returns the updated state. Containers delegate via
 `handle_action(path, body)` which walks the tree to the target child.
 
 **Examples of state:**
-| Eigenform | State |
+| Component | State |
 |---|---|
-| TextForm | current text value |
-| NumberForm | current number value |
-| BooleanForm | current boolean value |
-| ChoiceForm | current selected option |
-| CheckboxForm | selected option set |
-| NavigationForm | active tab / step / expanded sections |
-| ListForm | ordered items |
-| TableForm | cells, rows, columns, ordering constraints |
-| DictionaryForm | key-value entries |
+| TextComponent | current text value |
+| NumberComponent | current number value |
+| BooleanComponent | current boolean value |
+| ChoiceComponent | current selected option |
+| CheckboxComponent | selected option set |
+| NavigationComponent | active tab / step / expanded sections |
+| ListComponent | ordered items |
+| TableComponent | cells, rows, columns, ordering constraints |
+| DictionaryComponent | key-value entries |
 
 **Rule:** If a field's value changes because the *user did something*, it is
 state.
@@ -103,14 +103,14 @@ Recomputed every time `serialize()` or `render()` runs.
 response.
 
 **Examples of derived:**
-| Eigenform | Derived |
+| Component | Derived |
 |---|---|
 | Base | `is_complete`, `has_data` |
-| ComputedForm | `compute_result` (from `compute(siblings)`) |
-| ValidationForm | rule pass/fail status |
-| ScoreForm | score from answer-key comparison |
-| DynamicChoiceForm | options (from `options_fn(siblings)`) |
-| ListForm | `effective_must_follow` (constraints with fixed-demotion applied) |
+| ComputedComponent | `compute_result` (from `compute(siblings)`) |
+| ValidationComponent | rule pass/fail status |
+| ScoreComponent | score from answer-key comparison |
+| DynamicChoiceComponent | options (from `options_fn(siblings)`) |
+| ListComponent | `effective_must_follow` (constraints with fixed-demotion applied) |
 
 **Rule:** If you can compute the value at serialize-time from other values,
 it is derived. Don't cache it. Don't persist it. Recompute.
@@ -135,8 +135,8 @@ User actions → state. Other values → derived.
 
 ### 2.1 Key
 
-Every eigenform has a `key: str` attribute set at construction. The key is
-the eigenform's **identity** within its containing scope.
+Every component has a `key: str` attribute set at construction. The key is
+the component's **identity** within its containing scope.
 
 **Rules:**
 - Keys must be unique within a scope (enforced implicitly; collisions cause
@@ -159,22 +159,22 @@ inherited from the nearest container.
 
 | Container | Child scope | Rationale |
 |---|---|---|
-| PageForm | `self.key` | Standardized in the stateless-server refactor |
-| NavigationForm | `self.key` | Consistent with PageForm |
-| GroupForm | `self.key` | Consistent with PageForm |
-| RepeaterForm | `self.key/entry_id` | Compound scope for dynamic entries |
-| TableForm (typed columns) | `table_key/row_id` | Compound scope per cell |
+| PageComponent | `self.key` | Standardized in the stateless-server refactor |
+| NavigationComponent | `self.key` | Consistent with PageComponent |
+| GroupComponent | `self.key` | Consistent with PageComponent |
+| RepeaterComponent | `self.key/entry_id` | Compound scope for dynamic entries |
+| TableComponent (typed columns) | `table_key/row_id` | Compound scope per cell |
 
-**The PageForm convention was aligned only in Session-2026-04-16-003.**
-Previously PageForm wrote `__structure` at scope=binding-scope (instance ID)
+**The PageComponent convention was aligned only in Session-2026-04-16-003.**
+Previously PageComponent wrote `__structure` at scope=binding-scope (instance ID)
 but children bound at scope=self.key. That mismatch broke
 `_get_my_descriptor()` lookups. If you are adding a new container type,
-follow the NavigationForm/GroupForm convention — do not re-introduce the
+follow the NavigationComponent/GroupComponent convention — do not re-introduce the
 divergence.
 
 ### 2.3 Compound scopes
 
-Some containers (RepeaterForm, TableForm) emit children with compound
+Some containers (RepeaterComponent, TableComponent) emit children with compound
 scopes like `my_repeater/entry-abc123`. The Store treats scopes as opaque
 strings, so nesting works naturally — `my_repeater/entry-abc123/some-field`
 is a valid Store key. Path-based URL routing mirrors the compound scope.
@@ -183,7 +183,7 @@ is a valid Store key. Path-based URL routing mirrors the compound scope.
 
 ## 3. Reconciliation
 
-The operation that rebuilds a live eigenform tree from its persisted
+The operation that rebuilds a live component tree from its persisted
 representation is **reconciliation**. In React terms, this is what
 `React.createElement` + the diffing step does between two render trees.
 
@@ -194,19 +194,19 @@ discoverability):
 
 ```python
 def from_descriptor(desc: dict,
-                    reg: EigenformRegistry | None = None,
-                    seed: Eigenform | None = None) -> Eigenform
+                    reg: ComponentRegistry | None = None,
+                    seed: Component | None = None) -> Component
 ```
 
 **Inputs:**
 - `desc` — a descriptor dict (the JSON-serializable snapshot produced by
   `to_descriptor()`). Holds `type`, `key`, `label`, `instruction`,
   `editable`, optional `config`, and optional children fields.
-- `reg` — the eigenform type registry (defaults to the global registry).
-- `seed` — the corresponding seed eigenform, if available. Used to preserve
+- `reg` — the component type registry (defaults to the global registry).
+- `seed` — the corresponding seed component, if available. Used to preserve
   callables.
 
-**Output:** an unbound `Eigenform` instance ready for `bind()`.
+**Output:** an unbound `Component` instance ready for `bind()`.
 
 ### 3.2 The algorithm
 
@@ -220,31 +220,31 @@ def from_descriptor(desc: dict,
      `_apply_descriptor(desc)`. The descriptor wins over seed defaults —
      the descriptor is the canonical source of truth.
 3. If seed is absent or does not match:
-   - Look up the eigenform class in the registry.
+   - Look up the component class in the registry.
    - Construct a fresh instance from `key`, `label`, `instruction`,
      `editable`, and the `config` dict.
    - Recursively reconcile children.
 
 ### 3.3 The callable-preservation limitation
 
-**The central tension:** JSON cannot round-trip functions. Any eigenform
+**The central tension:** JSON cannot round-trip functions. Any component
 field that holds a callable (lambdas, validators, compute functions) must
 be preserved through reconciliation via seed-match, because it cannot be
 stored in the descriptor.
 
 **Affected fields include:**
-- `ComputedForm.compute: Callable[[siblings], value]`
-- `DynamicChoiceForm.options_fn: Callable[[siblings], list]`
-- `VisibilityForm.predicate: Callable[[siblings], bool]` (when callable)
-- `ValidationForm` rule predicates
+- `ComputedComponent.compute: Callable[[siblings], value]`
+- `DynamicChoiceComponent.options_fn: Callable[[siblings], list]`
+- `VisibilityComponent.predicate: Callable[[siblings], bool]` (when callable)
+- `ValidationComponent` rule predicates
 
 **When the seed is missing or does not match** (e.g., the Python definition
 moved, the key was renamed, a sibling was renamed), the fresh construction
-path (step 3) cannot provide the callable. The eigenform reconciles, binds,
+path (step 3) cannot provide the callable. The component reconciles, binds,
 and renders — but does nothing. No warning is emitted; no diagnostic is
 visible in the UI.
 
-**Mitigations today:** PageForm.bind() retains `_seed` and threads it into
+**Mitigations today:** PageComponent.bind() retains `_seed` and threads it into
 all `from_descriptor` calls during `_rebuild`, so the seed is available
 during the normal lifecycle. The gap manifests when: the seed is edited
 between binds; a child is added via structural action with no matching seed
@@ -273,7 +273,7 @@ visible in the UI rather than silent.
 ## 4. Affordance flotation (Portal)
 
 **Affordance flotation** is the engine's equivalent of a React Portal: a
-mechanism for a deeply-nested child's affordance to surface at the PageForm
+mechanism for a deeply-nested child's affordance to surface at the PageComponent
 level in the agent-facing JSON, rather than being rendered where the child
 lives.
 
@@ -285,7 +285,7 @@ serialization emits 20 identical `Clear` affordances (one per child). The
 agent must parse all 20 to learn that "Clear" exists.
 
 Flotation collapses these: one parameterized `Clear` affordance at the
-PageForm level, carrying a `targets` dict mapping full URLs to child
+PageComponent level, carrying a `targets` dict mapping full URLs to child
 labels. The agent sees one action; the 20 sites remain addressable by URL.
 
 ### 4.2 What gets floated
@@ -295,19 +295,19 @@ string identifies the merge group — affordances sharing the same marker
 collapse together. Current floatable markers:
 
 - `clear` — the universal Clear affordance (emitted by every data
-  eigenform with `has_data = True`)
-- `edit` — the `set_mode` affordance (emitted on every editable eigenform)
+  component with `has_data = True`)
+- `edit` — the `set_mode` affordance (emitted on every editable component)
 - `batch` — the Batch affordance (emitted on every container)
 
 ### 4.3 How flotation works
 
-1. Each eigenform's `_serialize_full()` tags its floatable affordances with
+1. Each component's `_serialize_full()` tags its floatable affordances with
    `_floatable = "<marker>"` on the serialized dict.
-2. PageForm's `_collect_floatable()` recursively walks `eigenform`,
-   `eigenforms`, `sections`, `steps`, and similar child fields, collecting
+2. PageComponent's `_collect_floatable()` recursively walks `component`,
+   `components`, `sections`, `steps`, and similar child fields, collecting
    floatable affordances from any depth.
-3. PageForm strips the floated affordances from child serializations.
-4. PageForm groups the collected affordances by merge marker and emits one
+3. PageComponent strips the floated affordances from child serializations.
+4. PageComponent groups the collected affordances by merge marker and emits one
    parameterized compound affordance per group, with a structured `targets`
    dict: `{full_url: child_label}`.
 
@@ -315,7 +315,7 @@ collapse together. Current floatable markers:
 
 - **Not applied to HTML rendering.** The human UI still renders per-child
   affordances where they live — deep-nested Clear buttons appear at the
-  data eigenform. Flotation is an agent-facing optimization only.
+  data component. Flotation is an agent-facing optimization only.
 - **Not a visibility mechanism.** A non-floatable affordance stays where
   it is; flotation is purely additive for floatable ones.
 - **Not a replacement for explicit routing.** Floated affordances still
@@ -324,10 +324,10 @@ collapse together. Current floatable markers:
 
 ### 4.5 Adding a new floatable affordance type
 
-1. In the emitting eigenform's `_serialize_full()`, set
+1. In the emitting component's `_serialize_full()`, set
    `affordance._floatable = "<unique-marker>"` on the affordance object
    before it is serialized.
-2. In PageForm's compound-affordance generation, register a template for
+2. In PageComponent's compound-affordance generation, register a template for
    the new marker (label, body shape, instruction).
 3. No changes needed in the recursive walker — it uses only the
    `_floatable` marker presence.
@@ -345,7 +345,7 @@ causes cross-boundary bugs.
 serialization. Present identically in JSON and HTML responses.
 
 Controlled state includes:
-- All form values (TextForm text, NumberForm number, ChoiceForm selection)
+- All form values (TextComponent text, NumberComponent number, ChoiceComponent selection)
 - Container navigation state (active tab, open sections)
 - Structural configuration (descriptor entries)
 - Completion status (derived, but server-computed)
@@ -368,7 +368,7 @@ Uncontrolled state includes:
 - Ephemeral tooltips, hover states
 
 Uncontrolled state is preserved across POST responses by **morphdom**. The
-`onBeforeElUpdated` hook in `app/static/eigenform.js` skips morphing
+`onBeforeElUpdated` hook in `app/static/component.js` skips morphing
 elements that currently have focus, so a user mid-typing is never
 disturbed. The rest of the uncontrolled state survives by virtue of
 morphdom mutating only changed subtrees.
@@ -399,30 +399,31 @@ controlled. Submit it. Let the server own it.
 ## 6. Vocabulary map
 
 A cross-reference between this codebase's terms and the equivalent React
-terms, for contributors arriving with a React background.
+terms, for contributors arriving with a React background. The base class
+is named `Component` intentionally — the shared vocabulary is the point.
+The table below covers the less-obvious alignments.
 
 | This codebase | React | Notes |
 |---|---|---|
-| Eigenform subclass | Component class | Same concept. |
 | Seed constructor args | Props | Captured in the `__structure` descriptor. |
 | Store entry at key scope | `useState` | Server-persisted. |
 | `is_complete`, `effective_*`, `compute()` | Derived state | Recomputed each serialize. |
 | `__structure` descriptor | Element tree / JSX output | Serializable. |
 | `from_descriptor()` / `reconcile()` | Reconciliation | See §3. |
-| `Eigenform.key` | Component key | Identity across reconciliation. |
-| `eigenforms=[...]`, `steps=[...]` | `children` prop | Container-specific names. |
+| `Component.key` | Component key | Identity across reconciliation. |
+| `components=[...]`, `steps=[...]` | `children` prop | Container-specific names. |
 | `render()` + Jinja2 templates | `render()` | Theme-fallback resolution. |
-| `morphdom` (`_efSwap` in eigenform.js) | Virtual DOM diff | Client-side, in-place. |
+| `morphdom` (`_cSwap` in component.js) | Virtual DOM diff | Client-side, in-place. |
 | Affordance flotation | Portal (novel variant) | Agent-JSON-only; see §4. |
 | Faithful projection | Controlled/uncontrolled boundary | See §5. |
 | `onBeforeElUpdated` hook | `ref` for focus preservation | Same mechanism. |
-| Fragment | GroupForm with no decoration | Implicit. |
+| Fragment | GroupComponent with no decoration | Implicit. |
 
 **Concepts this codebase does NOT have (by design):**
 
 | React concept | Why absent |
 |---|---|
-| Hooks (`useState` etc.) | Python closure ergonomics don't support the model. Eigenform subclasses cover composable state. |
+| Hooks (`useState` etc.) | Python closure ergonomics don't support the model. Component subclasses cover composable state. |
 | Functional components | Without hooks, no composition benefit. |
 | JSX | Seed files are our JSX — Python is more honest. |
 | Refs (imperative DOM escape hatch) | Would break HATEOAS and replayability. |
@@ -437,15 +438,16 @@ non-borrowings and §8 for the roadmap.
 
 ## Change log
 
+- Session-2026-04-17-002: `Eigenform` base class and all `*Form` subclasses renamed to `Component` / `*Component`. The `eigenforms/` template directory, `eigenform.js` static asset, and all `ef-*` / `data-ef-*` CSS/DOM prefixes renamed to `c-*` / `data-c-*`. Module files renamed to match (`engine/*component.py`). Registry type-name derivation now strips the `Component` suffix. Rationale: the custom name obscured that the base class is, by design, a plain component in the React sense — keeping the unfamiliar word was sunk cost, not a carrier of the actual invariant.
 - Session-2026-04-17-001: initial draft. Pass 1 of the framing design plan.
 - Session-2026-04-17-001: Pass 3 of the framing design plan landed.
-  - `Eigenform.render_safely()` — default method wraps `render()` in try/except and returns a structured error card on failure. Containers iterate children via `render_safely()` instead of `render()` — 18 call sites across 10 eigenform modules swapped.
-  - `engine/eigenform.py::_render_error_card(ef, exc)` — the error-card renderer. Detects Flask debug mode to optionally include a traceback. Falls back to a minimal inline HTML card if the template itself fails, so nothing can make a page unviewable.
-  - `app/templates/eigenforms/_error_boundary.html` — the card template: error badge, eigenform type, key, exception class, message, optional collapsible traceback, sibling-continuity hint.
-  - `app/static/style.css` — theme-agnostic `.ef-error-*` classes (red/amber palette, monospace exception details).
-  - Scope deliberately excluded from Pass 3: `serialize_safely()` for JSON parity; `bind()` and `_handle()` error scoping. Bind errors have no in-place representation (the eigenform tree literally does not exist post-bind-failure), so those remain 500s for now. Parked for a future pass.
+  - `Component.render_safely()` — default method wraps `render()` in try/except and returns a structured error card on failure. Containers iterate children via `render_safely()` instead of `render()` — 18 call sites across 10 component modules swapped.
+  - `engine/component.py::_render_error_card(ef, exc)` — the error-card renderer. Detects Flask debug mode to optionally include a traceback. Falls back to a minimal inline HTML card if the template itself fails, so nothing can make a page unviewable.
+  - `app/templates/components/_error_boundary.html` — the card template: error badge, component type, key, exception class, message, optional collapsible traceback, sibling-continuity hint.
+  - `app/static/style.css` — theme-agnostic `.c-error-*` classes (red/amber palette, monospace exception details).
+  - Scope deliberately excluded from Pass 3: `serialize_safely()` for JSON parity; `bind()` and `_handle()` error scoping. Bind errors have no in-place representation (the component tree literally does not exist post-bind-failure), so those remain 500s for now. Parked for a future pass.
 - Session-2026-04-17-001: Pass 2 of the framing design plan landed.
-  - `engine/sibling_ref.py` — `SiblingRef` str-subclass value type. Seven sibling-reading eigenforms (SwitchForm, VisibilityForm, DynamicChoiceForm, ComputedForm, ActionForm, ValidationForm, ScoreForm) coerce their `depends_on` fields into `SiblingRef` at construction.
-  - `PageForm._validate_sibling_refs()` — walks the bound tree after bind, builds a scope map, and validates every SiblingRef resolves. Raises `SiblingRefError` with actionable diagnostics on stale or type-mismatched refs.
-  - `engine/eigenform.py::_validate_field_value` — field-type validation at the `_set_my_field` / `_set_my_config` boundary. Supports simple types, `X | None` / Union, `Literal[...]`, and is permissive on complex/unknown annotations.
-  - `NavigationForm.mode: Literal["tabs","chain","sequence","accordion"]` and `FieldDescriptor.type: Literal["text","choice"]` — enum-like fields now validated at the boundary by Move 2.
+  - `engine/sibling_ref.py` — `SiblingRef` str-subclass value type. Seven sibling-reading components (SwitchComponent, VisibilityComponent, DynamicChoiceComponent, ComputedComponent, ActionComponent, ValidationComponent, ScoreComponent) coerce their `depends_on` fields into `SiblingRef` at construction.
+  - `PageComponent._validate_sibling_refs()` — walks the bound tree after bind, builds a scope map, and validates every SiblingRef resolves. Raises `SiblingRefError` with actionable diagnostics on stale or type-mismatched refs.
+  - `engine/component.py::_validate_field_value` — field-type validation at the `_set_my_field` / `_set_my_config` boundary. Supports simple types, `X | None` / Union, `Literal[...]`, and is permissive on complex/unknown annotations.
+  - `NavigationComponent.mode: Literal["tabs","chain","sequence","accordion"]` and `FieldDescriptor.type: Literal["text","choice"]` — enum-like fields now validated at the boundary by Move 2.

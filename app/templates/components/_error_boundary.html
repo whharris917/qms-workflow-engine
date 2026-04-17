@@ -1,0 +1,35 @@
+{# Error boundary card — rendered by Component.render_safely() when render()
+   raises. Self-contained, no affordances, no dependencies on wrapper CSS.
+
+   Context:
+     key       — the failing component's key
+     ef_type   — the Python class name
+     exc_type  — the exception class name
+     exc_msg   — the exception's str(e)
+     traceback — formatted traceback (only populated in Flask debug mode)
+#}
+<div class="c-error-boundary" role="alert" data-error-key="{{ key }}">
+  <div class="c-error-header">
+    <span class="c-error-badge">Render error</span>
+    <code class="c-error-type">{{ ef_type }}</code>
+    <span class="c-error-sep">&middot;</span>
+    <span class="c-error-key-label">key</span>
+    <code class="c-error-key">{{ key }}</code>
+  </div>
+  <div class="c-error-body">
+    <p class="c-error-message">
+      <code>{{ exc_type }}</code>: {{ exc_msg }}
+    </p>
+    {% if traceback %}
+    <details class="c-error-traceback">
+      <summary>Traceback (debug mode)</summary>
+      <pre>{{ traceback }}</pre>
+    </details>
+    {% endif %}
+    <p class="c-error-hint">
+      This component failed to render. Siblings remain functional. The page
+      itself is still interactive; only the broken subtree is replaced by
+      this card.
+    </p>
+  </div>
+</div>

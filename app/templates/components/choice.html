@@ -1,0 +1,41 @@
+{# ChoiceComponent template.
+
+   Context:
+     data  — the serialized component dict
+     ef    — the ChoiceComponent instance
+     url   — the component's POST URL
+     label — current label text
+     instruction — current instruction text
+     options_html — rendered child ListComponent HTML (edit mode only)
+#}
+{% if data.edit_mode %}
+  {% include "_edit_header.html" with context %}
+
+  {# Options — render the child ListComponent #}
+  {{ options_html|safe }}
+
+  {# Value #}
+  <p><strong>Selected:</strong> {{ (data.value or "None")|string }}</p>
+
+  {# Mark edit affordances, render the rest #}
+  {% for aff in data.affordances %}
+    {% if not aff._rendered %}
+      {% if aff.body.action in ("set_label", "set_instruction") %}
+        {% set _ = aff.update({"_rendered": true}) %}
+      {% else %}
+        {{ render_aff(aff) }}
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+
+{% else %}
+  <h3>{{ data.label }}</h3>
+  {% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
+  <p><strong>Selected:</strong> {{ (data.value or "None")|string }}</p>
+
+  {% for aff in data.affordances %}
+    {% if not aff._rendered %}
+      {{ render_aff(aff) }}
+    {% endif %}
+  {% endfor %}
+{% endif %}

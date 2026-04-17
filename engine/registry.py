@@ -1,27 +1,27 @@
-"""Eigenform Type Registry — explicit mapping from type names to classes.
+"""Component Type Registry — explicit mapping from type names to classes.
 
 The registry serves two purposes:
 
 1. **Lookup**: Given a type name string (e.g., "text"), return the
-   class (TextForm) so an eigenform can be instantiated at runtime.
+   class (TextComponent) so a component can be instantiated at runtime.
 
 2. **Discovery**: Query what types are available, enabling structural
    persistence (Phase C) and structural actions (Phase D) to reference
-   eigenforms by name rather than by Python import.
+   components by name rather than by Python import.
 
 Type names are derived from class names via the same rule as the
-Eigenform.form property: strip the "Form" suffix and lowercase.
-GroupForm subclasses (e.g., BugReport) register under their own
+Component.form property: strip the "Component" suffix and lowercase.
+GroupComponent subclasses (e.g., BugReport) register under their own
 derived names (e.g., "bugreport"), not under "group".
 
 Usage:
     from engine.registry import registry
 
-    # Auto-registers all built-in eigenform types
-    registry.lookup("text")        # -> TextForm
-    registry.lookup("rubikscube")  # -> RubiksCubeForm
+    # Auto-registers all built-in component types
+    registry.lookup("text")        # -> TextComponent
+    registry.lookup("rubikscube")  # -> RubiksCubeComponent
 
-    # Register a custom GroupForm subclass
+    # Register a custom GroupComponent subclass
     registry.register(BugReport)
     registry.lookup("bugreport")   # -> BugReport
 
@@ -34,31 +34,31 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from engine.eigenform import Eigenform
+    from engine.component import Component
 
 
 def _type_name(cls: type) -> str:
-    """Derive the registry name from a class, matching Eigenform.form."""
-    return cls.__name__.removesuffix("Form").lower()
+    """Derive the registry name from a class, matching Component.form."""
+    return cls.__name__.removesuffix("Component").lower()
 
 
-class EigenformRegistry:
-    """Maps type name strings to eigenform classes."""
+class ComponentRegistry:
+    """Maps type name strings to component classes."""
 
     def __init__(self):
-        self._types: dict[str, type[Eigenform]] = {}
+        self._types: dict[str, type[Component]] = {}
 
-    def register(self, cls: type[Eigenform], name: str | None = None) -> None:
-        """Register an eigenform class.
+    def register(self, cls: type[Component], name: str | None = None) -> None:
+        """Register a component class.
 
         If name is not provided, it is derived from the class name
-        using the same rule as Eigenform.form.
+        using the same rule as Component.form.
         """
         key = name if name is not None else _type_name(cls)
         self._types[key] = cls
 
-    def lookup(self, name: str) -> type[Eigenform] | None:
-        """Look up an eigenform class by type name. Returns None if not found."""
+    def lookup(self, name: str) -> type[Component] | None:
+        """Look up a component class by type name. Returns None if not found."""
         return self._types.get(name)
 
     def available(self) -> list[str]:
@@ -75,66 +75,66 @@ class EigenformRegistry:
         return len(self._types)
 
     def __repr__(self) -> str:
-        return f"EigenformRegistry({len(self._types)} types)"
+        return f"ComponentRegistry({len(self._types)} types)"
 
 
-def _build_default_registry() -> EigenformRegistry:
-    """Create a registry pre-loaded with all built-in eigenform types."""
+def _build_default_registry() -> ComponentRegistry:
+    """Create a registry pre-loaded with all built-in component types."""
     # Import here to avoid circular imports at module level
-    from engine.textform import TextForm
-    from engine.checkboxform import CheckboxForm
-    from engine.choiceform import ChoiceForm
-    from engine.multiform import MultiForm
-    from engine.listform import ListForm
-    from engine.tableform import TableForm
-    from engine.numberform import NumberForm
-    from engine.dateform import DateForm
-    from engine.booleanform import BooleanForm
-    from engine.dictionaryform import DictionaryForm
-    from engine.pageform import PageForm
-    from engine.groupform import GroupForm
-    from engine.repeaterform import RepeaterForm
-    from engine.switchform import SwitchForm
-    from engine.visibilityform import VisibilityForm
-    from engine.dynamicchoiceform import DynamicChoiceForm
-    from engine.scoreform import ScoreForm
-    from engine.computedform import ComputedForm
-    from engine.validationform import ValidationForm
-    from engine.actionform import ActionForm
-    from engine.rubikscubeform import RubiksCubeForm
-    from engine.setform import SetForm
-    from engine.navigationform import NavigationForm
+    from engine.textcomponent import TextComponent
+    from engine.checkboxcomponent import CheckboxComponent
+    from engine.choicecomponent import ChoiceComponent
+    from engine.multicomponent import MultiComponent
+    from engine.listcomponent import ListComponent
+    from engine.tablecomponent import TableComponent
+    from engine.numbercomponent import NumberComponent
+    from engine.datecomponent import DateComponent
+    from engine.booleancomponent import BooleanComponent
+    from engine.dictionarycomponent import DictionaryComponent
+    from engine.pagecomponent import PageComponent
+    from engine.groupcomponent import GroupComponent
+    from engine.repeatercomponent import RepeaterComponent
+    from engine.switchcomponent import SwitchComponent
+    from engine.visibilitycomponent import VisibilityComponent
+    from engine.dynamicchoicecomponent import DynamicChoiceComponent
+    from engine.scorecomponent import ScoreComponent
+    from engine.computedcomponent import ComputedComponent
+    from engine.validationcomponent import ValidationComponent
+    from engine.actioncomponent import ActionComponent
+    from engine.rubikscubecomponent import RubiksCubeComponent
+    from engine.setcomponent import SetComponent
+    from engine.navigationcomponent import NavigationComponent
     from engine.tablerunner import TableRunner
-    from engine.historyform import HistoryForm
-    from engine.infoform import InfoForm
-    r = EigenformRegistry()
+    from engine.historycomponent import HistoryComponent
+    from engine.infocomponent import InfoComponent
+    r = ComponentRegistry()
     for cls in [
-        TextForm, CheckboxForm, ChoiceForm, MultiForm, ListForm, SetForm,
-        TableForm, NavigationForm, TableRunner, HistoryForm,
-        NumberForm, DateForm, BooleanForm,
-        DictionaryForm,
-        PageForm, GroupForm, RepeaterForm,
-        SwitchForm,
-        VisibilityForm, DynamicChoiceForm,
-        ScoreForm, ComputedForm, ValidationForm,
-        ActionForm, RubiksCubeForm, InfoForm,
+        TextComponent, CheckboxComponent, ChoiceComponent, MultiComponent, ListComponent, SetComponent,
+        TableComponent, NavigationComponent, TableRunner, HistoryComponent,
+        NumberComponent, DateComponent, BooleanComponent,
+        DictionaryComponent,
+        PageComponent, GroupComponent, RepeaterComponent,
+        SwitchComponent,
+        VisibilityComponent, DynamicChoiceComponent,
+        ScoreComponent, ComputedComponent, ValidationComponent,
+        ActionComponent, RubiksCubeComponent, InfoComponent,
     ]:
         r.register(cls)
-    # Aliases for the unified NavigationForm modes
-    r.register(NavigationForm, name="tab")
-    r.register(NavigationForm, name="chain")
-    r.register(NavigationForm, name="sequence")
-    r.register(NavigationForm, name="accordion")
-    # Alias for renamed DictionaryForm
-    r.register(DictionaryForm, name="keyvalue")
+    # Aliases for the unified NavigationComponent modes
+    r.register(NavigationComponent, name="tab")
+    r.register(NavigationComponent, name="chain")
+    r.register(NavigationComponent, name="sequence")
+    r.register(NavigationComponent, name="accordion")
+    # Alias for renamed DictionaryComponent
+    r.register(DictionaryComponent, name="keyvalue")
     return r
 
 
 # Module-level default registry, lazily built on first access.
-_default: EigenformRegistry | None = None
+_default: ComponentRegistry | None = None
 
 
-def get_registry() -> EigenformRegistry:
+def get_registry() -> ComponentRegistry:
     """Return the default registry, building it on first call."""
     global _default
     if _default is None:
@@ -167,18 +167,18 @@ registry = _RegistryProxy()
 # Maps descriptor field names to child structure type.
 # "list" = list of child descriptors, "dict" = dict of key->descriptor, "single" = one descriptor.
 _CHILD_FIELDS = {
-    "eigenforms": "list",   # PageForm, GroupForm
-    "steps": "list",         # NavigationForm (all modes)
+    "components": "list",   # PageComponent, GroupComponent
+    "steps": "list",         # NavigationComponent (all modes)
     "tabs": "dict",          # legacy TabForm descriptors
     "sections": "dict",      # legacy AccordionForm descriptors
-    "cases": "dict",         # SwitchForm
-    "template": "list",      # RepeaterForm
-    "eigenform": "single",   # VisibilityForm
+    "cases": "dict",         # SwitchComponent
+    "template": "list",      # RepeaterComponent
+    "component": "single",   # VisibilityComponent
 }
 
 
 def validate_config(type_name: str, config: dict,
-                    reg: EigenformRegistry | None = None) -> str | None:
+                    reg: ComponentRegistry | None = None) -> str | None:
     """Validate config keys against a type's accepted fields.
 
     Returns None if valid, or an error message string if invalid.
@@ -192,7 +192,7 @@ def validate_config(type_name: str, config: dict,
         return None
 
     import dataclasses
-    from engine.eigenform import _BASE_FIELDS
+    from engine.component import _BASE_FIELDS
     valid_fields = {
         f.name for f in dataclasses.fields(cls)
         if f.name not in _BASE_FIELDS
@@ -208,12 +208,12 @@ def validate_config(type_name: str, config: dict,
     return None
 
 
-def describe_types(reg: EigenformRegistry | None = None) -> dict:
+def describe_types(reg: ComponentRegistry | None = None) -> dict:
     """Return a description of all registered types and their config fields."""
     if reg is None:
         reg = get_registry()
     import dataclasses
-    from engine.eigenform import _BASE_FIELDS
+    from engine.component import _BASE_FIELDS
     result = {}
     for name in sorted(reg.available()):
         cls = reg.lookup(name)
@@ -230,7 +230,7 @@ def describe_types(reg: EigenformRegistry | None = None) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Type Catalog — categorized type reference for the Add Eigenform UI.
+# Type Catalog — categorized type reference for the Add Component UI.
 #
 # Each category groups related types with one-line descriptions.  Types that
 # don't make sense on a mutable page are excluded: page (not embeddable),
@@ -267,12 +267,12 @@ TYPE_CATALOG: list[dict] = [
     },
     {
         "name": "Containers",
-        "hint": "Organize eigenforms into navigable structures.",
+        "hint": "Organize components into navigable structures.",
         "css": "containers",
         "types": [
-            ("group",      "\u25A2", "Named container for grouping related eigenforms."),
+            ("group",      "\u25A2", "Named container for grouping related components."),
             ("navigation", "\u2B12", "Tabs, wizard chain, gated sequence, or accordion. Set mode in config."),
-            ("repeater",   "\u29C9", "Stamps template eigenforms per dynamic entry."),
+            ("repeater",   "\u29C9", "Stamps template components per dynamic entry."),
         ],
     },
     {
@@ -283,7 +283,7 @@ TYPE_CATALOG: list[dict] = [
             ("switch",        "\u2442", "Selects between subtrees based on a sibling's value."),
             ("visibility",    "\u25D0", "Shows or hides a child based on a condition."),
             ("dynamicchoice", "\u25C8", "Choice whose options depend on a sibling's value."),
-            ("computed",      "\u0192", "Read-only value derived from other eigenforms."),
+            ("computed",      "\u0192", "Read-only value derived from other components."),
             ("score",         "\u2605", "Auto-grading from an answer key."),
             ("validation",    "\u2713", "Cross-field validation rules (pass/fail)."),
         ],
@@ -295,14 +295,14 @@ TYPE_CATALOG: list[dict] = [
         "types": [
             ("info",    "\u2139", "Read-only text display. Always complete."),
             ("action",  "\u25B6", "Button with preconditions, confirmation, and side effects."),
-            ("history", "\u29D6", "Wraps an eigenform with append-only change history."),
+            ("history", "\u29D6", "Wraps a component with append-only change history."),
         ],
     },
 ]
 
 
 def get_type_catalog() -> list[dict]:
-    """Return the canonical type catalog for the Add Eigenform UI.
+    """Return the canonical type catalog for the Add Component UI.
 
     Returns a list of category dicts, each with 'name', 'hint', and
     'types' (list of (type_name, description) tuples).
@@ -310,15 +310,15 @@ def get_type_catalog() -> list[dict]:
     return TYPE_CATALOG
 
 
-def from_descriptor(desc: dict, reg: EigenformRegistry | None = None,
-                    seed: "Eigenform | None" = None) -> "Eigenform":
-    """Reconcile a descriptor against a seed to produce a live eigenform.
+def from_descriptor(desc: dict, reg: ComponentRegistry | None = None,
+                    seed: "Component | None" = None) -> "Component":
+    """Reconcile a descriptor against a seed to produce a live component.
 
     This operation is **reconciliation** — the rough equivalent of React's
     element-tree reconciliation. It takes a JSON-serializable descriptor
     (the on-disk source of truth for structure) and an optional Python-side
     seed (the source of truth for callables and other non-serializable
-    behavior), and produces an unbound eigenform ready for bind().
+    behavior), and produces an unbound component ready for bind().
 
     The descriptor wins over seed defaults on scalar fields — the on-disk
     representation is authoritative. The seed wins on callables — they
@@ -329,24 +329,24 @@ def from_descriptor(desc: dict, reg: EigenformRegistry | None = None,
               label, instruction, editable, optional config, and optional
               children fields.
         reg: registry for type lookup. Uses the default registry if None.
-        seed: the corresponding seed eigenform from the Python definition.
+        seed: the corresponding seed component from the Python definition.
               If provided and matching (same type and key), the seed is
               deepcopied and the descriptor's scalars are applied on top —
               preserving callables from the seed. If None or mismatched,
-              the eigenform is constructed fresh from the registry and
+              the component is constructed fresh from the registry and
               descriptor config.
 
     Returns:
-        An unbound Eigenform instance ready for bind().
+        An unbound Component instance ready for bind().
 
     Raises:
         ValueError: if desc["type"] is not registered.
 
     Callable-preservation limitation:
         When a descriptor's type declares callable-valued fields (e.g.,
-        ComputedForm.compute, DynamicChoiceForm.options_fn) and the seed
+        ComputedComponent.compute, DynamicChoiceComponent.options_fn) and the seed
         is absent or does not match by (type, key), the fresh-construction
-        path cannot supply the callable. The eigenform reconciles, binds,
+        path cannot supply the callable. The component reconciles, binds,
         and renders — but the callable behavior is silently dropped. No
         warning is emitted. This is a known limitation; see
         docs/architecture.md §3.3 for mitigations and the planned fix
@@ -362,7 +362,7 @@ def from_descriptor(desc: dict, reg: EigenformRegistry | None = None,
     type_name = desc["type"]
     key = desc["key"]
 
-    # Migrate legacy container descriptors to unified NavigationForm
+    # Migrate legacy container descriptors to unified NavigationComponent
     if type_name in ("tab", "chain", "sequence", "accordion"):
         desc = dict(desc)  # don't mutate the original
         if "tabs" in desc and "steps" not in desc:
@@ -392,7 +392,7 @@ def from_descriptor(desc: dict, reg: EigenformRegistry | None = None,
     # Construct from registry + descriptor
     cls = reg.lookup(type_name)
     if cls is None:
-        raise ValueError(f"Unknown eigenform type: {type_name!r}")
+        raise ValueError(f"Unknown component type: {type_name!r}")
 
     kwargs = {"key": key, "label": desc.get("label", key)}
     if desc.get("instruction"):

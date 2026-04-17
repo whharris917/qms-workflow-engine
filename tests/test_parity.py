@@ -13,11 +13,11 @@ Coverage:
   * No affordance is missing a method.
   * Forward parity: every JSON affordance URL+action appears in HTML.
   * Reverse parity: every HTML action URL+action appears in JSON.
-  * URL resolvability: every affordance URL resolves to a real eigenform.
+  * URL resolvability: every affordance URL resolves to a real component.
 
 Scanned HTML attributes (all URL-carrying):
-  data-ef-post    data-ef-submit    data-ef-change
-  data-ef-add     data-ef-url
+  data-c-post    data-c-submit    data-c-change
+  data-c-add     data-c-url
 
 Chrome-rendered affordances (floated compounds marked _chrome_rendered=True)
 are deliberately excluded from forward parity — they are agent-JSON-only by
@@ -56,7 +56,7 @@ _PARAMETERIZATION_KEYS = ("targets", "tabs", "sections", "steps", "options")
 
 
 def extract_json_affordances(data) -> list[dict]:
-    """Recursively collect all affordances from a fully-serialized eigenform tree.
+    """Recursively collect all affordances from a fully-serialized component tree.
 
     Uses _serialize_full() output (not serialize()) because the _chrome_rendered
     flag is stripped by serialize() — and we need it to know which floated
@@ -125,8 +125,8 @@ def extract_json_affordances(data) -> list[dict]:
 
 # ---- HTML action extraction ----
 
-_URL_ATTRS = ("data-ef-post", "data-ef-submit", "data-ef-change",
-              "data-ef-add", "data-ef-url")
+_URL_ATTRS = ("data-c-post", "data-c-submit", "data-c-change",
+              "data-c-add", "data-c-url")
 
 
 class _DataAttrParser(HTMLParser):
@@ -142,7 +142,7 @@ class _DataAttrParser(HTMLParser):
             url = attr_dict.get(url_attr)
             if not url:
                 continue
-            body_raw = attr_dict.get("data-ef-body", "")
+            body_raw = attr_dict.get("data-c-body", "")
             body_action = ""
             if body_raw:
                 try:
@@ -160,7 +160,7 @@ class _DataAttrParser(HTMLParser):
 
 
 def extract_html_actions(html: str) -> list[dict]:
-    """Extract all eigenform action entries from rendered HTML."""
+    """Extract all component action entries from rendered HTML."""
     parser = _DataAttrParser()
     parser.feed(html)
     return parser.actions
@@ -215,7 +215,7 @@ def test_serialized_page_has_required_shape(all_pages, page_key):
     """Every page's serialize() output must have the expected agent-facing shape.
 
     Deliberately NOT checking 'form' or 'key' on the top-level output —
-    PageForm.serialize() strips both (agent-facing cleanliness). The internal
+    PageComponent.serialize() strips both (agent-facing cleanliness). The internal
     representation with 'form' available via _serialize_full() is a separate
     concern.
     """
@@ -254,7 +254,7 @@ def test_no_empty_url_affordances(all_pages, page_key):
         a for a in affs
         if not a["url"]
         and not a["_chrome_rendered"]
-        # Disabled buttons (ActionForm precondition-unmet) intentionally have no URL.
+        # Disabled buttons (ActionComponent precondition-unmet) intentionally have no URL.
         and "disabled" not in a.get("label", "").lower()
     ]
     if offenders:
@@ -321,7 +321,7 @@ def test_reverse_parity(all_pages, page_key):
 
     Exclusions:
       * Internal view-toggle URLs (JSON link, view selector) whose query
-        strings make them non-affordance browse links — no eigenform
+        strings make them non-affordance browse links — no component
         action, just navigation.
     """
     pg = all_pages[page_key]
@@ -395,19 +395,19 @@ def test_action_name_parity(all_pages, page_key):
 
 
 # ========================================================================
-# URL resolvability — every JSON affordance URL resolves to an eigenform.
+# URL resolvability — every JSON affordance URL resolves to a component.
 # ========================================================================
 
 def test_affordance_urls_resolve(all_pages, page_key):
-    """Every JSON affordance URL must route to a real eigenform via find_eigenform.
+    """Every JSON affordance URL must route to a real component via find_component.
 
     A URL like /pages/foo/bar that parity-matches between JSON and HTML
-    is still broken if find_eigenform("bar") returns None. The server
+    is still broken if find_component("bar") returns None. The server
     would 404 every attempt to use that affordance.
 
     Exclusions:
       * URLs targeting the page itself (end with /pages/{key}) — always
-        resolvable to the PageForm.
+        resolvable to the PageComponent.
       * URLs into embedded pages (contain /{parent}/{child} with child
         having its own url_prefix) — resolve via the embedded store.
     """
@@ -420,7 +420,7 @@ def test_affordance_urls_resolve(all_pages, page_key):
         url = a["url"]
         if not url or a["_chrome_rendered"]:
             continue
-        # Page-level URLs resolve to the PageForm itself.
+        # Page-level URLs resolve to the PageComponent itself.
         if url == page_url:
             continue
         # Extract the path portion beyond the page URL.
@@ -432,12 +432,12 @@ def test_affordance_urls_resolve(all_pages, page_key):
             # they route against a different tree.
             continue
         try:
-            target = pg.find_eigenform(sub_path)
+            target = pg.find_component(sub_path)
         except Exception as e:
             unresolved.append((url, f"{type(e).__name__}: {e}"))
             continue
         if target is None:
-            unresolved.append((url, "find_eigenform returned None"))
+            unresolved.append((url, "find_component returned None"))
     if unresolved:
         lines = "\n  ".join(f"{u} -> {reason}" for u, reason in unresolved)
         pytest.fail(

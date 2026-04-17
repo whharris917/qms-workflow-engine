@@ -10,8 +10,8 @@
 
 {% block content %}
 <div id="page-content">{{ page_html }}</div>
-<div class="ef-page-footer">
-    <label class="ef-debug-toggle" id="debug-toggle">
+<div class="c-page-footer">
+    <label class="c-debug-toggle" id="debug-toggle">
         <input type="checkbox" id="debug-checkbox" onchange="toggleDebug(this.checked)">
         Debug Mode
     </label>
@@ -24,7 +24,7 @@
        Off = operator-view + sleek theme (clean production look)
        On  = supervisor-view + default theme (full borders, chrome, JSON pane) */
     function _applyDebug() {
-        var debug = localStorage.getItem('ef-debug') === 'true';
+        var debug = localStorage.getItem('c-debug') === 'true';
         document.body.classList.toggle('supervisor-view', debug);
         document.body.classList.toggle('operator-view', !debug);
         document.getElementById('debug-checkbox').checked = debug;
@@ -35,12 +35,12 @@
         }
     }
     function toggleDebug(on) {
-        var wasDebug = localStorage.getItem('ef-debug') === 'true';
-        localStorage.setItem('ef-debug', on ? 'true' : 'false');
+        var wasDebug = localStorage.getItem('c-debug') === 'true';
+        localStorage.setItem('c-debug', on ? 'true' : 'false');
         /* Theme change requires server reload (templates are theme-dependent) */
         var needsReload = (on && _getThemeCookie() !== 'default') ||
                           (!on && _getThemeCookie() !== 'sleek');
-        document.cookie = 'ef-theme=' + (on ? 'default' : 'sleek') + ';path=/;max-age=31536000';
+        document.cookie = 'c-theme=' + (on ? 'default' : 'sleek') + ';path=/;max-age=31536000';
         if (needsReload) {
             location.reload();
         } else {
@@ -48,7 +48,7 @@
         }
     }
     function _getThemeCookie() {
-        var m = document.cookie.match(/(?:^|;\s*)ef-theme=(\w+)/);
+        var m = document.cookie.match(/(?:^|;\s*)c-theme=(\w+)/);
         return m ? m[1] : null;
     }
 
@@ -56,19 +56,19 @@
     _applyDebug();
 </script>
 <script src="{{ url_for('static', filename='morphdom-umd.min.js') }}"></script>
-<script src="{{ url_for('static', filename='eigenform.js') }}"></script>
+<script src="{{ url_for('static', filename='component.js') }}"></script>
 <script>
     /* SSE: reload page when another client mutates state.
        Suppress for 500ms after this tab's own POSTs. */
     var _selfUpdated = 0;
     document.addEventListener('click', function(e) {
-        if (e.target.closest('[data-ef-post]')) _selfUpdated = Date.now();
+        if (e.target.closest('[data-c-post]')) _selfUpdated = Date.now();
     });
     document.addEventListener('submit', function(e) {
-        if (e.target.closest('form[data-ef-submit]')) _selfUpdated = Date.now();
+        if (e.target.closest('form[data-c-submit]')) _selfUpdated = Date.now();
     });
     document.addEventListener('change', function(e) {
-        if (e.target.closest('[data-ef-change]')) _selfUpdated = Date.now();
+        if (e.target.closest('[data-c-change]')) _selfUpdated = Date.now();
     });
 
     var source = new EventSource('/pages/{{ instance_id }}/stream');
@@ -81,7 +81,7 @@
         }).then(function(html) {
             var doc = new DOMParser().parseFromString(html, 'text/html');
             var content = doc.getElementById('page-content');
-            if (content) _efSwap(content.innerHTML);
+            if (content) _cSwap(content.innerHTML);
         });
     };
 </script>

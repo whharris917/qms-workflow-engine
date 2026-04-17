@@ -1,36 +1,36 @@
 """Control Flow Gallery."""
 
-from engine.pageform import PageForm
-from engine.historyform import HistoryForm
-from engine.navigationform import NavigationForm
-from engine.textform import TextForm
-from engine.checkboxform import CheckboxForm
-from engine.choiceform import ChoiceForm
-from engine.booleanform import BooleanForm
-from engine.switchform import SwitchForm
-from engine.numberform import NumberForm
+from engine.pagecomponent import PageComponent
+from engine.historycomponent import HistoryComponent
+from engine.navigationcomponent import NavigationComponent
+from engine.textcomponent import TextComponent
+from engine.checkboxcomponent import CheckboxComponent
+from engine.choicecomponent import ChoiceComponent
+from engine.booleancomponent import BooleanComponent
+from engine.switchcomponent import SwitchComponent
+from engine.numbercomponent import NumberComponent
 
-SequenceDemo = NavigationForm(
+SequenceDemo = NavigationComponent(
     key="sequence-demo",
-    label="NavigationForm — Gated Sequential Workflow",
+    label="NavigationComponent — Gated Sequential Workflow",
     instruction=(
         "A gated sequence of steps. Each step must be completed "
         "before the next unlocks. You can revisit completed steps, "
         "but you cannot skip ahead."
     ),
     steps=[
-        TextForm(
+        TextComponent(
             key="project-name",
             label="Step 1: Project Name",
             instruction="Enter a name for your project.",
         ),
-        ChoiceForm(
+        ChoiceComponent(
             key="project-type",
             label="Step 2: Project Type",
             instruction="Select the type of project.",
             options=["Web Application", "CLI Tool", "Library", "Mobile App"],
         ),
-        CheckboxForm(
+        CheckboxComponent(
             key="features",
             label="Step 3: Features",
             instruction="Select which features to include.",
@@ -39,18 +39,18 @@ SequenceDemo = NavigationForm(
     ],
 )
 
-TechnicalReview = NavigationForm(
+TechnicalReview = NavigationComponent(
     key="technical-review",
     label="Technical Review",
     instruction="Complete the technical review.",
     steps=[
-        ChoiceForm(
+        ChoiceComponent(
             key="feasibility",
             label="Feasibility",
             instruction="Is the proposal technically feasible?",
             options=["Feasible", "Feasible with changes", "Not feasible"],
         ),
-        TextForm(multiline=True,
+        TextComponent(multiline=True,
             key="tech-notes",
             label="Technical Notes",
             instruction="Provide technical review notes.",
@@ -58,18 +58,18 @@ TechnicalReview = NavigationForm(
     ],
 )
 
-BusinessReview = NavigationForm(
+BusinessReview = NavigationComponent(
     key="business-review",
     label="Business Review",
     instruction="Complete the business review.",
     steps=[
-        ChoiceForm(
+        ChoiceComponent(
             key="priority",
             label="Priority",
             instruction="What priority should this receive?",
             options=["Critical", "High", "Medium", "Low"],
         ),
-        TextForm(multiline=True,
+        TextComponent(multiline=True,
             key="biz-notes",
             label="Business Notes",
             instruction="Provide business review notes.",
@@ -77,7 +77,7 @@ BusinessReview = NavigationForm(
     ],
 )
 
-ParallelReviews = NavigationForm(
+ParallelReviews = NavigationComponent(
     key="parallel-reviews",
     label="2. Parallel Reviews",
     mode="tabs",
@@ -85,7 +85,7 @@ ParallelReviews = NavigationForm(
     steps=[TechnicalReview, BusinessReview],
 )
 
-ForkMergeDemo = NavigationForm(
+ForkMergeDemo = NavigationComponent(
     key="fork-merge-demo",
     label="Fork / Merge — Parallel Branches",
     instruction=(
@@ -95,13 +95,13 @@ ForkMergeDemo = NavigationForm(
         "(the merge point) unlocks."
     ),
     steps=[
-        TextForm(
+        TextComponent(
             key="proposal",
             label="1. Proposal",
             instruction="Describe your proposal. This is the fork point — once complete, two independent review branches open.",
         ),
         ParallelReviews,
-        BooleanForm(
+        BooleanComponent(
             key="approved",
             label="3. Final Decision",
             instruction="Both reviews are complete. Approve or reject the proposal.",
@@ -111,17 +111,17 @@ ForkMergeDemo = NavigationForm(
     ],
 )
 
-BugBranch = NavigationForm(
+BugBranch = NavigationComponent(
     key="bug-branch",
     label="Bug Report Branch",
     instruction="Describe the bug.",
     steps=[
-        TextForm(multiline=True,
+        TextComponent(multiline=True,
             key="repro-steps",
             label="Reproduction Steps",
             instruction="How do you reproduce the bug?",
         ),
-        ChoiceForm(
+        ChoiceComponent(
             key="severity",
             label="Severity",
             instruction="How severe is this bug?",
@@ -130,17 +130,17 @@ BugBranch = NavigationForm(
     ],
 )
 
-FeatureBranch = NavigationForm(
+FeatureBranch = NavigationComponent(
     key="feature-branch",
     label="Feature Request Branch",
     instruction="Describe the feature.",
     steps=[
-        TextForm(multiline=True,
+        TextComponent(multiline=True,
             key="user-story",
             label="User Story",
             instruction="As a [role], I want [goal], so that [benefit].",
         ),
-        NumberForm(
+        NumberComponent(
             key="effort-estimate",
             label="Effort Estimate (days)",
             instruction="Estimate the effort in days.",
@@ -151,7 +151,7 @@ FeatureBranch = NavigationForm(
     ],
 )
 
-IssueBranch = SwitchForm(
+IssueBranch = SwitchComponent(
     key="issue-branch",
     label="2. Details",
     instruction="Complete the branch for your selected issue type.",
@@ -159,7 +159,7 @@ IssueBranch = SwitchForm(
     cases={
         "Bug Report": BugBranch,
         "Feature Request": FeatureBranch,
-        "Refactor": TextForm(multiline=True,
+        "Refactor": TextComponent(multiline=True,
             key="refactor-scope",
             label="Refactor Scope",
             instruction="Describe what will be refactored and why.",
@@ -167,7 +167,7 @@ IssueBranch = SwitchForm(
     },
 )
 
-RoutingDemo = NavigationForm(
+RoutingDemo = NavigationComponent(
     key="routing-demo",
     label="Routing — Conditional Branches",
     instruction=(
@@ -177,14 +177,14 @@ RoutingDemo = NavigationForm(
         "state independently. Step 3 unlocks once the active branch is complete."
     ),
     steps=[
-        ChoiceForm(
+        ChoiceComponent(
             key="issue-type",
             label="1. Issue Type",
             instruction="Select the type of issue. This determines the workflow branch.",
             options=["Bug Report", "Feature Request", "Refactor"],
         ),
         IssueBranch,
-        BooleanForm(
+        BooleanComponent(
             key="confirmed",
             label="3. Submit",
             instruction="The selected branch is complete. Confirm submission.",
@@ -194,25 +194,25 @@ RoutingDemo = NavigationForm(
     ],
 )
 
-HistoryDemo = HistoryForm(
+HistoryDemo = HistoryComponent(
     key="history-demo",
-    label="HistoryForm",
+    label="HistoryComponent",
     instruction=(
-        "Wraps an eigenform with append-only change history. "
+        "Wraps a component with append-only change history. "
         "Every change is recorded with a timestamp. "
         "Browse previous versions read-only — the history can never be edited."
     ),
-    eigenform=TextForm(
+    component=TextComponent(
         key="tracked-text",
         label="Tracked Text",
         instruction="Edit this value. Each change is recorded in the history.",
     ),
 )
 
-definition = PageForm(
+definition = PageComponent(
     key="control-flow-gallery",
     label="Control Flow Gallery",
-    eigenforms=[
+    components=[
         SequenceDemo,
         ForkMergeDemo,
         RoutingDemo,

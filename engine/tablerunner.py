@@ -1,16 +1,16 @@
-"""TableRunner — executes a TableForm as a gated sequential workflow.
+"""TableRunner — executes a TableComponent as a gated sequential workflow.
 
-A Runner reads a sibling eigenform's structure and presents an executable
-interface derived from it. TableRunner reads a TableForm and presents its
-rows as a gated sequence: each row's cell eigenforms are rendered large,
+A Runner reads a sibling component's structure and presents an executable
+interface derived from it. TableRunner reads a TableComponent and presents its
+rows as a gated sequence: each row's cell components are rendered large,
 one row at a time, with navigation gated by the table's ordering constraints.
 
-The TableRunner owns no data. All cell data lives in the source TableForm's
+The TableRunner owns no data. All cell data lives in the source TableComponent's
 compound scopes. The runner only stores its own navigation state (which row
 is currently focused).
 
-    TableForm defines structure  →  TableRunner executes it
-    Columns = what to do         →  Cell eigenforms = do it
+    TableComponent defines structure  →  TableRunner executes it
+    Columns = what to do         →  Cell components = do it
     Row constraints = gates      →  Gated navigation = enforcement
 """
 
@@ -21,37 +21,37 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from engine.affordances import Affordance, SimpleButtonAffordance
-from engine.eigenform import Eigenform
+from engine.component import Component
 from engine.ordered_collection import OrderedCollection
 from engine.templates import render_template
 from engine.store import Store
 
 
 @dataclass
-class TableRunner(Eigenform):
-    """Execute a TableForm as a gated sequential workflow.
+class TableRunner(Component):
+    """Execute a TableComponent as a gated sequential workflow.
 
-    The source TableForm defines the schema (columns, typed columns),
+    The source TableComponent defines the schema (columns, typed columns),
     the rows (stages), and the ordering constraints (gates). The runner
-    presents one row at a time, with cell eigenforms rendered large and
+    presents one row at a time, with cell components rendered large and
     interactive. Rows are accessible only when their prerequisite rows
     are complete.
     """
-    source: Any = None  # TableForm instance — set at definition time
+    source: Any = None  # TableComponent instance — set at definition time
 
-    # --- Internal: bound source and cell eigenforms ---
+    # --- Internal: bound source and cell components ---
 
     _bound_source: Any = field(default=None, init=False, repr=False)
 
     def _bind_children(self, store: Store, url_prefix: str):
-        """Bind by creating our own view of the source table's cell eigenforms.
+        """Bind by creating our own view of the source table's cell components.
 
-        All columns become eigenforms in the runner — typed columns use the
-        table's templates, and text columns become TextForms. This ensures
-        every cell in execution mode is a proper eigenform.
+        All columns become components in the runner — typed columns use the
+        table's templates, and text columns become TextComponents. This ensures
+        every cell in execution mode is a proper component.
         """
-        from engine.tableform import TableForm
-        if self.source is None or not isinstance(self.source, TableForm):
+        from engine.tablecomponent import TableComponent
+        if self.source is None or not isinstance(self.source, TableComponent):
             return
         # Bind a copy of the source to the same store and scope so it reads
         # the same data.
@@ -60,11 +60,11 @@ class TableRunner(Eigenform):
 
         # Only typed columns are executable — text columns are authoring-only
         # (they provide row labels but aren't interactive in the runner).
-        # Patch cell eigenform URLs to route through the runner.
+        # Patch cell component URLs to route through the runner.
         runner_url = f"{self._url_prefix}/{self.key}"
         for rg in getattr(bound, '_row_groups', []):
             rg._url_prefix = runner_url
-            for col_id, ef in rg.cell_eigenforms.items():
+            for col_id, ef in rg.cell_components.items():
                 ef._url_prefix = f"{runner_url}/{rg.key}"
         self._bound_source = bound
 
@@ -73,7 +73,7 @@ class TableRunner(Eigenform):
         return self._bound_source
 
     @property
-    def children(self) -> list[Eigenform]:
+    def children(self) -> list[Component]:
         """Expose the source table's RowGroups as children for path-based routing."""
         if self._source_table is None:
             return []
@@ -97,17 +97,17 @@ class TableRunner(Eigenform):
         return self._source_table._row_collection.effective_must_follow
 
     def _row_groups_by_id(self) -> dict[str, Any]:
-        from engine.tableform import RowGroup
+        from engine.tablecomponent import RowGroup
         if self._source_table is None:
             return {}
         return {rg.key: rg for rg in self._source_table.children}
 
     def _is_row_complete(self, row_id: str) -> bool:
-        """A row is complete when all its cell eigenforms are complete."""
+        """A row is complete when all its cell components are complete."""
         rg = self._row_groups_by_id().get(row_id)
         if rg is None:
             return False
-        return all(ef.is_complete for ef in rg.cell_eigenforms.values())
+        return all(ef.is_complete for ef in rg.cell_components.values())
 
     def _is_row_accessible(self, row_id: str) -> bool:
         """A row is accessible when all its prerequisite rows are complete."""
@@ -178,14 +178,14 @@ class TableRunner(Eigenform):
         state = self._serialize_state()
         state["complete"] = self.is_complete
 
-        # Serialize the active row's cell eigenforms
+        # Serialize the active row's cell components
         active = self._active_row_id
         rg = self._row_groups_by_id().get(active) if active else None
 
         cell_states = []
         for c in self._col_items():
             col_id = c["id"]
-            ef = rg.cell_eigenforms.get(col_id) if rg else None
+            ef = rg.cell_components.get(col_id) if rg else None
             cell_states.append({
                 "column": c["value"],
                 "col_id": col_id,
@@ -262,7 +262,7 @@ class TableRunner(Eigenform):
         if active_row and self._is_row_accessible(active_row):
             rg = self._row_groups_by_id().get(active_row)
             if rg:
-                cells_html = "".join(ef.render_safely() for ef in rg.cell_eigenforms.values())
+                cells_html = "".join(ef.render_safely() for ef in rg.cell_components.values())
         elif active_row and not self._is_row_accessible(active_row):
             prereqs = self._constraint_graph().get(active_row, [])
             locked_msg = f"This row is locked. Complete prerequisite rows first: {', '.join(prereqs)}."

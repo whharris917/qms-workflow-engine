@@ -1,0 +1,42 @@
+{# InfoComponent template — read-only text display with optional edit mode.
+
+   Context:
+     data      — serialized component dict
+     ef        — the InfoComponent instance
+     url       — component POST URL
+     label     — current label text
+     instruction — current instruction text
+     text_html — rendered HTML of child TextComponent (edit mode only)
+#}
+{% if data.edit_mode %}
+  {% include "_edit_header.html" with context %}
+
+  {# Mark edit-header affordances as rendered #}
+  {% for aff in data.affordances %}
+    {% set action = aff.body.action|default("") %}
+    {% if action in ("set_label", "set_instruction") %}
+      {% set _ = aff.update({"_rendered": true}) %}
+    {% endif %}
+  {% endfor %}
+
+  {% if text_html %}{{ text_html|safe }}{% endif %}
+
+{% else %}
+  <div class="c-info">
+    {% if data.label %}<h4 style="margin: 4px 0 1em 0;">{{ data.label }}</h4>{% endif %}
+    {% if data.text %}
+      {% for line in data.text.split('\n') %}
+        {% if line %}<p style="margin: 2px 0;">{{ line }}</p>{% endif %}
+      {% endfor %}
+    {% endif %}
+  </div>
+{% endif %}
+
+{# Remaining affordances #}
+<div class="c-remaining-affs">
+{% for aff in data.affordances %}
+  {% if not aff._rendered %}
+    {{ render_aff(aff) }}
+  {% endif %}
+{% endfor %}
+</div>

@@ -1,0 +1,54 @@
+{# HistoryComponent template.
+
+   Context:
+     data            — serialized component dict
+     ef              — the HistoryComponent instance
+     child_html      — rendered HTML of live child component (safe), or None
+     viewing         — version number being viewed, or None
+     read_only       — True if viewing historical version
+     timeline        — list of {version, timestamp} dicts
+     viewing_ts      — timestamp of viewed version (if read_only)
+     snapshot_html   — rendered HTML of historical snapshot (safe, if read_only)
+#}
+<h3>{{ data.label }}</h3>
+{% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
+
+{# Timeline bar #}
+{% if timeline %}
+  {% set history_len = timeline|length %}
+  <div style="margin-bottom: 12px;">
+    <div style="font-size: 11px; color: #888; margin-bottom: 6px;">{{ history_len }} version{{ "s" if history_len != 1 else "" }} recorded</div>
+    <div style="display: flex; align-items: center; gap: 3px; flex-wrap: wrap;">
+    {% for entry in timeline %}
+      {% if entry.version == viewing %}
+        <span style="width: 10px; height: 10px; border-radius: 50%; background: #6c5ce7; border: 2px solid #6c5ce7;" title="v{{ entry.version }}: {{ entry.timestamp }}"></span>
+      {% elif entry.version == history_len - 1 and viewing is none %}
+        <span style="width: 10px; height: 10px; border-radius: 50%; background: #2a2; border: 2px solid #2a2;" title="v{{ entry.version }}: {{ entry.timestamp }}"></span>
+      {% else %}
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: #ddd; border: 2px solid #ddd;" title="v{{ entry.version }}: {{ entry.timestamp }}"></span>
+      {% endif %}
+    {% endfor %}
+    </div>
+  </div>
+{% endif %}
+
+{% if read_only %}
+  {# Historical view — read-only snapshot #}
+  <div style="background: #f8f0ff; border: 1px solid #d4b8e8; border-radius: 8px; padding: 12px; margin-bottom: 8px;">
+    <div style="font-size: 11px; color: #7b2d8b; margin-bottom: 8px; font-weight: 600;">HISTORICAL VERSION {{ viewing }} &mdash; {{ viewing_ts }} &mdash; READ ONLY</div>
+    {{ snapshot_html|safe }}
+  </div>
+
+  {# Navigation affordances #}
+  {% for aff in data.affordances %}
+    {% if not aff._rendered %}{{ render_aff(aff) }}{% endif %}
+  {% endfor %}
+{% else %}
+  {# Current live view #}
+  {% if child_html %}{{ child_html|safe }}{% endif %}
+
+  {# History affordance (view history button) #}
+  {% for aff in data.affordances %}
+    {% if not aff._rendered %}{{ render_aff(aff) }}{% endif %}
+  {% endfor %}
+{% endif %}

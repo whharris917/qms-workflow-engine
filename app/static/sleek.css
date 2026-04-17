@@ -18,14 +18,14 @@ body.operator-view[data-theme="sleek"] #page-content {
 }
 
 /* Toolbar blends with dark background */
-body.operator-view[data-theme="sleek"] .ef-page-toolbar {
+body.operator-view[data-theme="sleek"] .c-page-toolbar {
     border-bottom: 1px solid #555d66;
     padding-bottom: 8px;
     margin-bottom: 12px;
 }
 
-/* --- Card: data eigenforms --- */
-body.operator-view[data-theme="sleek"] .eigenform {
+/* --- Card: data components --- */
+body.operator-view[data-theme="sleek"] .component {
     background: #363b42;
     border: 1px solid #000 !important;
     border-radius: 4px;
@@ -33,50 +33,50 @@ body.operator-view[data-theme="sleek"] .eigenform {
     margin: 16px 0;
 }
 
-/* Containers and PageForm: transparent, no card */
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"],
-body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"],
-body.operator-view[data-theme="sleek"] .eigenform[data-form="group"],
-body.operator-view[data-theme="sleek"] .eigenform[data-form="visibility"],
-body.operator-view[data-theme="sleek"] .eigenform[data-form="switch"],
-body.operator-view[data-theme="sleek"] .eigenform[data-form="repeater"] {
+/* Containers and PageComponent: transparent, no card */
+body.operator-view[data-theme="sleek"] .component[data-form="page"],
+body.operator-view[data-theme="sleek"] .component[data-form="navigation"],
+body.operator-view[data-theme="sleek"] .component[data-form="group"],
+body.operator-view[data-theme="sleek"] .component[data-form="visibility"],
+body.operator-view[data-theme="sleek"] .component[data-form="switch"],
+body.operator-view[data-theme="sleek"] .component[data-form="repeater"] {
     background: none !important;
     border: none !important;
     border-radius: 0 !important;
     padding: 0 !important;
     margin: 16px 0 !important;
 }
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] {
     margin: 0 !important;
 }
 
-/* PageForm: separator after header */
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > h2 + p {
+/* PageComponent: separator after header */
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > h2 + p {
     padding-bottom: 12px;
     border-bottom: 1px solid #cccccc;
     margin-bottom: 16px;
 }
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > h2:not(:has(+ p)) {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > h2:not(:has(+ p)) {
     padding-bottom: 12px;
     border-bottom: 1px solid #cccccc;
     margin-bottom: 16px;
 }
 
-/* Data eigenform card text: match theme font sizing */
-body.operator-view[data-theme="sleek"] .eigenform h3 {
+/* Data component card text: match theme font sizing */
+body.operator-view[data-theme="sleek"] .component h3 {
     font-size: 13px;
     font-weight: 600;
     margin: 0 0 4px 0;
 }
-body.operator-view[data-theme="sleek"] .eigenform p {
+body.operator-view[data-theme="sleek"] .component p {
     font-size: 12px;
     line-height: 1.5;
     color: #aaa;
     margin: 0 0 8px 0;
 }
 
-/* Titlebar: window-style title bar on data eigenform cards */
-body.operator-view[data-theme="sleek"] .eigenform > .ef-titlebar {
+/* Titlebar: window-style title bar on data component cards */
+body.operator-view[data-theme="sleek"] .component > .c-titlebar {
     display: flex;
     align-items: center;
     background: #22272e;
@@ -85,11 +85,11 @@ body.operator-view[data-theme="sleek"] .eigenform > .ef-titlebar {
     padding: 6px 12px;
     border-radius: 4px 4px 0 0;
 }
-body.operator-view[data-theme="sleek"] .ef-titlebar__spacer {
+body.operator-view[data-theme="sleek"] .c-titlebar__spacer {
     display: inline;
     flex: 1;
 }
-body.operator-view[data-theme="sleek"] .ef-titlebar__label {
+body.operator-view[data-theme="sleek"] .c-titlebar__label {
     display: inline;
     font-size: 12px;
     font-weight: 400;
@@ -97,39 +97,39 @@ body.operator-view[data-theme="sleek"] .ef-titlebar__label {
     letter-spacing: 0.02em;
 }
 /* Hide duplicate labels/instructions: titlebar or sidebar handles them */
-body.operator-view[data-theme="sleek"] .eigenform > h3,
-body.operator-view[data-theme="sleek"] .eigenform h3:first-child {
+body.operator-view[data-theme="sleek"] .component > h3,
+body.operator-view[data-theme="sleek"] .component h3:first-child {
     display: none;
 }
-body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] > h3 + p {
+body.operator-view[data-theme="sleek"] .component[data-form="navigation"] > h3 + p {
     display: none;
 }
 /* Note: container titlebar rules removed — sleek/wrapper.html does not emit
    titlebars for containers, so no CSS override is needed. */
 
 
-body.operator-view[data-theme="sleek"] .ef-chrome-btn {
+body.operator-view[data-theme="sleek"] .c-chrome-btn {
     color: #d29922 !important;
     border-color: #555d66 !important;
     background: #3e3e42 !important;
 }
-body.operator-view[data-theme="sleek"] .ef-chrome-btn:hover {
+body.operator-view[data-theme="sleek"] .c-chrome-btn:hover {
     border-color: #ff6b6b !important;
 }
-body.operator-view[data-theme="sleek"] .ef-chrome-btn span {
+body.operator-view[data-theme="sleek"] .c-chrome-btn span {
     color: inherit !important;
 }
 
 /* Completion: left accent */
-body.operator-view[data-theme="sleek"] .eigenform.eigenform--complete {
+body.operator-view[data-theme="sleek"] .component.component--complete {
     border-left: 2px solid #60a5fa;
 }
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"].eigenform--complete,
-body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"].eigenform--complete,
-body.operator-view[data-theme="sleek"] .eigenform[data-form="group"].eigenform--complete,
-body.operator-view[data-theme="sleek"] .eigenform[data-form="visibility"].eigenform--complete,
-body.operator-view[data-theme="sleek"] .eigenform[data-form="switch"].eigenform--complete,
-body.operator-view[data-theme="sleek"] .eigenform[data-form="repeater"].eigenform--complete {
+body.operator-view[data-theme="sleek"] .component[data-form="page"].component--complete,
+body.operator-view[data-theme="sleek"] .component[data-form="navigation"].component--complete,
+body.operator-view[data-theme="sleek"] .component[data-form="group"].component--complete,
+body.operator-view[data-theme="sleek"] .component[data-form="visibility"].component--complete,
+body.operator-view[data-theme="sleek"] .component[data-form="switch"].component--complete,
+body.operator-view[data-theme="sleek"] .component[data-form="repeater"].component--complete {
     border-left: none;
 }
 
@@ -181,7 +181,7 @@ body.operator-view[data-theme="sleek"] textarea::placeholder {
 
 /* --- Buttons --- */
 body.operator-view[data-theme="sleek"] button[type="submit"]:not([class*="sleek-"]),
-body.operator-view[data-theme="sleek"] button[data-ef-post]:not([class*="sleek-"]) {
+body.operator-view[data-theme="sleek"] button[data-c-post]:not([class*="sleek-"]) {
     font-family: inherit;
     font-size: 12px;
     color: #ffffff;
@@ -193,29 +193,29 @@ body.operator-view[data-theme="sleek"] button[data-ef-post]:not([class*="sleek-"
     transition: background 0.1s ease;
 }
 body.operator-view[data-theme="sleek"] button[type="submit"]:not([class*="sleek-"]):hover,
-body.operator-view[data-theme="sleek"] button[data-ef-post]:not([class*="sleek-"]):hover {
+body.operator-view[data-theme="sleek"] button[data-c-post]:not([class*="sleek-"]):hover {
     background: #3b82f6;
 }
 
 /* --- Affordance buttons --- */
-body.operator-view[data-theme="sleek"] .ef-aff-btn {
+body.operator-view[data-theme="sleek"] .c-aff-btn {
     color: #cccccc;
     background: #333;
     border: 1px solid #555;
     border-radius: 2px;
 }
-body.operator-view[data-theme="sleek"] .ef-aff-btn:hover {
+body.operator-view[data-theme="sleek"] .c-aff-btn:hover {
     background: #444b53;
     border-color: #ff6b6b;
 }
 
 /* --- Tab / navigation bar --- */
-body.operator-view[data-theme="sleek"] .ef-tab-bar {
+body.operator-view[data-theme="sleek"] .c-tab-bar {
     border-bottom: 1px solid #555d66;
     gap: 0;
     margin-bottom: 12px;
 }
-body.operator-view[data-theme="sleek"] .ef-aff-btn--tab {
+body.operator-view[data-theme="sleek"] .c-aff-btn--tab {
     color: #888;
     background: none;
     border: none;
@@ -223,17 +223,17 @@ body.operator-view[data-theme="sleek"] .ef-aff-btn--tab {
     border-radius: 0;
     padding: 6px 14px;
 }
-body.operator-view[data-theme="sleek"] .ef-aff-btn--tab:hover {
+body.operator-view[data-theme="sleek"] .c-aff-btn--tab:hover {
     color: #cccccc;
 }
 
-/* --- NavigationForm: horizontal tabs (default) --- */
+/* --- NavigationComponent: horizontal tabs (default) --- */
 
-body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] {
+body.operator-view[data-theme="sleek"] .component[data-form="navigation"] {
     border: 1px solid #1e1e1e !important;
     border-radius: 4px !important;
 }
-body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] > .ef-remaining-affs {
+body.operator-view[data-theme="sleek"] .component[data-form="navigation"] > .c-remaining-affs {
     background: #424850;
     border-left: 1px solid #555d66;
     border-right: 1px solid #555d66;
@@ -241,12 +241,12 @@ body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] > .ef-
     padding: 8px 20px;
     margin-top: 0;
 }
-body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] > .ef-remaining-affs:empty {
+body.operator-view[data-theme="sleek"] .component[data-form="navigation"] > .c-remaining-affs:empty {
     display: none;
 }
 
-/* Titlebar for NavigationForm */
-body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] > .ef-titlebar {
+/* Titlebar for NavigationComponent */
+body.operator-view[data-theme="sleek"] .component[data-form="navigation"] > .c-titlebar {
     display: flex;
     align-items: center;
     background: #1e1e1e;
@@ -256,8 +256,8 @@ body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] > .ef-
     padding: 6px 12px;
     margin: 0;
 }
-/* NavigationForm instruction: sits between titlebar and nav bar, enclosed by content border */
-body.operator-view[data-theme="sleek"] .ef-nav-instruction {
+/* NavigationComponent instruction: sits between titlebar and nav bar, enclosed by content border */
+body.operator-view[data-theme="sleek"] .c-nav-instruction {
     font-size: 12px;
     color: #888;
     padding: 8px 12px;
@@ -269,7 +269,7 @@ body.operator-view[data-theme="sleek"] .ef-nav-instruction {
 }
 
 /* Tab bar: horizontal row with bottom border, enclosed by content border */
-body.operator-view[data-theme="sleek"] .ef-nav-bar {
+body.operator-view[data-theme="sleek"] .c-nav-bar {
     display: flex !important;
     flex-direction: row !important;
     flex-wrap: wrap;
@@ -283,7 +283,7 @@ body.operator-view[data-theme="sleek"] .ef-nav-bar {
     border-radius: 0;
 }
 /* Tabs: horizontal style with bottom-border active indicator */
-body.operator-view[data-theme="sleek"] .ef-nav-tab {
+body.operator-view[data-theme="sleek"] .c-nav-tab {
     color: #888 !important;
     background: transparent !important;
     border: 1px solid #444 !important;
@@ -294,11 +294,11 @@ body.operator-view[data-theme="sleek"] .ef-nav-tab {
     cursor: pointer;
     text-align: center;
 }
-body.operator-view[data-theme="sleek"] .ef-nav-tab:hover {
+body.operator-view[data-theme="sleek"] .c-nav-tab:hover {
     color: #cccccc !important;
     background: #2a2a2d !important;
 }
-body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--active {
+body.operator-view[data-theme="sleek"] .c-nav-tab.c-nav-tab--active {
     color: #e0e0e0 !important;
     background: #424850 !important;
     border: none !important;
@@ -312,7 +312,7 @@ body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--active {
     z-index: 1;
 }
 /* Content panel: below the tab bar */
-body.operator-view[data-theme="sleek"] .ef-nav-content {
+body.operator-view[data-theme="sleek"] .c-nav-content {
     background: #424850;
     border: 1px solid #555d66;
     border-top: none;
@@ -323,7 +323,7 @@ body.operator-view[data-theme="sleek"] .ef-nav-content {
 
 /* --- Tab states (horizontal) --- */
 
-body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--complete {
+body.operator-view[data-theme="sleek"] .c-nav-tab.c-nav-tab--complete {
     color: #60a5fa !important;
     background: transparent !important;
     border: 1px solid #444 !important;
@@ -334,10 +334,10 @@ body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--complete {
     cursor: pointer;
     text-align: center;
 }
-body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--complete:hover {
+body.operator-view[data-theme="sleek"] .c-nav-tab.c-nav-tab--complete:hover {
     background: #2a2a2d !important;
 }
-body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--accessible {
+body.operator-view[data-theme="sleek"] .c-nav-tab.c-nav-tab--accessible {
     color: #666 !important;
     background: transparent !important;
     border: 1px solid #444 !important;
@@ -347,7 +347,7 @@ body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--accessible {
     font-size: 12px !important;
     text-align: center;
 }
-body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--locked {
+body.operator-view[data-theme="sleek"] .c-nav-tab.c-nav-tab--locked {
     color: #555 !important;
     background: transparent !important;
     border: 1px solid #444 !important;
@@ -359,43 +359,43 @@ body.operator-view[data-theme="sleek"] .ef-nav-tab.ef-nav-tab--locked {
 }
 
 /* Continue / Back / Next buttons inside tab bar */
-body.operator-view[data-theme="sleek"] .ef-nav-tab--continue,
-body.operator-view[data-theme="sleek"] .ef-nav-tab--buttons {
+body.operator-view[data-theme="sleek"] .c-nav-tab--continue,
+body.operator-view[data-theme="sleek"] .c-nav-tab--buttons {
     padding: 8px 12px;
     margin-left: auto;
 }
-body.operator-view[data-theme="sleek"] .ef-nav-tab--buttons {
+body.operator-view[data-theme="sleek"] .c-nav-tab--buttons {
     display: flex;
     flex-direction: row;
     gap: 4px;
 }
 /* Nav affordance buttons */
-body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] .ef-aff-btn {
+body.operator-view[data-theme="sleek"] .component[data-form="navigation"] .c-aff-btn {
     color: #cccccc;
     background: #333;
     border: 1px solid #555;
 }
-body.operator-view[data-theme="sleek"] .eigenform[data-form="navigation"] .ef-aff-btn:hover {
+body.operator-view[data-theme="sleek"] .component[data-form="navigation"] .c-aff-btn:hover {
     background: #444b53;
     border-color: #ff6b6b;
 }
 
-/* === PageForm > NavigationForm: vertical sidebar === */
+/* === PageComponent > NavigationComponent: vertical sidebar === */
 
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] {
     display: flex !important;
     flex-wrap: wrap !important;
     gap: 0 !important;
 }
 /* Titlebar and instruction span full width above the sidebar + content row */
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-titlebar,
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-instruction {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-titlebar,
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-nav-instruction {
     width: 100%;
     flex-basis: 100%;
     box-sizing: border-box;
 }
 /* Tab bar: vertical column on the left */
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-bar {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-nav-bar {
     flex-direction: column !important;
     border-top: 1px solid #444 !important;
     border-bottom: none !important;
@@ -407,7 +407,7 @@ body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform
     min-width: 120px;
 }
 /* Active tab: left-rounded, merges into content panel */
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-bar > .ef-nav-tab.ef-nav-tab--active {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-nav-bar > .c-nav-tab.c-nav-tab--active {
     background: #2b3035 !important;
     border: none !important;
     border-bottom: 1px solid #444 !important;
@@ -420,32 +420,32 @@ body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform
     z-index: 1;
 }
 /* All tabs: left-aligned vertical style */
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-bar > .ef-nav-tab {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-nav-bar > .c-nav-tab {
     border: none !important;
     border-bottom: 1px solid #444 !important;
     border-radius: 0 !important;
     text-align: right;
 }
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-bar > .ef-nav-tab.ef-nav-tab--complete {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-nav-bar > .c-nav-tab.c-nav-tab--complete {
     border: none !important;
     border-bottom: 1px solid #444 !important;
     border-radius: 0 !important;
     text-align: right;
 }
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-bar > .ef-nav-tab.ef-nav-tab--accessible {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-nav-bar > .c-nav-tab.c-nav-tab--accessible {
     border: none !important;
     border-bottom: 1px solid #444 !important;
     border-radius: 0 !important;
     text-align: right;
 }
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-bar > .ef-nav-tab.ef-nav-tab--locked {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-nav-bar > .c-nav-tab.c-nav-tab--locked {
     border: none !important;
     border-bottom: 1px solid #444 !important;
     border-radius: 0 !important;
     text-align: right;
 }
 /* Content panel: fills remaining space beside sidebar — darker than nested navs */
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-content {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-nav-content {
     background: #2b3035;
     border-left: none;
     border-top: none;
@@ -455,39 +455,39 @@ body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform
     min-width: 0;
 }
 /* Remaining affordances span full width */
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-remaining-affs {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-remaining-affs {
     flex-basis: 100%;
     background: #2b3035;
 }
 /* Continue / Back / Next: push to bottom in vertical bar */
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-bar > .ef-nav-tab--continue,
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-bar > .ef-nav-tab--buttons {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-nav-bar > .c-nav-tab--continue,
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-nav-bar > .c-nav-tab--buttons {
     margin-top: auto;
     margin-left: 0;
 }
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform[data-form="navigation"] > .ef-nav-bar > .ef-nav-tab--buttons {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-nav-bar > .c-nav-tab--buttons {
     flex-direction: column;
 }
 
 /* Vertical sidebar edit mode: toolbar and header span full width above sidebar split */
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform--editing[data-form="navigation"] > .sleek-edit-toolbar,
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform--editing[data-form="navigation"] > .ef-edit-label-form,
-body.operator-view[data-theme="sleek"] .eigenform[data-form="page"] > .eigenform--editing[data-form="navigation"] > .ef-edit-instr-form {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component--editing[data-form="navigation"] > .sleek-edit-toolbar,
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component--editing[data-form="navigation"] > .c-edit-label-form,
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component--editing[data-form="navigation"] > .c-edit-instr-form {
     width: 100%;
     flex-basis: 100%;
     box-sizing: border-box;
 }
 
-/* --- GroupForm: flex wrap for bar + content layout --- */
+/* --- GroupComponent: flex wrap for bar + content layout --- */
 
-body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] {
+body.operator-view[data-theme="sleek"] .component[data-form="group"] {
     display: flex !important;
     flex-wrap: wrap !important;
     gap: 0 !important;
     border: 1px solid #1e1e1e !important;
     border-radius: 4px !important;
 }
-body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] > .ef-titlebar {
+body.operator-view[data-theme="sleek"] .component[data-form="group"] > .c-titlebar {
     display: flex;
     align-items: center;
     background: #1e1e1e;
@@ -499,12 +499,12 @@ body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] > .ef-title
     flex-basis: 100%;
     box-sizing: border-box;
 }
-body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] > .ef-remaining-affs {
+body.operator-view[data-theme="sleek"] .component[data-form="group"] > .c-remaining-affs {
     flex-basis: 100%;
 }
 
-/* GroupForm bar: horizontal row with label tab + spacer + chrome */
-body.operator-view[data-theme="sleek"] .ef-group-bar {
+/* GroupComponent bar: horizontal row with label tab + spacer + chrome */
+body.operator-view[data-theme="sleek"] .c-group-bar {
     flex-direction: row !important;
     flex-wrap: nowrap !important;
     align-items: center;
@@ -516,7 +516,7 @@ body.operator-view[data-theme="sleek"] .ef-group-bar {
     flex-basis: 100%;
     padding-right: 12px !important;
 }
-body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] > .ef-nav-content {
+body.operator-view[data-theme="sleek"] .component[data-form="group"] > .c-nav-content {
     background: #424850;
     border-top: none;
     border-radius: 0 0 4px 4px;
@@ -526,7 +526,7 @@ body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] > .ef-nav-c
     flex-basis: 100%;
     box-sizing: border-box;
 }
-body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] .ef-nav-tab.ef-nav-tab--active {
+body.operator-view[data-theme="sleek"] .component[data-form="group"] .c-nav-tab.c-nav-tab--active {
     background: #424850 !important;
     border-radius: 4px 4px 0 0 !important;
     border-right: 1px solid #555d66 !important;
@@ -535,7 +535,7 @@ body.operator-view[data-theme="sleek"] .eigenform[data-form="group"] .ef-nav-tab
     margin-right: 0;
     text-align: left;
 }
-body.operator-view[data-theme="sleek"] .ef-group-instruction {
+body.operator-view[data-theme="sleek"] .c-group-instruction {
     font-size: 12px;
     color: #888;
     margin-bottom: 12px;
@@ -543,7 +543,7 @@ body.operator-view[data-theme="sleek"] .ef-group-instruction {
 }
 
 
-/* --- NavigationForm edit mode --- */
+/* --- NavigationComponent edit mode --- */
 
 /* Edit toolbar: add step form + mode switcher */
 body.operator-view[data-theme="sleek"] .sleek-edit-toolbar {
@@ -707,8 +707,8 @@ body.operator-view[data-theme="sleek"] .sleek-edit-btn--danger:hover {
 }
 
 /* Edit mode label/instruction forms */
-body.operator-view[data-theme="sleek"] .ef-edit-label-form,
-body.operator-view[data-theme="sleek"] .ef-edit-instr-form {
+body.operator-view[data-theme="sleek"] .c-edit-label-form,
+body.operator-view[data-theme="sleek"] .c-edit-instr-form {
     background: #1e1e1e;
     padding: 6px 12px;
     margin: 0;
@@ -718,17 +718,17 @@ body.operator-view[data-theme="sleek"] .ef-edit-instr-form {
     align-items: center;
     gap: 6px;
 }
-body.operator-view[data-theme="sleek"] .ef-edit-label-form {
+body.operator-view[data-theme="sleek"] .c-edit-label-form {
     border-top: 1px solid #444;
 }
-body.operator-view[data-theme="sleek"] .ef-edit-instr-form {
+body.operator-view[data-theme="sleek"] .c-edit-instr-form {
     border-top: 1px solid #333;
 }
 body.operator-view[data-theme="sleek"] .sleek-edit-toolbar {
     margin-top: 0;
 }
-body.operator-view[data-theme="sleek"] .ef-edit-label-input,
-body.operator-view[data-theme="sleek"] .ef-edit-instr-input {
+body.operator-view[data-theme="sleek"] .c-edit-label-input,
+body.operator-view[data-theme="sleek"] .c-edit-instr-input {
     background: #2b3035;
     color: #ccc;
     border: 1px solid #444;
@@ -737,16 +737,16 @@ body.operator-view[data-theme="sleek"] .ef-edit-instr-input {
     font: inherit;
     flex: 1;
 }
-body.operator-view[data-theme="sleek"] .ef-edit-label-input {
+body.operator-view[data-theme="sleek"] .c-edit-label-input {
     font-weight: bold;
     font-size: 14px;
 }
-body.operator-view[data-theme="sleek"] .ef-edit-instr-input {
+body.operator-view[data-theme="sleek"] .c-edit-instr-input {
     font-size: 12px;
     color: #888;
 }
 
-/* --- GroupForm / container edit mode: child control bars --- */
+/* --- GroupComponent / container edit mode: child control bars --- */
 
 body.operator-view[data-theme="sleek"] .sleek-edit-child {
     margin-bottom: 0;
@@ -771,7 +771,7 @@ body.operator-view[data-theme="sleek"] .sleek-edit-child__content {
     /* No extra padding or border — child renders at full width */
 }
 
-/* --- Mutable PageForm: Add Eigenform card picker --- */
+/* --- Mutable PageComponent: Add Component card picker --- */
 body.operator-view[data-theme="sleek"] .sleek-add-ef {
     background: #1a1f26;
     border: 1px solid #555d66;
@@ -1021,7 +1021,7 @@ body.operator-view[data-theme="sleek"] .sleek-struct__drop-indicator {
 }
 
 /* Drag tooltip — shows the POST body that would execute on release */
-.ef-drag-tooltip {
+.c-drag-tooltip {
     position: fixed;
     display: none;
     pointer-events: none;
@@ -1222,7 +1222,7 @@ body.operator-view[data-theme="sleek"] .sleek-struct__group-btn:hover {
     background: #3b82f6;
 }
 
-/* --- Mutable PageForm: per-eigenform margin controls --- */
+/* --- Mutable PageComponent: per-component margin controls --- */
 body.operator-view[data-theme="sleek"] .sleek-page-child {
     position: relative;
 }
@@ -1236,7 +1236,7 @@ body.operator-view[data-theme="sleek"] .sleek-page-child__controls {
     padding-top: 4px;
 }
 
-/* Rebuild from Seed button (mutable PageForm) */
+/* Rebuild from Seed button (mutable PageComponent) */
 body.operator-view[data-theme="sleek"] .sleek-page-rebuild {
     width: auto;
     height: auto;
@@ -1251,103 +1251,103 @@ body.operator-view[data-theme="sleek"] .sleek-page-rebuild:hover {
 /* --- Edit mode: shared class overrides for default templates --- */
 
 /* Standard action buttons (confirm, remove, arrow) */
-body.operator-view[data-theme="sleek"] .ef-btn-confirm {
+body.operator-view[data-theme="sleek"] .c-btn-confirm {
     background: #1a2a3c;
     border-color: #2563eb;
     color: #60a5fa;
 }
-body.operator-view[data-theme="sleek"] .ef-btn-confirm:hover {
+body.operator-view[data-theme="sleek"] .c-btn-confirm:hover {
     background: #1e3a5f;
 }
-body.operator-view[data-theme="sleek"] .ef-btn-remove {
+body.operator-view[data-theme="sleek"] .c-btn-remove {
     background: #2b3035;
     border-color: #444;
     color: #f48771;
 }
-body.operator-view[data-theme="sleek"] .ef-btn-remove:hover {
+body.operator-view[data-theme="sleek"] .c-btn-remove:hover {
     background: #3c1f1f;
     border-color: #be3434;
 }
-body.operator-view[data-theme="sleek"] .ef-btn-arrow {
+body.operator-view[data-theme="sleek"] .c-btn-arrow {
     background: #2b3035;
     border-color: #444;
     color: #888;
 }
-body.operator-view[data-theme="sleek"] .ef-btn-arrow:hover {
+body.operator-view[data-theme="sleek"] .c-btn-arrow:hover {
     background: #363b42;
     color: #ccc;
 }
 
 /* Generic edit input */
-body.operator-view[data-theme="sleek"] .ef-edit-input {
+body.operator-view[data-theme="sleek"] .c-edit-input {
     background: #2b3035;
     color: #ccc;
     border-color: #444;
 }
 
 /* Chrome buttons (pencil, play, undo, discard) */
-body.operator-view[data-theme="sleek"] .ef-chrome-btn {
+body.operator-view[data-theme="sleek"] .c-chrome-btn {
     color: #888;
     background: #2b3035;
     border-color: #444;
     font-size: 14px;
     line-height: 1;
 }
-body.operator-view[data-theme="sleek"] .ef-chrome-btn span {
+body.operator-view[data-theme="sleek"] .c-chrome-btn span {
     font-size: inherit;
     line-height: 1;
 }
-body.operator-view[data-theme="sleek"] .ef-chrome-btn:hover {
+body.operator-view[data-theme="sleek"] .c-chrome-btn:hover {
     color: #ccc;
     background: #363b42;
 }
 
-/* Container add-eigenform toolbar */
-body.operator-view[data-theme="sleek"] .ef-add-toolbar {
+/* Container add-component toolbar */
+body.operator-view[data-theme="sleek"] .c-add-toolbar {
     background: #1e1e1e;
     border-color: #444;
 }
-body.operator-view[data-theme="sleek"] .ef-add-toolbar-label {
+body.operator-view[data-theme="sleek"] .c-add-toolbar-label {
     color: #888;
 }
-body.operator-view[data-theme="sleek"] .ef-add-toolbar-input {
+body.operator-view[data-theme="sleek"] .c-add-toolbar-input {
     background: #2b3035;
     color: #ccc;
     border: 1px solid #444;
     border-radius: 3px;
 }
-body.operator-view[data-theme="sleek"] .ef-add-toolbar-submit {
+body.operator-view[data-theme="sleek"] .c-add-toolbar-submit {
     background: #2563eb;
     border-color: #3b82f6;
     color: #fff;
 }
-body.operator-view[data-theme="sleek"] .ef-add-toolbar-submit:hover {
+body.operator-view[data-theme="sleek"] .c-add-toolbar-submit:hover {
     background: #3b82f6;
 }
 
 /* Empty state */
-body.operator-view[data-theme="sleek"] .ef-empty-state {
+body.operator-view[data-theme="sleek"] .c-empty-state {
     color: #666;
     border-color: #444;
 }
 
 /* Accordion toggle headers */
-body.operator-view[data-theme="sleek"] .ef-aff-accordion {
+body.operator-view[data-theme="sleek"] .c-aff-accordion {
     background: #22272e;
     color: #ccc;
 }
 
 /* Section content in edit mode */
-body.operator-view[data-theme="sleek"] .ef-section-content--edit {
+body.operator-view[data-theme="sleek"] .c-section-content--edit {
     border-color: #444;
     background: #2b3035;
 }
-body.operator-view[data-theme="sleek"] .ef-section-content {
+body.operator-view[data-theme="sleek"] .c-section-content {
     border-left-color: #444;
 }
 
 /* Edit mode tab bar (used by default navigation/group templates) */
-body.operator-view[data-theme="sleek"] .ef-tab-bar {
+body.operator-view[data-theme="sleek"] .c-tab-bar {
     background: transparent;
 }
 
@@ -1450,7 +1450,7 @@ body.operator-view[data-theme="sleek"] span[style*="background:#e8f5e8"] {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   SLEEK EDIT MODE — unified config controls for all data eigenforms
+   SLEEK EDIT MODE — unified config controls for all data components
    ═══════════════════════════════════════════════════════════════════ */
 
 /* Config bar: sits below label/instruction edit forms */
@@ -1551,13 +1551,13 @@ body.operator-view[data-theme="sleek"] span[style*="background:#e8f5e8"] {
     font-weight: 600;
 }
 
-/* Child eigenform container (ChoiceForm options, CheckboxForm items, InfoForm text) */
+/* Child component container (ChoiceComponent options, CheckboxComponent items, InfoComponent text) */
 .sleek-edit-child-ef {
     margin: 4px 0;
     padding: 0 4px;
 }
 
-/* Status indicator (e.g., CheckboxForm "Confirmed") */
+/* Status indicator (e.g., CheckboxComponent "Confirmed") */
 .sleek-edit-status {
     color: #60a5fa;
     font-size: 12px;
@@ -1569,7 +1569,7 @@ body.operator-view[data-theme="sleek"] span[style*="background:#e8f5e8"] {
     margin: 4px 8px 4px;
 }
 
-/* Collection rows (DictionaryForm entries, MultiForm fields) */
+/* Collection rows (DictionaryComponent entries, MultiComponent fields) */
 .sleek-edit-row {
     display: flex;
     align-items: center;
@@ -1660,23 +1660,23 @@ body.operator-view[data-theme="sleek"] span[style*="background:#e8f5e8"] {
 }
 
 /* --- Feedback banners --- */
-body.operator-view[data-theme="sleek"] .ef-feedback--error {
+body.operator-view[data-theme="sleek"] .c-feedback--error {
     background: #3c1f1f;
     border-color: #be3434;
     color: #f48771;
 }
-body.operator-view[data-theme="sleek"] .ef-feedback--success {
+body.operator-view[data-theme="sleek"] .c-feedback--success {
     background: #1a2a3c;
     border-color: #3b82f6;
     color: #60a5fa;
 }
-body.operator-view[data-theme="sleek"] .ef-feedback__dismiss {
+body.operator-view[data-theme="sleek"] .c-feedback__dismiss {
     border-color: #be3434;
     color: #f48771;
 }
 
 
-/* --- TextForm sleek template --- */
+/* --- TextComponent sleek template --- */
 .sleek-text__label {
     display: block;
     font-size: 13px;
@@ -1778,7 +1778,7 @@ body.operator-view[data-theme="sleek"] .ef-feedback__dismiss {
     font-family: 'Cascadia Code', 'Consolas', monospace;
 }
 
-/* --- ListForm sleek template --- */
+/* --- ListComponent sleek template --- */
 .sleek-list {
     margin: 0;
 }
@@ -2034,7 +2034,7 @@ body.operator-view[data-theme="sleek"] .ef-feedback__dismiss {
     margin-top: 6px;
 }
 
-/* --- TableForm sleek template --- */
+/* --- TableComponent sleek template --- */
 .sleek-table {
     margin: 0;
 }
@@ -2828,4 +2828,4 @@ body.operator-view[data-theme="sleek"] .builder__footer-row {
     padding-top: 6px;
 }
 
-/* (preview section removed — eigenforms render inline below builder) */
+/* (preview section removed — components render inline below builder) */

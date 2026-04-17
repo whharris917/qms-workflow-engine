@@ -1,4 +1,4 @@
-"""SiblingRef — typed reference to a sibling eigenform.
+"""SiblingRef — typed reference to a sibling component.
 
 Replaces string-typed `depends_on="key"` with a validatable value that still
 behaves as a string for all existing call sites. See docs/architecture.md §2
@@ -9,19 +9,19 @@ Design: SiblingRef IS-A str. It is the sibling's key, with an optional
 `depends_on` as a string (URL composition, store lookups, JSON serialization,
 `render_dependency_line`) keeps working without modification — SiblingRef
 passes every `isinstance(x, str)` check. The only new behavior is the
-`.expects` attribute, used by PageForm at bind time to validate that the
+`.expects` attribute, used by PageComponent at bind time to validate that the
 referenced sibling exists and (optionally) has the expected type.
 
 Usage in seed files:
     # Plain string — no type assertion:
-    VisibilityForm(key="advanced", depends_on="mode", ...)
+    VisibilityComponent(key="advanced", depends_on="mode", ...)
 
     # With type assertion — validated at bind time:
-    from engine.textform import TextForm
-    ComputedForm(key="summary", depends_on=[SiblingRef("name", expects=TextForm)], ...)
+    from engine.textcomponent import TextComponent
+    ComputedComponent(key="summary", depends_on=[SiblingRef("name", expects=TextComponent)], ...)
 
 Either form works; the plain-string form is auto-coerced by the owning
-eigenform's __post_init__.
+component's __post_init__.
 """
 
 from __future__ import annotations
@@ -30,19 +30,19 @@ from typing import Iterable
 
 
 class SiblingRef(str):
-    """A sibling eigenform reference.
+    """A sibling component reference.
 
     Behaves as a string (the sibling's key) with an optional `.expects`
     type assertion attached. Two SiblingRefs with the same key compare equal
     regardless of `.expects`; a SiblingRef compares equal to its key string.
 
     Args:
-        key: the sibling's eigenform key (unique within the shared scope).
+        key: the sibling's component key (unique within the shared scope).
              Must be a non-empty string.
         expects: optional class to assert the sibling is an instance of.
                  When set, bind-time validation fails if the referenced
                  sibling is of a different type. Use for contracts like
-                 "this ComputedForm expects its dependency to be a TextForm."
+                 "this ComputedComponent expects its dependency to be a TextComponent."
     """
 
     __slots__ = ("_expects",)
@@ -99,7 +99,7 @@ class SiblingRefError(ValueError):
     """Raised when a SiblingRef cannot be resolved at bind time.
 
     Attributes:
-        owner_key: the key of the eigenform that declared the ref.
+        owner_key: the key of the component that declared the ref.
         owner_scope: the scope in which the ref was searched.
         ref: the SiblingRef that failed to resolve.
         known_keys: the sibling keys that DO exist in the scope, for

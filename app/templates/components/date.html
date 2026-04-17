@@ -1,0 +1,80 @@
+{# DateComponent template.
+
+   Context:
+     data  — the serialized component dict
+     ef    — the DateComponent instance
+     url   — the component's POST URL
+     label — current label text
+     instruction — current instruction text
+#}
+{% if data.edit_mode %}
+  {% include "_edit_header.html" with context %}
+
+  {# Config controls #}
+  <div style="margin: 2px 0; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 0.9em; color: #666;">
+  {# Include time toggle #}
+  {% set it_val = data.include_time or false %}
+  {% set it_body = {"action": "toggle_include_time"}|tojson %}
+  {% set it_tooltip = "POST " ~ url ~ " " ~ it_body %}
+  {% set it_bg = "#efffef" if it_val else "#f8f8f8" %}
+  {% set it_border = "#4a4" if it_val else "#ccc" %}
+  <button data-c-post="{{ url }}" data-c-body="{{ it_body }}"
+   style="cursor: pointer; font: inherit; font-size: 0.9em; border: 1px solid {{ it_border }}; background: {{ it_bg }}; padding: 1px 8px; border-radius: 3px;"
+   title="{{ it_tooltip }}">include time: {{ "on" if it_val else "off" }}</button>
+
+  {# Min/max date inputs #}
+  {% for field_label, action, val in [
+    ("min date", "set_min_date", data.min),
+    ("max date", "set_max_date", data.max),
+  ] %}
+    {% set display_val = "" if val is none else val|string %}
+    {% set body_json = {"action": action, "value": display_val}|tojson %}
+    {% set tooltip = "POST " ~ url ~ " " ~ body_json %}
+    <form style="display: flex; align-items: center; gap: 2px; margin: 0;"
+     data-c-submit="{{ url }}">
+    <input type="hidden" name="action" value="{{ action }}" />
+    <span style="font-weight: 600;">{{ field_label }}:</span>
+    <input name="value" type="text" value="{{ display_val }}"
+     placeholder="none"
+     style="font: inherit; border: 1px solid #ddd; padding: 1px 3px; margin: 0; width: 100px; text-align: center;"
+     title="{{ tooltip }}" />
+    <button type="submit" class="{{ CSS_CONFIRM }}"
+     title="{{ tooltip }}">&#10003;</button>
+    </form>
+  {% endfor %}
+  </div>
+
+  {# Value #}
+  {% set val = data.value %}
+  <p><strong>Value:</strong> {{ (val if val is not none else "None")|string }}</p>
+
+  {# Mark edit affordances, render the rest #}
+  {% for aff in data.affordances %}
+    {% if not aff._rendered %}
+      {% if aff.body.action in ("set_label", "set_instruction", "toggle_include_time", "set_min_date", "set_max_date") %}
+        {% set _ = aff.update({"_rendered": true}) %}
+      {% else %}
+        {{ render_aff(aff) }}
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+
+{% else %}
+  <h3>{{ data.label }}</h3>
+  {% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
+
+  {# Constraints summary #}
+  {% set constraints = [] %}
+  {% if data.include_time %}{% set _ = constraints.append("includes time") %}{% endif %}
+  {% if data.min is not none %}{% set _ = constraints.append("min: " ~ data.min|string) %}{% endif %}
+  {% if data.max is not none %}{% set _ = constraints.append("max: " ~ data.max|string) %}{% endif %}
+  {% if constraints %}
+    <p style="color: #666; font-size: 0.9em; margin: 2px 0;">{{ constraints|join(", ") }}</p>
+  {% endif %}
+
+  {% set val = data.value %}
+  <p><strong>Value:</strong> {{ (val if val is not none else "None")|string }}</p>
+  {% for aff in data.affordances %}
+    {% if not aff._rendered %}{{ render_aff(aff) }}{% endif %}
+  {% endfor %}
+{% endif %}

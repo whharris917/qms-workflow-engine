@@ -18,7 +18,7 @@ DATA_DIR = Path("data")
 registry = InstanceRegistry(DATA_DIR)
 
 # SSE subscribers: {instance_id: [queue, ...]}
-# Connection state only — knows nothing about eigenforms
+# Connection state only — knows nothing about components
 subscribers: dict[str, list[queue.Queue]] = {}
 
 
@@ -33,7 +33,7 @@ THEME_CSS = {"sleek": "sleek.css"}
 
 @bp.before_request
 def _apply_theme():
-    theme = request.cookies.get("ef-theme", "sleek")
+    theme = request.cookies.get("c-theme", "sleek")
     set_theme(theme if theme in THEMES and theme != "default" else None)
 
 
@@ -120,13 +120,13 @@ def deepdive():
 
 
 @bp.route("/deepdive/<path:path>", methods=["GET", "POST"])
-def deepdive_eigenform(path):
-    """Action/eigenform routing for the deepdive page (tab switches, etc.)."""
+def deepdive_component(path):
+    """Action/component routing for the deepdive page (tab switches, etc.)."""
     pg = _bind_deepdive()
     if pg is None:
         return "Not found", 404
     if request.method == "GET":
-        ef = pg.find_eigenform(path)
+        ef = pg.find_component(path)
         if ef is None:
             return jsonify({"error": f"Unknown path: {path}"}), 404
         if wants_html(request):
@@ -140,7 +140,7 @@ def deepdive_eigenform(path):
         return jsonify({"error": f"Unknown path: {path}"}), 404
     if wants_html(request):
         return Markup(pg.render())
-    ef = pg.find_eigenform(path)
+    ef = pg.find_component(path)
     if ef is not None:
         ef_state = ef.serialize()
         if "error" in result:
@@ -155,7 +155,7 @@ def framing():
     """Conceptual framing: a design plan for sharpening the engine's vocabulary.
 
     Hand-rolled HTML — this page is prose with tables and diagrams, not an
-    interactive form, so it bypasses the eigenform engine entirely.
+    interactive form, so it bypasses the component engine entirely.
     """
     return render_template("framing.html", active_page="framing")
 
@@ -247,9 +247,9 @@ def _shallow_serialize(pg) -> dict:
     return {
         "label": pg.label,
         "complete": pg.is_complete,
-        "eigenforms": [
+        "components": [
             {"label": ef.label, "complete": ef.is_complete}
-            for ef in pg.eigenforms
+            for ef in pg.components
         ],
     }
 
@@ -278,7 +278,7 @@ def page_stream(instance_id):
 
 
 @bp.route("/pages/<instance_id>/<path:path>", methods=["GET", "POST"])
-def eigenform(instance_id, path):
+def component(instance_id, path):
     pg = get_page(instance_id)
     if pg is None:
         if wants_html(request):
@@ -286,7 +286,7 @@ def eigenform(instance_id, path):
         return jsonify({"error": f"Unknown instance: {instance_id}"}), 404
 
     if request.method == "GET":
-        ef = pg.find_eigenform(path)
+        ef = pg.find_component(path)
         if ef is None:
             if wants_html(request):
                 return "Not found", 404
@@ -305,8 +305,8 @@ def eigenform(instance_id, path):
     notify_subscribers(instance_id, result)
     if wants_html(request):
         return Markup(pg.render())
-    # Return just the targeted eigenform state, not the full page
-    ef = pg.find_eigenform(path)
+    # Return just the targeted component state, not the full page
+    ef = pg.find_component(path)
     if ef is not None:
         ef_state = ef.serialize()
         if "error" in result:

@@ -1,22 +1,22 @@
 """Visibility Experiments — exploring conditional visibility patterns."""
 
-from engine.choiceform import ChoiceForm
-from engine.checkboxform import CheckboxForm
-from engine.textform import TextForm
-from engine.pageform import PageForm
-from engine.visibilityform import VisibilityForm
+from engine.choicecomponent import ChoiceComponent
+from engine.checkboxcomponent import CheckboxComponent
+from engine.textcomponent import TextComponent
+from engine.pagecomponent import PageComponent
+from engine.visibilitycomponent import VisibilityComponent
 
 
-definition = PageForm(key="visibility-experiments", label="Visibility Experiments", instruction="Experiments with conditional visibility.", eigenforms=[
-    ChoiceForm(key="mode", label="Mode", instruction="Select a mode.",
+definition = PageComponent(key="visibility-experiments", label="Visibility Experiments", instruction="Experiments with conditional visibility.", components=[
+    ChoiceComponent(key="mode", label="Mode", instruction="Select a mode.",
                options=["Simple", "Advanced", "Expert"]),
-    VisibilityForm(key="v-advanced", label="Advanced Options",
+    VisibilityComponent(key="v-advanced", label="Advanced Options",
                    depends_on="mode", visible_when=["Advanced", "Expert"],
-                   eigenform=TextForm(key="detail", label="Detail Level",
+                   component=TextComponent(key="detail", label="Detail Level",
                                      instruction="How much detail do you want?")),
-    VisibilityForm(key="v-expert", label="Expert Options",
+    VisibilityComponent(key="v-expert", label="Expert Options",
                    depends_on="mode", visible_when="Expert",
-                   eigenform=CheckboxForm(key="flags", label="Expert Flags",
+                   component=CheckboxComponent(key="flags", label="Expert Flags",
                                           instruction="Select expert features.",
                                           items=["debug", "verbose", "unsafe"])),
 ])

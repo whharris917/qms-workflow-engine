@@ -1,4 +1,4 @@
-"""JSON file store for eigenform state."""
+"""JSON file store for component state."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 class Store:
-    """Persists eigenform values as a JSON file on disk, scoped by resource.
+    """Persists component values as a JSON file on disk, scoped by resource.
 
     The store tracks the file's modification time and re-reads from disk
     whenever the file has changed or been deleted externally. This ensures

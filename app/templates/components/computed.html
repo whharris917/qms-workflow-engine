@@ -1,0 +1,27 @@
+{# ComputedComponent template.
+
+   Context:
+     data       — the serialized component dict
+     ef         — the ComputedComponent instance
+     url_prefix — the component's URL prefix for dependency links
+#}
+<h3>{{ data.label }}</h3>
+{% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
+{{ render_dep_line(data.depends_on, url_prefix) }}
+
+{% set computed = data.computed_value %}
+{% if computed is mapping %}
+  {% if computed.message %}
+    <p><strong>{{ computed.message }}</strong></p>
+  {% else %}
+    <dl style="margin: 4px 0;">
+    {% for k, v in computed.items() %}
+      <dt style="font-weight: bold;">{{ k }}</dt><dd>{{ v }}</dd>
+    {% endfor %}
+    </dl>
+  {% endif %}
+{% elif computed is not none %}
+  <p><strong>Value:</strong> {{ computed }}</p>
+{% else %}
+  <p class="c-na-text">Not yet computed.</p>
+{% endif %}

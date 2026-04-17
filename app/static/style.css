@@ -1,5 +1,5 @@
 /* ===================================================================
-   Eigenform Styles
+   Component Styles
    Extracted from inline style= attributes across 30 engine modules.
    =================================================================== */
 
@@ -8,42 +8,42 @@
     padding: 8px 12px;
 }
 
-/* --- Eigenform wrapper (eigenform.py render()) --- */
+/* --- Component wrapper (component.py render()) --- */
 
 /* Base: full surrounding border (Default Theme / Supervisor View) */
-.eigenform {
+.component {
     border: 2px solid #888;
     padding: 30px 12px 12px 12px;
     margin: 8px 0;
     position: relative;
 }
-.eigenform.eigenform--complete {
+.component.component--complete {
     border-color: #2a2;
 }
-.eigenform.eigenform--editing {
+.component.component--editing {
     border-style: dashed;
 }
 
 /* Titlebar (label + chrome buttons) */
-.ef-titlebar {
+.c-titlebar {
     display: flex;
     align-items: center;
     gap: 4px;
     margin-bottom: 4px;
 }
-.ef-titlebar__label {
+.c-titlebar__label {
     display: none;  /* Default theme: label rendered by template */
 }
-.ef-titlebar__spacer {
+.c-titlebar__spacer {
     display: none;  /* Default theme: no spacer, buttons stay left */
 }
 
 /* Chrome button row (edit/undo/discard, pencil) */
-.ef-chrome {
+.c-chrome {
     display: inline-flex;
     gap: 4px;
 }
-.ef-chrome-btn {
+.c-chrome-btn {
     cursor: pointer;
     width: 24px;
     height: 24px;
@@ -58,7 +58,7 @@
 }
 
 /* "See JSON" toggle */
-.ef-json-toggle {
+.c-json-toggle {
     position: absolute;
     top: 8px;
     right: 8px;
@@ -72,14 +72,14 @@
 }
 
 /* JSON pre block */
-.ef-json-pre {
+.c-json-pre {
     display: none;
     margin: 0;
     white-space: pre-wrap;
 }
 
 /* --- Inline action buttons (render_inline_button, 43+ call sites) --- */
-.ef-btn-confirm {
+.c-btn-confirm {
     cursor: pointer;
     border: 1px solid #4a4;
     background: #efffef;
@@ -91,7 +91,7 @@
     vertical-align: middle;
     box-sizing: content-box;
 }
-.ef-btn-remove {
+.c-btn-remove {
     cursor: pointer;
     border: 1px solid #ccc;
     background: #f8f8f8;
@@ -103,7 +103,7 @@
     vertical-align: middle;
     box-sizing: content-box;
 }
-.ef-btn-arrow {
+.c-btn-arrow {
     cursor: pointer;
     border: 1px solid #ccc;
     background: #f8f8f8;
@@ -114,7 +114,7 @@
     vertical-align: middle;
     box-sizing: content-box;
 }
-.ef-btn-gap {
+.c-btn-gap {
     display: inline-block;
     width: 24px;
     height: 24px;
@@ -125,24 +125,24 @@
 /* --- Affordance renderers (affordances.py) --- */
 
 /* Standard affordance button */
-.ef-aff-btn {
+.c-aff-btn {
     cursor: pointer;
     font-size: 12px;
     padding: 4px 10px;
 }
-.ef-aff-row {
+.c-aff-row {
     margin: 4px 0;
 }
 
 /* Tab button */
-.ef-aff-btn--tab {
+.c-aff-btn--tab {
     cursor: pointer;
     font-size: 12px;
     padding: 2px 8px;
 }
 
 /* Small button (table column headers, etc.) */
-.ef-aff-btn--small {
+.c-aff-btn--small {
     margin: 1px;
     cursor: pointer;
     width: 28px;
@@ -151,56 +151,56 @@
 }
 
 /* Disabled button */
-.ef-aff-btn--disabled {
+.c-aff-btn--disabled {
     font-size: 12px;
     padding: 4px 10px;
     opacity: 0.5;
     cursor: not-allowed;
 }
-.ef-aff-disabled-msg {
+.c-aff-disabled-msg {
     color: #888;
     font-size: 0.9em;
 }
 
 /* Toggle button pair */
-.ef-aff-toggle-group {
+.c-aff-toggle-group {
     display: flex;
     gap: 4px;
     margin: 4px 0;
 }
-.ef-aff-toggle-btn {
+.c-aff-toggle-btn {
     cursor: pointer;
     padding: 4px 12px;
 }
-.ef-aff-toggle-btn--true  { background: #2a2; color: white; }
-.ef-aff-toggle-btn--false { background: #c22; color: white; }
+.c-aff-toggle-btn--true  { background: #2a2; color: white; }
+.c-aff-toggle-btn--false { background: #c22; color: white; }
 
 /* Rating button group */
-.ef-aff-rating-group {
+.c-aff-rating-group {
     display: flex;
     gap: 4px;
     margin: 4px 0;
 }
-.ef-aff-rating-btn {
+.c-aff-rating-btn {
     cursor: pointer;
     width: 32px;
     height: 32px;
 }
-.ef-aff-rating-btn--active {
+.c-aff-rating-btn--active {
     background: #f0a020;
     color: white;
     font-weight: bold;
 }
 
 /* Navigation tab buttons (default view) */
-.ef-nav-tab {
+.c-nav-tab {
     cursor: pointer;
     font-size: 12px;
     padding: 2px 8px;
 }
 
 /* Accordion toggle header */
-.ef-aff-accordion {
+.c-aff-accordion {
     cursor: pointer;
     padding: 6px 8px;
     background: #eee;
@@ -211,63 +211,63 @@
 }
 
 /* Separator row (parameterized, constraint picker) */
-.ef-aff-separator {
+.c-aff-separator {
     margin: 4px 0;
     padding: 4px 0;
     border-top: 1px solid #eee;
 }
 
 /* --- Form styles --- */
-.ef-form-inline { display: inline; }
-.ef-form-nomargin { margin: 0; }
-.ef-form-row {
+.c-form-inline { display: inline; }
+.c-form-nomargin { margin: 0; }
+.c-form-row {
     display: flex;
     align-items: center;
     gap: 4px;
 }
 
 /* Inputs */
-.ef-input--narrow { width: 100px; margin-right: 4px; }
-.ef-input--medium { width: 160px; }
-.ef-input--wide   { width: 200px; }
-.ef-input--number { width: 120px; }
-.ef-input--kv-key   { width: 120px; margin-right: 4px; }
-.ef-input--kv-value { width: 160px; margin-right: 4px; }
-.ef-input--range {
+.c-input--narrow { width: 100px; margin-right: 4px; }
+.c-input--medium { width: 160px; }
+.c-input--wide   { width: 200px; }
+.c-input--number { width: 120px; }
+.c-input--kv-key   { width: 120px; margin-right: 4px; }
+.c-input--kv-value { width: 160px; margin-right: 4px; }
+.c-input--range {
     width: 200px;
     vertical-align: middle;
 }
-.ef-input--textarea {
+.c-input--textarea {
     width: 100%;
     box-sizing: border-box;
 }
-.ef-range-display { margin-left: 8px; }
+.c-range-display { margin-left: 8px; }
 
 /* --- Checkbox / radio labels --- */
-.ef-label-block {
+.c-label-block {
     display: block;
     cursor: pointer;
 }
-.ef-label-radio {
+.c-label-radio {
     display: block;
     cursor: pointer;
     padding: 2px 0;
 }
 
 /* --- Edit mode shared styles --- */
-.ef-edit-label-form {
+.c-edit-label-form {
     display: flex;
     align-items: center;
     gap: 4px;
     margin: 0.83em 0;
 }
-.ef-edit-instr-form {
+.c-edit-instr-form {
     display: flex;
     align-items: center;
     gap: 4px;
     margin: 1em 0;
 }
-.ef-edit-label-input {
+.c-edit-label-input {
     font: inherit;
     font-size: 1.17em;
     font-weight: bold;
@@ -275,14 +275,14 @@
     padding: 1px 3px;
     margin: 0;
 }
-.ef-edit-instr-input {
+.c-edit-instr-input {
     font: inherit;
     border: 1px solid #ddd;
     padding: 1px 3px;
     margin: 0;
     width: 100%;
 }
-.ef-edit-input {
+.c-edit-input {
     font: inherit;
     border: 1px solid #ccc;
     border-radius: 3px;
@@ -291,24 +291,24 @@
 }
 
 /* --- List / collection styles --- */
-.ef-list {
+.c-list {
     margin: 4px 0;
     padding-left: 24px;
 }
-.ef-list-item {
+.c-list-item {
     margin: 4px 0;
     display: flex;
     align-items: center;
     gap: 4px;
 }
-.ef-list-item--add {
+.c-list-item--add {
     margin: 4px 0;
     display: flex;
     align-items: center;
     gap: 4px;
     list-style: none;
 }
-.ef-id-pill {
+.c-id-pill {
     display: inline-block;
     min-width: 52px;
     color: #666;
@@ -319,8 +319,8 @@
     font-family: monospace;
     font-size: 0.85em;
 }
-.ef-id-pill--hidden { visibility: hidden; }
-.ef-fixed-value {
+.c-id-pill--hidden { visibility: hidden; }
+.c-fixed-value {
     display: inline-block;
     width: 200px;
     padding: 2px 4px;
@@ -330,20 +330,20 @@
     background: #f0f0f0;
     border-radius: 3px;
 }
-.ef-item-input {
+.c-item-input {
     border: 1px solid #ddd;
     padding: 2px 4px;
     width: 200px;
 }
 
 /* Constraint pills */
-.ef-constraint-wrap {
+.c-constraint-wrap {
     color: #999;
     display: inline-flex;
     align-items: center;
     gap: 2px;
 }
-.ef-constraint-pill {
+.c-constraint-pill {
     display: inline-block;
     min-width: 52px;
     color: #666;
@@ -355,13 +355,13 @@
     font-family: monospace;
     font-size: 0.85em;
 }
-.ef-constraint-pill--fixed {
+.c-constraint-pill--fixed {
     background: #fff3cd;
     border: 1px solid #856404;
 }
 
 /* Constraint dropdown overlay */
-.ef-constraint-dropdown {
+.c-constraint-dropdown {
     position: relative;
     display: inline-block;
     width: 24px;
@@ -371,7 +371,7 @@
     background: #f8f8f8;
     vertical-align: middle;
 }
-.ef-constraint-dropdown-icon {
+.c-constraint-dropdown-icon {
     position: absolute;
     inset: 0;
     display: flex;
@@ -381,7 +381,7 @@
     font-weight: normal;
     pointer-events: none;
 }
-.ef-constraint-dropdown select {
+.c-constraint-dropdown select {
     position: absolute;
     inset: 0;
     width: 100%;
@@ -391,7 +391,7 @@
 }
 
 /* Pin toggle */
-.ef-pin-btn {
+.c-pin-btn {
     cursor: pointer;
     width: 24px;
     height: 24px;
@@ -400,22 +400,22 @@
     vertical-align: middle;
     box-sizing: content-box;
 }
-.ef-pin-btn--pinned {
+.c-pin-btn--pinned {
     border: 1px solid #856404;
     background: #fff3cd;
 }
-.ef-pin-btn--unpinned {
+.c-pin-btn--unpinned {
     border: 1px solid #ccc;
     background: none;
 }
 /* Small pin for constraints */
-.ef-pin-btn--small {
+.c-pin-btn--small {
     width: 18px;
     height: 18px;
 }
 
 /* --- Container edit mode --- */
-.ef-toolbar {
+.c-toolbar {
     display: flex;
     gap: 4px;
     align-items: center;
@@ -425,7 +425,7 @@
     border: 1px solid #ddd;
     border-radius: 4px;
 }
-.ef-ctrl-bar {
+.c-ctrl-bar {
     display: flex;
     gap: 4px;
     align-items: center;
@@ -436,7 +436,7 @@
 }
 
 /* --- Feedback banners --- */
-.ef-feedback {
+.c-feedback {
     padding: 8px 12px;
     margin: 4px 0;
     border-radius: 4px;
@@ -444,29 +444,29 @@
     justify-content: space-between;
     align-items: center;
 }
-.ef-feedback--error {
+.c-feedback--error {
     background: #fdecea;
     border: 1px solid #f5c6cb;
     color: #721c24;
 }
-.ef-feedback--success {
+.c-feedback--success {
     background: #edf7ed;
     border: 1px solid #c3e6cb;
     color: #155724;
 }
-.ef-feedback__target {
+.c-feedback__target {
     opacity: 0.7;
 }
-.ef-feedback__meta {
+.c-feedback__meta {
     display: flex;
     align-items: center;
     gap: 8px;
 }
-.ef-feedback__timestamp {
+.c-feedback__timestamp {
     opacity: 0.5;
     font-size: 0.85em;
 }
-.ef-feedback__dismiss {
+.c-feedback__dismiss {
     cursor: pointer;
     font-size: 11px;
     padding: 1px 6px;
@@ -477,19 +477,19 @@
 }
 
 /* N/A text */
-.ef-na-text {
+.c-na-text {
     color: #888;
     font-style: italic;
 }
 
 /* Muted text */
-.ef-muted {
+.c-muted {
     color: #888;
     font-size: 0.9em;
 }
 
-/* Config row (NumberForm constraints, etc.) */
-.ef-config-row {
+/* Config row (NumberComponent constraints, etc.) */
+.c-config-row {
     margin: 2px 0;
     display: flex;
     flex-wrap: wrap;
@@ -498,23 +498,23 @@
     font-size: 0.9em;
     color: #666;
 }
-.ef-config-toggle {
+.c-config-toggle {
     cursor: pointer;
     font: inherit;
     font-size: 0.9em;
     padding: 1px 8px;
     border-radius: 3px;
 }
-.ef-config-toggle--on {
+.c-config-toggle--on {
     border: 1px solid #4a4;
     background: #efffef;
     color: #2a2;
 }
-.ef-config-toggle--off {
+.c-config-toggle--off {
     border: 1px solid #ccc;
     background: none;
 }
-.ef-config-input {
+.c-config-input {
     width: 60px;
     font: inherit;
     font-size: 0.9em;
@@ -523,29 +523,29 @@
     padding: 1px 4px;
 }
 
-/* --- Container add-eigenform toolbar --- */
-.ef-add-toolbar {
+/* --- Container add-component toolbar --- */
+.c-add-toolbar {
     background: #f5f5f5;
     border: 1px solid #ddd;
     padding: 10px;
     margin-bottom: 12px;
     border-radius: 4px;
 }
-.ef-add-toolbar-form {
+.c-add-toolbar-form {
     display: flex;
     gap: 8px;
     align-items: end;
     flex-wrap: wrap;
 }
-.ef-add-toolbar-label {
+.c-add-toolbar-label {
     font-size: 11px;
     color: #666;
     display: block;
 }
-.ef-add-toolbar-input {
+.c-add-toolbar-input {
     padding: 4px;
 }
-.ef-add-toolbar-submit {
+.c-add-toolbar-submit {
     padding: 4px 14px;
     cursor: pointer;
     background: #4a7;
@@ -555,7 +555,7 @@
 }
 
 /* --- Container edit-mode per-item control bar --- */
-.ef-item-ctrl-bar {
+.c-item-ctrl-bar {
     display: flex;
     align-items: center;
     gap: 4px;
@@ -567,16 +567,16 @@
     font-size: 11px;
     color: #666;
 }
-.ef-item-ctrl-key {
+.c-item-ctrl-key {
     font-family: monospace;
     background: #eee;
     padding: 1px 5px;
     border-radius: 2px;
 }
-.ef-item-ctrl-spacer {
+.c-item-ctrl-spacer {
     flex: 1;
 }
-.ef-item-ctrl-placeholder {
+.c-item-ctrl-placeholder {
     display: inline-block;
     width: 24px;
     height: 24px;
@@ -584,7 +584,7 @@
 }
 
 /* Icon buttons for structural controls (move, toggle-editable, delete) */
-.ef-icon-btn {
+.c-icon-btn {
     cursor: pointer;
     width: 24px;
     height: 24px;
@@ -599,23 +599,23 @@
     align-items: center;
     justify-content: center;
 }
-.ef-icon-btn:hover {
+.c-icon-btn:hover {
     background: #eee;
     border-color: #aaa;
 }
-.ef-icon-btn--active {
+.c-icon-btn--active {
     border-color: #69c;
     background: #e8f0fe;
     color: #2563eb;
 }
-.ef-icon-btn--danger {
+.c-icon-btn--danger {
     font-size: 17px;
 }
-.ef-icon-btn--danger:hover {
+.c-icon-btn--danger:hover {
     background: #eee;
     border-color: #aaa;
 }
-.ef-text-btn--subtle {
+.c-text-btn--subtle {
     cursor: pointer;
     border: 1px solid #ccc;
     background: #f8f8f8;
@@ -624,18 +624,18 @@
     border-radius: 3px;
     color: #888;
 }
-.ef-text-btn--subtle:hover {
+.c-text-btn--subtle:hover {
     background: #eee;
     color: #666;
 }
-.ef-item-content {
+.c-item-content {
     border: 1px solid #e0e0e0;
     border-radius: 0 0 4px 4px;
     padding: 8px;
 }
 
 /* --- Container empty state --- */
-.ef-empty-state {
+.c-empty-state {
     padding: 24px;
     text-align: center;
     color: #999;
@@ -645,7 +645,7 @@
 }
 
 /* --- Container tab/step bar --- */
-.ef-tab-bar {
+.c-tab-bar {
     display: flex;
     flex-wrap: wrap;
     gap: 2px;
@@ -654,17 +654,17 @@
 }
 
 /* --- Remaining affordances wrapper --- */
-.ef-remaining-affs {
+.c-remaining-affs {
     margin-top: 12px;
 }
 
 /* --- Section expand/collapse --- */
-.ef-section-content {
+.c-section-content {
     padding-left: 12px;
     border-left: 2px solid #ddd;
     margin-bottom: 8px;
 }
-.ef-section-content--edit {
+.c-section-content--edit {
     border: 1px solid #e0e0e0;
     border-top: none;
     border-radius: 0 0 4px 4px;
@@ -673,7 +673,7 @@
 }
 
 /* --- Accordion section header --- */
-.ef-section-header {
+.c-section-header {
     display: flex;
     align-items: center;
     gap: 4px;
@@ -685,19 +685,19 @@
 }
 
 /* --- Table-specific --- */
-.ef-table-shaded {
+.c-table-shaded {
     background: #f0f0f0;
 }
 
 /* --- Page footer (debug toggle) --- */
-.ef-page-footer {
+.c-page-footer {
     display: flex;
     justify-content: flex-end;
     padding: 12px 0;
     margin-top: 24px;
     border-top: 1px solid #e0e0e0;
 }
-.ef-debug-toggle {
+.c-debug-toggle {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 11px;
     cursor: pointer;
@@ -707,7 +707,7 @@
     gap: 4px;
     user-select: none;
 }
-.ef-debug-toggle input[type="checkbox"] {
+.c-debug-toggle input[type="checkbox"] {
     cursor: pointer;
 }
 
@@ -715,54 +715,54 @@
    Suppresses chrome (view toggle, edit buttons, JSON pane).
    Default theme: left accent on data forms, no border on containers.
    Non-default themes: no prescription — theme CSS handles it. */
-body.operator-view .ef-view-toggle {
+body.operator-view .c-view-toggle {
     display: none !important;
 }
-body.operator-view .ef-json-pane {
+body.operator-view .c-json-pane {
     display: none !important;
 }
 
 /* Operator View + Default theme: left accent on data forms only */
-body.operator-view:not([data-theme]) .eigenform,
-body.operator-view[data-theme="default"] .eigenform {
+body.operator-view:not([data-theme]) .component,
+body.operator-view[data-theme="default"] .component {
     border: none;
     border-left: 3px solid #d0d0d0;
     padding: 8px 12px;
     margin: 6px 0;
 }
-body.operator-view:not([data-theme]) .eigenform.eigenform--complete,
-body.operator-view[data-theme="default"] .eigenform.eigenform--complete {
+body.operator-view:not([data-theme]) .component.component--complete,
+body.operator-view[data-theme="default"] .component.component--complete {
     border-left-color: #2a2;
 }
-body.operator-view:not([data-theme]) .eigenform.eigenform--editing,
-body.operator-view[data-theme="default"] .eigenform.eigenform--editing {
+body.operator-view:not([data-theme]) .component.component--editing,
+body.operator-view[data-theme="default"] .component.component--editing {
     border: 2px dashed #d0d0d0;
     padding: 8px 12px;
 }
-body.operator-view:not([data-theme]) .eigenform.eigenform--editing.eigenform--complete,
-body.operator-view[data-theme="default"] .eigenform.eigenform--editing.eigenform--complete {
+body.operator-view:not([data-theme]) .component.component--editing.component--complete,
+body.operator-view[data-theme="default"] .component.component--editing.component--complete {
     border-color: #2a2;
 }
 /* Containers: no border in operator default */
-body.operator-view:not([data-theme]) .eigenform[data-form="page"],
-body.operator-view:not([data-theme]) .eigenform[data-form="navigation"],
-body.operator-view:not([data-theme]) .eigenform[data-form="group"],
-body.operator-view:not([data-theme]) .eigenform[data-form="visibility"],
-body.operator-view:not([data-theme]) .eigenform[data-form="switch"],
-body.operator-view:not([data-theme]) .eigenform[data-form="repeater"],
-body.operator-view[data-theme="default"] .eigenform[data-form="page"],
-body.operator-view[data-theme="default"] .eigenform[data-form="navigation"],
-body.operator-view[data-theme="default"] .eigenform[data-form="group"],
-body.operator-view[data-theme="default"] .eigenform[data-form="visibility"],
-body.operator-view[data-theme="default"] .eigenform[data-form="switch"],
-body.operator-view[data-theme="default"] .eigenform[data-form="repeater"] {
+body.operator-view:not([data-theme]) .component[data-form="page"],
+body.operator-view:not([data-theme]) .component[data-form="navigation"],
+body.operator-view:not([data-theme]) .component[data-form="group"],
+body.operator-view:not([data-theme]) .component[data-form="visibility"],
+body.operator-view:not([data-theme]) .component[data-form="switch"],
+body.operator-view:not([data-theme]) .component[data-form="repeater"],
+body.operator-view[data-theme="default"] .component[data-form="page"],
+body.operator-view[data-theme="default"] .component[data-form="navigation"],
+body.operator-view[data-theme="default"] .component[data-form="group"],
+body.operator-view[data-theme="default"] .component[data-form="visibility"],
+body.operator-view[data-theme="default"] .component[data-form="switch"],
+body.operator-view[data-theme="default"] .component[data-form="repeater"] {
     border-left: none;
     padding-left: 0;
 }
 
-/* Operator View + non-default theme: strip all eigenform borders so
+/* Operator View + non-default theme: strip all component borders so
    the theme CSS starts from a clean slate */
-body.operator-view[data-theme]:not([data-theme="default"]) .eigenform {
+body.operator-view[data-theme]:not([data-theme="default"]) .component {
     border: none;
 }
 
@@ -770,9 +770,9 @@ body.operator-view[data-theme]:not([data-theme="default"]) .eigenform {
    Default theme. Full surrounding borders. All chrome visible. */
 
 /* === Error boundary (render_safely on render failure) ===
-   Structured placeholder rendered when an eigenform's render() raises.
+   Structured placeholder rendered when a component's render() raises.
    Theme-agnostic — appears in both default and sleek themes. */
-.ef-error-boundary {
+.c-error-boundary {
     border: 2px solid #c74545;
     background: #fff5f5;
     padding: 0.75rem 1rem;
@@ -782,7 +782,7 @@ body.operator-view[data-theme]:not([data-theme="default"]) .eigenform {
     font-size: 0.9rem;
     color: #4a1a1a;
 }
-.ef-error-header {
+.c-error-header {
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -791,7 +791,7 @@ body.operator-view[data-theme]:not([data-theme="default"]) .eigenform {
     padding-bottom: 0.5rem;
     border-bottom: 1px dashed #d48a8a;
 }
-.ef-error-badge {
+.c-error-badge {
     background: #c74545;
     color: #fff;
     padding: 2px 8px;
@@ -801,7 +801,7 @@ body.operator-view[data-theme]:not([data-theme="default"]) .eigenform {
     letter-spacing: 0.04em;
     text-transform: uppercase;
 }
-.ef-error-type {
+.c-error-type {
     background: #fae0e0;
     color: #8a2727;
     padding: 2px 6px;
@@ -810,14 +810,14 @@ body.operator-view[data-theme]:not([data-theme="default"]) .eigenform {
     font-size: 0.82rem;
     font-weight: 600;
 }
-.ef-error-sep {
+.c-error-sep {
     color: #c08a8a;
 }
-.ef-error-key-label {
+.c-error-key-label {
     font-size: 0.8rem;
     color: #8a5a5a;
 }
-.ef-error-key {
+.c-error-key {
     background: #fae0e0;
     color: #8a2727;
     padding: 2px 6px;
@@ -825,13 +825,13 @@ body.operator-view[data-theme]:not([data-theme="default"]) .eigenform {
     font-family: "Consolas", "Monaco", monospace;
     font-size: 0.82rem;
 }
-.ef-error-body {
+.c-error-body {
     line-height: 1.55;
 }
-.ef-error-message {
+.c-error-message {
     margin: 0 0 0.5rem 0;
 }
-.ef-error-message code {
+.c-error-message code {
     background: #ffe8e8;
     padding: 1px 5px;
     border-radius: 3px;
@@ -839,17 +839,17 @@ body.operator-view[data-theme]:not([data-theme="default"]) .eigenform {
     font-size: 0.86em;
     color: #8a2727;
 }
-.ef-error-traceback {
+.c-error-traceback {
     margin: 0.5rem 0;
 }
-.ef-error-traceback summary {
+.c-error-traceback summary {
     cursor: pointer;
     font-size: 0.82rem;
     color: #8a2727;
     font-weight: 600;
     user-select: none;
 }
-.ef-error-traceback pre {
+.c-error-traceback pre {
     background: #3a1a1a;
     color: #f0d0d0;
     padding: 0.6rem 0.85rem;
@@ -860,7 +860,7 @@ body.operator-view[data-theme]:not([data-theme="default"]) .eigenform {
     line-height: 1.4;
     margin: 0.4rem 0 0 0;
 }
-.ef-error-hint {
+.c-error-hint {
     font-size: 0.82rem;
     color: #7a5050;
     font-style: italic;

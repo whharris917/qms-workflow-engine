@@ -1,10 +1,10 @@
-"""Shared Jinja2 environment for eigenform HTML templates.
+"""Shared Jinja2 environment for component HTML templates.
 
-Templates live in app/templates/eigenforms/. Eigenforms call
+Templates live in app/templates/components/. Components call
 render_template() to produce HTML from their serialized state.
 
 The environment is configured with autoescape=True by default.
-Templates that embed child eigenform HTML use the |safe filter.
+Templates that embed child component HTML use the |safe filter.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 from markupsafe import Markup
 
-_TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "app" / "templates" / "eigenforms"
+_TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "app" / "templates" / "components"
 
 _env = Environment(
     loader=FileSystemLoader(str(_TEMPLATE_DIR)),
@@ -32,9 +32,9 @@ def _render_affordance(aff: dict) -> Markup:
 
 
 _env.globals["render_aff"] = _render_affordance
-_env.globals["CSS_CONFIRM"] = "ef-btn-confirm"
-_env.globals["CSS_REMOVE"] = "ef-btn-remove"
-_env.globals["CSS_ARROW"] = "ef-btn-arrow"
+_env.globals["CSS_CONFIRM"] = "c-btn-confirm"
+_env.globals["CSS_REMOVE"] = "c-btn-remove"
+_env.globals["CSS_ARROW"] = "c-btn-arrow"
 
 
 def _render_inline_button(url: str, body: dict, content: str, style: str = "") -> Markup:
@@ -45,13 +45,13 @@ def _render_inline_button(url: str, body: dict, content: str, style: str = "") -
 
 def _render_dep_line(depends_on, url_prefix: str = "") -> Markup:
     """Render dependency line. Available in templates as render_dep_line()."""
-    from engine.eigenform import render_dependency_line
+    from engine.component import render_dependency_line
     return Markup(render_dependency_line(depends_on, url_prefix))
 
 
 _env.globals["render_btn"] = _render_inline_button
 _env.globals["render_dep_line"] = _render_dep_line
-_env.globals["BUTTON_GAP"] = '<span class="ef-btn-gap"></span>'
+_env.globals["BUTTON_GAP"] = '<span class="c-btn-gap"></span>'
 
 
 def _tojson_filter(value):

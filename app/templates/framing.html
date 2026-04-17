@@ -637,13 +637,14 @@
 
     <div class="fr-hero">
         <h1>Conceptual Framing</h1>
-        <div class="subtitle">A design plan for sharpening how we think and talk about the Eigenform engine</div>
+        <div class="subtitle">How the engine maps to React conventions, and why</div>
         <p>
             The <strong>QMS Workflow Engine</strong> is a Python framework for defining interactive workflow forms that
             render as HTML for humans and serialize as JSON for AI agents &mdash; same state, same actions, same URLs,
-            one source of truth. This page is a design plan to sharpen how we describe it.
+            one source of truth. This page documents how it aligns with the component vocabulary most web developers
+            already know.
         </p>
-        <p class="claim">The thesis, in one sentence: the engine grew from first principles and landed closer to React than anyone planned. The concepts are already load-bearing &mdash; they just aren't named.</p>
+        <p class="claim">The engine grew from first principles &mdash; HATEOAS affordances, faithful projection, stateless server &mdash; and landed at a shape recognizably adjacent to React. The alignment is intentional in the vocabulary and accidental in the architecture.</p>
         <p>
             If you already know the codebase, skip to &sect;1. If you&rsquo;re new to the engine, the
             <a href="#s0" style="color: #ffd88a;">primer below</a> walks through the vocabulary, the core loop, and a
@@ -662,7 +663,7 @@
             <li><a href="#s5">Error boundaries</a></li>
             <li><a href="#s6">Context (parked)</a></li>
             <li><a href="#s7">What we&rsquo;re not borrowing</a></li>
-            <li><a href="#s8">The design plan</a></li>
+            <li><a href="#s8">How we got here</a></li>
         </ol>
     </nav>
 
@@ -670,7 +671,7 @@
     <section class="fr-section fr-primer" id="s0">
         <span class="primer-label">&#9733; Primer</span>
         <h2><span class="num">00</span> Before the comparison &mdash; what is this engine?</h2>
-        <p class="section-hook">The rest of the page assumes you know what an eigenform is, what <code>bind()</code> does, and why anyone would care. This section establishes that vocabulary from scratch. Skip it if you already know.</p>
+        <p class="section-hook">The rest of the page assumes you know what a component is, what <code>bind()</code> does, and why anyone would care. This section establishes that vocabulary from scratch. Skip it if you already know.</p>
 
         <h3>The problem the engine solves</h3>
         <p>
@@ -689,19 +690,18 @@
             by a parity test that compares every URL exposed in JSON to every clickable element rendered in HTML.
         </p>
 
-        <h3>The central idea: an <em>eigenform</em></h3>
+        <h3>The central idea: a <em>component</em></h3>
         <p>
-            An <strong>eigenform</strong> is a self-contained form element. A text input is an eigenform. A
-            container of tabs is an eigenform. A whole page is an eigenform. The vocabulary is uniform all the way
-            up and down. Eigenforms compose &mdash; a container eigenform holds child eigenforms, and the tree
-            itself is an eigenform.
+            A <strong>component</strong> is a self-contained form element. A text input is a component. A
+            container of tabs is a component. A whole page is a component. The vocabulary is uniform all the way
+            up and down. Components compose &mdash; a container component holds child components, and the tree
+            itself is a component.
         </p>
         <p>
-            The name is technical. &ldquo;Eigen&rdquo; as in &ldquo;eigenvector&rdquo; &mdash; something that
-            preserves its identity under transformation. An eigenform serializes, renders, handles actions, and
-            recomposes without losing the thing it is.
+            Each component preserves its identity under transformation &mdash; it serializes, renders, handles
+            actions, and recomposes without losing the thing it is.
         </p>
-        <p>Every eigenform does four things:</p>
+        <p>Every component does four things:</p>
         <ul>
             <li><strong>Serialize</strong> itself to JSON &mdash; current state, plus a list of available <em>affordances</em> (see below).</li>
             <li><strong>Render</strong> itself to HTML &mdash; styled for a browser, with the same affordances exposed as buttons and forms.</li>
@@ -725,7 +725,7 @@
             </div>
             <div class="fr-loop-step">
                 <div><span class="stage-num">2</span><strong>Bind</strong></div>
-                <p>The server attaches a per-instance JSON file (the <em>Store</em>) to the seed, producing a live tree of bound eigenforms with scoped keys.</p>
+                <p>The server attaches a per-instance JSON file (the <em>Store</em>) to the seed, producing a live tree of bound components with scoped keys.</p>
             </div>
             <div class="fr-loop-step">
                 <div><span class="stage-num">3</span><strong>Serve</strong></div>
@@ -745,19 +745,19 @@
 
         <dl class="fr-vocab">
             <dt>Seed</dt>
-            <dd>The Python-code definition of a page&rsquo;s structure. Lives in <code>pages/*.py</code>, exported as <code>definition = PageForm(...)</code>. Immutable at runtime. Holds callables (lambdas, validators) that cannot round-trip through JSON.</dd>
+            <dd>The Python-code definition of a page&rsquo;s structure. Lives in <code>pages/*.py</code>, exported as <code>definition = PageComponent(...)</code>. Immutable at runtime. Holds callables (lambdas, validators) that cannot round-trip through JSON.</dd>
 
             <dt>Store</dt>
             <dd>A per-instance JSON file. One file per bound page instance, at <code>data/{instance_id}.json</code>. Holds all mutable state &mdash; current values, active tab, descriptor overrides.</dd>
 
             <dt>Bind</dt>
-            <dd>The operation that attaches a Store to a seed and recursively produces a live tree of eigenforms. Scopes each child by key. Happens on every request.</dd>
+            <dd>The operation that attaches a Store to a seed and recursively produces a live tree of components. Scopes each child by key. Happens on every request.</dd>
 
             <dt>Descriptor</dt>
-            <dd>A JSON-serializable snapshot of an eigenform tree &mdash; its props (configuration values) and its children&rsquo;s descriptors. Stored as <code>__structure</code> in the Store. The canonical source of truth for any runtime-editable structure.</dd>
+            <dd>A JSON-serializable snapshot of a component tree &mdash; its props (configuration values) and its children&rsquo;s descriptors. Stored as <code>__structure</code> in the Store. The canonical source of truth for any runtime-editable structure.</dd>
 
             <dt>Key</dt>
-            <dd>A string identifier unique within a container scope. Used for routing, Store scoping, and matching descriptors to seeds. Think of it as the eigenform&rsquo;s identity.</dd>
+            <dd>A string identifier unique within a container scope. Used for routing, Store scoping, and matching descriptors to seeds. Think of it as the component&rsquo;s identity.</dd>
 
             <dt>Scope</dt>
             <dd>The parent container&rsquo;s namespace. A child&rsquo;s Store entries are prefixed with the scope to keep siblings separated.</dd>
@@ -766,30 +766,30 @@
             <dd>A declared action: URL, HTTP method, POST body template (with placeholders like <code>&lt;value&gt;</code>), and a human-readable hint. Emitted identically in JSON and HTML so the two clients always see the same action list.</dd>
 
             <dt>Faithful projection</dt>
-            <dd>The principle that HTML is a derivation of JSON &mdash; the two express the same state and the same actions. Enforced at CI time by <code>tests/test_parity.py</code>, which compares affordance URLs in JSON against <code>data-ef-*</code> attributes in HTML for every page.</dd>
+            <dd>The principle that HTML is a derivation of JSON &mdash; the two express the same state and the same actions. Enforced at CI time by <code>tests/test_parity.py</code>, which compares affordance URLs in JSON against <code>data-c-*</code> attributes in HTML for every page.</dd>
 
             <dt>HATEOAS</dt>
             <dd>Hypermedia As The Engine Of Application State. A client discovers what it can do by reading what the server sent, not by reading external documentation. The engine exposes all actions as affordances; the client never needs a separate schema.</dd>
 
             <dt>Handle</dt>
-            <dd>The method <code>_handle(body)</code> that each eigenform implements to process an action. Interprets the action name, mutates the Store, returns the updated state.</dd>
+            <dd>The method <code>_handle(body)</code> that each component implements to process an action. Interprets the action name, mutates the Store, returns the updated state.</dd>
 
             <dt>Container vs leaf</dt>
-            <dd>A <em>container</em> eigenform holds children (PageForm, NavigationForm, GroupForm, etc.). A <em>leaf</em> holds a primitive value (TextForm, NumberForm, BooleanForm, etc.).</dd>
+            <dd>A <em>container</em> component holds children (PageComponent, NavigationComponent, GroupComponent, etc.). A <em>leaf</em> holds a primitive value (TextComponent, NumberComponent, BooleanComponent, etc.).</dd>
         </dl>
 
         <h3>A minimal example</h3>
         <p>The smallest useful page: a label plus a single text input.</p>
 
 <pre class="code"><span class="c"># pages/hello.py</span>
-<span class="k">from</span> engine.pageform <span class="k">import</span> PageForm
-<span class="k">from</span> engine.textform <span class="k">import</span> TextForm
+<span class="k">from</span> engine.pagecomponent <span class="k">import</span> PageComponent
+<span class="k">from</span> engine.textcomponent <span class="k">import</span> TextComponent
 
-definition = PageForm(
+definition = PageComponent(
     key=<span class="s">"hello"</span>,
     label=<span class="s">"Hello Page"</span>,
-    eigenforms=[
-        TextForm(key=<span class="s">"name"</span>, label=<span class="s">"Your name"</span>),
+    components=[
+        TextComponent(key=<span class="s">"name"</span>, label=<span class="s">"Your name"</span>),
     ],
 )</pre>
 
@@ -798,30 +798,30 @@ definition = PageForm(
             <ol>
                 <li>Server discovers <code>pages/hello.py</code> and imports the seed.</li>
                 <li>Server calls <code>seed.bind(data_dir, scope="hello")</code>. Store is created if missing; empty.</li>
-                <li>PageForm recursively binds its children. TextForm is now a live instance scoped to <code>hello/name</code>.</li>
-                <li><strong>JSON request:</strong> <code>serialize()</code> returns <code>{key: "name", value: null, affordances: [{method: "POST", url: "/pages/hello/name", body: {action: "set_value", value: "&lt;str&gt;"}}]}</code>, wrapped by PageForm&rsquo;s own serialization.</li>
-                <li><strong>HTML request:</strong> <code>render()</code> produces a styled input with the same URL as a <code>data-ef-post</code> attribute. The parity test verifies the URL matches.</li>
+                <li>PageComponent recursively binds its children. TextComponent is now a live instance scoped to <code>hello/name</code>.</li>
+                <li><strong>JSON request:</strong> <code>serialize()</code> returns <code>{key: "name", value: null, affordances: [{method: "POST", url: "/pages/hello/name", body: {action: "set_value", value: "&lt;str&gt;"}}]}</code>, wrapped by PageComponent&rsquo;s own serialization.</li>
+                <li><strong>HTML request:</strong> <code>render()</code> produces a styled input with the same URL as a <code>data-c-post</code> attribute. The parity test verifies the URL matches.</li>
             </ol>
             <h4>What happens when the user types &ldquo;Alice&rdquo; and submits</h4>
             <ol>
                 <li>Browser POSTs <code>{"action": "set_value", "value": "Alice"}</code> to <code>/pages/hello/name</code>.</li>
                 <li>Server binds the seed again (fresh tree; no memoization across requests).</li>
-                <li>Server walks path <code>name</code> to locate the TextForm child, calls <code>_handle({"action": "set_value", "value": "Alice"})</code>.</li>
-                <li>TextForm writes <code>"Alice"</code> to Store key <code>hello/name</code>.</li>
+                <li>Server walks path <code>name</code> to locate the TextComponent child, calls <code>_handle({"action": "set_value", "value": "Alice"})</code>.</li>
+                <li>TextComponent writes <code>"Alice"</code> to Store key <code>hello/name</code>.</li>
                 <li>Server re-serializes the full page. Returns JSON or morphs-in HTML, depending on the client.</li>
-                <li>Next GET reads the same Store. TextForm binds with <code>value="Alice"</code>. <code>is_complete</code> returns <code>True</code>. Page reflects the update.</li>
+                <li>Next GET reads the same Store. TextComponent binds with <code>value="Alice"</code>. <code>is_complete</code> returns <code>True</code>. Page reflects the update.</li>
             </ol>
         </div>
 
         <p>
             That is the entire engine. Everything else &mdash; tabs, tables, conditional visibility, cross-field
-            validation, page builders &mdash; is a variation on this loop with richer eigenform types and richer
+            validation, page builders &mdash; is a variation on this loop with richer component types and richer
             affordances.
         </p>
 
         <h3>The type catalog, in brief</h3>
         <p>
-            The engine ships about 28 eigenform types across six categories. The types mentioned elsewhere on this
+            The engine ships about 28 component types across six categories. The types mentioned elsewhere on this
             page are summarized here so the references make sense.
         </p>
 
@@ -834,30 +834,30 @@ definition = PageForm(
                 </tr>
             </thead>
             <tbody>
-                <tr><td class="type-name">PageForm</td><td class="type-role">Container (top)</td><td>The outermost container. Owns the Store binding. Every page is one PageForm.</td></tr>
-                <tr><td class="type-name">NavigationForm</td><td class="type-role">Container</td><td>Unified tabs / chain / sequence / accordion container. One class, four modes selected by the <code>mode</code> prop.</td></tr>
-                <tr><td class="type-name">GroupForm</td><td class="type-role">Container</td><td>A named grouping for reusable compositions. No special semantics; just a labeled wrapper.</td></tr>
-                <tr><td class="type-name">RepeaterForm</td><td class="type-role">Container</td><td>Stamps a template eigenform per dynamic entry. Compound-scoped children.</td></tr>
-                <tr><td class="type-name">TextForm</td><td class="type-role">Data leaf</td><td>Free-form string. Optional <code>multiline</code>, <code>min_length</code>, <code>max_length</code>.</td></tr>
-                <tr><td class="type-name">NumberForm</td><td class="type-role">Data leaf</td><td>Numeric input with optional <code>min_val</code> / <code>max_val</code> / <code>step</code> / <code>slider</code>.</td></tr>
-                <tr><td class="type-name">BooleanForm / DateForm</td><td class="type-role">Data leaf</td><td>Binary toggle / ISO date input.</td></tr>
-                <tr><td class="type-name">ChoiceForm / CheckboxForm</td><td class="type-role">Data leaf</td><td>Single-select / multi-select, each backed by an embedded ListForm for the options.</td></tr>
-                <tr><td class="type-name">ListForm / SetForm / TableForm</td><td class="type-role">Data collection</td><td>Ordered list / unique set / dynamic table with typed columns.</td></tr>
-                <tr><td class="type-name">MultiForm</td><td class="type-role">Data composite</td><td>Groups several FieldDescriptors under a single affordance.</td></tr>
-                <tr><td class="type-name">InfoForm</td><td class="type-role">Read-only display</td><td>Static text block. No interaction affordances. Always complete.</td></tr>
-                <tr><td class="type-name">ComputedForm</td><td class="type-role">Sibling-reading</td><td>Derived display computed from sibling values via a <code>compute(siblings)</code> callable.</td></tr>
-                <tr><td class="type-name">ValidationForm</td><td class="type-role">Sibling-reading</td><td>Cross-field validation rules. Produces pending / pass / fail status that can block page completion.</td></tr>
-                <tr><td class="type-name">VisibilityForm</td><td class="type-role">Reactive wrapper</td><td>Shows its child only when a predicate over siblings holds.</td></tr>
-                <tr><td class="type-name">SwitchForm</td><td class="type-role">Reactive structural</td><td>Selects one of N alternative subtrees based on a sibling&rsquo;s value.</td></tr>
-                <tr><td class="type-name">DynamicChoiceForm</td><td class="type-role">Reactive</td><td>ChoiceForm whose options depend on a sibling value via <code>options_fn</code>.</td></tr>
-                <tr><td class="type-name">ActionForm</td><td class="type-role">Imperative</td><td>A button that triggers a side effect. Can return structural actions that reshape the page.</td></tr>
-                <tr><td class="type-name">HistoryForm</td><td class="type-role">Wrapper</td><td>Wraps any eigenform with append-only change history.</td></tr>
+                <tr><td class="type-name">PageComponent</td><td class="type-role">Container (top)</td><td>The outermost container. Owns the Store binding. Every page is one PageComponent.</td></tr>
+                <tr><td class="type-name">NavigationComponent</td><td class="type-role">Container</td><td>Unified tabs / chain / sequence / accordion container. One class, four modes selected by the <code>mode</code> prop.</td></tr>
+                <tr><td class="type-name">GroupComponent</td><td class="type-role">Container</td><td>A named grouping for reusable compositions. No special semantics; just a labeled wrapper.</td></tr>
+                <tr><td class="type-name">RepeaterComponent</td><td class="type-role">Container</td><td>Stamps a template component per dynamic entry. Compound-scoped children.</td></tr>
+                <tr><td class="type-name">TextComponent</td><td class="type-role">Data leaf</td><td>Free-form string. Optional <code>multiline</code>, <code>min_length</code>, <code>max_length</code>.</td></tr>
+                <tr><td class="type-name">NumberComponent</td><td class="type-role">Data leaf</td><td>Numeric input with optional <code>min_val</code> / <code>max_val</code> / <code>step</code> / <code>slider</code>.</td></tr>
+                <tr><td class="type-name">BooleanComponent / DateComponent</td><td class="type-role">Data leaf</td><td>Binary toggle / ISO date input.</td></tr>
+                <tr><td class="type-name">ChoiceComponent / CheckboxComponent</td><td class="type-role">Data leaf</td><td>Single-select / multi-select, each backed by an embedded ListComponent for the options.</td></tr>
+                <tr><td class="type-name">ListComponent / SetComponent / TableComponent</td><td class="type-role">Data collection</td><td>Ordered list / unique set / dynamic table with typed columns.</td></tr>
+                <tr><td class="type-name">MultiComponent</td><td class="type-role">Data composite</td><td>Groups several FieldDescriptors under a single affordance.</td></tr>
+                <tr><td class="type-name">InfoComponent</td><td class="type-role">Read-only display</td><td>Static text block. No interaction affordances. Always complete.</td></tr>
+                <tr><td class="type-name">ComputedComponent</td><td class="type-role">Sibling-reading</td><td>Derived display computed from sibling values via a <code>compute(siblings)</code> callable.</td></tr>
+                <tr><td class="type-name">ValidationComponent</td><td class="type-role">Sibling-reading</td><td>Cross-field validation rules. Produces pending / pass / fail status that can block page completion.</td></tr>
+                <tr><td class="type-name">VisibilityComponent</td><td class="type-role">Reactive wrapper</td><td>Shows its child only when a predicate over siblings holds.</td></tr>
+                <tr><td class="type-name">SwitchComponent</td><td class="type-role">Reactive structural</td><td>Selects one of N alternative subtrees based on a sibling&rsquo;s value.</td></tr>
+                <tr><td class="type-name">DynamicChoiceComponent</td><td class="type-role">Reactive</td><td>ChoiceComponent whose options depend on a sibling value via <code>options_fn</code>.</td></tr>
+                <tr><td class="type-name">ActionComponent</td><td class="type-role">Imperative</td><td>A button that triggers a side effect. Can return structural actions that reshape the page.</td></tr>
+                <tr><td class="type-name">HistoryComponent</td><td class="type-role">Wrapper</td><td>Wraps any component with append-only change history.</td></tr>
             </tbody>
         </table>
 
         <p>
-            Seven of those types &mdash; SwitchForm, VisibilityForm, DynamicChoiceForm, ComputedForm,
-            ValidationForm, ActionForm, ScoreForm &mdash; read from their siblings via a string field called
+            Seven of those types &mdash; SwitchComponent, VisibilityComponent, DynamicChoiceComponent, ComputedComponent,
+            ValidationComponent, ActionComponent, ScoreComponent &mdash; read from their siblings via a string field called
             <code>depends_on</code>. That shadow dependency graph is one of the gaps this design plan addresses.
         </p>
 
@@ -873,61 +873,59 @@ definition = PageForm(
     <!-- ================================================ 1. Thesis ================================================ -->
     <section class="fr-section" id="s1">
         <h2><span class="num">01</span> Thesis</h2>
-        <p class="section-hook">The architecture grew from first principles and landed adjacent to React. That convergence is informative.</p>
+        <p class="section-hook">The architecture grew from first principles and landed adjacent to React. Name things accordingly.</p>
 
         <p>
             If you read the primer, the shape should already feel familiar to anyone with React experience. A page
             is a tree of components. Each component owns some state, receives some configuration from its parent,
             and is responsible for rendering itself. When an input changes, a diff flows up, the tree re-renders,
-            and the DOM is updated in place. Substitute &ldquo;eigenform&rdquo; for &ldquo;component&rdquo; and the
-            mental model transfers almost verbatim.
+            and the DOM is updated in place. The mental model transfers almost verbatim.
         </p>
         <p>
-            The Eigenform engine was not designed to mirror React. It grew from a different set of first principles &mdash;
+            The engine was not designed to mirror React. It grew from a different set of first principles &mdash;
             HATEOAS affordances, faithful projection, stateless server, self-describing documents &mdash; and ended up at a
             structure that is recognizably React-shaped. Either React solved problems that also exist here, or both systems
             converged on the same invariants. Both readings are true.
         </p>
 
         <p>
-            The engine is stuck with an awkward inheritance. The concepts are load-bearing but unnamed. Three costs follow.
+            The engine uses the standard vocabulary where the standard vocabulary fits. The base class is
+            <code>Component</code>; each concrete type is <code>TextComponent</code>, <code>PageComponent</code>,
+            <code>NavigationComponent</code>, and so on. Seed constructor arguments are props; Store entries are state;
+            everything else is derived. <code>from_descriptor</code> is reconciliation. Affordance flotation is a portal
+            with a novel merge rule. Faithful projection is the controlled/uncontrolled state boundary applied to an
+            agent-plus-human audience instead of just an in-browser one.
         </p>
 
-        <ul>
-            <li>New contributors cannot search for what to call things.</li>
-            <li>Internal documentation invents local jargon where industry jargon exists.</li>
-            <li>Design discussions re-litigate debates the React community settled a decade ago &mdash; hooks vs classes, context vs prop drilling, error boundaries, controlled vs uncontrolled.</li>
-        </ul>
+        <p>
+            The payoff of using the standard names is cumulative, not dramatic: new contributors search for what they
+            already know. Internal documentation stops inventing local jargon. Design discussions inherit a decade of
+            React community resolution on debates like controlled-vs-uncontrolled, context, and error boundaries.
+            AI agents arriving cold to the codebase are productive faster because they have already read millions of
+            words about the concepts involved.
+        </p>
 
         <p>
-            This page is a plan with two parts: <strong>name what we already have</strong>, and <strong>close the three gaps</strong>
-            where the React mental model points at concrete missing machinery. The plan is small. It does not propose
-            rewriting the engine in React. It proposes aligning vocabulary so that the next decade of engineers &mdash; human
-            and AI &mdash; can read this codebase without first reconstructing a mental model from scratch.
+            The rest of this page is the reference: how each React concept is spelled here, what lives where, and which
+            concepts we deliberately don&rsquo;t borrow.
         </p>
     </section>
 
     <!-- ================================================ 2. The Mapping ================================================ -->
     <section class="fr-section" id="s2">
         <h2><span class="num">02</span> The mapping</h2>
-        <p class="section-hook">One row per React concept. Most already have an equivalent. Three do not.</p>
+        <p class="section-hook">One row per React concept. The base class is already <code>Component</code>; the table below covers the less-obvious alignments.</p>
 
         <table class="fr-map">
             <thead>
                 <tr>
                     <th>React concept</th>
-                    <th>Eigenform equivalent</th>
+                    <th>Component equivalent</th>
                     <th>Status</th>
                     <th>Notes</th>
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td class="react">Component class</td>
-                    <td class="eq">Eigenform subclass</td>
-                    <td class="status"><span class="pill ok">Present</span></td>
-                    <td class="note"><code>class TextForm(Eigenform)</code> is a component class.</td>
-                </tr>
                 <tr>
                     <td class="react">Props</td>
                     <td class="eq">Parent&rsquo;s <code>__structure</code> descriptor</td>
@@ -938,11 +936,11 @@ definition = PageForm(
                     <td class="react">State</td>
                     <td class="eq">Store entries at key scope</td>
                     <td class="status"><span class="pill ok">Present</span></td>
-                    <td class="note">Per-instance JSON file, scoped by eigenform key. <code>useState</code> with server-side persistence.</td>
+                    <td class="note">Per-instance JSON file, scoped by component key. <code>useState</code> with server-side persistence.</td>
                 </tr>
                 <tr>
                     <td class="react">Derived state</td>
-                    <td class="eq"><code>is_complete</code>, <code>effective_*</code>, <code>ComputedForm.compute</code></td>
+                    <td class="eq"><code>is_complete</code>, <code>effective_*</code>, <code>ComputedComponent.compute</code></td>
                     <td class="status"><span class="pill ok">Present</span></td>
                     <td class="note">Never persisted; recomputed each serialize.</td>
                 </tr>
@@ -960,13 +958,13 @@ definition = PageForm(
                 </tr>
                 <tr>
                     <td class="react">Keys</td>
-                    <td class="eq"><code>Eigenform.key</code></td>
+                    <td class="eq"><code>Component.key</code></td>
                     <td class="status"><span class="pill ok">Present</span></td>
                     <td class="note">Load-bearing in routing, Store scoping, and reconciliation. Identity.</td>
                 </tr>
                 <tr>
                     <td class="react">Children prop</td>
-                    <td class="eq"><code>eigenforms=[...]</code>, <code>steps=[...]</code>, <code>items=[...]</code></td>
+                    <td class="eq"><code>components=[...]</code>, <code>steps=[...]</code>, <code>items=[...]</code></td>
                     <td class="status"><span class="pill ok">Present</span></td>
                     <td class="note">Container-specific parameter names; same shape.</td>
                 </tr>
@@ -978,7 +976,7 @@ definition = PageForm(
                 </tr>
                 <tr>
                     <td class="react">DOM diff</td>
-                    <td class="eq">morphdom <code>_efSwap</code></td>
+                    <td class="eq">morphdom <code>_cSwap</code></td>
                     <td class="status"><span class="pill ok">Present</span></td>
                     <td class="note">A small client-side library that diffs an old DOM fragment against a new one and mutates only what changed. Preserves focus, scroll, <code>&lt;details&gt;</code> state across POSTs.</td>
                 </tr>
@@ -986,7 +984,7 @@ definition = PageForm(
                     <td class="react">Portal</td>
                     <td class="eq">Affordance flotation</td>
                     <td class="status"><span class="pill ok">Present</span></td>
-                    <td class="note">Deeply-nested affordances bubble up to the PageForm level in the agent JSON, collapsed into one parameterized affordance per action kind (e.g. one <code>clear</code> that targets any child). Keeps agent context small. HTML rendering is unaffected.</td>
+                    <td class="note">Deeply-nested affordances bubble up to the PageComponent level in the agent JSON, collapsed into one parameterized affordance per action kind (e.g. one <code>clear</code> that targets any child). Keeps agent context small. HTML rendering is unaffected.</td>
                 </tr>
                 <tr>
                     <td class="react">Controlled vs uncontrolled</td>
@@ -996,13 +994,13 @@ definition = PageForm(
                 </tr>
                 <tr>
                     <td class="react">Fragment</td>
-                    <td class="eq">GroupForm with no decoration</td>
+                    <td class="eq">GroupComponent with no decoration</td>
                     <td class="status"><span class="pill ok">Present</span></td>
-                    <td class="note">Implicit. A GroupForm without label/instruction is a fragment.</td>
+                    <td class="note">Implicit. A GroupComponent without label/instruction is a fragment.</td>
                 </tr>
                 <tr>
                     <td class="react">Higher-order component</td>
-                    <td class="eq">GroupForm subclassing</td>
+                    <td class="eq">GroupComponent subclassing</td>
                     <td class="status"><span class="pill partial">Partial</span></td>
                     <td class="note">Closest analog. Composition is supported; behavior-sharing beyond composition is not.</td>
                 </tr>
@@ -1014,9 +1012,9 @@ definition = PageForm(
                 </tr>
                 <tr>
                     <td class="react">Error boundary</td>
-                    <td class="eq">&mdash;</td>
-                    <td class="status"><span class="pill absent">Absent</span></td>
-                    <td class="note">Child exceptions 500 the whole page. Corrupt descriptors silently fall back to seed.</td>
+                    <td class="eq"><code>Component.render_safely()</code></td>
+                    <td class="status"><span class="pill ok">Present</span></td>
+                    <td class="note">Default wraps <code>render()</code> in try/except, returns a structured error card on failure. Eighteen child-render sites across ten modules use it. Bind and <code>_handle()</code> error scoping parked as follow-ons.</td>
                 </tr>
                 <tr>
                     <td class="react">Custom hooks</td>
@@ -1040,21 +1038,22 @@ definition = PageForm(
         </table>
 
         <div class="fr-callout">
-            <strong>Read this table as a coverage map, not a scorecard.</strong> The &ldquo;Present&rdquo; rows show
-            how much of React&rsquo;s vocabulary already applies. The three &ldquo;Absent&rdquo; rows are the target of this plan.
-            The &ldquo;N/A&rdquo; rows are deliberate.
+            <strong>Read this table as a coverage map.</strong> The &ldquo;Present&rdquo; rows show where the
+            React vocabulary already applies one-to-one. &ldquo;Absent&rdquo; means the concept is genuinely missing
+            and on the backlog if and when it earns its keep. &ldquo;N/A&rdquo; means we deliberately don&rsquo;t
+            borrow &mdash; see &sect;7 for why.
         </div>
     </section>
 
     <!-- ========================================== 3. Props, State, Derived ========================================== -->
     <section class="fr-section" id="s3">
         <h2><span class="num">03</span> Props, State, Derived</h2>
-        <p class="section-hook">Every eigenform field is one of three things. No document names this yet.</p>
+        <p class="section-hook">Every component field is one of three things. Misplacing a field is the single most common source of subtle bugs.</p>
 
         <p>
-            The descriptor-as-truth refactor drew React&rsquo;s most important line: <em>where does this value live?</em> Naming
-            the three categories makes an invariant readable that currently has to be induced from studying seven or eight
-            eigenforms.
+            The descriptor-as-truth refactor drew React&rsquo;s most important line: <em>where does this value live?</em> The
+            three categories below each have a canonical location on disk and a mutation API. When adding a new field, pick
+            a category first &mdash; the category determines everything else.
         </p>
 
         <div class="fr-triple">
@@ -1065,21 +1064,21 @@ definition = PageForm(
                 <ul>
                     <li><code>label</code>, <code>instruction</code></li>
                     <li><code>editable</code></li>
-                    <li><code>NavigationForm.mode</code></li>
-                    <li><code>TextForm.multiline</code>, <code>min_length</code>, <code>max_length</code></li>
-                    <li><code>NumberForm.min_val</code>, <code>max_val</code></li>
+                    <li><code>NavigationComponent.mode</code></li>
+                    <li><code>TextComponent.multiline</code>, <code>min_length</code>, <code>max_length</code></li>
+                    <li><code>NumberComponent.min_val</code>, <code>max_val</code></li>
                 </ul>
             </div>
             <div class="fr-triple-card state">
                 <h4>State</h4>
                 <span class="lives">Store at key scope</span>
-                <p>Persisted per instance, per eigenform key, in the instance JSON file. Modifications flow through <code>_handle()</code> during action dispatch. This is what a user&rsquo;s interactions actually change.</p>
+                <p>Persisted per instance, per component key, in the instance JSON file. Modifications flow through <code>_handle()</code> during action dispatch. This is what a user&rsquo;s interactions actually change.</p>
                 <ul>
-                    <li>TextForm current text</li>
-                    <li>CheckboxForm selected options</li>
-                    <li>NavigationForm active tab</li>
-                    <li>ListForm ordered items</li>
-                    <li>TableForm row data</li>
+                    <li>TextComponent current text</li>
+                    <li>CheckboxComponent selected options</li>
+                    <li>NavigationComponent active tab</li>
+                    <li>ListComponent ordered items</li>
+                    <li>TableComponent row data</li>
                 </ul>
             </div>
             <div class="fr-triple-card derived">
@@ -1089,8 +1088,8 @@ definition = PageForm(
                 <ul>
                     <li><code>is_complete</code></li>
                     <li><code>has_data</code></li>
-                    <li><code>ComputedForm.compute_result</code></li>
-                    <li><code>ListForm.effective_must_follow</code></li>
+                    <li><code>ComputedComponent.compute_result</code></li>
+                    <li><code>ListComponent.effective_must_follow</code></li>
                     <li>All <code>effective_*</code> properties</li>
                 </ul>
             </div>
@@ -1098,14 +1097,15 @@ definition = PageForm(
 
         <div class="fr-callout">
             <strong>The rule:</strong> props live in the descriptor, state lives in the Store, neither owns derived values.
-            Adding a new field? The category tells you which mutation path to use. Writing this down is a half-day doc pass.
+            The category tells you which mutation path to use. See <code>docs/architecture.md</code> &sect;1 for the
+            authoritative spec.
         </div>
     </section>
 
     <!-- ========================================== 4. Reconciliation ========================================== -->
     <section class="fr-section" id="s4">
         <h2><span class="num">04</span> Reconciliation</h2>
-        <p class="section-hook"><code>from_descriptor</code> is reconciliation. The name never appears in the codebase.</p>
+        <p class="section-hook"><code>from_descriptor</code> is reconciliation. The alias <code>reconcile</code> is exported at the registry module level for discoverability.</p>
 
         <div class="fr-recon">
             <div class="fr-recon-box input">
@@ -1126,7 +1126,7 @@ definition = PageForm(
         <div class="fr-recon" style="grid-template-columns: 1fr; margin-top: -0.5rem;">
             <div class="fr-recon-arrow" style="justify-self: center;">&darr;</div>
             <div class="fr-recon-box output" style="max-width: 280px; justify-self: center;">
-                <strong>Bound eigenform tree</strong>
+                <strong>Bound component tree</strong>
                 <div class="hint">live, serializable, renderable</div>
             </div>
         </div>
@@ -1138,72 +1138,77 @@ definition = PageForm(
         </p>
 
         <div class="fr-recon-caveat">
-            <strong>The callable problem.</strong> When a seed contains <code>ComputedForm(key="score", compute=lambda s: ...)</code>,
+            <strong>The callable problem.</strong> When a seed contains <code>ComputedComponent(key="score", compute=lambda s: ...)</code>,
             the lambda cannot serialize to JSON. On reconciliation, the descriptor has no <code>compute</code>; only the seed does.
             If the seed is missing &mdash; because the Python definition moved, the key changed, or a sibling was renamed &mdash;
             the callable is silently dropped. The form renders but does nothing. No warning.
         </div>
 
-        <h3>Concrete actions, small</h3>
+        <h3>What shipped</h3>
         <ul>
-            <li>Add a docstring to <code>from_descriptor</code> naming the operation &ldquo;reconciliation.&rdquo;</li>
-            <li>Expose <code>reconcile = from_descriptor</code> at the registry module level. Readers who know the React term find it; readers who know the local term keep working. Zero cost.</li>
-            <li>When a type declares callable-valued fields, require the <code>seed</code> parameter. Return a typed diagnostic (not <code>None</code>) when seed-match fails so broken reconciliation is visible in the UI, not silent.</li>
+            <li><strong>Docstring</strong> on <code>from_descriptor</code> names the operation &ldquo;reconciliation&rdquo; and lifts the callable-preservation limitation to a first-class Raises block.</li>
+            <li><strong>Module-level alias</strong> <code>reconcile = from_descriptor</code> in <code>engine/registry.py</code>. Readers who know the React term find it; readers who know the local term keep working.</li>
+            <li><strong>Typed sibling refs</strong> via <code>SiblingRef</code>: a <code>str</code>-subclass value with an optional <code>expects=</code> type assertion, validated at bind time. Stale or type-mismatched references raise <code>SiblingRefError</code> with actionable diagnostics instead of failing silently.</li>
         </ul>
+
+        <h3>What&rsquo;s still open</h3>
+        <p>
+            The callable-preservation problem above still has a silent mode. When a seed moves or is renamed and
+            reconciliation falls back to fresh construction, any declared callable-valued field simply returns
+            <code>None</code>. The planned fix is to require the <code>seed</code> parameter when a type declares
+            callable fields and return a typed diagnostic on mismatch so the broken state is visible in the UI. Not yet
+            shipped; tracked as a Pass 2 follow-on.
+        </p>
     </section>
 
     <!-- ========================================== 5. Error boundaries ========================================== -->
     <section class="fr-section" id="s5">
         <h2><span class="num">05</span> Error boundaries</h2>
-        <p class="section-hook">The one concrete React idea with real QMS payoff. Small, high-value, backward-compatible.</p>
+        <p class="section-hook">Rendering failures are scoped, visible, and do not take the whole page down.</p>
 
         <p>
             A quality system makes failures <strong>visible</strong>, <strong>scoped</strong>, and <strong>reportable</strong>.
             React error boundaries deliver exactly that shape: a container catches exceptions from its subtree, renders a
-            structured placeholder, lets siblings continue. The eigenform engine does not do this yet.
+            structured placeholder, lets siblings continue. The engine implements the render-time case today.
         </p>
 
         <div class="fr-beforeafter">
             <div class="fr-ba-panel before">
-                <h4>Today</h4>
+                <h4>Before</h4>
                 <div class="ba-label">A child raises &rarr; the whole page 500s.</div>
                 <ul>
-                    <li>Child <code>bind()</code> exception kills the request.</li>
                     <li>Child <code>render()</code> exception kills the request.</li>
-                    <li>Child <code>_handle()</code> exception kills the request, state possibly partial.</li>
-                    <li>Corrupt <code>__structure</code> &rarr; silent fallback to seed, no UI diagnostic.</li>
+                    <li>Sibling components never render.</li>
+                    <li>No diagnostic in the UI.</li>
                 </ul>
             </div>
             <div class="fr-ba-panel after">
-                <h4>Proposed</h4>
+                <h4>Now</h4>
                 <div class="ba-label">A child raises &rarr; it becomes a visible error card.</div>
                 <ul>
-                    <li><code>Eigenform.render_safely()</code> default wraps <code>render()</code> in try/except.</li>
-                    <li>Exception &rarr; structured card: key, type, exception, optional stack.</li>
-                    <li>A &ldquo;Report&rdquo; affordance files to the QMS audit log.</li>
+                    <li><code>Component.render_safely()</code> default wraps <code>render()</code> in try/except.</li>
+                    <li>Exception &rarr; structured card with key, type, exception class, message. Flask debug mode adds a collapsible traceback.</li>
+                    <li>Defensive fallback to minimal inline HTML if the <code>_error_boundary.html</code> template itself fails.</li>
                     <li>Siblings render normally; page remains interactive.</li>
                 </ul>
             </div>
         </div>
 
-        <h3>Sketch</h3>
+        <h3>The shape</h3>
 <pre class="code"><span class="k">def</span> render_safely(self) -> <span class="k">str</span>:
     <span class="k">try</span>:
         <span class="k">return</span> self.render()
     <span class="k">except</span> Exception <span class="k">as</span> e:
-        <span class="k">return</span> render_template(<span class="s">"_error_boundary.html"</span>,
-                               key=self.key, type=type(self).__name__,
-                               exception=e, debug=<span class="k">is_debug</span>())
+        <span class="k">return</span> _render_error_card(self, e)
 
-<span class="c"># Every container iterates render_safely() on children instead of render().</span></pre>
+<span class="c"># Every container iterates render_safely() on children instead of render().</span>
+<span class="c"># Eighteen call sites across ten modules.</span></pre>
 
-        <h3>Effort &amp; payoff</h3>
+        <h3>Shipped &amp; open</h3>
         <ul>
-            <li><strong>Half a day, one CR.</strong> Core is ~30 lines on the base class.</li>
-            <li><strong>Five containers</strong> get a one-line swap from <code>render()</code> to <code>render_safely()</code>.</li>
-            <li><strong>One new template</strong>: <code>_error_boundary.html</code>.</li>
-            <li><strong>Backward-compatible by construction</strong>: no exception &rarr; identical output. Existing tests unaffected.</li>
-            <li><strong>QMS alignment</strong>: traceability, scope containment, evidence &mdash; directly in engine code.</li>
+            <li><strong>Shipped:</strong> render-time boundary via <code>Component.render_safely()</code>. Theme-agnostic <code>.c-error-*</code> CSS. Eighteen child-render call sites swapped from <code>render()</code> to <code>render_safely()</code>. Parity tests and backward compatibility unaffected.</li>
+            <li><strong>Parked (follow-ons):</strong> <code>serialize_safely()</code> for JSON-side parity; <code>bind()</code> error scoping (the component tree literally does not exist post-bind failure, so there is nothing to contain today); <code>_handle()</code> error scoping around partial-mutation risk.</li>
+            <li><strong>Not yet:</strong> a Report affordance that files structured error evidence into the QMS audit log. Small CR when the QMS workflows come online.</li>
         </ul>
     </section>
 
@@ -1214,7 +1219,7 @@ definition = PageForm(
 
         <p>
             React Context solves &ldquo;an ancestor passes data to a deep descendant without prop-drilling through every
-            intermediate component.&rdquo; Hypothetical eigenform uses:
+            intermediate component.&rdquo; Hypothetical component uses:
         </p>
 
         <table class="fr-map">
@@ -1228,7 +1233,7 @@ definition = PageForm(
                 <tr><td class="react">Passing Store to children</td><td class="note">Already solved. <code>bind()</code> threads <code>_store</code>.</td></tr>
                 <tr><td class="react">Passing theme to templates</td><td class="note">Already solved. Thread-local in <code>templates.py</code> plus <code>data-theme</code> attribute.</td></tr>
                 <tr><td class="react">Passing user / permissions</td><td class="note">Does not exist yet. No authenticated user model.</td></tr>
-                <tr><td class="react">Passing validation scope</td><td class="note">Does not exist yet. ValidationForm uses sibling refs.</td></tr>
+                <tr><td class="react">Passing validation scope</td><td class="note">Does not exist yet. ValidationComponent uses sibling refs.</td></tr>
             </tbody>
         </table>
 
@@ -1255,7 +1260,7 @@ definition = PageForm(
                 <p>
                     <code>useState</code>, <code>useEffect</code>, <code>useContext</code> exploit JavaScript closure
                     ergonomics and call-order stability. A Python port would be either a fragile call-counter dict or
-                    decorator magic. Eigenform subclasses with fields plus descriptors already cover
+                    decorator magic. Component subclasses with fields plus descriptors already cover
                     &ldquo;composable state with identity.&rdquo;
                 </p>
             </div>
@@ -1263,7 +1268,7 @@ definition = PageForm(
                 <h4><span class="x">&#10005;</span> Functional components</h4>
                 <p>
                     React moved from class components to function components for hook composition. Without hooks,
-                    there is no composition benefit. Class-based eigenforms are the right shape for this engine.
+                    there is no composition benefit. Class-based components are the right shape for this engine.
                 </p>
             </div>
             <div class="fr-reject-card">
@@ -1291,17 +1296,17 @@ definition = PageForm(
         </div>
     </section>
 
-    <!-- ========================================== 8. The Design Plan ========================================== -->
+    <!-- ========================================== 8. The Arc ========================================== -->
     <section class="fr-section" id="s8">
-        <h2><span class="num">08</span> The design plan</h2>
-        <p class="section-hook">Sequenced in priority order. Each pass is independently shippable. Total effort for Passes 1&ndash;3: ~2.5 days.</p>
+        <h2><span class="num">08</span> How we got here</h2>
+        <p class="section-hook">The vocabulary alignment landed in four passes. Each was independently shippable.</p>
 
         <div class="fr-plan">
             <div class="fr-pass p1">
-                <div class="fr-pass-label">Pass 1 &mdash; Naming</div>
+                <div class="fr-pass-label">Pass 1 &mdash; Naming the invariants</div>
                 <div class="fr-pass-body">
-                    <strong>Documentation and aliases only</strong>
-                    <span>Architecture doc (<a href="https://github.com/whharris917/qms-workflow-engine/blob/main/docs/architecture.md"><code>docs/architecture.md</code></a>) with Props/State/Derived, Reconciliation, Portal, Controlled vs uncontrolled. Docstring for <code>from_descriptor</code> naming "reconciliation" and lifting the callable-preservation limitation. Module-level <code>reconcile</code> alias.</span>
+                    <strong>Documentation and aliases</strong>
+                    <span>Architecture reference (<a href="https://github.com/whharris917/qms-workflow-engine/blob/main/docs/architecture.md"><code>docs/architecture.md</code></a>) with Props/State/Derived, Reconciliation, Portal, and the controlled-vs-uncontrolled boundary. Docstring on <code>from_descriptor</code> naming the operation &ldquo;reconciliation&rdquo; and surfacing the callable-preservation limitation as a first-class Raises block. Module-level <code>reconcile</code> alias.</span>
                 </div>
                 <div class="fr-pass-meta">
                     <span class="effort">~1 day</span>
@@ -1312,7 +1317,7 @@ definition = PageForm(
                 <div class="fr-pass-label">Pass 2 &mdash; Typed composition</div>
                 <div class="fr-pass-body">
                     <strong>SiblingRef + field-type validation + Literal enums</strong>
-                    <span>Move 1: <code>SiblingRef(key, expects=)</code> as a <code>str</code>-subclass value. Seven sibling-reading eigenforms coerce on construction. <code>PageForm._validate_sibling_refs()</code> raises <code>SiblingRefError</code> with actionable diagnostics on stale or type-mismatched refs at bind time. Move 2: <code>_set_my_field</code> / <code>_set_my_config</code> validate against the dataclass annotation (simple types, <code>X | None</code>, <code>Literal[...]</code>). Move 3: <code>NavigationForm.mode</code> and <code>FieldDescriptor.type</code> tightened to <code>Literal</code>.</span>
+                    <span>Move 1: <code>SiblingRef(key, expects=)</code> as a <code>str</code>-subclass value. Seven sibling-reading components coerce on construction. <code>PageComponent._validate_sibling_refs()</code> raises <code>SiblingRefError</code> with actionable diagnostics on stale or type-mismatched refs at bind time. Move 2: <code>_set_my_field</code> / <code>_set_my_config</code> validate against the dataclass annotation (simple types, <code>X | None</code>, <code>Literal[...]</code>). Move 3: <code>NavigationComponent.mode</code> and <code>FieldDescriptor.type</code> tightened to <code>Literal</code>.</span>
                 </div>
                 <div class="fr-pass-meta">
                     <span class="effort">~1 day</span>
@@ -1323,7 +1328,7 @@ definition = PageForm(
                 <div class="fr-pass-label">Pass 3 &mdash; Error boundaries</div>
                 <div class="fr-pass-body">
                     <strong>render_safely() on base class</strong>
-                    <span><code>Eigenform.render_safely()</code> wraps <code>render()</code> and returns a structured error card on failure. Eighteen child-render call sites across ten eigenform modules swapped. <code>_error_boundary.html</code> template (theme-agnostic, traceback in Flask debug mode). Defensive fallback to minimal inline HTML if the template itself fails. <code>serialize_safely()</code>, <code>bind()</code>, and <code>_handle()</code> scoping deliberately parked.</span>
+                    <span><code>Component.render_safely()</code> wraps <code>render()</code> and returns a structured error card on failure. Eighteen child-render call sites across ten component modules swapped. <code>_error_boundary.html</code> template (theme-agnostic, traceback in Flask debug mode). Defensive fallback to minimal inline HTML if the template itself fails. <code>serialize_safely()</code>, <code>bind()</code>, and <code>_handle()</code> scoping deliberately parked.</span>
                 </div>
                 <div class="fr-pass-meta">
                     <span class="effort">~0.5 day</span>
@@ -1331,30 +1336,38 @@ definition = PageForm(
                 </div>
             </div>
             <div class="fr-pass p4">
-                <div class="fr-pass-label">Pass 4 &mdash; Deferred</div>
+                <div class="fr-pass-label">Pass 4 &mdash; Retiring the custom vocabulary</div>
                 <div class="fr-pass-body">
-                    <strong>Context primitive; composable behavior</strong>
-                    <span>Park Context until a concrete ancestor-to-descendant channel is wanted. Custom hooks / behavior mixins not pursued &mdash; Python grain doesn&rsquo;t fit.</span>
+                    <strong>Eigenform &rarr; Component; *Form &rarr; *Component</strong>
+                    <span>The base class was originally named <code>Eigenform</code> &mdash; a path-dependent choice that obscured its plain nature as a component in the React sense. Rename propagated through: 25 concrete subclasses (<code>TextForm</code> &rarr; <code>TextComponent</code>, etc.), module filenames, the <code>eigenforms/</code> template directory, the <code>eigenform.js</code> static asset, CSS prefixes (<code>ef-</code> &rarr; <code>c-</code>), DOM data attributes (<code>data-ef-</code> &rarr; <code>data-c-</code>), action-protocol names (<code>add_eigenform</code> &rarr; <code>add_component</code>, etc.), and all documentation prose. Seventy-two parity tests held.</span>
                 </div>
                 <div class="fr-pass-meta">
-                    <span class="effort">&mdash;</span>
-                    <span class="status deferred">Deferred</span>
+                    <span class="effort">~0.5 day</span>
+                    <span class="status landed">Landed</span>
                 </div>
             </div>
         </div>
+
+        <h3>What&rsquo;s still open</h3>
+        <ul>
+            <li><strong>Callable-preservation diagnostic.</strong> When a seed moves or is renamed and reconciliation falls back to fresh construction, callable fields (<code>ComputedComponent.compute</code>, <code>DynamicChoiceComponent.options_fn</code>, etc.) silently become <code>None</code>. Require the <code>seed</code> parameter for types with callables; return a typed diagnostic on seed-match failure.</li>
+            <li><strong>Error-boundary expansion.</strong> <code>serialize_safely()</code> for JSON-side parity; bind-error scoping once we have a representation for &ldquo;component tree could not be built&rdquo;; <code>_handle()</code> scoping for partial-mutation risk.</li>
+            <li><strong>Context primitive.</strong> Parked until a concrete ancestor-to-descendant channel is wanted &mdash; most likely user / permissions when the QMS workflows come online.</li>
+            <li><strong>Action dispatch as a reducer pattern.</strong> 88 <code>if action == "xxx"</code> branches across 20 files are a reducer-in-disguise. A named <code>ActionRegistry</code> with dispatch by name would make the pattern explicit and open middleware / logging / replay for free. Not yet scheduled.</li>
+        </ul>
 
         <h3>The second-order effect</h3>
         <p>
             Every AI model has read millions of words about React. None has read this codebase. When the codebase uses
             React-standard names for React-standard concepts, any agent arriving for the first time is productive faster.
-            The vocabulary itself becomes a documentation artifact &mdash; an invisible alignment between this engine and
-            the broader ecosystem that reads its source.
+            The vocabulary itself is a documentation artifact &mdash; an invisible alignment between this engine and the
+            broader ecosystem that reads its source.
         </p>
 
         <div class="fr-callout">
-            <strong>The architectural investment is already paid.</strong> This plan is about harvest, not capital
-            expenditure. Pass 1 is prose. Pass 2 is queued. Pass 3 is small. The codebase is at the stage where the next
-            round of improvements is no longer &ldquo;make it work&rdquo; but &ldquo;make it clear.&rdquo;
+            <strong>The architectural investment was already paid.</strong> The passes above are harvest, not capital
+            expenditure. The codebase moved from &ldquo;make it work&rdquo; to &ldquo;make it clear&rdquo; to &ldquo;name
+            it the same way everyone else does.&rdquo;
         </div>
     </section>
 

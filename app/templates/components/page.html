@@ -1,0 +1,147 @@
+{# PageComponent template.
+
+   Context:
+     data            — serialized component dict
+     ef              — the PageComponent instance
+     url             — page POST URL (url_prefix)
+     label           — current label text
+     instruction     — current instruction text
+     children_html   — list of rendered child HTML strings (non-mutable mode)
+     child_items     — list of {key, index, html} dicts (mutable mode)
+     available_types — sorted list of available component types (mutable mode)
+     feedback        — feedback dict from data (may be None)
+     mutable         — whether mutable_structure is on
+#}
+<h2>{{ data.label }}</h2>
+{% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
+
+{# Feedback banners #}
+{% if feedback %}
+  {% set affs = data.affordances|default([]) %}
+  {# Index dismiss affordances by target #}
+  {% set dismiss_affs = {} %}
+  {% for aff in affs %}
+    {% if aff.body.action == "dismiss_feedback" %}
+      {% set _ = dismiss_affs.update({aff.body.target|default(""): aff}) %}
+    {% endif %}
+  {% endfor %}
+
+  {# Persistent errors #}
+  {% for err in feedback.errors|default([]) %}
+    {% set target = err.target|default("") %}
+    {% set dismiss_html = "" %}
+    {% set aff = dismiss_affs.get(target) %}
+    {% if aff %}
+      {% set _ = aff.update({"_rendered": true}) %}
+      {% set dismiss_html = render_btn(aff.url, aff.body, "&#10005;", "c-feedback__dismiss") %}
+    {% endif %}
+    <div class="c-feedback c-feedback--error">
+      <span><strong>&#10007; Error:</strong> {{ err.message }}{% if target %} <span class="c-feedback__target">({{ target }})</span>{% endif %}</span>
+      <span class="c-feedback__meta">
+        <span class="c-feedback__timestamp">{{ err.timestamp|default("") }}</span>
+        {{ dismiss_html|safe }}
+      </span>
+    </div>
+  {% endfor %}
+
+  {# Latest success #}
+  {% set succ = feedback.success %}
+  {% if succ %}
+    {% set target = succ.target|default("") %}
+    <div class="c-feedback c-feedback--success">
+      <span><strong>&#10003; OK:</strong> {{ succ.message }}{% if target %} <span class="c-feedback__target">({{ target }})</span>{% endif %}</span>
+      <span class="c-feedback__timestamp">{{ succ.timestamp|default("") }}</span>
+    </div>
+  {% endif %}
+
+  {% if feedback.errors or succ %}
+    <div style="margin-bottom: 8px;"></div>
+  {% endif %}
+{% endif %}
+
+{% if mutable %}
+  {# Mark structural affordances as rendered #}
+  {% for aff in data.affordances %}
+    {% set action = aff.body.action|default("") %}
+    {% if action in ("add_component", "remove_component", "move_component", "toggle_editable", "rebuild_from_seed", "group_components", "reparent_component", "ungroup_component") %}
+      {% set _ = aff.update({"_rendered": true}) %}
+    {% endif %}
+  {% endfor %}
+
+  {# Add Component toolbar — categorized type selector #}
+  <div class="c-add-toolbar">
+  <form class="c-add-toolbar-form" data-c-submit="{{ url }}">
+    <input type="hidden" name="action" value="add_component" />
+    <div><label class="c-add-toolbar-label">Type</label>
+    <select name="type" class="c-add-toolbar-input">
+      <option value="">— choose a type —</option>
+      {% for cat in type_catalog %}
+      <optgroup label="{{ cat.name }} — {{ cat.hint }}">
+        {% for type_name, icon, desc in cat.types %}<option value="{{ type_name }}">{{ icon }} {{ type_name }} — {{ desc }}</option>
+        {% endfor %}
+      </optgroup>
+      {% endfor %}
+    </select></div>
+    <div><label class="c-add-toolbar-label">Key <span style="opacity:.5">(auto)</span></label>
+    <input name="key" type="text" placeholder="auto-generated"
+      class="c-add-toolbar-input" style="width: 140px;" /></div>
+    <div><label class="c-add-toolbar-label">Label <span style="opacity:.5">(auto)</span></label>
+    <input name="label" type="text" placeholder="auto-generated"
+      class="c-add-toolbar-input" style="width: 160px;" /></div>
+    <button type="submit" class="c-add-toolbar-submit">+ Add</button>
+  </form></div>
+
+  {# Components with inline controls #}
+  {% for item in child_items %}
+    <div style="margin-bottom: 8px;">
+      <div class="c-item-ctrl-bar">
+        <span class="c-item-ctrl-key">{{ item.key }}</span>
+        <span class="c-item-ctrl-spacer"></span>
+        {% if item.index > 0 %}
+          {{ render_btn(url, {"action": "move_component", "key": item.key, "position": item.index - 1},
+              "&#9650;", "c-icon-btn") }}
+        {% else %}
+          <span class="c-item-ctrl-placeholder"></span>
+        {% endif %}
+        {% if item.index < child_items|length - 1 %}
+          {{ render_btn(url, {"action": "move_component", "key": item.key, "position": item.index + 1},
+              "&#9660;", "c-icon-btn") }}
+        {% else %}
+          <span class="c-item-ctrl-placeholder"></span>
+        {% endif %}
+        {% if item.editable %}
+          {{ render_btn(url, {"action": "toggle_editable", "key": item.key},
+              "&#128275;", "c-icon-btn c-icon-btn--active") }}
+        {% else %}
+          {{ render_btn(url, {"action": "toggle_editable", "key": item.key},
+              "&#128274;", "c-icon-btn") }}
+        {% endif %}
+        {{ render_btn(url, {"action": "remove_component", "key": item.key},
+            "&#128465;", "c-icon-btn c-icon-btn--danger") }}
+      </div>
+      <div class="c-item-content">{{ item.html|safe }}</div>
+    </div>
+  {% endfor %}
+
+  {% if not child_items %}
+    <div class="c-empty-state">No components yet. Use the toolbar above to add one.</div>
+  {% endif %}
+
+  {# Rebuild from seed button #}
+  <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee;">
+    {{ render_btn(url, {"action": "rebuild_from_seed"},
+        "&#8634; Rebuild from Seed", "c-text-btn--subtle") }}
+  </div>
+
+{% else %}
+  {% for html in children_html %}{{ html|safe }}{% endfor %}
+{% endif %}
+
+{# Remaining non-structural affordances (Reset Page, etc.) #}
+<div class="c-remaining-affs">
+{% for aff in data.affordances %}
+  {% if not aff._rendered %}
+    {{ render_aff(aff) }}
+  {% endif %}
+{% endfor %}
+</div>

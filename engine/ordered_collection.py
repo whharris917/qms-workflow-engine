@@ -1,13 +1,13 @@
 """OrderedCollection — a reusable ordered-item engine with stable IDs and constraints.
 
-This is a plain data structure, not an eigenform. It manages:
+This is a plain data structure, not a component. It manages:
 - Items with stable IDs, values, and a fixed flag
 - A monotonic ID counter
 - Static and dynamic must_follow ordering constraints
 - Cycle detection and topological sort enforcement
 - Constraint-aware move up/down
 
-Eigenforms (ListForm, TableForm) compose this to get ordering logic
+Components (ListComponent, TableComponent) compose this to get ordering logic
 without duplicating it.
 """
 

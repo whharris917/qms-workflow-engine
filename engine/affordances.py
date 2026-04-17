@@ -1,13 +1,13 @@
-"""Affordance — a description of an action that can be performed on an eigenform.
+"""Affordance — a description of an action that can be performed on a component.
 
 Affordances are pure data. They describe what actions are available, with
 what parameters, at what URL. They serialize to dicts that appear in the
-eigenform's JSON output.
+component's JSON output.
 
-Affordances do NOT render themselves. The eigenform that produces them is
+Affordances do NOT render themselves. The component that produces them is
 responsible for accounting for each one in its render_from_data() method.
 The render_affordance_html() utility is available as a convenience for
-eigenforms that don't need custom placement.
+components that don't need custom placement.
 """
 
 from __future__ import annotations
@@ -34,9 +34,9 @@ STYLE_ARROW = (
 )
 
 # --- CSS class constants (for render_inline_button) ---
-CSS_CONFIRM = "ef-btn-confirm"
-CSS_REMOVE = "ef-btn-remove"
-CSS_ARROW = "ef-btn-arrow"
+CSS_CONFIRM = "c-btn-confirm"
+CSS_REMOVE = "c-btn-remove"
+CSS_ARROW = "c-btn-arrow"
 BUTTON_GAP = (
     '<span style="display: inline-block; width: 24px; height: 24px;'
     ' border: 1px solid transparent; vertical-align: middle;"></span>'
@@ -44,19 +44,19 @@ BUTTON_GAP = (
 
 
 def _body_attr(body: dict) -> str:
-    """Produce an HTML-escaped data-ef-body attribute value."""
+    """Produce an HTML-escaped data-c-body attribute value."""
     return escape(json.dumps(body))
 
 
 def render_inline_button(url: str, body: dict, content: str, css_class: str) -> str:
     """Render a button that POSTs a JSON body via event delegation.
 
-    The eigenform controls the URL, body, and CSS class. The global
-    delegation script (eigenform.js) handles the fetch+swap cycle.
+    The component controls the URL, body, and CSS class. The global
+    delegation script (component.js) handles the fetch+swap cycle.
     """
     tooltip = f'{escape("POST " + url)} {escape(json.dumps(body))}'
     return (
-        f'<button data-ef-post="{escape(url)}" data-ef-body="{_body_attr(body)}"'
+        f'<button data-c-post="{escape(url)}" data-c-body="{_body_attr(body)}"'
         f' class="{css_class}"'
         f' title="{tooltip}">'
         f'{content}</button>'
@@ -65,10 +65,10 @@ def render_inline_button(url: str, body: dict, content: str, css_class: str) -> 
 
 @dataclass
 class Affordance:
-    """A description of a possible action on an eigenform.
+    """A description of a possible action on a component.
 
     Affordances are data, not renderers. They serialize to dicts for
-    agents and include render_hints for eigenforms that use the
+    agents and include render_hints for components that use the
     render_affordance_html() utility.
     """
     label: str
@@ -109,8 +109,8 @@ class SimpleButtonAffordance(Affordance):
         return {"type": "button"}
 
 
-class AddEigenformAffordance(Affordance):
-    """Affordance for adding an eigenform to a mutable page.
+class AddComponentAffordance(Affordance):
+    """Affordance for adding a component to a mutable page.
 
     Carries a structured type_catalog that appears in the agent-facing
     JSON, giving agents a categorized reference of available types.
@@ -129,7 +129,7 @@ class AddEigenformAffordance(Affordance):
         return result
 
     def _render_hints(self) -> dict:
-        return {"type": "add_eigenform"}
+        return {"type": "add_component"}
 
 
 class AddConstraintAffordance(Affordance):
@@ -159,9 +159,9 @@ class CheckboxAffordance(Affordance):
 
 
 # ---------------------------------------------------------------------------
-# Utility for eigenforms — renders an affordance dict as HTML.
-# Eigenforms may use this for simple cases or build custom HTML instead.
-# Either way, the eigenform must account for every affordance.
+# Utility for components — renders an affordance dict as HTML.
+# Components may use this for simple cases or build custom HTML instead.
+# Either way, the component must account for every affordance.
 # ---------------------------------------------------------------------------
 
 def render_affordance_html(aff: dict) -> str:
@@ -221,7 +221,7 @@ def render_affordance_html(aff: dict) -> str:
 def _render_text_input(label: str, url: str, endpoint: str) -> str:
     body_template = {"value": ""}
     return (
-        f'<form style="display: inline" data-ef-submit="{escape(url)}">'
+        f'<form style="display: inline" data-c-submit="{escape(url)}">'
         f'<input name="value" type="text"'
         f' title="{escape(endpoint)} {escape(json.dumps(body_template))}" />'
         f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps(body_template))}">'
@@ -233,7 +233,7 @@ def _render_text_input(label: str, url: str, endpoint: str) -> str:
 def _render_button(label: str, url: str, endpoint: str, body: dict) -> str:
     return (
         f'<div style="margin: 4px 0;">'
-        f'<button data-ef-post="{escape(url)}" data-ef-body="{_body_attr(body)}"'
+        f'<button data-c-post="{escape(url)}" data-c-body="{_body_attr(body)}"'
         f' style="cursor: pointer; font-size: 12px; padding: 4px 10px;"'
         f' title="{escape(endpoint)} {escape(json.dumps(body))}">'
         f'{escape(label)}</button>'
@@ -249,9 +249,9 @@ def _render_checkbox(url: str, endpoint: str, items: dict) -> str:
         parts.append(
             f'<label style="display: block; cursor: pointer;">'
             f'<input type="checkbox"{checked_attr} autocomplete="off"'
-            f' data-ef-post="{escape(url)}"'
-            f' data-ef-body="{_body_attr({item_key: "__TOGGLE"})}"'
-            f' data-ef-toggle-key="{escape(item_key)}"'
+            f' data-c-post="{escape(url)}"'
+            f' data-c-body="{_body_attr({item_key: "__TOGGLE"})}"'
+            f' data-c-toggle-key="{escape(item_key)}"'
             f' title="{escape(endpoint)} {escape(json.dumps(toggle_body))}"'
             f' /> {escape(item_key)}'
             f'</label>'
@@ -267,7 +267,7 @@ def _render_radio(url: str, endpoint: str, options: list, current: str | None) -
         html += (
             f'<label style="display: block; cursor: pointer; padding: 2px 0;">'
             f'<input type="radio" name="{escape(url)}"{checked}'
-            f' data-ef-post="{escape(url)}" data-ef-body="{_body_attr(body)}"'
+            f' data-c-post="{escape(url)}" data-c-body="{_body_attr(body)}"'
             f' title="{escape(endpoint)} {escape(json.dumps(body))}"'
             f' /> {escape(opt)}'
             f'</label>'
@@ -310,7 +310,7 @@ def _render_multi_field(label: str, url: str, endpoint: str, fields: list, value
             )
 
     return (
-        f'<form data-ef-submit="{escape(url)}">'
+        f'<form data-c-submit="{escape(url)}">'
         f'{inputs}'
         f'<button type="submit" title="{escape(endpoint)} {escape(json.dumps(values if values else {}))}">'
         f'{escape(label)}</button>'
@@ -332,7 +332,7 @@ def _render_text_input_add(label: str, url: str, endpoint: str, body: dict, plac
         hidden_inputs += f'<input type="hidden" name="{escape(k)}" value="{escape(str(v))}" />'
 
     return (
-        f'<form style="display: inline" data-ef-submit="{escape(url)}">'
+        f'<form style="display: inline" data-c-submit="{escape(url)}">'
         f'{hidden_inputs}'
         f'<input name="{escape(input_key)}" type="text" placeholder="{escape(placeholder or input_key)}" style="width: 160px;" />'
         f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps(body))}">'
@@ -357,7 +357,7 @@ def _render_parameterized(label: str, url: str, endpoint: str, body: dict, param
 
     return (
         f'<div style="margin: 4px 0; padding: 4px 0; border-top: 1px solid #eee;">'
-        f'<form style="margin: 0;" data-ef-submit="{escape(url)}">'
+        f'<form style="margin: 0;" data-c-submit="{escape(url)}">'
         f'{hidden_inputs}'
         f'{inputs}'
         f' <button type="submit" title="{escape(endpoint)} {escape(json.dumps(body))}">'
@@ -369,7 +369,7 @@ def _render_parameterized(label: str, url: str, endpoint: str, body: dict, param
 
 def _render_small_button(label: str, url: str, endpoint: str, body: dict) -> str:
     return (
-        f'<button data-ef-post="{escape(url)}" data-ef-body="{_body_attr(body)}"'
+        f'<button data-c-post="{escape(url)}" data-c-body="{_body_attr(body)}"'
         f' style="margin: 1px; cursor: pointer; width: 28px; height: 28px; font-size: 11px;"'
         f' title="{escape(endpoint)} {escape(json.dumps(body))}">'
         f'{escape(label)}</button>'
@@ -378,7 +378,7 @@ def _render_small_button(label: str, url: str, endpoint: str, body: dict) -> str
 
 def _render_number_input(label: str, url: str, endpoint: str, hints: dict) -> str:
     return (
-        f'<form data-ef-submit="{escape(url)}">'
+        f'<form data-c-submit="{escape(url)}">'
         f'<input name="value" type="text" inputmode="decimal" style="width: 120px;"'
         f' title="{escape(endpoint)}" />'
         f'<div style="margin-top: 4px;">'
@@ -392,7 +392,7 @@ def _render_number_input(label: str, url: str, endpoint: str, hints: dict) -> st
 def _render_date_input(label: str, url: str, endpoint: str, hints: dict) -> str:
     input_type = "datetime-local" if hints.get("include_time") else "date"
     return (
-        f'<form data-ef-submit="{escape(url)}">'
+        f'<form data-c-submit="{escape(url)}">'
         f'<input name="value" type="{input_type}"'
         f' title="{escape(endpoint)}" />'
         f'<div style="margin-top: 4px;">'
@@ -413,11 +413,11 @@ def _render_toggle(label: str, url: str, endpoint: str, hints: dict) -> str:
     false_body = {"value": False}
     return (
         f'<div style="display: flex; gap: 4px; margin: 4px 0;">'
-        f'<button data-ef-post="{escape(url)}" data-ef-body="{_body_attr(true_body)}"'
+        f'<button data-c-post="{escape(url)}" data-c-body="{_body_attr(true_body)}"'
         f' style="cursor: pointer; padding: 4px 12px; {true_style}"'
         f' title="{escape(endpoint)} {escape(json.dumps(true_body))}">'
         f'{true_label}</button>'
-        f'<button data-ef-post="{escape(url)}" data-ef-body="{_body_attr(false_body)}"'
+        f'<button data-c-post="{escape(url)}" data-c-body="{_body_attr(false_body)}"'
         f' style="cursor: pointer; padding: 4px 12px; {false_style}"'
         f' title="{escape(endpoint)} {escape(json.dumps(false_body))}">'
         f'{false_label}</button>'
@@ -432,7 +432,7 @@ def _render_range_input(label: str, url: str, endpoint: str, hints: dict) -> str
     current = hints.get("current")
     default = current if current is not None else min_val
     return (
-        f'<form style="margin: 4px 0;" data-ef-submit="{escape(url)}">'
+        f'<form style="margin: 4px 0;" data-c-submit="{escape(url)}">'
         f'<input type="hidden" name="__parse" value="value:float" />'
         f'<input name="value" type="range" min="{min_val}" max="{max_val}" step="{step}" value="{default}"'
         f' oninput="this.nextElementSibling.textContent=this.value"'
@@ -449,7 +449,7 @@ def _render_range_input(label: str, url: str, endpoint: str, hints: dict) -> str
 def _render_textarea(label: str, url: str, endpoint: str, hints: dict) -> str:
     max_attr = f' maxlength="{hints["max_length"]}"' if hints.get("max_length") else ""
     return (
-        f'<form data-ef-submit="{escape(url)}">'
+        f'<form data-c-submit="{escape(url)}">'
         f'<textarea name="value" rows="5" style="width: 100%; box-sizing: border-box;"{max_attr}'
         f'></textarea>'
         f'<div style="margin-top: 4px;">'
@@ -471,7 +471,7 @@ def _render_rating(label: str, url: str, endpoint: str, hints: dict) -> str:
         title_suffix = f" ({title_label})" if title_label else ""
         body = {"value": i}
         html += (
-            f'<button data-ef-post="{escape(url)}" data-ef-body="{_body_attr(body)}"'
+            f'<button data-c-post="{escape(url)}" data-c-body="{_body_attr(body)}"'
             f' style="cursor: pointer; width: 32px; height: 32px; {active}"'
             f' title="{escape(endpoint)} {{value: {i}}}{escape(title_suffix)}">'
             f'{i}</button>'
@@ -484,7 +484,7 @@ def _render_kv_add(label: str, url: str, endpoint: str, hints: dict) -> str:
     key_label = escape(hints.get("key_label", "Key"))
     value_label = escape(hints.get("value_label", "Value"))
     return (
-        f'<form style="display: inline" data-ef-submit="{escape(url)}">'
+        f'<form style="display: inline" data-c-submit="{escape(url)}">'
         f'<input type="hidden" name="action" value="add" />'
         f'<input name="key" type="text" placeholder="{key_label}" style="width: 120px; margin-right: 4px;" />'
         f'<input name="value" type="text" placeholder="{value_label}" style="width: 160px; margin-right: 4px;" />'
@@ -515,7 +515,7 @@ def _render_constraint_picker(label: str, url: str, endpoint: str, hints: dict) 
         opts_html += f'<option value="{escape(opt)}">{display}</option>'
     return (
         f'<div style="margin: 4px 0; padding: 4px 0; border-top: 1px solid #eee;">'
-        f'<form style="margin: 0;" data-ef-submit="{escape(url)}">'
+        f'<form style="margin: 0;" data-c-submit="{escape(url)}">'
         f'<input type="hidden" name="action" value="add_constraint" />'
         f'<select name="item">{opts_html}</select>'
         f' must follow '

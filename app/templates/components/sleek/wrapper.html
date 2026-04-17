@@ -1,0 +1,94 @@
+{# Sleek theme component wrapper.
+
+   Data forms: dark card with titlebar (label + chrome).
+   NavigationComponent / GroupComponent: titlebar extends into LEFT margin (tab bar territory).
+   Other containers: transparent, no card, chrome buttons only.
+   No hidden elements — the template simply doesn't emit what isn't needed.
+
+   Context: same as wrapper.html
+     classes, form, key, uid, label, editable, edit_mode,
+     undo_count, url, inner, json_str, is_container
+#}
+{% set cls_str = classes|join(" ") %}
+{% if is_container and form == "navigation" %}
+{# --- NavigationComponent: titlebar always visible, chrome conditional on editable --- #}
+<div class="{{ cls_str }}{% if edit_mode %} component--editing{% endif %}" data-form="{{ form }}" data-key="{{ key }}">
+<div class="c-titlebar">
+<span class="c-titlebar__label">{{ label }}</span>
+<span class="c-titlebar__spacer"></span>
+{% if editable %}
+<div class="c-chrome">
+{% if edit_mode %}
+  <button data-c-post="{{ url }}" data-c-body="{{ {"action": "set_mode", "mode": "execute"}|tojson }}" class="c-chrome-btn" title="POST {{ url }} {{ {"action": "set_mode", "mode": "execute"}|tojson }}"><span>&#9654;</span></button>
+  {% if undo_count > 0 %}
+  <button data-c-post="{{ url }}" data-c-body="{{ {"action": "undo"}|tojson }}" class="c-chrome-btn" title="Undo ({{ undo_count }})"><span>&#8630;</span></button>
+  {% endif %}
+  <button data-c-post="{{ url }}" data-c-body="{{ {"action": "discard"}|tojson }}" class="c-chrome-btn" title="Discard all changes"><span>&#10005;</span></button>
+{% else %}
+  <button data-c-post="{{ url }}" data-c-body="{{ {"action": "set_mode", "mode": "edit"}|tojson }}" class="c-chrome-btn" title="POST {{ url }} {{ {"action": "set_mode", "mode": "edit"}|tojson }}"><span>&#9998;</span></button>
+{% endif %}
+</div>
+{% endif %}
+</div>
+{% if instruction %}<div class="c-nav-instruction">{{ instruction }}</div>{% endif %}
+{{ inner|safe }}
+</div>
+{% elif is_container and form == "group" %}
+{# --- GroupComponent: execute mode chrome in group bar; edit mode chrome in titlebar --- #}
+<div class="{{ cls_str }}{% if edit_mode %} component--editing{% endif %}" data-form="{{ form }}" data-key="{{ key }}">
+{% if edit_mode %}
+<div class="c-titlebar">
+<span class="c-titlebar__label">{{ label }}</span>
+<span class="c-titlebar__spacer"></span>
+<div class="c-chrome">
+  <button data-c-post="{{ url }}" data-c-body="{{ {"action": "set_mode", "mode": "execute"}|tojson }}" class="c-chrome-btn" title="POST {{ url }} {{ {"action": "set_mode", "mode": "execute"}|tojson }}"><span>&#9654;</span></button>
+  {% if undo_count > 0 %}
+  <button data-c-post="{{ url }}" data-c-body="{{ {"action": "undo"}|tojson }}" class="c-chrome-btn" title="Undo ({{ undo_count }})"><span>&#8630;</span></button>
+  {% endif %}
+  <button data-c-post="{{ url }}" data-c-body="{{ {"action": "discard"}|tojson }}" class="c-chrome-btn" title="Discard all changes"><span>&#10005;</span></button>
+</div>
+</div>
+{% endif %}
+{{ inner|safe }}
+</div>
+{% elif is_container %}
+{# --- Other containers: transparent, minimal --- #}
+<div class="{{ cls_str }}" data-form="{{ form }}" data-key="{{ key }}">
+{% if editable %}
+<div class="c-chrome">
+{% if edit_mode %}
+  <button data-c-post="{{ url }}" data-c-body="{{ {"action": "set_mode", "mode": "execute"}|tojson }}" class="c-chrome-btn" title="POST {{ url }} {{ {"action": "set_mode", "mode": "execute"}|tojson }}"><span>&#9654;</span></button>
+  {% if undo_count > 0 %}
+  <button data-c-post="{{ url }}" data-c-body="{{ {"action": "undo"}|tojson }}" class="c-chrome-btn" title="Undo ({{ undo_count }})"><span>&#8630;</span></button>
+  {% endif %}
+  <button data-c-post="{{ url }}" data-c-body="{{ {"action": "discard"}|tojson }}" class="c-chrome-btn" title="Discard all changes"><span>&#10005;</span></button>
+{% else %}
+  <button data-c-post="{{ url }}" data-c-body="{{ {"action": "set_mode", "mode": "edit"}|tojson }}" class="c-chrome-btn" title="POST {{ url }} {{ {"action": "set_mode", "mode": "edit"}|tojson }}"><span>&#9998;</span></button>
+{% endif %}
+</div>
+{% endif %}
+{{ inner|safe }}
+</div>
+{% else %}
+{# --- Data form wrapper: card with titlebar (always) --- #}
+<div class="{{ cls_str }}" data-form="{{ form }}" data-key="{{ key }}">
+<div class="c-titlebar">
+<span class="c-titlebar__label">{{ label }}</span>
+<span class="c-titlebar__spacer"></span>
+{% if editable %}
+<div class="c-chrome">
+{% if edit_mode %}
+  <button data-c-post="{{ url }}" data-c-body="{{ {"action": "set_mode", "mode": "execute"}|tojson }}" class="c-chrome-btn" title="POST {{ url }} {{ {"action": "set_mode", "mode": "execute"}|tojson }}"><span>&#9654;</span></button>
+  {% if undo_count > 0 %}
+  <button data-c-post="{{ url }}" data-c-body="{{ {"action": "undo"}|tojson }}" class="c-chrome-btn" title="Undo ({{ undo_count }})"><span>&#8630;</span></button>
+  {% endif %}
+  <button data-c-post="{{ url }}" data-c-body="{{ {"action": "discard"}|tojson }}" class="c-chrome-btn" title="Discard all changes"><span>&#10005;</span></button>
+{% else %}
+  <button data-c-post="{{ url }}" data-c-body="{{ {"action": "set_mode", "mode": "edit"}|tojson }}" class="c-chrome-btn" title="POST {{ url }} {{ {"action": "set_mode", "mode": "edit"}|tojson }}"><span>&#9998;</span></button>
+{% endif %}
+</div>
+{% endif %}
+</div>
+{{ inner|safe }}
+</div>
+{% endif %}

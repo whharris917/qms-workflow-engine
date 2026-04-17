@@ -1,0 +1,36 @@
+{# DateComponent sleek theme — native edit mode, default execute mode. #}
+{% if data.edit_mode %}
+{% for aff in data.affordances %}
+  {% if aff.body.action in ("set_label", "set_instruction", "toggle_include_time", "set_min_date", "set_max_date") %}
+    {% set _ = aff.update({"_rendered": true}) %}
+  {% endif %}
+{% endfor %}
+{% include "_edit_header.html" with context %}
+<div class="sleek-edit-config">
+  {% set it_body = {"action": "toggle_include_time"}|tojson %}
+  <button data-c-post="{{ url }}" data-c-body="{{ it_body }}"
+    class="sleek-edit-config__toggle{% if data.include_time %} sleek-edit-config__toggle--on{% endif %}"
+    title="POST {{ url }} {{ it_body }}">include time: {{ "on" if data.include_time else "off" }}</button>
+  {% for field_label, action, val in [
+    ("min date", "set_min_date", data.min),
+    ("max date", "set_max_date", data.max),
+  ] %}
+  {% set display_val = "" if val is none else val|string %}
+  <form class="sleek-edit-config__field" data-c-submit="{{ url }}">
+    <input type="hidden" name="action" value="{{ action }}" />
+    <span class="sleek-edit-config__label">{{ field_label }}:</span>
+    <input name="value" type="text" value="{{ display_val }}" placeholder="none"
+      class="sleek-edit-config__input sleek-edit-config__input--wide" />
+    <button type="submit" class="sleek-edit-config__btn">&#10003;</button>
+  </form>
+  {% endfor %}
+</div>
+<p class="sleek-edit-value"><strong>Value:</strong> {{ (data.value if data.value is not none else "None")|string }}</p>
+<div class="sleek-edit-remaining">
+{% for aff in data.affordances %}
+  {% if not aff._rendered %}{{ render_aff(aff) }}{% endif %}
+{% endfor %}
+</div>
+{% else %}
+{% include "date.html" %}
+{% endif %}
