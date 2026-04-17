@@ -91,6 +91,65 @@ def index():
     return jsonify({"seeds": seed_list, "instances": instance_list})
 
 
+def _bind_deepdive():
+    """Bind the deepdive seed to a fixed scope/url_prefix (not via the
+    InstanceRegistry — this page has a permanent URL)."""
+    seed = seeds().get("deepdive")
+    if seed is None:
+        return None
+    return seed.bind(DATA_DIR, scope="deepdive", url_prefix="/deepdive")
+
+
+@bp.route("/deepdive", methods=["GET", "POST"])
+def deepdive():
+    """Self-referential page: the engine analyzing itself."""
+    pg = _bind_deepdive()
+    if pg is None:
+        return "Deep dive page seed not found.", 500
+    if request.method == "POST":
+        pg.handle(request.json)
+        if wants_html(request):
+            return Markup(pg.render())
+        return jsonify(pg.serialize())
+    if wants_html(request):
+        html = Markup(pg.render())
+        return render_template("page.html", page_html=html, title=pg.label,
+                               instance_id="deepdive", theme_css=_theme_css(),
+                               active_page="deepdive")
+    return jsonify(pg.serialize())
+
+
+@bp.route("/deepdive/<path:path>", methods=["GET", "POST"])
+def deepdive_eigenform(path):
+    """Action/eigenform routing for the deepdive page (tab switches, etc.)."""
+    pg = _bind_deepdive()
+    if pg is None:
+        return "Not found", 404
+    if request.method == "GET":
+        ef = pg.find_eigenform(path)
+        if ef is None:
+            return jsonify({"error": f"Unknown path: {path}"}), 404
+        if wants_html(request):
+            html = Markup(ef.render())
+            return render_template("page.html", page_html=html, title=ef.label,
+                                   instance_id="deepdive", theme_css=_theme_css(),
+                                   active_page="deepdive")
+        return jsonify(ef.serialize())
+    result = pg.handle_action(path, request.json)
+    if result is None:
+        return jsonify({"error": f"Unknown path: {path}"}), 404
+    if wants_html(request):
+        return Markup(pg.render())
+    ef = pg.find_eigenform(path)
+    if ef is not None:
+        ef_state = ef.serialize()
+        if "error" in result:
+            ef_state["error"] = result["error"]
+            ef_state["failed_action"] = result.get("failed_action")
+        return jsonify(ef_state)
+    return jsonify(result)
+
+
 @bp.route("/portal")
 def portal():
     instances = registry.list_instances()
