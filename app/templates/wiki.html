@@ -1,0 +1,609 @@
+{% extends "base.html" %}
+{% block title %}QMS Workflow Engine — Wikipedia{% endblock %}
+
+{% block head_extra %}
+<style>
+    /* ---------- Wikipedia look ---------- */
+    .wiki-wrap {
+        max-width: 1000px;
+        margin: 0 auto;
+        background: #fff;
+        padding: 1.5rem 2rem 3rem;
+        font-family: sans-serif;
+        color: #202122;
+        line-height: 1.6;
+    }
+    .wiki-wrap p, .wiki-wrap li { font-size: 0.95rem; }
+    .wiki-wrap a { color: #0645ad; text-decoration: none; }
+    .wiki-wrap a:hover { text-decoration: underline; }
+    .wiki-wrap a.redlink { color: #ba0000; }
+    .wiki-wrap code {
+        background: #f8f9fa;
+        border: 1px solid #eaecf0;
+        padding: 0.05rem 0.3rem;
+        border-radius: 2px;
+        font-family: monospace;
+        font-size: 0.9em;
+        color: #202122;
+    }
+
+    /* Article chrome */
+    .wiki-meta {
+        font-size: 0.78rem;
+        color: #54595d;
+        margin-bottom: 0.25rem;
+    }
+    .wiki-title {
+        font-family: "Linux Libertine", Georgia, Times, serif;
+        font-size: 2.2rem;
+        font-weight: normal;
+        border-bottom: 1px solid #a2a9b1;
+        padding-bottom: 0.25rem;
+        margin-bottom: 0.15rem;
+    }
+    .wiki-subtitle {
+        font-size: 0.8rem;
+        font-style: italic;
+        color: #54595d;
+        margin-bottom: 1.2rem;
+    }
+
+    /* Layout: main column + infobox */
+    .wiki-body {
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        gap: 1.5rem;
+        align-items: start;
+    }
+    @media (max-width: 880px) {
+        .wiki-body { grid-template-columns: 1fr; }
+    }
+
+    .wiki-main h2 {
+        font-family: "Linux Libertine", Georgia, Times, serif;
+        font-size: 1.55rem;
+        font-weight: normal;
+        border-bottom: 1px solid #a2a9b1;
+        padding-bottom: 0.15rem;
+        margin: 1.8rem 0 0.8rem;
+    }
+    .wiki-main h3 {
+        font-family: "Linux Libertine", Georgia, Times, serif;
+        font-size: 1.2rem;
+        font-weight: bold;
+        margin: 1.25rem 0 0.5rem;
+    }
+    .wiki-main p { margin-bottom: 0.75rem; }
+    .wiki-main ul, .wiki-main ol { margin: 0 0 0.85rem 1.6rem; }
+    .wiki-main li { margin-bottom: 0.25rem; }
+    .wiki-main blockquote {
+        margin: 0.75rem 1rem;
+        padding: 0.5rem 1rem;
+        border-left: 3px solid #eaecf0;
+        color: #333;
+        font-style: italic;
+    }
+
+    /* Infobox */
+    .infobox {
+        font-size: 0.82rem;
+        border: 1px solid #a2a9b1;
+        background: #f8f9fa;
+        padding: 0.5rem;
+        line-height: 1.4;
+    }
+    .infobox .ib-title {
+        text-align: center;
+        font-weight: bold;
+        font-size: 1rem;
+        padding: 0.4rem 0;
+        border-bottom: 1px solid #a2a9b1;
+        margin-bottom: 0.4rem;
+    }
+    .infobox .ib-hero {
+        text-align: center;
+        padding: 1rem;
+        background: #fff;
+        border-bottom: 1px solid #eaecf0;
+        margin-bottom: 0.4rem;
+        font-family: "Linux Libertine", Georgia, serif;
+        color: #54595d;
+        font-style: italic;
+        font-size: 0.85rem;
+    }
+    .infobox .ib-hero .icon {
+        font-size: 2.2rem;
+        display: block;
+        color: #3b82f6;
+        margin-bottom: 0.3rem;
+        font-style: normal;
+    }
+    .infobox table { width: 100%; border-collapse: collapse; }
+    .infobox th, .infobox td {
+        text-align: left;
+        padding: 0.28rem 0.35rem;
+        vertical-align: top;
+        border-bottom: 1px solid #eaecf0;
+    }
+    .infobox th {
+        width: 110px;
+        font-weight: bold;
+        background: #eaf3ff;
+    }
+    .infobox .ib-section {
+        background: #ccd;
+        color: #000;
+        font-weight: bold;
+        text-align: center;
+        padding: 0.35rem;
+        border-bottom: 1px solid #a2a9b1;
+    }
+
+    /* Table of contents */
+    .wiki-toc {
+        display: inline-block;
+        background: #f8f9fa;
+        border: 1px solid #a2a9b1;
+        padding: 0.65rem 1rem;
+        margin: 1rem 0;
+        font-size: 0.9rem;
+    }
+    .wiki-toc .toc-head {
+        text-align: center;
+        font-weight: bold;
+        border-bottom: 1px solid #a2a9b1;
+        padding-bottom: 0.2rem;
+        margin-bottom: 0.4rem;
+    }
+    .wiki-toc ol { margin: 0 0 0 1.4rem; padding: 0; }
+    .wiki-toc ol ol { margin-left: 1.2rem; font-size: 0.88rem; }
+    .wiki-toc li { margin-bottom: 0.08rem; }
+    .wiki-toc a { color: #0645ad; }
+
+    /* Hat notes (small italic blurb under section headings) */
+    .hatnote {
+        font-style: italic;
+        font-size: 0.88rem;
+        color: #54595d;
+        margin: 0.2rem 0 0.8rem 1rem;
+    }
+
+    /* Refs */
+    sup.ref {
+        font-size: 0.76rem;
+        vertical-align: super;
+        line-height: 0;
+    }
+    sup.ref a { color: #0645ad; }
+    .wiki-refs {
+        font-size: 0.85rem;
+        column-count: 2;
+        column-gap: 1.5rem;
+    }
+    .wiki-refs ol { margin-left: 1.4rem; }
+    .wiki-refs li { margin-bottom: 0.35rem; break-inside: avoid; }
+    @media (max-width: 700px) {
+        .wiki-refs { column-count: 1; }
+    }
+
+    /* Categories footer */
+    .wiki-categories {
+        margin-top: 2rem;
+        padding: 0.5rem 0.75rem;
+        border-top: 1px solid #a2a9b1;
+        border-bottom: 1px solid #a2a9b1;
+        font-size: 0.85rem;
+    }
+    .wiki-categories .label { font-weight: bold; margin-right: 0.5rem; }
+    .wiki-categories a {
+        display: inline-block;
+        margin-right: 0.4rem;
+        padding: 0.1rem 0.4rem;
+        background: #eaecf0;
+        border-radius: 2px;
+    }
+
+    .wiki-retrieved {
+        margin-top: 1rem;
+        font-size: 0.78rem;
+        color: #72777d;
+        font-style: italic;
+    }
+
+    /* Small code table for the comparison matrix */
+    .wiki-compare {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0.75rem 0;
+        font-size: 0.88rem;
+    }
+    .wiki-compare th, .wiki-compare td {
+        border: 1px solid #a2a9b1;
+        padding: 0.35rem 0.55rem;
+        text-align: left;
+        vertical-align: top;
+    }
+    .wiki-compare th {
+        background: #eaf3ff;
+        font-weight: bold;
+    }
+    .wiki-compare tbody tr:nth-child(even) { background: #fafbfc; }
+    .wiki-compare td.yes { color: #14532d; }
+    .wiki-compare td.no  { color: #7c2d12; }
+
+    .wiki-terminology dt {
+        font-weight: bold;
+        margin-top: 0.55rem;
+    }
+    .wiki-terminology dd {
+        margin: 0 0 0.4rem 1.4rem;
+        color: #333;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wiki-wrap">
+
+    <div class="wiki-meta">From the internal reference library</div>
+    <h1 class="wiki-title">QMS Workflow Engine</h1>
+    <div class="wiki-subtitle">A hypothetical encyclopedia entry about this engine, written in the style of a Wikipedia article.</div>
+
+    <div class="wiki-body">
+        <div class="wiki-main">
+
+            <p>
+                The <strong>QMS Workflow Engine</strong> is a Python framework for building interactive workflow applications that serve humans and artificial-intelligence (AI) agents from a single source definition. Developed under the <em>Pipe Dream</em> project as part of a <a href="https://en.wikipedia.org/wiki/Good_manufacturing_practice">GMP</a>-inspired Quality Management System (QMS), it treats a web page and a machine-readable API as two projections of the same underlying state, an invariant the project refers to as <em>faithful projection</em>.<sup class="ref"><a href="#ref-1">[1]</a></sup> The framework uses a component tree as its primary abstraction, reaching a design recognizably adjacent to <a href="https://en.wikipedia.org/wiki/React_(JavaScript_library)">React</a> and similar front-end libraries despite being developed from different first principles.<sup class="ref"><a href="#ref-2">[2]</a></sup>
+            </p>
+
+            <p>
+                The engine is notable for making AI agents a first-class client: every rendered button corresponds to a machine-readable <em>affordance</em> exposed at the same <a href="https://en.wikipedia.org/wiki/HATEOAS">HATEOAS</a> URL, enabling a language model to drive any workflow without a parallel API schema.<sup class="ref"><a href="#ref-3">[3]</a></sup> The alignment between the two surfaces is enforced at continuous-integration time by a parity test suite.<sup class="ref"><a href="#ref-4">[4]</a></sup>
+            </p>
+
+            <p>
+                Initial development began in early 2026 as a clean-room rebuild of an earlier CLI-based workflow engine. The current architecture is the fourth major iteration.<sup class="ref"><a href="#ref-5">[5]</a></sup>
+            </p>
+
+            <div class="wiki-toc">
+                <div class="toc-head">Contents</div>
+                <ol>
+                    <li><a href="#history">History</a></li>
+                    <li><a href="#architecture">Architecture</a>
+                        <ol>
+                            <li><a href="#core-loop">The core loop</a></li>
+                            <li><a href="#three-trees">Seed, descriptor, and bound tree</a></li>
+                            <li><a href="#affordances">Affordances and HATEOAS</a></li>
+                        </ol>
+                    </li>
+                    <li><a href="#features">Features</a>
+                        <ol>
+                            <li><a href="#components">Component types</a></li>
+                            <li><a href="#faithful-projection">Faithful projection</a></li>
+                            <li><a href="#flotation">Affordance flotation</a></li>
+                            <li><a href="#mutable">Mutable pages</a></li>
+                            <li><a href="#error-boundaries">Error boundaries</a></li>
+                        </ol>
+                    </li>
+                    <li><a href="#philosophy">Design philosophy</a></li>
+                    <li><a href="#terminology">Terminology</a></li>
+                    <li><a href="#comparison">Comparison with other frameworks</a></li>
+                    <li><a href="#limitations">Limitations</a></li>
+                    <li><a href="#see-also">See also</a></li>
+                    <li><a href="#references">References</a></li>
+                    <li><a href="#external">External links</a></li>
+                </ol>
+            </div>
+
+            <h2 id="history">History</h2>
+            <p>
+                The engine originated as part of <em>Pipe Dream</em>, a project combining a Python-based quality management system with a downstream application called <em>Flow State</em>. The QMS was initially bootstrapped with a command-line interface for document control (change records, investigations, variance reports) but lacked a runtime for the actual workflows the QMS described.<sup class="ref"><a href="#ref-5">[5]</a></sup>
+            </p>
+            <p>
+                A first workflow engine, based on <a href="https://en.wikipedia.org/wiki/YAML">YAML</a> definitions and graph traversal, was prototyped in March 2026 (known internally as &ldquo;Workflow Engine v1&rdquo;). A web-based iteration followed (v2), which split handler logic across multiple implementations. In late March 2026 the codebase was deleted and rebuilt from first principles around a new abstraction the developers called the <em>eigenform</em>: a self-contained unit that rendered itself to HTML, serialized itself to JSON, and dispatched its own actions.<sup class="ref"><a href="#ref-5">[5]</a></sup>
+            </p>
+            <p>
+                The <em>eigenform</em> name, originally intended to evoke the <a href="https://en.wikipedia.org/wiki/Eigenvalues_and_eigenvectors">eigenvector</a> sense of &ldquo;preserves identity under transformation,&rdquo; was retired in April 2026 in favor of the industry-standard term <em>component</em>.<sup class="ref"><a href="#ref-6">[6]</a></sup> The project team described the original name as a path-dependent choice that obscured the architecture&rsquo;s fundamental similarity to existing component frameworks.<sup class="ref"><a href="#ref-2">[2]</a></sup>
+            </p>
+            <p>
+                Subsequent development focused on four &ldquo;framing passes&rdquo; aligning the engine&rsquo;s vocabulary with React conventions: naming internal invariants (props, state, derived; reconciliation), adding typed sibling references with bind-time validation, introducing render-time error boundaries, and finally renaming the base class from <code>Eigenform</code> to <code>Component</code>.<sup class="ref"><a href="#ref-1">[1]</a></sup>
+            </p>
+
+            <h2 id="architecture">Architecture</h2>
+
+            <h3 id="core-loop">The core loop</h3>
+            <p>
+                Every request processed by the engine walks four stages:<sup class="ref"><a href="#ref-7">[7]</a></sup>
+            </p>
+            <ol>
+                <li><strong>Define</strong>. Page definitions live as Python modules in <code>pages/</code>, auto-discovered on every request. A definition exports a <em>seed</em>: an unbound tree of component instances.</li>
+                <li><strong>Bind</strong>. The server attaches a per-instance <a href="https://en.wikipedia.org/wiki/JSON">JSON</a> file called the <em>Store</em> to the seed, producing a live, scoped, Store-connected tree.</li>
+                <li><strong>Serve</strong>. The bound tree serializes to JSON (for agent clients) or renders to HTML (for browsers). Both outputs describe the same state and expose the same URLs.</li>
+                <li><strong>Handle</strong>. On a <code>POST</code>, the server rebinds, walks to the target component by URL path, and invokes its <code>_handle()</code> method, which validates the body, writes to the Store, and returns the updated state.</li>
+            </ol>
+            <p>
+                The server holds no long-lived component tree in memory; every request rebuilds the tree from the seed plus the Store. Because the Store is the only authoritative mutable state, the engine is trivially horizontally scalable: any server can handle any request, and editing a page definition takes effect on the next request with no restart.<sup class="ref"><a href="#ref-7">[7]</a></sup>
+            </p>
+
+            <h3 id="three-trees">Seed, descriptor, and bound tree</h3>
+            <p>
+                Three related trees participate in rendering any page:<sup class="ref"><a href="#ref-8">[8]</a></sup>
+            </p>
+            <ul>
+                <li>The <strong>seed tree</strong> is the Python definition in <code>pages/*.py</code>. Immutable, holds callables (lambdas, validators, compute functions), has no identity.</li>
+                <li>The <strong>descriptor tree</strong> is a JSON-serializable snapshot stored in the Store at <code>__structure</code> keys. It is the canonical source of truth for any runtime-editable structure.</li>
+                <li>The <strong>bound tree</strong> is the live, scoped instance tree the engine renders and serializes. Rebuilt every request.</li>
+            </ul>
+            <p>
+                The operation that produces the bound tree from a seed plus a descriptor is called <strong>reconciliation</strong>, and is exposed under both names (<code>from_descriptor</code> and <code>reconcile</code>) for discoverability. It walks the descriptor, matches each node against the seed by key, deepcopies the matched seed to preserve callables, and applies the descriptor&rsquo;s scalar overrides on top.<sup class="ref"><a href="#ref-8">[8]</a></sup>
+            </p>
+
+            <h3 id="affordances">Affordances and HATEOAS</h3>
+            <p>
+                Every component&rsquo;s JSON serialization includes a list of <strong>affordances</strong>: dicts describing the actions currently available, with label, HTTP method, URL, POST-body template, and a natural-language instruction. Both browsers and agents consume affordances directly &mdash; browsers render them as buttons, agents interpolate values into the body template and POST.<sup class="ref"><a href="#ref-3">[3]</a></sup>
+            </p>
+            <p>
+                This is the <a href="https://en.wikipedia.org/wiki/HATEOAS">HATEOAS</a> principle applied consistently: the server&rsquo;s response describes the actions available next, so no out-of-band API schema is required. An AI agent interacting with the engine can walk any workflow by reading each response and picking an affordance to follow, without holding a separate specification.<sup class="ref"><a href="#ref-3">[3]</a></sup>
+            </p>
+
+            <h2 id="features">Features</h2>
+
+            <h3 id="components">Component types</h3>
+            <p class="hatnote">See also: <a href="/readme">Component Reference</a>.</p>
+            <p>
+                The engine ships with 26 built-in component classes registered under 31 names, covering data leaves (<code>TextComponent</code>, <code>NumberComponent</code>, <code>DateComponent</code>, <code>BooleanComponent</code>, <code>ChoiceComponent</code>, <code>CheckboxComponent</code>, <code>MultiComponent</code>), collections (<code>ListComponent</code>, <code>SetComponent</code>, <code>DictionaryComponent</code>, <code>TableComponent</code>), containers (<code>PageComponent</code>, <code>GroupComponent</code>, <code>NavigationComponent</code>, <code>RepeaterComponent</code>), reactive components (<code>SwitchComponent</code>, <code>VisibilityComponent</code>, <code>DynamicChoiceComponent</code>, <code>ComputedComponent</code>, <code>ScoreComponent</code>, <code>ValidationComponent</code>), and wrappers (<code>HistoryComponent</code>, <code>ActionComponent</code>, <code>InfoComponent</code>).<sup class="ref"><a href="#ref-9">[9]</a></sup>
+            </p>
+            <p>
+                A single <code>NavigationComponent</code> class replaces what other frameworks expose as four separate widgets (tabs, wizards, sequences, accordions), switching behavior via a <code>mode</code> prop that accepts one of four <a href="https://en.wikipedia.org/wiki/Literal_type">literal</a> values.<sup class="ref"><a href="#ref-9">[9]</a></sup>
+            </p>
+
+            <h3 id="faithful-projection">Faithful projection</h3>
+            <p>
+                <em>Faithful projection</em> is the engine&rsquo;s term for the invariant that JSON and HTML views of a page describe the same state and expose the same URL surface. The property is enforced at continuous-integration time by a 72-test parity suite spanning nine test categories, including forward parity (every JSON URL appears in HTML), reverse parity (every clickable HTML URL is declared in JSON), action-name parity, URL resolvability, and structural shape tests.<sup class="ref"><a href="#ref-4">[4]</a></sup>
+            </p>
+
+            <h3 id="flotation">Affordance flotation</h3>
+            <p>
+                Affordances marked <code>_floatable</code> by a component serialize through the tree and surface at the top-level <code>PageComponent</code>, collapsed into a single parameterized compound affordance with a structured <code>targets</code> dictionary. The mechanism is conceptually similar to React&rsquo;s <code>createPortal</code>, though applied to machine-readable JSON rather than DOM placement, and with a novel merge step that groups affordances of the same action kind together.<sup class="ref"><a href="#ref-10">[10]</a></sup>
+            </p>
+            <p>
+                Flotation reduces the size of agent-facing JSON without affecting HTML rendering. On flat pages, affordance count drops by roughly 61%; on deeply nested pages the savings are larger.<sup class="ref"><a href="#ref-10">[10]</a></sup>
+            </p>
+
+            <h3 id="mutable">Mutable pages</h3>
+            <p>
+                Pages declared with <code>mutable_structure=True</code> permit runtime editing of the component tree itself, including adding, removing, moving, reparenting, and grouping children. Edits persist to the page&rsquo;s <code>__structure</code> descriptor and survive restarts. The feature is exposed to both human users (via a tile-based structural editor and drag-and-drop) and to AI agents (via a documented action protocol with actions named <code>add_component</code>, <code>remove_component</code>, <code>move_component</code>, <code>reparent_component</code>, <code>group_components</code>, <code>ungroup_component</code>, and <code>rebuild_from_seed</code>).<sup class="ref"><a href="#ref-11">[11]</a></sup>
+            </p>
+            <p>
+                Components of type <code>ActionComponent</code> can additionally return <code>structural_actions</code> from their handlers, enabling <em>self-modifying pages</em> in which the tree reshapes itself in response to user interaction. This capability was introduced under the internal name &ldquo;fractal complexity plan&rdquo; in March 2026.<sup class="ref"><a href="#ref-5">[5]</a></sup>
+            </p>
+
+            <h3 id="error-boundaries">Error boundaries</h3>
+            <p>
+                As of April 2026, the base <code>Component</code> class implements <code>render_safely()</code>, which wraps <code>render()</code> in a try/except and returns a structured error card on failure. Eighteen child-render call sites across ten component modules delegate to <code>render_safely()</code> so a single component&rsquo;s rendering exception does not take the whole page down. The error card is theme-aware and includes an optional Python traceback in <a href="https://en.wikipedia.org/wiki/Flask_(web_framework)">Flask</a> debug mode.<sup class="ref"><a href="#ref-1">[1]</a></sup>
+            </p>
+
+            <h2 id="philosophy">Design philosophy</h2>
+            <p>
+                The engine was designed around two principles described in the project&rsquo;s architectural documentation:<sup class="ref"><a href="#ref-2">[2]</a></sup><sup class="ref"><a href="#ref-12">[12]</a></sup>
+            </p>
+            <ul>
+                <li><strong>Dual-consumer equivalence.</strong> Human operators and AI agents interact with the same URL, take the same actions against the same endpoints, and see equivalent representations of the same state. Neither surface is a second-class citizen.</li>
+                <li><strong>Stateless server authority.</strong> The server holds no in-memory component tree between requests. The Store JSON file is the sole source of truth; every request rebuilds the tree from a seed plus the Store.</li>
+            </ul>
+            <p>
+                The project&rsquo;s self-analysis document observes that the design landed &ldquo;closer to React than anyone planned,&rdquo; despite emerging from independent first principles (HATEOAS, content negotiation, faithful projection, stateless server, self-describing documents).<sup class="ref"><a href="#ref-1">[1]</a></sup> The developers describe this convergence as either evidence that React solves problems common to any component-based interactive application, or that both systems converged on shared invariants from distinct starting points.<sup class="ref"><a href="#ref-1">[1]</a></sup>
+            </p>
+
+            <h2 id="terminology">Terminology</h2>
+            <dl class="wiki-terminology">
+                <dt>Affordance</dt>
+                <dd>A dict describing an available action, with label, method, URL, body template, and instruction. Plural <em>affordances</em>. A component&rsquo;s serialization includes its current affordance list.</dd>
+
+                <dt>Bind</dt>
+                <dd>The operation that attaches a Store to a seed and produces a live tree. Analogous to React&rsquo;s component mount.</dd>
+
+                <dt>Component</dt>
+                <dd>The engine&rsquo;s base abstraction, previously called an <em>eigenform</em>. Each concrete component is a Python dataclass subclass (<code>TextComponent</code>, <code>NavigationComponent</code>, etc.) implementing the protocol: <code>serialize()</code>, <code>render()</code>, <code>_handle()</code>.</dd>
+
+                <dt>Descriptor</dt>
+                <dd>A JSON-serializable snapshot of a component tree, stored at the <code>__structure</code> key inside the Store. Canonical source of truth for structure and props.</dd>
+
+                <dt>Faithful projection</dt>
+                <dd>The invariant that HTML and JSON views of a page expose the same URL surface and describe the same state. Enforced by parity tests.</dd>
+
+                <dt>Reconciliation</dt>
+                <dd>The operation that builds a live component tree from a descriptor plus a seed. Implemented by the <code>from_descriptor</code> function (aliased as <code>reconcile</code>).</dd>
+
+                <dt>Seed</dt>
+                <dd>The unbound Python definition of a page. Lives in <code>pages/*.py</code> as a module-level <code>definition</code> variable.</dd>
+
+                <dt>Store</dt>
+                <dd>The per-instance JSON file holding all mutable state for a page instance. One file per instance at <code>data/{instance_id}.json</code>.</dd>
+            </dl>
+
+            <h2 id="comparison">Comparison with other frameworks</h2>
+            <table class="wiki-compare">
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>QMS Engine</th>
+                        <th>React</th>
+                        <th>Phoenix LiveView</th>
+                        <th>Svelte / SvelteKit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Component-based</td>
+                        <td class="yes">Yes</td>
+                        <td class="yes">Yes</td>
+                        <td class="yes">Yes</td>
+                        <td class="yes">Yes</td>
+                    </tr>
+                    <tr>
+                        <td>Server-authoritative state</td>
+                        <td class="yes">Yes</td>
+                        <td class="no">No (client-first)</td>
+                        <td class="yes">Yes</td>
+                        <td>Optional</td>
+                    </tr>
+                    <tr>
+                        <td>First-class machine client</td>
+                        <td class="yes">Yes (HATEOAS affordances)</td>
+                        <td class="no">No</td>
+                        <td class="no">No</td>
+                        <td class="no">No</td>
+                    </tr>
+                    <tr>
+                        <td>Single definition, dual surface</td>
+                        <td class="yes">Yes (JSON + HTML)</td>
+                        <td class="no">No</td>
+                        <td class="no">No</td>
+                        <td class="no">No</td>
+                    </tr>
+                    <tr>
+                        <td>Reconciliation</td>
+                        <td class="yes">Yes (<code>from_descriptor</code>)</td>
+                        <td class="yes">Yes (fiber tree)</td>
+                        <td>Partial</td>
+                        <td class="yes">Yes (compiled)</td>
+                    </tr>
+                    <tr>
+                        <td>Client-side DOM diff</td>
+                        <td class="yes">Yes (morphdom)</td>
+                        <td class="yes">Yes (virtual DOM)</td>
+                        <td class="yes">Yes (morphdom)</td>
+                        <td>Compiled updates</td>
+                    </tr>
+                    <tr>
+                        <td>Portal / flotation</td>
+                        <td class="yes">Yes (agent-JSON)</td>
+                        <td class="yes">Yes (DOM)</td>
+                        <td class="no">No</td>
+                        <td class="yes">Yes</td>
+                    </tr>
+                    <tr>
+                        <td>Error boundaries</td>
+                        <td class="yes">Yes (render-time)</td>
+                        <td class="yes">Yes</td>
+                        <td>Partial</td>
+                        <td class="yes">Yes</td>
+                    </tr>
+                    <tr>
+                        <td>Runtime-editable structure</td>
+                        <td class="yes">Yes (mutable pages)</td>
+                        <td class="no">No</td>
+                        <td class="no">No</td>
+                        <td class="no">No</td>
+                    </tr>
+                    <tr>
+                        <td>Written in</td>
+                        <td>Python</td>
+                        <td>JavaScript</td>
+                        <td>Elixir</td>
+                        <td>JavaScript/TS</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p>
+                The closest analogue in spirit is <a href="https://en.wikipedia.org/wiki/Phoenix_(web_framework)">Phoenix LiveView</a> &mdash; both systems maintain server-authoritative component state, use morphdom-style DOM diffing, and eschew client-side hydration. Unlike LiveView, the QMS engine treats machine agents as a peer client rather than a consumer of a separate API, and its state lives in per-instance JSON rather than in-memory server processes.<sup class="ref"><a href="#ref-2">[2]</a></sup>
+            </p>
+
+            <h2 id="limitations">Limitations</h2>
+            <p>
+                The project&rsquo;s self-analysis document (<em>Deep Dive</em>) enumerates several acknowledged gaps:<sup class="ref"><a href="#ref-12">[12]</a></sup>
+            </p>
+            <ul>
+                <li><strong>Unstructured action dispatch.</strong> The engine has 88 <code>if action == "..."</code> branches across 20 files, implementing what amounts to a <a href="https://en.wikipedia.org/wiki/Redux_(JavaScript_library)">Redux</a>-style reducer pattern without the name or an explicit registry. A formal action registry is on the backlog.</li>
+                <li><strong>Silent callable-preservation failure.</strong> When a seed is renamed or deleted and reconciliation falls back to fresh construction, components with callable-valued fields (<code>ComputedComponent.compute</code>, <code>DynamicChoiceComponent.options_fn</code>) silently receive <code>None</code>. The fix requires the seed parameter when callable fields are declared, with a typed diagnostic on mismatch.</li>
+                <li><strong>No Context primitive.</strong> The engine has no ancestor-to-descendant data channel equivalent to React Context. Sibling references exist but propagate only laterally. A Context primitive has been considered and explicitly parked until a concrete use case arrives.</li>
+                <li><strong>No concurrency model.</strong> Two simultaneous writers to the same component produce last-write-wins. The Store uses atomic write-temp-then-rename on every write, but there is no optimistic concurrency or conflict detection.</li>
+            </ul>
+
+            <h2 id="see-also">See also</h2>
+            <ul>
+                <li><a href="/framing">Conceptual framing</a> &mdash; extended reference for the engine&rsquo;s vocabulary alignment with React.</li>
+                <li><a href="/readme">Engine README</a> &mdash; full component catalog and HTTP API reference.</li>
+                <li><a href="/deepdive">Deep Dive</a> &mdash; the engine&rsquo;s self-analysis, including open limitations.</li>
+                <li><a href="/learn">Learning Portal</a> &mdash; progressive tutorial for new contributors.</li>
+                <li><a href="/portal">Agent Portal</a> &mdash; live instance launcher.</li>
+            </ul>
+
+            <h2 id="references">References</h2>
+            <div class="wiki-refs">
+                <ol>
+                    <li id="ref-1"><a href="/framing">Conceptual Framing</a>. QMS Workflow Engine, &sect;1 (Thesis), &sect;5 (Error boundaries), &sect;8 (How we got here).</li>
+                    <li id="ref-2"><a href="/framing#s2">Conceptual Framing &sect;2</a>, &ldquo;The Mapping.&rdquo; Compares engine vocabulary with React conventions row by row.</li>
+                    <li id="ref-3"><a href="/learn/humans-and-agents">Humans and Agents</a>. Learning Portal Lesson 5. Affordances, HATEOAS, and controlled-vs-uncontrolled state.</li>
+                    <li id="ref-4"><a href="/learn/affordances">Affordances, Rendering, and Parity Tests</a>. Learning Portal Lesson 6. The 72-test parity suite across 9 categories.</li>
+                    <li id="ref-5"><a href="/readme">Engine README</a>, &ldquo;History&rdquo;. Project state arc from YAML prototype to current architecture.</li>
+                    <li id="ref-6"><code>docs/architecture.md</code> change log, entry for Session-2026-04-17-002. Eigenform &rarr; Component rename rationale.</li>
+                    <li id="ref-7"><a href="/learn/loop">The Core Loop</a>. Learning Portal Lesson 2.</li>
+                    <li id="ref-8"><a href="/learn/reconciliation">Reconciliation and the Descriptor</a>. Learning Portal Lesson 7.</li>
+                    <li id="ref-9"><a href="/portal">Agent Portal</a>. Spawn a Component Gallery instance for a live tour.</li>
+                    <li id="ref-10"><a href="/framing#s2">Conceptual Framing &sect;2</a>, &ldquo;Portal&rdquo; row; <code>docs/architecture.md</code> &sect;4, &ldquo;Affordance flotation.&rdquo;</li>
+                    <li id="ref-11"><a href="/learn/mutation">Mutation Mechanics</a>. Learning Portal Lesson 8.</li>
+                    <li id="ref-12"><a href="/deepdive">Deep Dive</a>. Self-analysis with explicit list of architectural gaps.</li>
+                </ol>
+            </div>
+
+            <h2 id="external">External links</h2>
+            <ul>
+                <li><a href="https://github.com/whharris917/qms-workflow-engine">QMS Workflow Engine repository</a> on GitHub.</li>
+                <li><a href="https://github.com/whharris917/pipe-dream">Pipe Dream project</a> &mdash; parent project including the QMS documents.</li>
+            </ul>
+
+            <div class="wiki-categories">
+                <span class="label">Categories:</span>
+                <a href="#">Python web frameworks</a>
+                <a href="#">Component-based software engineering</a>
+                <a href="#">Human&ndash;AI interaction</a>
+                <a href="#">Hypermedia frameworks</a>
+                <a href="#">Quality management software</a>
+            </div>
+
+            <p class="wiki-retrieved">
+                Retrieved from the internal project library. Last updated: Session-2026-04-17-002.
+            </p>
+
+        </div><!-- /wiki-main -->
+
+        <aside class="wiki-main">
+            <div class="infobox">
+                <div class="ib-title">QMS Workflow Engine</div>
+                <div class="ib-hero">
+                    <span class="icon">&#9881;</span>
+                    <em>&ldquo;One definition,<br>two audiences.&rdquo;</em>
+                </div>
+                <table>
+                    <tr><th>Developer</th>         <td>Pipe Dream project (<a href="https://github.com/whharris917">whharris917</a>)</td></tr>
+                    <tr><th>Initial release</th>   <td>March 25, 2026<br><small>(as <em>Eigenform</em> engine)</small></td></tr>
+                    <tr><th>Stable release</th>    <td>2026-04-17 &bull; <code>dev/content-model-unification</code></td></tr>
+                    <tr><th>Repository</th>        <td><a href="https://github.com/whharris917/qms-workflow-engine">github.com/whharris917/<wbr>qms-workflow-engine</a></td></tr>
+                    <tr><th>Written in</th>        <td><a href="https://en.wikipedia.org/wiki/Python_(programming_language)">Python</a> (3.11+)</td></tr>
+                    <tr><th>Engine</th>            <td><a href="https://en.wikipedia.org/wiki/Flask_(web_framework)">Flask</a>, <a href="https://en.wikipedia.org/wiki/Jinja_(template_engine)">Jinja2</a>, <a href="https://github.com/patrick-steele-idem/morphdom">morphdom</a></td></tr>
+                    <tr><th>Platform</th>          <td>Cross-platform (server-side)</td></tr>
+                    <tr><th>License</th>           <td>(project internal)</td></tr>
+                    <tr><th>Website</th>           <td><a href="/">127.0.0.1:5000</a></td></tr>
+
+                    <tr><td class="ib-section" colspan="2">Key concepts</td></tr>
+                    <tr><th>Base abstraction</th>  <td><code>Component</code> (formerly <code>Eigenform</code>)</td></tr>
+                    <tr><th>Built-in types</th>    <td>26 classes, 31 registered names</td></tr>
+                    <tr><th>Rendering</th>         <td>Server-side HTML + JSON; morphdom on client</td></tr>
+                    <tr><th>Persistence</th>       <td>Per-instance JSON files</td></tr>
+
+                    <tr><td class="ib-section" colspan="2">Parity</td></tr>
+                    <tr><th>Test suite</th>        <td>72 tests across 9 categories</td></tr>
+                    <tr><th>Enforced at</th>       <td>Continuous integration</td></tr>
+
+                    <tr><td class="ib-section" colspan="2">Related</td></tr>
+                    <tr><th>Paradigm</th>          <td>Component-based, <a href="https://en.wikipedia.org/wiki/HATEOAS">HATEOAS</a>, stateless server</td></tr>
+                    <tr><th>Similar projects</th>  <td>React, Phoenix LiveView, Hotwire</td></tr>
+                </table>
+            </div>
+        </aside>
+
+    </div><!-- /wiki-body -->
+
+</div>
+{% endblock %}

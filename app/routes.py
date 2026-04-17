@@ -160,6 +160,12 @@ def framing():
     return render_template("framing.html", active_page="framing")
 
 
+@bp.route("/wiki")
+def wiki():
+    """Hypothetical Wikipedia-style article about the engine."""
+    return render_template("wiki.html", active_page="wiki")
+
+
 # Learning Portal — progressive tutorial pages.
 # Each lesson is a hand-rolled HTML template extending learn/_lesson_base.html.
 # The slug maps to a template file under app/templates/learn/.
