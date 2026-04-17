@@ -435,6 +435,33 @@ function _efSyncTooltips() {
 }
 _efSyncTooltips();
 
+/* Morphdom integration: in-place DOM diff instead of innerHTML swap.
+ * Preserves focus, scroll (window + nested), caret position, in-progress
+ * input values, <details> open/closed, and CSS transitions in flight.
+ * Falls back to innerHTML swap if morphdom isn't loaded. */
+function _efSwap(html) {
+    var root = document.getElementById('page-content');
+    if (typeof morphdom === 'undefined') {
+        var scrollY = window.scrollY;
+        root.innerHTML = html;
+        window.scrollTo(0, scrollY);
+        return;
+    }
+    morphdom(root, '<div id="page-content">' + html + '</div>', {
+        /* If a focused input would be morphed, leave it alone so the user
+         * doesn't lose what they're typing. The structural diff still
+         * happens around it. */
+        onBeforeElUpdated: function(fromEl, toEl) {
+            if (fromEl === document.activeElement &&
+                (fromEl.tagName === 'INPUT' || fromEl.tagName === 'TEXTAREA' ||
+                 fromEl.tagName === 'SELECT')) {
+                return false;
+            }
+            return true;
+        }
+    });
+}
+
 function _efPost(url, body) {
     fetch(url, {
         method: 'POST',
@@ -446,9 +473,7 @@ function _efPost(url, body) {
     }).then(function(resp) {
         return resp.text();
     }).then(function(html) {
-        var scrollY = window.scrollY;
-        document.getElementById('page-content').innerHTML = html;
-        window.scrollTo(0, scrollY);
+        _efSwap(html);
         _efSyncTooltips();
     });
 }

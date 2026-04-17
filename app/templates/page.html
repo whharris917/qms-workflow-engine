@@ -55,6 +55,7 @@
     /* Apply on load */
     _applyDebug();
 </script>
+<script src="{{ url_for('static', filename='morphdom-umd.min.js') }}"></script>
 <script src="{{ url_for('static', filename='eigenform.js') }}"></script>
 <script>
     /* SSE: reload page when another client mutates state.
@@ -73,7 +74,6 @@
     var source = new EventSource('/pages/{{ instance_id }}/stream');
     source.onmessage = function(event) {
         if (Date.now() - _selfUpdated < 500) return;
-        var scrollY = window.scrollY;
         fetch('/pages/{{ instance_id }}', {
             headers: {'Accept': 'text/html'}
         }).then(function(resp) {
@@ -81,10 +81,7 @@
         }).then(function(html) {
             var doc = new DOMParser().parseFromString(html, 'text/html');
             var content = doc.getElementById('page-content');
-            if (content) {
-                document.getElementById('page-content').innerHTML = content.innerHTML;
-                window.scrollTo(0, scrollY);
-            }
+            if (content) _efSwap(content.innerHTML);
         });
     };
 </script>
