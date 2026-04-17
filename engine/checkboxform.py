@@ -92,7 +92,7 @@ class CheckboxForm(Eigenform):
         items = self._effective_items
         affs = [
             CheckboxAffordance(
-                label=f"Set {self.effective_label}",
+                label=f"Set {self.label}",
                 method="POST",
                 url=self.url,
                 body={item: "<true | false>" for item in items},

@@ -35,24 +35,13 @@ class ListForm(Eigenform):
     must_follow: dict[str, list[str]] = field(default_factory=dict)
     allow_constraints: bool = True
 
-    @property
-    def _effective_allow_constraints(self) -> bool:
-        """allow_constraints from store override if set, else Python default."""
-        if self._store is not None:
-            override = self._store.get(self._scope, f"{self.key}.__config")
-            if override is not None:
-                return override.get("allow_constraints", self.allow_constraints)
-        return self.allow_constraints
-
     def _snapshot_edit_state(self) -> dict:
         state = super()._snapshot_edit_state()
-        state["__config"] = self._store.get(self._scope, f"{self.key}.__config")
         state["__value"] = self._store.get(self._scope, self.key)
         return state
 
     def _restore_edit_state(self, state: dict):
         super()._restore_edit_state(state)
-        self._store.set(self._scope, f"{self.key}.__config", state.get("__config"))
         self._store.set(self._scope, self.key, state.get("__value"))
 
     def _get_edit_affordances(self) -> list[Affordance]:
@@ -68,7 +57,7 @@ class ListForm(Eigenform):
         affs.append(Affordance(
             label="Toggle Constraints", method="POST", url=self.url,
             body={"action": "toggle_constraints"},
-            instruction=f"Toggle whether ordering constraints are allowed. Currently: {self._effective_allow_constraints}",
+            instruction=f"Toggle whether ordering constraints are allowed. Currently: {self.allow_constraints}",
         ))
         return affs
 
@@ -78,7 +67,7 @@ class ListForm(Eigenform):
             id_prefix="item",
             fixed_items=self.fixed_items,
             static_must_follow=self.must_follow,
-            allow_constraints=self._effective_allow_constraints,
+            allow_constraints=self.allow_constraints,
             relax_fixed=self.edit_mode,
         )
         oc.load(self.value)
@@ -185,7 +174,7 @@ class ListForm(Eigenform):
                 ))
 
         # Ordering constraint affordances
-        if self._effective_allow_constraints and len(items) > 1:
+        if self.allow_constraints and len(items) > 1:
             item_ids = [i["id"] for i in items]
             item_labels = {i["id"]: i["value"] for i in items}
             id_labels = [f"{i['id']} ({i['value']})" for i in items]
@@ -228,7 +217,7 @@ class ListForm(Eigenform):
                                url=self.url, label=data["label"],
                                instruction=data.get("instruction") or "",
                                oc=oc,
-                               allow_constraints=self._effective_allow_constraints,
+                               allow_constraints=self.allow_constraints,
                                all_must_follow=oc.all_must_follow,
                                id_to_val=oc.id_to_value,
                                static_pairs=static_pairs,
@@ -239,9 +228,7 @@ class ListForm(Eigenform):
 
         if action == "toggle_constraints" and self.editable and self.edit_mode:
             self._push_undo()
-            cfg = self._store.get(self._scope, f"{self.key}.__config") or {}
-            cfg["allow_constraints"] = not self._effective_allow_constraints
-            self._store.set(self._scope, f"{self.key}.__config", cfg)
+            self._set_my_config("allow_constraints", not self.allow_constraints)
             return self.serialize()
 
         # Edit-mode only actions

@@ -79,16 +79,17 @@ class GroupForm(Eigenform):
     def _bind_children(self, store: Store, url_prefix: str):
         self._seed = list(self.eigenforms)
 
-        if self.editable:
-            stored = store.get(self.key, "__structure")
-            if stored is None:
-                structure = [ef.to_descriptor() for ef in self._seed]
-                store.set(self.key, "__structure", structure)
-                source = self._seed
-            else:
-                source = self._reconstruct(stored)
+        # __structure is the on-disk source of truth for child structure
+        # AND for child seed-time field overrides (label, instruction, config).
+        # Always write it so children's _set_my_field/_set_my_config calls
+        # have a descriptor entry to mutate, regardless of editability.
+        stored = store.get(self.key, "__structure")
+        if stored is None:
+            structure = [ef.to_descriptor() for ef in self._seed]
+            store.set(self.key, "__structure", structure)
+            source = self._seed
         else:
-            source = self.eigenforms
+            source = self._reconstruct(stored)
 
         self.eigenforms = [
             ef.bind(store=store, scope=self.key, url_prefix=f"{url_prefix}/{self.key}")

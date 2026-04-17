@@ -92,8 +92,128 @@ class Eigenform:
         bound._store = store
         bound._scope = scope
         bound._url_prefix = url_prefix
+        bound._migrate_legacy_overrides()
         bound._bind_children(store, url_prefix)
         return bound
+
+    # --- Descriptor as single source of truth ---
+
+    def _get_my_descriptor(self) -> dict | None:
+        """Return this eigenform's entry in the parent container's __structure.
+
+        Returns None if no parent structure exists or this eigenform isn't
+        in it (e.g., top-level seed before first __structure write).
+        """
+        if self._store is None or self._scope is None:
+            return None
+        structure = self._store.get(self._scope, "__structure")
+        if not structure:
+            return None
+        for desc in structure:
+            if desc.get("key") == self.key:
+                return desc
+        return None
+
+    def _set_my_field(self, name: str, value):
+        """Set a top-level field (label, instruction, editable) in my descriptor.
+
+        The parent's __structure is the canonical record. Also updates
+        self.{name} so the runtime instance stays consistent within this
+        request before the next bind.
+        """
+        if self._store is None or self._scope is None:
+            return
+        structure = self._store.get(self._scope, "__structure") or []
+        for desc in structure:
+            if desc.get("key") == self.key:
+                if value is None:
+                    desc.pop(name, None)
+                else:
+                    desc[name] = value
+                self._store.set(self._scope, "__structure", structure)
+                setattr(self, name, value)
+                return
+
+    def _set_my_config(self, name: str, value):
+        """Set a config-level field (mode, multiline, min_length, …) in my descriptor.
+
+        Also updates self.{name} so the runtime instance reflects the change
+        within this request.
+        """
+        if self._store is None or self._scope is None:
+            return
+        structure = self._store.get(self._scope, "__structure") or []
+        for desc in structure:
+            if desc.get("key") == self.key:
+                cfg = desc.setdefault("config", {})
+                cfg[name] = value
+                if not cfg:
+                    desc.pop("config", None)
+                self._store.set(self._scope, "__structure", structure)
+                setattr(self, name, value)
+                return
+
+    def _apply_descriptor(self, desc: dict):
+        """Apply scalar fields from a descriptor onto this instance.
+
+        Called by from_descriptor on the seed-match path so the descriptor
+        wins over the seed's defaults. Subclasses override to handle
+        non-scalar fields (e.g., MultiForm.fields = list[FieldDescriptor]).
+        """
+        if "label" in desc:
+            self.label = desc["label"]
+        if "instruction" in desc:
+            self.instruction = desc["instruction"]
+        self.editable = bool(desc.get("editable", False))
+        for k, v in (desc.get("config") or {}).items():
+            setattr(self, k, v)
+
+    def _migrate_legacy_overrides(self):
+        """Fold any legacy __config/__label/__instruction entries for this
+        eigenform into the parent's __structure descriptor, then delete them.
+
+        This runs once per bind. After migration, __structure is the only
+        place these fields are stored; subsequent reads come from self.{field}.
+        """
+        if self._store is None or self._scope is None:
+            return
+        legacy_label = self._store.get(self._scope, f"{self.key}.__label")
+        legacy_instr = self._store.get(self._scope, f"{self.key}.__instruction")
+        legacy_cfg = self._store.get(self._scope, f"{self.key}.__config")
+        if legacy_label is None and legacy_instr is None and legacy_cfg is None:
+            return
+        structure = self._store.get(self._scope, "__structure")
+        if not structure:
+            return
+        changed = False
+        for desc in structure:
+            if desc.get("key") != self.key:
+                continue
+            if legacy_label is not None:
+                desc["label"] = legacy_label
+                changed = True
+            if legacy_instr is not None:
+                desc["instruction"] = legacy_instr
+                changed = True
+            if legacy_cfg is not None:
+                cfg = desc.setdefault("config", {})
+                cfg.update(legacy_cfg)
+                changed = True
+            break
+        if changed:
+            self._store.set(self._scope, "__structure", structure)
+            # Re-apply the freshly-folded descriptor onto this instance
+            # so the runtime reflects the migrated overrides.
+            for desc in structure:
+                if desc.get("key") == self.key:
+                    self._apply_descriptor(desc)
+                    break
+        if legacy_label is not None:
+            self._store.delete(self._scope, f"{self.key}.__label")
+        if legacy_instr is not None:
+            self._store.delete(self._scope, f"{self.key}.__instruction")
+        if legacy_cfg is not None:
+            self._store.delete(self._scope, f"{self.key}.__config")
 
     @property
     def value(self) -> Any:
@@ -121,35 +241,33 @@ class Eigenform:
             return False
         return bool(self._store.get(self._scope, f"{self.key}.__edit"))
 
-    @property
-    def effective_label(self) -> str:
-        """The label to display — store override if set, else Python default."""
-        if self._store is not None:
-            override = self._store.get(self._scope, f"{self.key}.__label")
-            if override is not None:
-                return override
-        return self.label
-
-    @property
-    def effective_instruction(self) -> str | None:
-        """The instruction to display — store override if set, else Python default."""
-        if self._store is not None:
-            override = self._store.get(self._scope, f"{self.key}.__instruction")
-            if override is not None:
-                return override
-        return self.instruction
-
     def _snapshot_edit_state(self) -> dict:
-        """Capture current edit state. Subclasses extend to include config/children."""
-        return {
-            "__label": self._store.get(self._scope, f"{self.key}.__label"),
-            "__instruction": self._store.get(self._scope, f"{self.key}.__instruction"),
-        }
+        """Capture current edit state by snapshotting this eigenform's entry
+        in the parent's __structure. Subclasses extend to include child data
+        scopes that live outside the descriptor (e.g., child stores).
+        """
+        import copy as _copy
+        desc = self._get_my_descriptor()
+        return {"__descriptor": _copy.deepcopy(desc) if desc else None}
 
     def _restore_edit_state(self, state: dict):
-        """Restore edit state from snapshot. Subclasses extend."""
-        self._store.set(self._scope, f"{self.key}.__label", state.get("__label"))
-        self._store.set(self._scope, f"{self.key}.__instruction", state.get("__instruction"))
+        """Restore the descriptor entry from a snapshot and re-apply scalar
+        fields to this instance so the runtime reflects the restoration.
+        """
+        snap = state.get("__descriptor")
+        if snap is None or self._store is None or self._scope is None:
+            return
+        structure = self._store.get(self._scope, "__structure") or []
+        replaced = False
+        for i, desc in enumerate(structure):
+            if desc.get("key") == self.key:
+                structure[i] = snap
+                replaced = True
+                break
+        if not replaced:
+            structure.append(snap)
+        self._store.set(self._scope, "__structure", structure)
+        self._apply_descriptor(snap)
 
     def _push_undo(self):
         """Snapshot current edit state and push to undo stack."""
@@ -172,10 +290,10 @@ class Eigenform:
                 method="POST",
                 url=self.url,
                 body={"action": "set_label", "label": "<new label>"},
-                instruction=f"Rename this eigenform. Current label: {self.effective_label}",
+                instruction=f"Rename this eigenform. Current label: {self.label}",
             ),
         ]
-        current_instr = self.effective_instruction or ""
+        current_instr = self.instruction or ""
         affs.append(
             Affordance(
                 label="Set Instruction",
@@ -251,8 +369,8 @@ class Eigenform:
         return {
             "form": self.form,
             "key": self.key,
-            "label": self.effective_label,
-            "instruction": self.effective_instruction,
+            "label": self.label,
+            "instruction": self.instruction,
         }
 
     def _serialize_state(self) -> dict:
@@ -291,7 +409,7 @@ class Eigenform:
                 method="POST",
                 url=self.url,
                 body={"action": "clear"},
-                instruction=f"Clear all data from this {self.effective_label}.",
+                instruction=f"Clear all data from this {self.label}.",
             )
             _aff._floatable = "clear"
             affordances.append(_aff)
@@ -449,8 +567,8 @@ class Eigenform:
             form=self.form,
             key=self.key,
             uid=self.uid,
-            label=self.effective_label,
-            instruction=self.effective_instruction or "",
+            label=self.label,
+            instruction=self.instruction or "",
             editable=self.editable,
             edit_mode=self.edit_mode,
             undo_count=self._undo_depth,
@@ -512,13 +630,12 @@ class Eigenform:
             new_label = body.get("label", "").strip()
             if not new_label:
                 return self._error("Label cannot be empty.", action=action)
-            self._store.set(self._scope, f"{self.key}.__label", new_label)
+            self._set_my_field("label", new_label)
             return self.serialize()
         if action == "set_instruction" and self.editable and self.edit_mode:
             self._push_undo()
             new_instr = body.get("instruction", "").strip()
-            # Empty string clears the override (reverts to Python default)
-            self._store.set(self._scope, f"{self.key}.__instruction", new_instr if new_instr else None)
+            self._set_my_field("instruction", new_instr if new_instr else None)
             return self.serialize()
         return self._handle(body)
 

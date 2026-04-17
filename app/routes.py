@@ -179,7 +179,7 @@ def _shallow_serialize(pg) -> dict:
         "label": pg.label,
         "complete": pg.is_complete,
         "eigenforms": [
-            {"label": ef.effective_label, "complete": ef.is_complete}
+            {"label": ef.label, "complete": ef.is_complete}
             for ef in pg.eigenforms
         ],
     }

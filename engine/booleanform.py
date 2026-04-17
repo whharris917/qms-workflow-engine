@@ -36,63 +36,42 @@ class BooleanForm(Eigenform):
     true_label: str = "Yes"
     false_label: str = "No"
 
-    def _snapshot_edit_state(self) -> dict:
-        state = super()._snapshot_edit_state()
-        state["__config"] = self._store.get(self._scope, f"{self.key}.__config")
-        return state
-
-    def _restore_edit_state(self, state: dict):
-        super()._restore_edit_state(state)
-        self._store.set(self._scope, f"{self.key}.__config", state.get("__config"))
-
-    @property
-    def _effective_config(self) -> dict:
-        """Config from store override if set, else Python defaults."""
-        if self._store is not None:
-            override = self._store.get(self._scope, f"{self.key}.__config")
-            if override is not None:
-                return override
-        return {"true_label": self.true_label, "false_label": self.false_label}
-
     @property
     def is_complete(self) -> bool:
         return self.value is not None
 
     def _serialize_state(self) -> dict:
-        cfg = self._effective_config
         return self._base_state() | {
             "value": self.value,
-            "true_label": cfg["true_label"],
-            "false_label": cfg["false_label"],
+            "true_label": self.true_label,
+            "false_label": self.false_label,
         }
 
     def _get_edit_affordances(self) -> list[Affordance]:
-        cfg = self._effective_config
         affs = super()._get_edit_affordances()
         affs.append(Affordance(
             label="Set True Label", method="POST", url=self.url,
             body={"action": "set_true_label", "label": "<label>"},
-            instruction=f"Label shown when value is true. Current: {cfg['true_label']}",
+            instruction=f"Label shown when value is true. Current: {self.true_label}",
         ))
         affs.append(Affordance(
             label="Set False Label", method="POST", url=self.url,
             body={"action": "set_false_label", "label": "<label>"},
-            instruction=f"Label shown when value is false. Current: {cfg['false_label']}",
+            instruction=f"Label shown when value is false. Current: {self.false_label}",
         ))
         return affs
 
     def get_affordances(self) -> list[Affordance]:
-        cfg = self._effective_config
         return [
             ToggleAffordance(
-                label=f"Set {self.effective_label}",
+                label=f"Set {self.label}",
                 method="POST",
                 url=self.url,
                 body={"value": f"<true | false>"},
-                instruction=f"Set to true ({cfg['true_label']}) or false ({cfg['false_label']}).",
+                instruction=f"Set to true ({self.true_label}) or false ({self.false_label}).",
                 current=self.value,
-                true_label=cfg["true_label"],
-                false_label=cfg["false_label"],
+                true_label=self.true_label,
+                false_label=self.false_label,
             )
         ]
 
@@ -109,10 +88,8 @@ class BooleanForm(Eigenform):
             new_label = body.get("label", "").strip()
             if not new_label:
                 return self._error("Label cannot be empty.", action=action)
-            cfg = dict(self._effective_config)
             field = "true_label" if action == "set_true_label" else "false_label"
-            cfg[field] = new_label
-            self._store.set(self._scope, f"{self.key}.__config", cfg)
+            self._set_my_config(field, new_label)
             return self.serialize()
 
         # Normal value setting

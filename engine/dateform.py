@@ -41,45 +41,22 @@ class DateForm(Eigenform):
     min_date: str | None = None
     max_date: str | None = None
 
-    def _snapshot_edit_state(self) -> dict:
-        state = super()._snapshot_edit_state()
-        state["__config"] = self._store.get(self._scope, f"{self.key}.__config")
-        return state
-
-    def _restore_edit_state(self, state: dict):
-        super()._restore_edit_state(state)
-        self._store.set(self._scope, f"{self.key}.__config", state.get("__config"))
-
-    @property
-    def _effective_config(self) -> dict:
-        """Config from store override if set, else Python defaults."""
-        if self._store is not None:
-            override = self._store.get(self._scope, f"{self.key}.__config")
-            if override is not None:
-                return override
-        return {"include_time": self.include_time, "min_date": self.min_date,
-                "max_date": self.max_date}
-
     @property
     def is_complete(self) -> bool:
         return self.value is not None
 
     def _serialize_state(self) -> dict:
-        cfg = self._effective_config
-        inc_time = cfg.get("include_time", False)
-        fmt = "YYYY-MM-DDTHH:MM" if inc_time else "YYYY-MM-DD"
+        fmt = "YYYY-MM-DDTHH:MM" if self.include_time else "YYYY-MM-DD"
         return self._base_state() | {
             "value": self.value,
             "format": fmt,
-            "include_time": inc_time,
-            "min": cfg.get("min_date"),
-            "max": cfg.get("max_date"),
+            "include_time": self.include_time,
+            "min": self.min_date,
+            "max": self.max_date,
         }
 
     def get_affordances(self) -> list[Affordance]:
-        cfg = self._effective_config
-        inc_time = cfg.get("include_time", False)
-        fmt = "YYYY-MM-DDTHH:MM" if inc_time else "YYYY-MM-DD"
+        fmt = "YYYY-MM-DDTHH:MM" if self.include_time else "YYYY-MM-DD"
         return [
             DateInputAffordance(
                 label=f"Set {self.label}",
@@ -87,29 +64,28 @@ class DateForm(Eigenform):
                 url=self.url,
                 body={"value": f"<{fmt}>"},
                 instruction=f"Enter a date in {fmt} format.",
-                include_time=inc_time,
-                min_date=cfg.get("min_date"),
-                max_date=cfg.get("max_date"),
+                include_time=self.include_time,
+                min_date=self.min_date,
+                max_date=self.max_date,
             )
         ]
 
     def _get_edit_affordances(self) -> list[Affordance]:
-        cfg = self._effective_config
         affs = super()._get_edit_affordances()
         affs.append(Affordance(
             label="Toggle Include Time", method="POST", url=self.url,
             body={"action": "toggle_include_time"},
-            instruction=f"Toggle datetime mode (YYYY-MM-DDTHH:MM). Currently: {cfg.get('include_time', False)}",
+            instruction=f"Toggle datetime mode (YYYY-MM-DDTHH:MM). Currently: {self.include_time}",
         ))
         affs.append(Affordance(
             label="Set Min Date", method="POST", url=self.url,
             body={"action": "set_min_date", "value": "<YYYY-MM-DD or null>"},
-            instruction=f"Set earliest allowed date. Current: {cfg.get('min_date')}",
+            instruction=f"Set earliest allowed date. Current: {self.min_date}",
         ))
         affs.append(Affordance(
             label="Set Max Date", method="POST", url=self.url,
             body={"action": "set_max_date", "value": "<YYYY-MM-DD or null>"},
-            instruction=f"Set latest allowed date. Current: {cfg.get('max_date')}",
+            instruction=f"Set latest allowed date. Current: {self.max_date}",
         ))
         return affs
 
@@ -124,9 +100,7 @@ class DateForm(Eigenform):
         # Edit-mode config actions
         if action == "toggle_include_time" and self.editable and self.edit_mode:
             self._push_undo()
-            cfg = dict(self._effective_config)
-            cfg["include_time"] = not cfg.get("include_time", False)
-            self._store.set(self._scope, f"{self.key}.__config", cfg)
+            self._set_my_config("include_time", not self.include_time)
             return self.serialize()
 
         if action in ("set_min_date", "set_max_date") and self.editable and self.edit_mode:
@@ -138,25 +112,19 @@ class DateForm(Eigenform):
                 if not DATE_RE.match(raw):
                     return self._error(f"Invalid date format. Expected YYYY-MM-DD, got: {raw}", body=body)
                 val = raw
-            cfg = dict(self._effective_config)
             field = "min_date" if action == "set_min_date" else "max_date"
-            cfg[field] = val
-            self._store.set(self._scope, f"{self.key}.__config", cfg)
+            self._set_my_config(field, val)
             return self.serialize()
 
-        # Normal value setting — use effective config for validation
-        cfg = self._effective_config
-        inc_time = cfg.get("include_time", False)
-        min_d = cfg.get("min_date")
-        max_d = cfg.get("max_date")
+        # Normal value setting — read directly from self
         raw = body.get("value", "")
-        pattern = DATETIME_RE if inc_time else DATE_RE
+        pattern = DATETIME_RE if self.include_time else DATE_RE
         if not pattern.match(raw):
-            fmt = "YYYY-MM-DDTHH:MM" if inc_time else "YYYY-MM-DD"
+            fmt = "YYYY-MM-DDTHH:MM" if self.include_time else "YYYY-MM-DD"
             return self._error(f"Invalid date format. Expected {fmt}, got: {raw}", body=body)
-        if min_d and raw < min_d:
-            return self._error(f"Date {raw} is before minimum {min_d}", body=body)
-        if max_d and raw > max_d:
-            return self._error(f"Date {raw} is after maximum {max_d}", body=body)
+        if self.min_date and raw < self.min_date:
+            return self._error(f"Date {raw} is before minimum {self.min_date}", body=body)
+        if self.max_date and raw > self.max_date:
+            return self._error(f"Date {raw} is after maximum {self.max_date}", body=body)
         self._store.set(self._scope, self.key, raw)
         return self.serialize()

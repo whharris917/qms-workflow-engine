@@ -41,102 +41,77 @@ class NumberForm(Eigenform):
     slider: bool = False
     unit: str | None = None
 
-    def _snapshot_edit_state(self) -> dict:
-        state = super()._snapshot_edit_state()
-        state["__config"] = self._store.get(self._scope, f"{self.key}.__config")
-        return state
-
-    def _restore_edit_state(self, state: dict):
-        super()._restore_edit_state(state)
-        self._store.set(self._scope, f"{self.key}.__config", state.get("__config"))
-
-    @property
-    def _effective_config(self) -> dict:
-        """Config from store override if set, else Python defaults."""
-        if self._store is not None:
-            override = self._store.get(self._scope, f"{self.key}.__config")
-            if override is not None:
-                return override
-        return {"min_val": self.min_val, "max_val": self.max_val,
-                "step": self.step, "slider": self.slider, "unit": self.unit}
-
     @property
     def is_complete(self) -> bool:
         return self.value is not None
 
     def _serialize_state(self) -> dict:
-        cfg = self._effective_config
         state = self._base_state() | {
             "value": self.value,
-            "min": cfg.get("min_val"),
-            "max": cfg.get("max_val"),
-            "step": cfg.get("step"),
+            "min": self.min_val,
+            "max": self.max_val,
+            "step": self.step,
         }
-        if cfg.get("slider"):
+        if self.slider:
             state["slider"] = True
-        if cfg.get("unit"):
-            state["unit"] = cfg["unit"]
+        if self.unit:
+            state["unit"] = self.unit
         return state
 
     def get_affordances(self) -> list[Affordance]:
-        cfg = self._effective_config
-        min_v, max_v = cfg.get("min_val"), cfg.get("max_val")
-        step_v = cfg.get("step")
-        is_slider = cfg.get("slider", False)
         parts = []
-        if min_v is not None:
-            parts.append(f"min {min_v}")
-        if max_v is not None:
-            parts.append(f"max {max_v}")
+        if self.min_val is not None:
+            parts.append(f"min {self.min_val}")
+        if self.max_val is not None:
+            parts.append(f"max {self.max_val}")
         hint = f" ({', '.join(parts)})" if parts else ""
-        if is_slider:
-            body_hint = f"<{min_v if min_v is not None else 0}..{max_v if max_v is not None else 100}>"
-            instruction = f"Set a value between {min_v} and {max_v} (step {step_v or 1})."
+        if self.slider:
+            body_hint = f"<{self.min_val if self.min_val is not None else 0}..{self.max_val if self.max_val is not None else 100}>"
+            instruction = f"Set a value between {self.min_val} and {self.max_val} (step {self.step or 1})."
         else:
             body_hint = "<number>"
             instruction = f"Enter a number{hint}."
         return [
             NumberInputAffordance(
-                label=f"Set {self.effective_label}",
+                label=f"Set {self.label}",
                 method="POST",
                 url=self.url,
                 body={"value": body_hint},
                 instruction=instruction,
-                min_val=min_v,
-                max_val=max_v,
-                step=step_v,
-                slider=is_slider,
+                min_val=self.min_val,
+                max_val=self.max_val,
+                step=self.step,
+                slider=self.slider,
                 current=self.value,
             )
         ]
 
     def _get_edit_affordances(self) -> list[Affordance]:
-        cfg = self._effective_config
         affs = super()._get_edit_affordances()
         affs.append(Affordance(
             label="Set Min", method="POST", url=self.url,
             body={"action": "set_min", "value": "<number or null>"},
-            instruction=f"Set minimum bound. Current: {cfg.get('min_val')}",
+            instruction=f"Set minimum bound. Current: {self.min_val}",
         ))
         affs.append(Affordance(
             label="Set Max", method="POST", url=self.url,
             body={"action": "set_max", "value": "<number or null>"},
-            instruction=f"Set maximum bound. Current: {cfg.get('max_val')}",
+            instruction=f"Set maximum bound. Current: {self.max_val}",
         ))
         affs.append(Affordance(
             label="Set Step", method="POST", url=self.url,
             body={"action": "set_step", "value": "<number or null>"},
-            instruction=f"Set step size. Current: {cfg.get('step')}",
+            instruction=f"Set step size. Current: {self.step}",
         ))
         affs.append(Affordance(
             label="Toggle Slider", method="POST", url=self.url,
             body={"action": "toggle_slider"},
-            instruction=f"Toggle slider display mode. Currently: {cfg.get('slider', False)}",
+            instruction=f"Toggle slider display mode. Currently: {self.slider}",
         ))
         affs.append(Affordance(
             label="Set Unit", method="POST", url=self.url,
             body={"action": "set_unit", "value": "<string or null>"},
-            instruction=f"Set unit label (e.g. 'kg', '%'). Current: {cfg.get('unit')}",
+            instruction=f"Set unit label (e.g. 'kg', '%'). Current: {self.unit}",
         ))
         return affs
 
@@ -159,45 +134,36 @@ class NumberForm(Eigenform):
                     val = float(raw)
                 except (TypeError, ValueError):
                     return self._error(f"Invalid number: {raw}", body=body)
-            cfg = dict(self._effective_config)
             field = {"set_min": "min_val", "set_max": "max_val", "set_step": "step"}[action]
-            cfg[field] = val
-            self._store.set(self._scope, f"{self.key}.__config", cfg)
+            self._set_my_config(field, val)
             return self.serialize()
 
         if action == "toggle_slider" and self.editable and self.edit_mode:
             self._push_undo()
-            cfg = dict(self._effective_config)
-            cfg["slider"] = not cfg.get("slider", False)
-            self._store.set(self._scope, f"{self.key}.__config", cfg)
+            self._set_my_config("slider", not self.slider)
             return self.serialize()
 
         if action == "set_unit" and self.editable and self.edit_mode:
             self._push_undo()
             raw = body.get("value")
             val = None if raw is None or raw == "" or raw == "null" else str(raw)
-            cfg = dict(self._effective_config)
-            cfg["unit"] = val
-            self._store.set(self._scope, f"{self.key}.__config", cfg)
+            self._set_my_config("unit", val)
             return self.serialize()
 
-        # Normal value setting — use effective config for validation
-        cfg = self._effective_config
-        min_v, max_v = cfg.get("min_val"), cfg.get("max_val")
-        step_v = cfg.get("step")
+        # Normal value setting — read directly from self
         raw = body.get("value")
         try:
             val = float(raw)
         except (TypeError, ValueError):
             return self._error(f"Invalid number: {raw}", body=body)
-        if min_v is not None and val < min_v:
-            return self._error(f"Value {val} is below minimum {min_v}", body=body)
-        if max_v is not None and val > max_v:
-            return self._error(f"Value {val} is above maximum {max_v}", body=body)
-        if step_v is not None:
-            base = min_v if min_v is not None else 0
-            remainder = abs((val - base) % step_v)
-            if min(remainder, step_v - remainder) > 1e-9:
-                return self._error(f"Value {val} is not a valid step (step {step_v} from {base})", body=body)
+        if self.min_val is not None and val < self.min_val:
+            return self._error(f"Value {val} is below minimum {self.min_val}", body=body)
+        if self.max_val is not None and val > self.max_val:
+            return self._error(f"Value {val} is above maximum {self.max_val}", body=body)
+        if self.step is not None:
+            base = self.min_val if self.min_val is not None else 0
+            remainder = abs((val - base) % self.step)
+            if min(remainder, self.step - remainder) > 1e-9:
+                return self._error(f"Value {val} is not a valid step (step {self.step} from {base})", body=body)
         self._store.set(self._scope, self.key, val)
         return self.serialize()

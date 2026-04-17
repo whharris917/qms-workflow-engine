@@ -112,38 +112,21 @@ class NavigationForm(Eigenform):
 
     # --- Structural persistence ---
 
-    @property
-    def _effective_config(self) -> dict:
-        """Config from store override if set, else Python defaults."""
-        if self._store is not None:
-            override = self._store.get(self._scope, f"{self.key}.__config")
-            if override is not None:
-                return override
-        return {"mode": self.mode, "default_expanded": self.default_expanded}
-
     def _bind_children(self, store: Store, url_prefix: str):
-        # Apply stored config override (mode, default_expanded) before any
-        # logic that reads self.mode — otherwise serialize/render/handle
-        # would see the seed mode instead of the edited one.
-        override = store.get(self._scope, f"{self.key}.__config")
-        if override is not None:
-            if "mode" in override:
-                self.mode = override["mode"]
-            if "default_expanded" in override:
-                self.default_expanded = override["default_expanded"]
-
+        # self.mode / self.default_expanded are populated by from_descriptor
+        # via _apply_descriptor on every reconstruct, so no extra override
+        # read is needed here.
         self._seed = list(self.steps)
 
-        if self.editable:
-            stored = store.get(self.key, "__structure")
-            if stored is None:
-                structure = [ef.to_descriptor() for ef in self._seed]
-                store.set(self.key, "__structure", structure)
-                source = self._seed
-            else:
-                source = self._reconstruct(stored)
+        # __structure is the on-disk source of truth — always written so
+        # children's descriptor entries are available for _set_my_*.
+        stored = store.get(self.key, "__structure")
+        if stored is None:
+            structure = [ef.to_descriptor() for ef in self._seed]
+            store.set(self.key, "__structure", structure)
+            source = self._seed
         else:
-            source = self.steps
+            source = self._reconstruct(stored)
 
         self.steps = [
             ef.bind(store=store, scope=self.key,
@@ -184,13 +167,11 @@ class NavigationForm(Eigenform):
     def _snapshot_edit_state(self) -> dict:
         state = super()._snapshot_edit_state()
         state["__children_scope"] = self._store.snapshot_scope(self.key)
-        state["__config"] = self._store.get(self._scope, f"{self.key}.__config")
         return state
 
     def _restore_edit_state(self, state: dict):
         super()._restore_edit_state(state)
         self._store.restore_scope(self.key, state.get("__children_scope", {}))
-        self._store.set(self._scope, f"{self.key}.__config", state.get("__config"))
         self._rebuild()
 
     def _nav_affordances(self) -> list[Affordance]:
@@ -200,7 +181,7 @@ class NavigationForm(Eigenform):
 
         if self.mode == "tabs":
             other = {
-                ef.key: ef.effective_label
+                ef.key: ef.label
                 for ef in self.steps
                 if ef.key != (self.active_step.key if self.active_step else None)
             }
@@ -225,7 +206,7 @@ class NavigationForm(Eigenform):
                     instruction="Resume from the next incomplete step.",
                 ))
             completed = {
-                ef.key: ef.effective_label
+                ef.key: ef.label
                 for ef in self.steps
                 if ef.is_complete
                 and ef.key != (active.key if active else None)
@@ -246,23 +227,23 @@ class NavigationForm(Eigenform):
             if idx > 0:
                 prev = self.steps[idx - 1]
                 affordances.append(SimpleButtonAffordance(
-                    label=f"\u2190 Back: {prev.effective_label}",
+                    label=f"\u2190 Back: {prev.label}",
                     method="POST", url=url,
                     body={"step": prev.key},
-                    instruction=f"Go back to {prev.effective_label}.",
+                    instruction=f"Go back to {prev.label}.",
                 ))
             if idx < len(self.steps) - 1 and self.steps[idx].is_complete:
                 nxt = self.steps[idx + 1]
                 affordances.append(SimpleButtonAffordance(
-                    label=f"Next: {nxt.effective_label} \u2192",
+                    label=f"Next: {nxt.label} \u2192",
                     method="POST", url=url,
                     body={"step": nxt.key},
-                    instruction=f"Advance to {nxt.effective_label}.",
+                    instruction=f"Advance to {nxt.label}.",
                 ))
             active = self.active_step
             highest = self._highest_accessible_index()
             completed = {
-                ef.key: ef.effective_label
+                ef.key: ef.label
                 for i, ef in enumerate(self.steps)
                 if i <= highest
                 and ef.key != (active.key if active else None)
@@ -283,7 +264,7 @@ class NavigationForm(Eigenform):
             if self.steps:
                 sections = {
                     ef.key: {
-                        "label": ef.effective_label,
+                        "label": ef.label,
                         "expanded": self._is_expanded(ef.key),
                     }
                     for ef in self.steps
@@ -308,11 +289,9 @@ class NavigationForm(Eigenform):
         reg = get_registry()
         available = reg.available()
 
-        cfg = self._effective_config
-        current_mode = cfg.get("mode")
         for m in ("tabs", "chain", "sequence", "accordion"):
-            is_current = m == current_mode
-            affs.append(SimpleButtonAffordance(
+            is_current = m == self.mode
+            aff = SimpleButtonAffordance(
                 label=f"Mode: {m}" + (" (current)" if is_current else ""),
                 method="POST",
                 url=self.url,
@@ -322,7 +301,9 @@ class NavigationForm(Eigenform):
                     + ("" if not is_current else " (Already active.)")
                     + " Changing mode clears the current navigation value."
                 ),
-            ))
+            )
+            aff._chrome_rendered = True
+            affs.append(aff)
 
         affs.append(SetValueAffordance(
             label="Add Step",
@@ -565,16 +546,12 @@ class NavigationForm(Eigenform):
         if new_mode == self.mode:
             return self.serialize()
 
-        cfg = dict(self._effective_config)
-        cfg["mode"] = new_mode
-        self._store.set(self._scope, f"{self.key}.__config", cfg)
+        self._set_my_config("mode", new_mode)
 
         # Stored self.value has a mode-specific shape (step key for
         # tabs/chain/sequence, dict for accordion). Clear it so the
         # new mode starts from a clean state.
         self._store.delete(self._scope, self.key)
-
-        self.mode = new_mode
         return self.serialize()
 
     # --- Serialization ---
@@ -593,7 +570,7 @@ class NavigationForm(Eigenform):
             for i, ef in enumerate(self.steps):
                 entry = {
                     "key": ef.key,
-                    "label": ef.effective_label,
+                    "label": ef.label,
                     "complete": ef.is_complete,
                 }
                 if self.mode in ("sequence", "chain"):
@@ -632,7 +609,7 @@ class NavigationForm(Eigenform):
             for i, ef in enumerate(self.steps):
                 expanded = self._is_expanded(ef.key) if not data.get("edit_mode") else self._is_expanded(ef.key)
                 step_items.append({
-                    "key": ef.key, "label": ef.effective_label,
+                    "key": ef.key, "label": ef.label,
                     "expanded": expanded, "editable": ef.editable, "index": i,
                 })
                 if expanded:
@@ -643,7 +620,7 @@ class NavigationForm(Eigenform):
             active_key = data.get("active_step")
             for i, ef in enumerate(self.steps):
                 item = {
-                    "key": ef.key, "label": ef.effective_label,
+                    "key": ef.key, "label": ef.label,
                     "is_active": ef.key == active_key, "editable": ef.editable,
                     "index": i, "complete": ef.is_complete,
                 }

@@ -545,19 +545,64 @@ body.operator-view[data-theme="sleek"] .ef-group-instruction {
 
 /* --- NavigationForm edit mode --- */
 
-/* Edit toolbar: add step form */
+/* Edit toolbar: add step form + mode switcher */
 body.operator-view[data-theme="sleek"] .sleek-edit-toolbar {
     padding: 8px 12px;
     background: #1e1e1e;
     border-left: 1px solid #555d66;
     border-right: 1px solid #555d66;
     border-bottom: 1px solid #444;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+    justify-content: space-between;
 }
 body.operator-view[data-theme="sleek"] .sleek-edit-toolbar__form {
     display: flex;
     gap: 6px;
     align-items: center;
     flex-wrap: wrap;
+}
+
+/* Mode switcher: segmented pill group (active=blue, others=gray) */
+body.operator-view[data-theme="sleek"] .sleek-mode-switcher {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+body.operator-view[data-theme="sleek"] .sleek-mode-switcher__label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #888;
+    margin-right: 2px;
+}
+body.operator-view[data-theme="sleek"] .sleek-mode-pill {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    border: 1px solid #444;
+    background: #2b3035;
+    color: #aaa;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-family: inherit;
+    border-radius: 3px;
+    line-height: 1;
+    transition: background 80ms, color 80ms, border-color 80ms;
+}
+body.operator-view[data-theme="sleek"] .sleek-mode-pill:hover {
+    background: #363b42;
+    color: #e0e0e0;
+    border-color: #555d66;
+}
+body.operator-view[data-theme="sleek"] .sleek-mode-pill.sleek-mode-pill--active {
+    background: #1a2a3c;
+    border-color: #3b82f6;
+    color: #60a5fa;
+    cursor: default;
+    font-weight: 600;
 }
 body.operator-view[data-theme="sleek"] .sleek-edit-toolbar__select,
 body.operator-view[data-theme="sleek"] .sleek-edit-toolbar__input {

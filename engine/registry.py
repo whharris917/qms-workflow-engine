@@ -350,11 +350,14 @@ def from_descriptor(desc: dict, reg: EigenformRegistry | None = None,
             config.setdefault("mode", "accordion")
         desc["type"] = type_name = "navigation"
 
-    # If the seed matches at this level, use it (preserves callables)
+    # If the seed matches at this level, use it (preserves callables).
+    # Apply the descriptor's scalar fields onto a copy of the seed so the
+    # descriptor — the on-disk source of truth — wins over seed defaults.
     if seed is not None and seed.form == type_name and seed.key == key:
-        # Apply descriptor overrides that may differ from the seed
-        seed.editable = bool(desc.get("editable"))
-        return seed
+        import copy as _copy
+        instance = _copy.deepcopy(seed)
+        instance._apply_descriptor(desc)
+        return instance
 
     # Construct from registry + descriptor
     cls = reg.lookup(type_name)

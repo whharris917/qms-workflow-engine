@@ -95,7 +95,11 @@ class PageForm(Eigenform):
         bound._seed = list(bound.eigenforms)
 
         # --- Structural persistence ---
-        stored_structure = store.get(scope, "__structure")
+        # __structure is stored at scope=self.key (matching the convention
+        # used by NavigationForm/GroupForm) so that children — bound at
+        # scope=self.key — can locate their own descriptor entry via
+        # self._scope and mutate it through _set_my_field/_set_my_config.
+        stored_structure = store.get(bound.key, "__structure")
 
         if stored_structure is None:
             # First bind: write seed structure to store
@@ -103,7 +107,7 @@ class PageForm(Eigenform):
             if bound.mutable_structure:
                 for desc in structure:
                     desc["editable"] = True
-            store.set(scope, "__structure", structure)
+            store.set(bound.key, "__structure", structure)
             source = bound._seed
         else:
             # Subsequent bind: reconstruct from stored structure
@@ -111,7 +115,7 @@ class PageForm(Eigenform):
             try:
                 source = bound._reconstruct(stored_structure)
             except Exception:
-                store.delete(scope, "__structure")
+                store.delete(bound.key, "__structure")
                 source = bound._seed
 
         bound.eigenforms = [
@@ -138,13 +142,13 @@ class PageForm(Eigenform):
         Called after structural mutations (add/remove/move) to refresh
         the bound eigenform list from the updated stored structure.
         """
-        stored = self._store.get(self._scope, "__structure")
+        stored = self._store.get(self.key, "__structure")
         if stored is None:
             return
         try:
             source = self._reconstruct(stored)
         except Exception:
-            self._store.delete(self._scope, "__structure")
+            self._store.delete(self.key, "__structure")
             source = self._seed
         self.eigenforms = [
             ef.bind(store=self._store, scope=self.key, url_prefix=self._url_prefix)
@@ -159,6 +163,7 @@ class PageForm(Eigenform):
         """
         # Clear everything
         self._store.clear_scope(self._scope)
+        self._store.clear_scope(self.key)
         self._clear_recursive(self.eigenforms)
 
         # Rewrite structure from seed
@@ -166,7 +171,7 @@ class PageForm(Eigenform):
         if self.mutable_structure:
             for desc in structure:
                 desc["editable"] = True
-        self._store.set(self._scope, "__structure", structure)
+        self._store.set(self.key, "__structure", structure)
 
         # Rebind from seed
         self.eigenforms = [
@@ -514,10 +519,10 @@ class PageForm(Eigenform):
     # --- Structural mutation helpers ---
 
     def _get_structure(self) -> list[dict]:
-        return list(self._store.get(self._scope, "__structure") or [])
+        return list(self._store.get(self.key, "__structure") or [])
 
     def _save_structure(self, structure: list[dict]):
-        self._store.set(self._scope, "__structure", structure)
+        self._store.set(self.key, "__structure", structure)
 
     def _handle(self, body: dict) -> dict:
         """Handle page-level actions."""
@@ -532,15 +537,17 @@ class PageForm(Eigenform):
             if self.mutable_structure:
                 # Mutable pages: clear everything including structure
                 self._store.clear_scope(self._scope)
+                self._store.clear_scope(self.key)
                 self._clear_recursive(self.eigenforms)
                 self._rebuild()
             else:
                 # Fixed pages: preserve structure, clear data only
-                structure = self._store.get(self._scope, "__structure")
+                structure = self._store.get(self.key, "__structure")
                 self._store.clear_scope(self._scope)
+                self._store.clear_scope(self.key)
                 self._clear_recursive(self.eigenforms)
                 if structure is not None:
-                    self._store.set(self._scope, "__structure", structure)
+                    self._store.set(self.key, "__structure", structure)
             return self.serialize()
 
         if not self.mutable_structure and action in (

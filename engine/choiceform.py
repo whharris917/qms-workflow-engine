@@ -88,7 +88,7 @@ class ChoiceForm(Eigenform):
         opts_str = " | ".join(opts)
         return [
             SelectAffordance(
-                label=f"Set {self.effective_label}",
+                label=f"Set {self.label}",
                 method="POST",
                 url=self.url,
                 body={"value": f"<{opts_str}>"},

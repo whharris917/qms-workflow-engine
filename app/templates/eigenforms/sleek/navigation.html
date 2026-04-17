@@ -25,7 +25,7 @@
   {# Editable label + instruction #}
   {% include "_edit_header.html" with context %}
 
-  {# Add Step toolbar #}
+  {# Add Step toolbar + mode switcher #}
   <div class="sleek-edit-toolbar">
     <form class="sleek-edit-toolbar__form" data-ef-submit="{{ url }}">
       <input type="hidden" name="action" value="add_step" />
@@ -37,6 +37,16 @@
       <input name="label" type="text" placeholder="Label" class="sleek-edit-toolbar__input" />
       <button type="submit" class="sleek-edit-toolbar__btn">+ Add</button>
     </form>
+    <div class="sleek-mode-switcher" role="group" aria-label="Display mode">
+      <span class="sleek-mode-switcher__label">Mode</span>
+      {% for m in ("tabs", "chain", "sequence", "accordion") %}
+        {% if m == mode %}
+          <span class="sleek-mode-pill sleek-mode-pill--active" aria-current="true">{{ m }}</span>
+        {% else %}
+          {{ render_btn(url, {"action": "set_nav_mode", "mode": m}, m, "sleek-mode-pill") }}
+        {% endif %}
+      {% endfor %}
+    </div>
   </div>
 
   {# Nav bar with inline edit controls per tab #}
