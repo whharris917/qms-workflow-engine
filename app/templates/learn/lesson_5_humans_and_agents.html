@@ -33,7 +33,7 @@
 {
   <span class="s">"label"</span>: <span class="s">"Save"</span>,
   <span class="s">"method"</span>: <span class="s">"POST"</span>,
-  <span class="s">"url"</span>: <span class="s">"/pages/hello-1/name"</span>,
+  <span class="s">"url"</span>: <span class="s">"/pages/a3f9c2d1/name"</span>,
   <span class="s">"body"</span>: {<span class="s">"action"</span>: <span class="s">"set_value"</span>, <span class="s">"value"</span>: <span class="s">"&lt;value&gt;"</span>},
   <span class="s">"instruction"</span>: <span class="s">"Submit the text value. Must be at least 2 characters."</span>
 }</pre>
@@ -73,7 +73,7 @@
 </p>
 
 <pre class="lesson-code"><span class="c"># An agent&#39;s loop, in pseudocode</span>
-response = GET(<span class="s">"/pages/survey-1"</span>)
+response = GET(<span class="s">"/pages/7e4b81cf"</span>)
 <span class="k">while not</span> response[<span class="s">"is_complete"</span>]:
     affordances = collect_affordances(response)
     chosen = pick_best(affordances)        <span class="c"># LLM judgment</span>

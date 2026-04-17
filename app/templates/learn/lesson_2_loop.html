@@ -41,11 +41,11 @@
 
 <pre class="lesson-code"><span class="c"># roughly what bind() does</span>
 page = PageComponent(key=<span class="s">"hello"</span>, components=[TextComponent(key=<span class="s">"name"</span>)])
-bound = page.bind(data_dir=Path(<span class="s">"data"</span>), scope=<span class="s">"hello-1"</span>)
+bound = page.bind(data_dir=Path(<span class="s">"data"</span>), scope=<span class="s">"a3f9c2d1"</span>)
 <span class="c"># Now bound.components[0] has a Store reference and can read/write its value.</span></pre>
 
 <p>
-    After bind, the tree is a working instance. Each component has a path like <code>/pages/hello-1/name</code> that uniquely addresses it. Each one can produce JSON or HTML on demand.
+    After bind, the tree is a working instance. Each component has a path like <code>/pages/a3f9c2d1/name</code> that uniquely addresses it. Each one can produce JSON or HTML on demand.
 </p>
 
 <h2>3. Serve</h2>
@@ -90,8 +90,8 @@ bound = page.bind(data_dir=Path(<span class="s">"data"</span>), scope=<span clas
 </p>
 
 <ol>
-    <li>Browser fires <code>POST /pages/hello-1/name</code> with body <code>{"action": "set_value", "value": "Alex"}</code>.</li>
-    <li>Server reads the URL, calls <code>discover_pages()</code>, grabs the <code>hello</code> seed, binds to <code>data/hello-1.json</code>.</li>
+    <li>Browser fires <code>POST /pages/a3f9c2d1/name</code> with body <code>{"action": "set_value", "value": "Alex"}</code>.</li>
+    <li>Server reads the URL, calls <code>discover_pages()</code>, grabs the <code>hello</code> seed, binds to <code>data/a3f9c2d1.json</code>.</li>
     <li>Server walks the bound tree by path (<code>name</code> is a direct child), finds the TextComponent.</li>
     <li>TextComponent <code>_handle</code> validates, writes <code>"Alex"</code> to the Store.</li>
     <li>Server re-serializes the whole page (cheap), returns HTML.</li>

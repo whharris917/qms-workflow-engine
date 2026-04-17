@@ -24,7 +24,7 @@
 
 <pre class="lesson-code">  <span class="v">pages/survey.py</span>  →   <span class="v">seed tree</span>
                             ↓ deepcopy + apply descriptor overrides
-  <span class="v">data/survey-1.json</span>  →   <span class="v">descriptor tree</span>
+  <span class="v">data/7e4b81cf.json</span>  →   <span class="v">descriptor tree</span>
                             ↓ reconcile (from_descriptor)
                        <span class="v">bound tree</span>
                             ↓ bind(Store, scope, url_prefix)
@@ -40,7 +40,7 @@
     Every container writes a <code>__structure</code> entry into its Store scope. That entry is the canonical record of what&rsquo;s in the tree, in what order, with which props.
 </p>
 
-<pre class="lesson-code"><span class="c"># data/survey-1.json — concrete shape</span>
+<pre class="lesson-code"><span class="c"># data/7e4b81cf.json — concrete shape</span>
 {
   <span class="s">"survey"</span>: {
     <span class="s">"__structure"</span>: {

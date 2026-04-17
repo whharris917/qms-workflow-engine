@@ -28,7 +28,7 @@ definition = PageComponent(
 )</pre>
 
 <p>
-    Save that as <code>pages/hello.py</code>. Start the server with <code>python run.py</code>. Open the Agent Portal, click &ldquo;New&rdquo; next to the <em>Hello Page</em> card, and you&rsquo;ll be looking at your first running page.
+    Save that as <code>pages/hello.py</code>. Start the server with <code>python run.py</code>. Open the Agent Portal, click &ldquo;New&rdquo; next to the <em>Hello Page</em> card, and you&rsquo;ll be looking at your first running page. The URL will be something like <code>/pages/a3f9c2d1</code> &mdash; each spawned instance gets its own 8-character hex identifier.
 </p>
 
 <div class="lesson-callout note">
@@ -57,11 +57,11 @@ definition = PageComponent(
 </p>
 
 <pre class="lesson-code"><span class="c"># Human view (browser default)</span>
-GET /pages/hello-1
+GET /pages/a3f9c2d1
 Accept: text/html
 
 <span class="c"># Agent view</span>
-GET /pages/hello-1
+GET /pages/a3f9c2d1
 Accept: application/json</pre>
 
 <p>
@@ -69,7 +69,7 @@ Accept: application/json</pre>
 </p>
 
 <div class="lesson-callout try">
-    <strong>Try it.</strong> Type a name into the field and click &ldquo;Save&rdquo;. The value is persisted to <code>data/hello-1.json</code>. Refresh the page &mdash; your name is still there. Reload the server &mdash; still there. The engine is stateless in memory; the Store is the source of truth.
+    <strong>Try it.</strong> Type a name into the field and click &ldquo;Save&rdquo;. The value is persisted to <code>data/a3f9c2d1.json</code>. Refresh the page &mdash; your name is still there. Reload the server &mdash; still there. The engine is stateless in memory; the Store is the source of truth.
 </div>
 
 <h2>A small addition</h2>
