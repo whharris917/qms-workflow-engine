@@ -125,36 +125,43 @@ class TextForm(Component):
         ))
         return affs
 
-    def _handle(self, body: dict) -> dict:
-        action = body.get("action")
+    _actions = {
+        None: "_do_set",
+        "toggle_multiline": "_do_toggle_multiline",
+        "set_min_length": "_do_set_length",
+        "set_max_length": "_do_set_length",
+    }
 
-        # Edit-mode config actions
-        if action == "toggle_multiline" and self.editable and self.edit_mode:
-            self._push_undo()
-            self._set_my_config("multiline", not self.multiline)
-            return self.serialize()
-
-        if action in ("set_min_length", "set_max_length") and self.editable and self.edit_mode:
-            self._push_undo()
-            raw = body.get("value")
-            if raw is None or raw == "" or raw == "null":
-                val = None
-            else:
-                try:
-                    val = int(raw)
-                    if val < 0:
-                        return self._error("Length must be non-negative", body=body)
-                except (TypeError, ValueError):
-                    return self._error(f"Invalid integer: {raw}", body=body)
-            field = "min_length" if action == "set_min_length" else "max_length"
-            self._set_my_config(field, val)
-            return self.serialize()
-
-        # Normal value setting — read directly from self
+    def _do_set(self, body: dict) -> dict:
         val = body.get("value", "")
         if self.min_length is not None and len(val) < self.min_length:
             return self._error(f"Text is too short ({len(val)} chars). Minimum: {self.min_length}", body=body)
         if self.max_length is not None and len(val) > self.max_length:
             return self._error(f"Text is too long ({len(val)} chars). Maximum: {self.max_length}", body=body)
         self._store.set(self._scope, self.key, body.get("value"))
+        return self.serialize()
+
+    def _do_toggle_multiline(self, body: dict) -> dict:
+        if not (self.editable and self.edit_mode):
+            return self.serialize()
+        self._push_undo()
+        self._set_my_config("multiline", not self.multiline)
+        return self.serialize()
+
+    def _do_set_length(self, body: dict) -> dict:
+        if not (self.editable and self.edit_mode):
+            return self.serialize()
+        self._push_undo()
+        raw = body.get("value")
+        if raw is None or raw == "" or raw == "null":
+            val = None
+        else:
+            try:
+                val = int(raw)
+                if val < 0:
+                    return self._error("Length must be non-negative", body=body)
+            except (TypeError, ValueError):
+                return self._error(f"Invalid integer: {raw}", body=body)
+        field = "min_length" if body.get("action") == "set_min_length" else "max_length"
+        self._set_my_config(field, val)
         return self.serialize()

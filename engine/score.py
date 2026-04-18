@@ -82,9 +82,6 @@ class Score(Component):
     def get_affordances(self):
         return []
 
-    def _handle(self, body: dict) -> dict:
-        return self.serialize()
-
 
 def _format_answer(val) -> str:
     from markupsafe import escape as _esc

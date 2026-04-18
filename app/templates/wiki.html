@@ -287,19 +287,31 @@
         <div class="wiki-main">
 
             <p>
-                <strong>Razem</strong> (<a href="https://en.wikipedia.org/wiki/Polish_language">Polish</a>: <em>together</em>) is a Python framework for building interactive applications that serve humans and artificial-intelligence (AI) agents from a single source definition. Developed under the <em>Pipe Dream</em> project as the runtime for a <a href="https://en.wikipedia.org/wiki/Good_manufacturing_practice">GMP</a>-inspired Quality Management System, it treats a web page and a machine-readable API as two projections of the same underlying state, an invariant the project refers to as <em>faithful projection</em>.<sup class="ref"><a href="#ref-1">[1]</a></sup> Razem uses a component tree as its primary abstraction, reaching a design recognizably adjacent to <a href="https://en.wikipedia.org/wiki/React_(JavaScript_library)">React</a> and similar front-end libraries despite being developed from different first principles.<sup class="ref"><a href="#ref-2">[2]</a></sup>
+                <strong>Razem</strong> (<a href="https://en.wikipedia.org/wiki/Polish_language">Polish</a>: <em>together</em>) is a framework for building interactive workflows designed for collaborative use by humans and artificial-intelligence (AI) agents. Developed under the <em>Pipe Dream</em> project, the framework was named to reflect its central design goal: a system in which humans and AI collaborate through a shared, perfectly aligned view of any given workflow. Rather than maintaining separate human-facing and machine-facing interfaces that inevitably drift apart, Razem generates a single unified interface that both audiences use.<sup class="ref"><a href="#ref-1">[1]</a></sup> Despite originating from different first principles, the resulting architecture is recognizably adjacent to <a href="https://en.wikipedia.org/wiki/React_(JavaScript_library)">React</a> and similar component frameworks.<sup class="ref"><a href="#ref-2">[2]</a></sup>
             </p>
 
             <p>
-                Razem is notable for making AI agents a first-class client: every rendered button corresponds to a machine-readable <em>affordance</em> exposed at the same <a href="https://en.wikipedia.org/wiki/HATEOAS">HATEOAS</a> URL, enabling a language model to drive any workflow without a parallel API schema.<sup class="ref"><a href="#ref-3">[3]</a></sup> The alignment between the two surfaces is enforced at continuous-integration time by a parity test suite.<sup class="ref"><a href="#ref-4">[4]</a></sup>
+                Razem achieves this alignment through an architectural invariant called <em>faithful projection</em>, enforced by a 72-test continuous-integration parity suite.<sup class="ref"><a href="#ref-4">[4]</a></sup> The invariant guarantees a strict one-to-one correspondence: every form field, validation rule, and button rendered on screen for a human has an exact machine-readable equivalent exposed to the AI agent. Because both audiences share the same view and the same capabilities, a human operator can step into the agent&rsquo;s role at any point &mdash; inspecting state, replaying actions, or overriding decisions &mdash; without requiring a separate debugging interface.
             </p>
 
             <p>
-                Although Razem grew out of work on a quality management system, the framework itself contains no QMS-specific code and is general-purpose. The QMS it serves &mdash; internally the <em>QMS Workflow Engine</em> &mdash; is the first intended application to be built on top of Razem; the two had been conflated under a single name for most of early development before being disentangled.<sup class="ref"><a href="#ref-13">[13]</a></sup>
+                To make this shared interface possible, Razem relies on <a href="https://en.wikipedia.org/wiki/HATEOAS">HATEOAS</a> (Hypermedia As The Engine Of Application State). Rather than maintaining a parallel API schema, every rendered UI element emits a self-describing <em>affordance</em> containing the URL and payload needed to interact with it.<sup class="ref"><a href="#ref-3">[3]</a></sup> An AI agent reads the current state, inspects the available affordances, and decides what to do next &mdash; exactly as a human reads the page and clicks a button.
             </p>
 
             <p>
-                Initial development began in early 2026 as a clean-room rebuild of an earlier CLI-based workflow engine. The current architecture is the fourth major iteration.<sup class="ref"><a href="#ref-5">[5]</a></sup>
+                The vast majority of the framework consists of declarative components that passively gather and validate data. To execute domain logic &mdash; such as launching a backend process or invoking legacy CLI tools &mdash; Razem provides imperative components such as <code>Action</code>, which serve as bridges to external systems once a form is fully validated by either a human or an agent.<sup class="ref"><a href="#ref-11">[11]</a></sup>
+            </p>
+
+            <p>
+                Architecturally, Razem replaces traditional node-and-graph workflow abstractions. Where most workflow engines model processes as discrete nodes connected by directional edges, separating control-flow logic from the user interface, Razem handles routing entirely through component nesting. A sequential process is a <code>Navigation</code> in sequence mode; a conditional branch is a <code>Switch</code> that renders subtrees based on a sibling&rsquo;s value; a looping process is a <code>Repeater</code>. By treating control flow as another type of container, the framework unifies form rendering, state management, and workflow routing into a single tree.<sup class="ref"><a href="#ref-7">[7]</a></sup>
+            </p>
+
+            <p>
+                Although Razem grew out of work on a <a href="https://en.wikipedia.org/wiki/Good_manufacturing_practice">GMP</a>-inspired quality management system, the framework itself contains no QMS-specific code and is general-purpose. The QMS it was built to serve &mdash; internally the <em>QMS Workflow Engine</em> &mdash; is the first intended application; the two were conflated under a single name for most of early development before being separated.<sup class="ref"><a href="#ref-13">[13]</a></sup>
+            </p>
+
+            <p>
+                Razem addresses a recurring problem in agent&ndash;computer interaction. Agents today typically either interact with headless APIs &mdash; which tend to diverge from human-facing interfaces over time &mdash; or navigate web pages via DOM scraping and computer vision. By producing both surfaces from a single component definition, Razem eliminates this split: agents receive a deterministic machine-readable representation while humans receive a standard web form, both derived from the same source and verified to match.<sup class="ref"><a href="#ref-1">[1]</a></sup><sup class="ref"><a href="#ref-4">[4]</a></sup>
             </p>
 
             <div class="wiki-toc">

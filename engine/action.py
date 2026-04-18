@@ -40,6 +40,7 @@ class DisabledAffordance(Affordance):
 class Action(Component):
     """A button that executes a function with access to sibling state and the store."""
     form = "action"
+    _callable_fields = ("action_fn", "precondition_fn")
 
     action_label: str = "Execute"
     action_fn: Callable[[dict, Store, str], dict] | None = None
@@ -158,19 +159,21 @@ class Action(Component):
         return render_template("action.html", data=data, ef=self,
                                url_prefix=self._url_prefix)
 
-    def _handle(self, body: dict) -> dict:
-        action = body.get("action")
-        if action == "execute":
-            if self.confirm:
-                self._store.set(self._scope, self.key, {"status": "armed"})
-                return self.serialize()
-            return self._execute()
-        elif action == "confirm":
-            return self._execute()
-        elif action == "cancel":
-            self._store.set(self._scope, self.key, {"status": "cancelled"})
+    _actions = {
+        "execute": "_do_execute",
+        "confirm": "_do_confirm",
+        "cancel": "_do_cancel",
+    }
+
+    def _do_execute(self, body: dict) -> dict:
+        if self.confirm:
+            self._store.set(self._scope, self.key, {"status": "armed"})
             return self.serialize()
-        result = self.serialize()
-        result["error"] = f"Unknown action: {action}"
-        result["failed_action"] = action
-        return result
+        return self._execute()
+
+    def _do_confirm(self, body: dict) -> dict:
+        return self._execute()
+
+    def _do_cancel(self, body: dict) -> dict:
+        self._store.set(self._scope, self.key, {"status": "cancelled"})
+        return self.serialize()

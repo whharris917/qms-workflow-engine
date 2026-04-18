@@ -272,11 +272,11 @@ class TableRunner(Component):
 
     # --- Action handling ---
 
-    def _handle(self, body: dict) -> dict:
-        action = body.get("action", "")
-        if action == "navigate":
-            row_id = body.get("row", "")
-            row_ids = {item["id"] for item in self._row_items()}
-            if row_id in row_ids and self._is_row_accessible(row_id):
-                self._store.set(self._scope, self.key, row_id)
+    _actions = {"navigate": "_do_navigate"}
+
+    def _do_navigate(self, body: dict) -> dict:
+        row_id = body.get("row", "")
+        row_ids = {item["id"] for item in self._row_items()}
+        if row_id in row_ids and self._is_row_accessible(row_id):
+            self._store.set(self._scope, self.key, row_id)
         return self.serialize()

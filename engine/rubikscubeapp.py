@@ -234,21 +234,29 @@ class RubiksCubeApp(Component):
         face_html = {fk: _render_face(faces.get(fk, []), fk) for fk in [U, D, L, R, F, B]}
         return render_template("rubikscube.html", data=data, ef=self, faces=faces, solved=solved, face_w=face_w, face_html=face_html, url=self.url)
 
-    def _handle(self, body: dict) -> dict:
-        action = body.get("action", "rotate")
-        if action == "rotate":
-            face = body.get("face", "")
-            direction = body.get("direction", "cw")
-            if face in (U, D, L, R, F, B) and direction in ("cw", "ccw"):
-                new_cube = _apply_rotation(self.cube, face, direction)
-                self._store.set(self._scope, self.key, new_cube)
-        elif action == "shuffle":
-            cube = copy.deepcopy(SOLVED)
-            faces = [U, D, L, R, F, B]
-            directions = ["cw", "ccw"]
-            for _ in range(20):
-                cube = _apply_rotation(cube, random.choice(faces), random.choice(directions))
-            self._store.set(self._scope, self.key, cube)
-        elif action == "restart":
-            self._store.set(self._scope, self.key, copy.deepcopy(SOLVED))
+    _actions = {
+        "rotate": "_do_rotate",
+        "shuffle": "_do_shuffle",
+        "restart": "_do_restart",
+    }
+
+    def _do_rotate(self, body: dict) -> dict:
+        face = body.get("face", "")
+        direction = body.get("direction", "cw")
+        if face in (U, D, L, R, F, B) and direction in ("cw", "ccw"):
+            new_cube = _apply_rotation(self.cube, face, direction)
+            self._store.set(self._scope, self.key, new_cube)
+        return self.serialize()
+
+    def _do_shuffle(self, body: dict) -> dict:
+        cube = copy.deepcopy(SOLVED)
+        faces = [U, D, L, R, F, B]
+        directions = ["cw", "ccw"]
+        for _ in range(20):
+            cube = _apply_rotation(cube, random.choice(faces), random.choice(directions))
+        self._store.set(self._scope, self.key, cube)
+        return self.serialize()
+
+    def _do_restart(self, body: dict) -> dict:
+        self._store.set(self._scope, self.key, copy.deepcopy(SOLVED))
         return self.serialize()

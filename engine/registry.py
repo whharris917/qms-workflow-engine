@@ -415,7 +415,17 @@ def from_descriptor(desc: dict, reg: ComponentRegistry | None = None,
         elif child_type == "single":
             kwargs[field_name] = from_descriptor(child_data, reg)
 
-    return cls(**kwargs)
+    instance = cls(**kwargs)
+
+    # Callable-preservation diagnostic: flag fields that were silently
+    # lost because no matching seed was available for deepcopy.
+    if cls._callable_fields:
+        missing = [f for f in cls._callable_fields
+                   if getattr(instance, f, None) is None]
+        if missing:
+            instance._missing_callables = missing
+
+    return instance
 
 
 # Discoverability alias. The operation from_descriptor() performs is

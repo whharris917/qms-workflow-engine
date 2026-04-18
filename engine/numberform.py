@@ -122,37 +122,16 @@ class NumberForm(Component):
                                url=self.url, label=data["label"],
                                instruction=data.get("instruction") or "")
 
-    def _handle(self, body: dict) -> dict:
-        action = body.get("action")
+    _actions = {
+        None: "_do_set",
+        "set_min": "_do_set_bound",
+        "set_max": "_do_set_bound",
+        "set_step": "_do_set_bound",
+        "toggle_slider": "_do_toggle_slider",
+        "set_unit": "_do_set_unit",
+    }
 
-        # Edit-mode config actions
-        if action in ("set_min", "set_max", "set_step") and self.editable and self.edit_mode:
-            self._push_undo()
-            raw = body.get("value")
-            if raw is None or raw == "" or raw == "null":
-                val = None
-            else:
-                try:
-                    val = float(raw)
-                except (TypeError, ValueError):
-                    return self._error(f"Invalid number: {raw}", body=body)
-            field = {"set_min": "min_val", "set_max": "max_val", "set_step": "step"}[action]
-            self._set_my_config(field, val)
-            return self.serialize()
-
-        if action == "toggle_slider" and self.editable and self.edit_mode:
-            self._push_undo()
-            self._set_my_config("slider", not self.slider)
-            return self.serialize()
-
-        if action == "set_unit" and self.editable and self.edit_mode:
-            self._push_undo()
-            raw = body.get("value")
-            val = None if raw is None or raw == "" or raw == "null" else str(raw)
-            self._set_my_config("unit", val)
-            return self.serialize()
-
-        # Normal value setting — read directly from self
+    def _do_set(self, body: dict) -> dict:
         raw = body.get("value")
         try:
             val = float(raw)
@@ -168,4 +147,37 @@ class NumberForm(Component):
             if min(remainder, self.step - remainder) > 1e-9:
                 return self._error(f"Value {val} is not a valid step (step {self.step} from {base})", body=body)
         self._store.set(self._scope, self.key, val)
+        return self.serialize()
+
+    def _do_set_bound(self, body: dict) -> dict:
+        if not (self.editable and self.edit_mode):
+            return self.serialize()
+        self._push_undo()
+        raw = body.get("value")
+        if raw is None or raw == "" or raw == "null":
+            val = None
+        else:
+            try:
+                val = float(raw)
+            except (TypeError, ValueError):
+                return self._error(f"Invalid number: {raw}", body=body)
+        action = body.get("action")
+        field = {"set_min": "min_val", "set_max": "max_val", "set_step": "step"}[action]
+        self._set_my_config(field, val)
+        return self.serialize()
+
+    def _do_toggle_slider(self, body: dict) -> dict:
+        if not (self.editable and self.edit_mode):
+            return self.serialize()
+        self._push_undo()
+        self._set_my_config("slider", not self.slider)
+        return self.serialize()
+
+    def _do_set_unit(self, body: dict) -> dict:
+        if not (self.editable and self.edit_mode):
+            return self.serialize()
+        self._push_undo()
+        raw = body.get("value")
+        val = None if raw is None or raw == "" or raw == "null" else str(raw)
+        self._set_my_config("unit", val)
         return self.serialize()

@@ -120,20 +120,25 @@ class CheckboxForm(Component):
                                instruction=data.get("instruction") or "",
                                items_html=items_html)
 
-    def _handle(self, body: dict) -> dict:
-        action = body.get("action")
-        if action == "done":
-            stored = dict(self.value or {})
-            stored["__confirmed"] = True
-            self._store.set(self._scope, self.key, stored)
-        else:
-            current = self.checked
-            changed = False
-            for item_key, value in body.items():
-                if item_key in current:
-                    current[item_key] = value
-                    changed = True
-            if changed:
-                current["__confirmed"] = False
-            self._store.set(self._scope, self.key, current)
+    _actions = {
+        None: "_do_toggle",
+        "done": "_do_done",
+    }
+
+    def _do_toggle(self, body: dict) -> dict:
+        current = self.checked
+        changed = False
+        for item_key, value in body.items():
+            if item_key in current:
+                current[item_key] = value
+                changed = True
+        if changed:
+            current["__confirmed"] = False
+        self._store.set(self._scope, self.key, current)
+        return self.serialize()
+
+    def _do_done(self, body: dict) -> dict:
+        stored = dict(self.value or {})
+        stored["__confirmed"] = True
+        self._store.set(self._scope, self.key, stored)
         return self.serialize()

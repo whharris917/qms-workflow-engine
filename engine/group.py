@@ -360,24 +360,36 @@ class Group(Component):
         self._rebuild()
         return self.serialize()
 
-    def _handle(self, body: dict) -> dict:
-        action = body.get("action", "")
+    _actions = {
+        "add_component": "_do_add_component",
+        "remove_component": "_do_remove_component",
+        "move_component": "_do_move_component",
+        "toggle_editable": "_do_toggle_editable",
+    }
 
-        if self.edit_mode:
-            if action == "add_component":
-                self._push_undo()
-                return self._add_component(body)
-            elif action == "remove_component":
-                self._push_undo()
-                return self._remove_component(body)
-            elif action == "move_component":
-                self._push_undo()
-                return self._move_component(body)
-            elif action == "toggle_editable":
-                self._push_undo()
-                return self._toggle_editable(body)
+    def _do_add_component(self, body: dict) -> dict:
+        if not self.edit_mode:
+            return self.serialize()
+        self._push_undo()
+        return self._add_component(body)
 
-        return self.serialize()
+    def _do_remove_component(self, body: dict) -> dict:
+        if not self.edit_mode:
+            return self.serialize()
+        self._push_undo()
+        return self._remove_component(body)
+
+    def _do_move_component(self, body: dict) -> dict:
+        if not self.edit_mode:
+            return self.serialize()
+        self._push_undo()
+        return self._move_component(body)
+
+    def _do_toggle_editable(self, body: dict) -> dict:
+        if not self.edit_mode:
+            return self.serialize()
+        self._push_undo()
+        return self._toggle_editable(body)
 
     # --- Serialization ---
 

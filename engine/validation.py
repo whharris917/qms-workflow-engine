@@ -99,6 +99,3 @@ class Validation(Component):
     def render_from_data(self, data: dict) -> str:
         return render_template("validation.html", data=data, ef=self,
                                url_prefix=self._url_prefix)
-
-    def _handle(self, body: dict) -> dict:
-        return self.serialize()

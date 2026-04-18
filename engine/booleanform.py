@@ -82,19 +82,13 @@ class BooleanForm(Component):
                                url=self.url, label=data["label"],
                                instruction=data.get("instruction") or "")
 
-    def _handle(self, body: dict) -> dict:
-        action = body.get("action")
+    _actions = {
+        None: "_do_set",
+        "set_true_label": "_do_set_config_label",
+        "set_false_label": "_do_set_config_label",
+    }
 
-        if action in ("set_true_label", "set_false_label") and self.editable and self.edit_mode:
-            self._push_undo()
-            new_label = body.get("label", "").strip()
-            if not new_label:
-                return self._error("Label cannot be empty.", action=action)
-            field = "true_label" if action == "set_true_label" else "false_label"
-            self._set_my_config(field, new_label)
-            return self.serialize()
-
-        # Normal value setting
+    def _do_set(self, body: dict) -> dict:
         raw = body.get("value")
         if isinstance(raw, bool):
             val = raw
@@ -103,4 +97,15 @@ class BooleanForm(Component):
         else:
             val = bool(raw)
         self._store.set(self._scope, self.key, val)
+        return self.serialize()
+
+    def _do_set_config_label(self, body: dict) -> dict:
+        if not (self.editable and self.edit_mode):
+            return self.serialize()
+        self._push_undo()
+        new_label = body.get("label", "").strip()
+        if not new_label:
+            return self._error("Label cannot be empty.", action=body.get("action"))
+        field = "true_label" if body.get("action") == "set_true_label" else "false_label"
+        self._set_my_config(field, new_label)
         return self.serialize()

@@ -27,6 +27,7 @@ from engine.templates import render_template
 class Computation(Component):
     """Read-only component that computes a value from sibling state."""
     form = "computed"
+    _callable_fields = ("compute_fn",)
 
     depends_on: "list[str | SiblingRef]" = field(default_factory=list)
     compute_fn: Callable[[dict], Any] | None = None
@@ -78,5 +79,4 @@ class Computation(Component):
         return render_template("computed.html", data=data, ef=self,
                                url_prefix=self._url_prefix)
 
-    def _handle(self, body: dict) -> dict:
-        return self.serialize()
+    pass  # No actions — read-only component

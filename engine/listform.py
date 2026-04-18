@@ -225,120 +225,166 @@ class ListForm(Component):
                                static_pairs=static_pairs,
                                stored_constraints=oc.stored_constraints)
 
-    def _handle(self, body: dict) -> dict:
-        action = body.get("action", "")
+    _actions = {
+        "toggle_constraints": "_do_toggle_constraints",
+        "toggle_fixed": "_do_toggle_fixed",
+        "toggle_constraint_fixed": "_do_toggle_constraint_fixed",
+        "add": "_do_add",
+        "edit": "_do_edit",
+        "remove": "_do_remove",
+        "move": "_do_move",
+        "move_up": "_do_move_up",
+        "move_down": "_do_move_down",
+        "add_constraint": "_do_add_constraint",
+        "remove_constraint": "_do_remove_constraint",
+        "na": "_do_na",
+        "clear_na": "_do_clear_na",
+    }
 
-        if action == "toggle_constraints" and self.editable and self.edit_mode:
-            self._push_undo()
-            self._set_my_config("allow_constraints", not self.allow_constraints)
+    def _do_toggle_constraints(self, body: dict) -> dict:
+        if not (self.editable and self.edit_mode):
             return self.serialize()
+        self._push_undo()
+        self._set_my_config("allow_constraints", not self.allow_constraints)
+        return self.serialize()
 
-        # Edit-mode only actions
-        if action == "toggle_fixed" and self.editable and self.edit_mode:
-            self._push_undo()
-            item_id = body.get("id", "")
-            item = next((i for i in self._collection.items if i["id"] == item_id), None)
-            if not item:
-                return self._error(f"Unknown item: {item_id}", action=action)
-            oc = self._collection
-            state = oc.set_fixed(item_id, not item.get("fixed", False))
-            self._store.set(self._scope, self.key, state)
+    def _do_toggle_fixed(self, body: dict) -> dict:
+        if not (self.editable and self.edit_mode):
             return self.serialize()
+        self._push_undo()
+        item_id = body.get("id", "")
+        item = next((i for i in self._collection.items if i["id"] == item_id), None)
+        if not item:
+            return self._error(f"Unknown item: {item_id}", action="toggle_fixed")
+        state = self._collection.set_fixed(item_id, not item.get("fixed", False))
+        self._store.set(self._scope, self.key, state)
+        return self.serialize()
 
-        if action == "toggle_constraint_fixed" and self.editable and self.edit_mode:
-            self._push_undo()
-            item_id = body.get("item", "")
-            after_id = body.get("after", "")
-            # Determine current fixed state
-            is_static = after_id in self.must_follow.get(item_id, [])
-            stored = next((c for c in self._collection.stored_constraints
-                           if c["item"] == item_id and c["after"] == after_id), None)
-            currently_fixed = is_static and (not stored or stored.get("fixed") is not False)
-            if not is_static and stored:
-                currently_fixed = bool(stored.get("fixed"))
-            oc = self._collection
-            try:
-                state = oc.set_constraint_fixed(item_id, after_id, not currently_fixed)
-            except ValueError as e:
-                return self._error(str(e), action=action)
-            self._store.set(self._scope, self.key, state)
+    def _do_toggle_constraint_fixed(self, body: dict) -> dict:
+        if not (self.editable and self.edit_mode):
             return self.serialize()
+        self._push_undo()
+        item_id = body.get("item", "")
+        after_id = body.get("after", "")
+        is_static = after_id in self.must_follow.get(item_id, [])
+        stored = next((c for c in self._collection.stored_constraints
+                       if c["item"] == item_id and c["after"] == after_id), None)
+        currently_fixed = is_static and (not stored or stored.get("fixed") is not False)
+        if not is_static and stored:
+            currently_fixed = bool(stored.get("fixed"))
+        try:
+            state = self._collection.set_constraint_fixed(item_id, after_id, not currently_fixed)
+        except ValueError as e:
+            return self._error(str(e), action="toggle_constraint_fixed")
+        self._store.set(self._scope, self.key, state)
+        return self.serialize()
 
-        # Push undo before any item mutation in edit mode
-        if self.edit_mode and action in ("add", "edit", "remove", "move", "move_up", "move_down",
-                                          "add_constraint", "remove_constraint", "na", "clear_na"):
+    def _do_add(self, body: dict) -> dict:
+        if self.edit_mode:
             self._push_undo()
+        value = body.get("value", "").strip()
+        if not value:
+            return self._error("Item value is required.", action="add")
+        try:
+            state = self._collection.add(value)
+        except ValueError as e:
+            return self._error(str(e), action="add")
+        self._store.set(self._scope, self.key, state)
+        return self.serialize()
 
+    def _do_edit(self, body: dict) -> dict:
+        if self.edit_mode:
+            self._push_undo()
+        item_id = body.get("id", "")
+        value = body.get("value", "")
+        try:
+            state = self._collection.edit(item_id, value)
+        except ValueError as e:
+            return self._error(str(e), action="edit")
+        self._store.set(self._scope, self.key, state)
+        return self.serialize()
+
+    def _do_remove(self, body: dict) -> dict:
+        if self.edit_mode:
+            self._push_undo()
+        item_id = body.get("id", "")
+        try:
+            state = self._collection.remove(item_id)
+        except ValueError as e:
+            return self._error(str(e), action="remove")
+        self._store.set(self._scope, self.key, state)
+        return self.serialize()
+
+    def _do_move(self, body: dict) -> dict:
+        if self.edit_mode:
+            self._push_undo()
+        item_id = body.get("id", "")
+        position = body.get("position")
+        if isinstance(position, str) and position.isdigit():
+            position = int(position)
+        try:
+            state = self._collection.move_to(item_id, position)
+        except ValueError as e:
+            return self._error(str(e), action="move")
+        self._store.set(self._scope, self.key, state)
+        return self.serialize()
+
+    def _do_move_up(self, body: dict) -> dict:
+        if self.edit_mode:
+            self._push_undo()
+        item_id = body.get("id", "")
+        try:
+            state = self._collection.move_up(item_id)
+        except ValueError as e:
+            return self._error(str(e), action="move_up")
+        self._store.set(self._scope, self.key, state)
+        return self.serialize()
+
+    def _do_move_down(self, body: dict) -> dict:
+        if self.edit_mode:
+            self._push_undo()
+        item_id = body.get("id", "")
+        try:
+            state = self._collection.move_down(item_id)
+        except ValueError as e:
+            return self._error(str(e), action="move_down")
+        self._store.set(self._scope, self.key, state)
+        return self.serialize()
+
+    def _do_add_constraint(self, body: dict) -> dict:
+        if self.edit_mode:
+            self._push_undo()
+        item_id = body.get("item", "")
+        after_id = body.get("after", "")
+        try:
+            state = self._collection.add_constraint(item_id, after_id)
+        except ValueError as e:
+            return self._error(str(e), action="add_constraint")
+        self._store.set(self._scope, self.key, state)
+        return self.serialize()
+
+    def _do_remove_constraint(self, body: dict) -> dict:
+        if self.edit_mode:
+            self._push_undo()
+        item_id = body.get("item", "")
+        after_id = body.get("after", "")
+        try:
+            state = self._collection.remove_constraint(item_id, after_id)
+        except ValueError as e:
+            return self._error(str(e), action="remove_constraint")
+        self._store.set(self._scope, self.key, state)
+        return self.serialize()
+
+    def _do_na(self, body: dict) -> dict:
+        if self.edit_mode:
+            self._push_undo()
         oc = self._collection
+        self._store.set(self._scope, self.key, {"items": [], "next_id": oc.next_id, "__na": True})
+        return self.serialize()
 
-        if action == "add":
-            value = body.get("value", "").strip()
-            if not value:
-                return self._error("Item value is required.", action=action)
-            try:
-                state = oc.add(value)
-            except ValueError as e:
-                return self._error(str(e), action=action)
-            self._store.set(self._scope, self.key, state)
-
-        elif action == "edit":
-            item_id = body.get("id", "")
-            value = body.get("value", "")
-            try:
-                state = oc.edit(item_id, value)
-            except ValueError as e:
-                return self._error(str(e), action=action)
-            self._store.set(self._scope, self.key, state)
-
-        elif action == "remove":
-            item_id = body.get("id", "")
-            try:
-                state = oc.remove(item_id)
-            except ValueError as e:
-                return self._error(str(e), action=action)
-            self._store.set(self._scope, self.key, state)
-
-        elif action in ("move", "move_up", "move_down"):
-            item_id = body.get("id", "")
-            try:
-                if action == "move_up":
-                    state = oc.move_up(item_id)
-                elif action == "move_down":
-                    state = oc.move_down(item_id)
-                else:
-                    position = body.get("position")
-                    if isinstance(position, str) and position.isdigit():
-                        position = int(position)
-                    state = oc.move_to(item_id, position)
-            except ValueError as e:
-                return self._error(str(e), action=action)
-            self._store.set(self._scope, self.key, state)
-
-        elif action == "add_constraint":
-            item_id = body.get("item", "")
-            after_id = body.get("after", "")
-            try:
-                state = oc.add_constraint(item_id, after_id)
-            except ValueError as e:
-                return self._error(str(e), action=action)
-            self._store.set(self._scope, self.key, state)
-
-        elif action == "remove_constraint":
-            item_id = body.get("item", "")
-            after_id = body.get("after", "")
-            try:
-                state = oc.remove_constraint(item_id, after_id)
-            except ValueError as e:
-                return self._error(str(e), action=action)
-            self._store.set(self._scope, self.key, state)
-
-        elif action == "na":
-            self._store.set(self._scope, self.key, {"items": [], "next_id": oc.next_id, "__na": True})
-
-        elif action == "clear_na":
-            self._store.set(self._scope, self.key, {"items": [], "next_id": oc.next_id})
-
-        else:
-            return self._error(f"Unknown action: {action}", action=action)
-
+    def _do_clear_na(self, body: dict) -> dict:
+        if self.edit_mode:
+            self._push_undo()
+        oc = self._collection
+        self._store.set(self._scope, self.key, {"items": [], "next_id": oc.next_id})
         return self.serialize()

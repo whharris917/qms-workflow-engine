@@ -108,61 +108,67 @@ class DictionaryForm(Component):
         return render_template("dictionary.html", data=data, ef=self,
                                url=self.url)
 
-    def _handle(self, body: dict) -> dict:
+    _actions = {
+        "add": "_do_add",
+        "edit": "_do_edit",
+        "remove": "_do_remove",
+        "set_key_label": "_do_set_config_label",
+        "set_value_label": "_do_set_config_label",
+    }
+
+    def _do_set_config_label(self, body: dict) -> dict:
+        if not (self.editable and self.edit_mode):
+            return self.serialize()
+        self._push_undo()
+        raw = body.get("value", "").strip()
+        if not raw:
+            return self._error("Label cannot be empty", body=body)
         action = body.get("action")
+        field = "key_label" if action == "set_key_label" else "value_label"
+        self._set_my_config(field, raw)
+        return self.serialize()
 
-        # Edit-mode config actions
-        if action in ("set_key_label", "set_value_label") and self.editable and self.edit_mode:
-            self._push_undo()
-            raw = body.get("value", "").strip()
-            if not raw:
-                return self._error("Label cannot be empty", body=body)
-            field = "key_label" if action == "set_key_label" else "value_label"
-            self._set_my_config(field, raw)
-            return self.serialize()
-
+    def _do_add(self, body: dict) -> dict:
         state = self._state
+        k = body.get("key", "")
+        v = body.get("value", "")
+        if not k or k.startswith("<"):
+            return self._error("Key is required.", action="add")
+        existing = {e["key"] for e in state["entries"]}
+        if k in existing:
+            return self._error(f"Key '{k}' already exists.", action="add")
+        eid = f"kv_{state.get('next_id', 0)}"
+        state["entries"].append({"id": eid, "key": k, "value": v})
+        state["next_id"] = state.get("next_id", 0) + 1
+        self._store.set(self._scope, self.key, state)
+        return self.serialize()
 
-        if action == "add":
-            k = body.get("key", "")
-            v = body.get("value", "")
-            if not k or k.startswith("<"):
-                return self._error("Key is required.", action=action)
-            existing = {e["key"] for e in state["entries"]}
-            if k in existing:
-                return self._error(f"Key '{k}' already exists.", action=action)
-            eid = f"kv_{state.get('next_id', 0)}"
-            state["entries"].append({"id": eid, "key": k, "value": v})
-            state["next_id"] = state.get("next_id", 0) + 1
-            self._store.set(self._scope, self.key, state)
-            return self.serialize()
+    def _do_edit(self, body: dict) -> dict:
+        state = self._state
+        target_key = body.get("key", "")
+        entry = next((e for e in state["entries"] if e["key"] == target_key), None)
+        if entry is None:
+            existing_keys = [e["key"] for e in state["entries"] if e.get("key")]
+            return self._error(f"No entry with key {target_key!r}. Valid: {', '.join(existing_keys)}", action="edit")
+        new_key = body.get("new_key")
+        if new_key and not new_key.startswith("<"):
+            existing = {e["key"] for e in state["entries"] if e["key"] != target_key}
+            if new_key in existing:
+                return self._error(f"Key '{new_key}' already exists on another entry.", action="edit")
+            entry["key"] = new_key
+        v = body.get("value")
+        if v and not v.startswith("<"):
+            entry["value"] = v
+        self._store.set(self._scope, self.key, state)
+        return self.serialize()
 
-        elif action == "edit":
-            target_key = body.get("key", "")
-            entry = next((e for e in state["entries"] if e["key"] == target_key), None)
-            if entry is None:
-                existing_keys = [e["key"] for e in state["entries"] if e.get("key")]
-                return self._error(f"No entry with key {target_key!r}. Valid: {', '.join(existing_keys)}", action=action)
-            new_key = body.get("new_key")
-            if new_key and not new_key.startswith("<"):
-                existing = {e["key"] for e in state["entries"] if e["key"] != target_key}
-                if new_key in existing:
-                    return self._error(f"Key '{new_key}' already exists on another entry.", action=action)
-                entry["key"] = new_key
-            v = body.get("value")
-            if v and not v.startswith("<"):
-                entry["value"] = v
-            self._store.set(self._scope, self.key, state)
-            return self.serialize()
-
-        elif action == "remove":
-            target_key = body.get("key", "")
-            before = len(state["entries"])
-            state["entries"] = [e for e in state["entries"] if e["key"] != target_key]
-            if len(state["entries"]) == before:
-                existing_keys = [e["key"] for e in state["entries"] if e.get("key")]
-                return self._error(f"No entry with key {target_key!r}. Valid: {', '.join(existing_keys)}", action=action)
-            self._store.set(self._scope, self.key, state)
-            return self.serialize()
-
-        return self._error(f"Unknown action: {action}", action=action)
+    def _do_remove(self, body: dict) -> dict:
+        state = self._state
+        target_key = body.get("key", "")
+        before = len(state["entries"])
+        state["entries"] = [e for e in state["entries"] if e["key"] != target_key]
+        if len(state["entries"]) == before:
+            existing_keys = [e["key"] for e in state["entries"] if e.get("key")]
+            return self._error(f"No entry with key {target_key!r}. Valid: {', '.join(existing_keys)}", action="remove")
+        self._store.set(self._scope, self.key, state)
+        return self.serialize()

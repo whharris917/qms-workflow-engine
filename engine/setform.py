@@ -68,30 +68,30 @@ class SetForm(Component):
     def render_from_data(self, data: dict) -> str:
         return render_template("set.html", data=data, ef=self)
 
-    def _handle(self, body: dict) -> dict:
-        action = body.get("action", "")
+    _actions = {
+        "add": "_do_add",
+        "remove": "_do_remove",
+    }
+
+    def _do_add(self, body: dict) -> dict:
         items = list(self.items)
+        value = body.get("value", "").strip()
+        if not value:
+            return self._error("Item value is required.", action="add")
+        if value in items:
+            return self._error(f"Duplicate: {value!r} is already in the set.", action="add")
+        items.append(value)
+        self._store.set(self._scope, self.key, items)
+        return self.serialize()
 
-        if action == "add":
-            value = body.get("value", "").strip()
-            if not value:
-                return self._error("Item value is required.", action=action)
-            if value in items:
-                return self._error(f"Duplicate: {value!r} is already in the set.", action=action)
-            items.append(value)
-            self._store.set(self._scope, self.key, items)
-
-        elif action == "remove":
-            value = body.get("value", "")
-            if value not in items:
-                return self._error(
-                    f"Not in set: {value!r}. Current items: {', '.join(items)}",
-                    action=action,
-                )
-            items.remove(value)
-            self._store.set(self._scope, self.key, items)
-
-        else:
-            return self._error(f"Unknown action: {action}", action=action)
-
+    def _do_remove(self, body: dict) -> dict:
+        items = list(self.items)
+        value = body.get("value", "")
+        if value not in items:
+            return self._error(
+                f"Not in set: {value!r}. Current items: {', '.join(items)}",
+                action="remove",
+            )
+        items.remove(value)
+        self._store.set(self._scope, self.key, items)
         return self.serialize()

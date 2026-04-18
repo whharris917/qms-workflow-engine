@@ -96,29 +96,14 @@ class DateForm(Component):
                                url=self.url, label=data["label"],
                                instruction=data.get("instruction") or "")
 
-    def _handle(self, body: dict) -> dict:
-        action = body.get("action")
+    _actions = {
+        None: "_do_set",
+        "toggle_include_time": "_do_toggle_include_time",
+        "set_min_date": "_do_set_date_bound",
+        "set_max_date": "_do_set_date_bound",
+    }
 
-        # Edit-mode config actions
-        if action == "toggle_include_time" and self.editable and self.edit_mode:
-            self._push_undo()
-            self._set_my_config("include_time", not self.include_time)
-            return self.serialize()
-
-        if action in ("set_min_date", "set_max_date") and self.editable and self.edit_mode:
-            self._push_undo()
-            raw = body.get("value")
-            if raw is None or raw == "" or raw == "null":
-                val = None
-            else:
-                if not DATE_RE.match(raw):
-                    return self._error(f"Invalid date format. Expected YYYY-MM-DD, got: {raw}", body=body)
-                val = raw
-            field = "min_date" if action == "set_min_date" else "max_date"
-            self._set_my_config(field, val)
-            return self.serialize()
-
-        # Normal value setting — read directly from self
+    def _do_set(self, body: dict) -> dict:
         raw = body.get("value", "")
         pattern = DATETIME_RE if self.include_time else DATE_RE
         if not pattern.match(raw):
@@ -129,4 +114,27 @@ class DateForm(Component):
         if self.max_date and raw > self.max_date:
             return self._error(f"Date {raw} is after maximum {self.max_date}", body=body)
         self._store.set(self._scope, self.key, raw)
+        return self.serialize()
+
+    def _do_toggle_include_time(self, body: dict) -> dict:
+        if not (self.editable and self.edit_mode):
+            return self.serialize()
+        self._push_undo()
+        self._set_my_config("include_time", not self.include_time)
+        return self.serialize()
+
+    def _do_set_date_bound(self, body: dict) -> dict:
+        if not (self.editable and self.edit_mode):
+            return self.serialize()
+        self._push_undo()
+        raw = body.get("value")
+        if raw is None or raw == "" or raw == "null":
+            val = None
+        else:
+            if not DATE_RE.match(raw):
+                return self._error(f"Invalid date format. Expected YYYY-MM-DD, got: {raw}", body=body)
+            val = raw
+        action = body.get("action")
+        field = "min_date" if action == "set_min_date" else "max_date"
+        self._set_my_config(field, val)
         return self.serialize()

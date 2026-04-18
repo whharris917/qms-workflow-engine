@@ -244,6 +244,19 @@ class Component:
     _scope: str | None = None
     _url_prefix: str | None = None
 
+    # Action registry: maps action name → method name for dispatch.
+    # Subclasses populate this instead of writing if/elif chains in _handle().
+    _actions = {}
+
+    # Callable-preservation diagnostic. Subclasses that declare callable-
+    # valued fields override this so from_descriptor() can detect when a
+    # fresh-construction fallback silently drops callable behavior.
+    _callable_fields: tuple[str, ...] = ()
+
+    # Set by from_descriptor() when callable fields are lost during
+    # fresh construction (no matching seed available).
+    _missing_callables: list[str] | None = None
+
     def __post_init__(self):
         if self.key is None:
             form = getattr(self, 'form', 'component')
@@ -570,12 +583,19 @@ class Component:
 
     def _base_state(self) -> dict:
         """Return the state fields common to all components."""
-        return {
+        state = {
             "form": self.form,
             "key": self.key,
             "label": self.label,
             "instruction": self.instruction,
         }
+        if self._missing_callables:
+            state["warnings"] = [
+                f"Missing callable: {f} (component was reconstructed "
+                f"without a matching seed definition)"
+                for f in self._missing_callables
+            ]
+        return state
 
     def _serialize_state(self) -> dict:
         """Serialize this component's state fields. Subclasses implement this."""
@@ -869,8 +889,13 @@ class Component:
             new_instr = body.get("instruction", "").strip()
             self._set_my_field("instruction", new_instr if new_instr else None)
             return self.serialize()
+        handler_name = self._actions.get(action)
+        if handler_name is not None:
+            return getattr(self, handler_name)(body)
         return self._handle(body)
 
     def _handle(self, body: dict) -> dict:
-        """Handle a single action. Subclasses must implement."""
-        raise NotImplementedError
+        """Fallback for actions not in the _actions registry.
+        Subclasses may override for custom dispatch (e.g., delegation).
+        """
+        return self.serialize()

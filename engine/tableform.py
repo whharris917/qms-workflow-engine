@@ -25,6 +25,7 @@ from engine.affordances import (
 )
 from engine.component import Component
 from engine.ordered_collection import OrderedCollection
+from engine.tableform_actions import TableFormActionsMixin
 from engine.templates import render_template
 
 
@@ -75,12 +76,9 @@ class RowGroup(Component):
     def get_affordances(self) -> list[Affordance]:
         return []
 
-    def _handle(self, body: dict) -> dict:
-        return self.serialize()
-
 
 @dataclass
-class TableForm(Component):
+class TableForm(TableFormActionsMixin, Component):
     """A table with dynamic columns, stable row IDs, and row-level operations.
 
     Both rows and columns are backed by OrderedCollection, providing:
@@ -971,224 +969,25 @@ class TableForm(Component):
                                row_static_pairs=row_static_pairs,
                                col_static_pairs=col_static_pairs)
 
-    def _handle(self, body: dict) -> dict:
-        action = body.get("action", "")
-        col_oc = self._col_collection
-        row_oc = self._row_collection
-        col_state, row_state, cells = self._current_states()
-        templates = self._typed_column_templates
+    _actions = {
+        "add_column": "_do_add_column",
+        "rename_column": "_do_rename_column",
+        "add_row": "_do_add_row",
+        "set_cell": "_do_set_cell",
+        "set_row": "_do_set_row",
+        "remove_row": "_do_remove_row",
+        "remove_column": "_do_remove_column",
+        "move_row_up": "_do_move_row_up",
+        "move_row_down": "_do_move_row_down",
+        "move_col_left": "_do_move_col_left",
+        "move_col_right": "_do_move_col_right",
+        "add_row_constraint": "_do_add_row_constraint",
+        "remove_row_constraint": "_do_remove_row_constraint",
+        "add_col_constraint": "_do_add_col_constraint",
+        "remove_col_constraint": "_do_remove_col_constraint",
+        "toggle_auto_chain_rows": "_do_toggle_auto_chain_rows",
+        "toggle_auto_chain_cols": "_do_toggle_auto_chain_cols",
+    }
 
-        if action == "add_column":
-            label = body.get("label", "").strip()
-            if not label:
-                return self._error("Column label is required.", action=action)
-            try:
-                col_state = col_oc.add(label)
-            except ValueError as e:
-                return self._error(str(e), action=action)
-            # Seed one empty row if this is the first column
-            if not row_state.get("items"):
-                row_state = row_oc.add("")
-            # Initialize cells for new column (text columns only)
-            new_col_id = col_state["items"][-1]["id"]
-            for row_id in [i["id"] for i in row_state.get("items", [])]:
-                cells.setdefault(row_id, {})[new_col_id] = None
-            col_state = self._apply_auto_chain(col_state, "auto_chain_cols")
-            self._save(col_state, row_state, cells)
-
-        elif action == "rename_column":
-            col_ref = body.get("column", "")
-            new_label = body.get("label", "").strip()
-            col_key = self._resolve_column(col_ref)
-            if not col_key:
-                return self._error(f"Unknown column: {col_ref}. Valid: {', '.join(self.col_keys)}", action=action)
-            if not new_label:
-                return self._error("New label is required.", action=action)
-            try:
-                col_state = col_oc.edit(col_key, new_label)
-            except ValueError as e:
-                return self._error(str(e), action=action)
-            self._save(col_state, row_state, cells)
-
-        elif action == "add_row":
-            try:
-                row_state = row_oc.add("")
-            except ValueError as e:
-                return self._error(str(e), action=action)
-            new_row_id = row_state["items"][-1]["id"]
-            row = {}
-            for col_item in col_state.get("items", []):
-                col_key = col_item["id"]
-                if col_key in templates:
-                    continue  # Typed columns managed via cell component URLs
-                val = body.get(col_key)
-                if val is None:
-                    val = body.get(col_item.get("value", ""))
-                row[col_key] = val
-            cells[new_row_id] = row
-            row_state = self._apply_auto_chain(row_state, "auto_chain_rows")
-            self._save(col_state, row_state, cells)
-            self._rebuild_rows()
-
-        elif action == "set_cell":
-            row_id = body.get("row", "")
-            col_ref = body.get("column", "")
-            value = body.get("value")
-            if row_id not in cells and row_id not in {i["id"] for i in row_state.get("items", [])}:
-                return self._error(f"Unknown row: {row_id}. Valid: {', '.join(i['id'] for i in row_state.get('items', []))}", action=action)
-            col_key = self._resolve_column(col_ref)
-            if not col_key:
-                return self._error(f"Unknown column: {col_ref}. Valid: {', '.join(self.col_keys)}", action=action)
-            if col_key in templates:
-                return self._error(
-                    f"Column '{col_key}' is a typed column ({templates[col_key].form}). "
-                    f"Use its cell URL instead: {self.url}/<row_id>/{col_key}",
-                    action=action,
-                )
-            cells.setdefault(row_id, {})[col_key] = value
-            self._save(col_state, row_state, cells)
-
-        elif action == "set_row":
-            row_id = body.get("row", "")
-            row_ids = {i["id"] for i in row_state.get("items", [])}
-            if row_id not in row_ids:
-                return self._error(f"Unknown row: {row_id}. Valid: {', '.join(row_ids)}", action=action)
-            for col_item in col_state.get("items", []):
-                col_key = col_item["id"]
-                if col_key in templates:
-                    continue  # Typed columns managed via cell component URLs
-                val = body.get(col_key)
-                if val is None:
-                    val = body.get(col_item.get("value", ""))
-                if val is not None:
-                    cells.setdefault(row_id, {})[col_key] = val
-            self._save(col_state, row_state, cells)
-
-        elif action == "remove_row":
-            row_id = body.get("row", "")
-            # Clear typed cell compound scopes before removing
-            if templates and self._store:
-                self._store.clear_scope(f"{self.key}/{row_id}")
-            try:
-                row_state = row_oc.remove(row_id)
-            except ValueError as e:
-                return self._error(str(e), action=action)
-            cells.pop(row_id, None)
-            row_state = self._apply_auto_chain(row_state, "auto_chain_rows")
-            self._save(col_state, row_state, cells)
-            self._rebuild_rows()
-
-        elif action == "remove_column":
-            col_ref = body.get("column", "")
-            col_key = self._resolve_column(col_ref)
-            if not col_key:
-                return self._error(f"Unknown column: {col_ref}. Valid: {', '.join(self.col_keys)}", action=action)
-            try:
-                col_state = col_oc.remove(col_key)
-            except ValueError as e:
-                return self._error(str(e), action=action)
-            for row_id in cells:
-                cells[row_id].pop(col_key, None)
-            col_state = self._apply_auto_chain(col_state, "auto_chain_cols")
-            self._save(col_state, row_state, cells)
-
-        elif action == "move_row_up":
-            row_id = body.get("row", "")
-            try:
-                row_state = row_oc.move_up(row_id)
-            except ValueError as e:
-                return self._error(str(e), action=action)
-            row_state = self._apply_auto_chain(row_state, "auto_chain_rows")
-            self._save(col_state, row_state, cells)
-
-        elif action == "move_row_down":
-            row_id = body.get("row", "")
-            try:
-                row_state = row_oc.move_down(row_id)
-            except ValueError as e:
-                return self._error(str(e), action=action)
-            row_state = self._apply_auto_chain(row_state, "auto_chain_rows")
-            self._save(col_state, row_state, cells)
-
-        elif action == "move_col_left":
-            col_ref = body.get("column", "")
-            col_key = self._resolve_column(col_ref)
-            if not col_key:
-                return self._error(f"Unknown column: {col_ref}. Valid: {', '.join(self.col_keys)}", action=action)
-            try:
-                col_state = col_oc.move_up(col_key)
-            except ValueError as e:
-                return self._error(str(e), action=action)
-            col_state = self._apply_auto_chain(col_state, "auto_chain_cols")
-            self._save(col_state, row_state, cells)
-
-        elif action == "move_col_right":
-            col_ref = body.get("column", "")
-            col_key = self._resolve_column(col_ref)
-            if not col_key:
-                return self._error(f"Unknown column: {col_ref}. Valid: {', '.join(self.col_keys)}", action=action)
-            try:
-                col_state = col_oc.move_down(col_key)
-            except ValueError as e:
-                return self._error(str(e), action=action)
-            col_state = self._apply_auto_chain(col_state, "auto_chain_cols")
-            self._save(col_state, row_state, cells)
-
-        elif action == "add_row_constraint":
-            item_id = body.get("item", "")
-            after_id = body.get("after", "")
-            try:
-                row_state = row_oc.add_constraint(item_id, after_id)
-            except ValueError as e:
-                return self._error(str(e), action=action)
-            self._save(col_state, row_state, cells)
-
-        elif action == "remove_row_constraint":
-            item_id = body.get("item", "")
-            after_id = body.get("after", "")
-            try:
-                row_state = row_oc.remove_constraint(item_id, after_id)
-            except ValueError as e:
-                return self._error(str(e), action=action)
-            self._save(col_state, row_state, cells)
-
-        elif action == "add_col_constraint":
-            item_id = body.get("item", "")
-            after_id = body.get("after", "")
-            try:
-                col_state = col_oc.add_constraint(item_id, after_id)
-            except ValueError as e:
-                return self._error(str(e), action=action)
-            self._save(col_state, row_state, cells)
-
-        elif action == "remove_col_constraint":
-            item_id = body.get("item", "")
-            after_id = body.get("after", "")
-            try:
-                col_state = col_oc.remove_constraint(item_id, after_id)
-            except ValueError as e:
-                return self._error(str(e), action=action)
-            self._save(col_state, row_state, cells)
-
-        elif action == "toggle_auto_chain_rows":
-            config = dict(self._config)
-            config["auto_chain_rows"] = not config.get("auto_chain_rows", False)
-            if config["auto_chain_rows"]:
-                row_state = self._apply_auto_chain(row_state, "auto_chain_rows", config)
-            else:
-                row_state.pop("constraints", None)
-            self._save(col_state, row_state, cells, config=config)
-
-        elif action == "toggle_auto_chain_cols":
-            config = dict(self._config)
-            config["auto_chain_cols"] = not config.get("auto_chain_cols", False)
-            if config["auto_chain_cols"]:
-                col_state = self._apply_auto_chain(col_state, "auto_chain_cols", config)
-            else:
-                col_state.pop("constraints", None)
-            self._save(col_state, row_state, cells, config=config)
-
-        else:
-            return self._error(f"Unknown action: {action}", action=action)
-
-        return self.serialize()
+    # Action handler methods (_do_add_column, _do_add_row, _do_set_cell, etc.)
+    # are provided by TableFormActionsMixin in engine/tableform_actions.py.

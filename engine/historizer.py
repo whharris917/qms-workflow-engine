@@ -215,19 +215,24 @@ class Historizer(Component):
 
     # --- Action handling ---
 
+    _actions = {
+        "view_version": "_do_view_version",
+        "view_current": "_do_view_current",
+    }
+
+    def _do_view_version(self, body: dict) -> dict:
+        version = body.get("version")
+        if isinstance(version, int):
+            history = self._history
+            if 0 <= version < len(history):
+                self._store.set(self._scope, f"{self.key}.__viewing", version)
+        return self.serialize()
+
+    def _do_view_current(self, body: dict) -> dict:
+        self._store.delete(self._scope, f"{self.key}.__viewing")
+        return self.serialize()
+
     def _handle(self, body: dict) -> dict:
-        action = body.get("action", "")
-        if action == "view_version":
-            version = body.get("version")
-            if isinstance(version, int):
-                history = self._history
-                if 0 <= version < len(history):
-                    self._store.set(self._scope, f"{self.key}.__viewing", version)
-            return self.serialize()
-        if action == "view_current":
-            self._store.delete(self._scope, f"{self.key}.__viewing")
-            return self.serialize()
-        # Delegate unknown actions to child
         if self.component:
             return self.component.handle(body)
         return self.serialize()

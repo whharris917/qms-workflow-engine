@@ -108,8 +108,9 @@ class ChoiceForm(Component):
                                instruction=data.get("instruction") or "",
                                options_html=options_html)
 
-    def _handle(self, body: dict) -> dict:
-        # Normal value setting
+    _actions = {None: "_do_set"}
+
+    def _do_set(self, body: dict) -> dict:
         value = body.get("value")
         if value in self._effective_options:
             self._store.set(self._scope, self.key, value)

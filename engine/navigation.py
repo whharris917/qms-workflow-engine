@@ -496,49 +496,71 @@ class Navigation(Component):
         self._rebuild()
         return self.serialize()
 
-    def _handle(self, body: dict) -> dict:
-        action = body.get("action", "")
+    _actions = {
+        None: "_do_navigate_step",
+        "toggle": "_do_toggle",
+        "continue": "_do_continue",
+        "add_step": "_do_add_step",
+        "remove_step": "_do_remove_step",
+        "move_step": "_do_move_step",
+        "toggle_editable": "_do_toggle_editable",
+        "set_nav_mode": "_do_set_nav_mode",
+    }
 
-        # --- Navigation ---
-        if self.mode == "accordion" and action == "toggle":
-            step_key = body.get("step")
-            if step_key and step_key in {ef.key for ef in self.steps}:
-                state = dict(self._expanded_state)
-                state[step_key] = not self._is_expanded(step_key)
-                self._store.set(self._scope, self.key, state)
-            return self.serialize()
-
-        if self.mode == "chain" and action == "continue":
-            self._store.set(self._scope, self.key, None)
-            return self.serialize()
-
+    def _do_navigate_step(self, body: dict) -> dict:
         step_key = body.get("step")
         if step_key and self.mode != "accordion":
             for i, ef in enumerate(self.steps):
                 if ef.key == step_key and self._is_accessible(i):
                     self._store.set(self._scope, self.key, step_key)
                     break
-            return self.serialize()
-
-        # --- Structural (edit mode) ---
-        if self.edit_mode:
-            if action == "add_step":
-                self._push_undo()
-                return self._add_step(body)
-            elif action == "remove_step":
-                self._push_undo()
-                return self._remove_step(body)
-            elif action == "move_step":
-                self._push_undo()
-                return self._move_step(body)
-            elif action == "toggle_editable":
-                self._push_undo()
-                return self._toggle_editable(body)
-            elif action == "set_nav_mode":
-                self._push_undo()
-                return self._set_nav_mode(body)
-
         return self.serialize()
+
+    def _do_toggle(self, body: dict) -> dict:
+        if self.mode != "accordion":
+            return self.serialize()
+        step_key = body.get("step")
+        if step_key and step_key in {ef.key for ef in self.steps}:
+            state = dict(self._expanded_state)
+            state[step_key] = not self._is_expanded(step_key)
+            self._store.set(self._scope, self.key, state)
+        return self.serialize()
+
+    def _do_continue(self, body: dict) -> dict:
+        if self.mode != "chain":
+            return self.serialize()
+        self._store.set(self._scope, self.key, None)
+        return self.serialize()
+
+    def _do_add_step(self, body: dict) -> dict:
+        if not self.edit_mode:
+            return self.serialize()
+        self._push_undo()
+        return self._add_step(body)
+
+    def _do_remove_step(self, body: dict) -> dict:
+        if not self.edit_mode:
+            return self.serialize()
+        self._push_undo()
+        return self._remove_step(body)
+
+    def _do_move_step(self, body: dict) -> dict:
+        if not self.edit_mode:
+            return self.serialize()
+        self._push_undo()
+        return self._move_step(body)
+
+    def _do_toggle_editable(self, body: dict) -> dict:
+        if not self.edit_mode:
+            return self.serialize()
+        self._push_undo()
+        return self._toggle_editable(body)
+
+    def _do_set_nav_mode(self, body: dict) -> dict:
+        if not self.edit_mode:
+            return self.serialize()
+        self._push_undo()
+        return self._set_nav_mode(body)
 
     def _set_nav_mode(self, body: dict) -> dict:
         valid_modes = ("tabs", "chain", "sequence", "accordion")

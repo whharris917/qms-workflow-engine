@@ -56,9 +56,6 @@ class EntryGroup(Component):
     def get_affordances(self) -> list[Affordance]:
         return []
 
-    def _handle(self, body: dict) -> dict:
-        return self.serialize()
-
 
 @dataclass
 class Repeater(Component):
@@ -198,32 +195,31 @@ class Repeater(Component):
             entry_items.append({"id": entry_id, "index": idx, "label": f"{self.entry_label} {idx + 1}", "html": "".join(ef.render_safely() for ef in eg.components), "remove_body": remove_affs.get(entry_id, {}).get("body")})
         return render_template("repeater.html", data=data, ef=self, url=self.url, entry_label=self.entry_label, entry_count=data.get("entry_count", 0), min_entries=self.min_entries, max_entries=self.max_entries, entry_items=entry_items)
 
-    def _handle(self, body: dict) -> dict:
-        action = body.get("action", "")
+    _actions = {
+        "add": "_do_add",
+        "remove": "_do_remove",
+    }
+
+    def _do_add(self, body: dict) -> dict:
         entries = list(self._entry_ids)
         next_id = self._next_id
+        if self.max_entries is not None and len(entries) >= self.max_entries:
+            return self._error(f"Maximum {self.max_entries} entries reached.", action="add")
+        entry_id = f"entry_{next_id}"
+        entries.append(entry_id)
+        next_id += 1
+        self._save_structural(entries, next_id)
+        self._rebuild_entries()
+        return self.serialize()
 
-        if action == "add":
-            if self.max_entries is not None and len(entries) >= self.max_entries:
-                return self._error(f"Maximum {self.max_entries} entries reached.", action=action)
-            entry_id = f"entry_{next_id}"
-            entries.append(entry_id)
-            next_id += 1
-            self._save_structural(entries, next_id)
-            self._rebuild_entries()
-
-        elif action == "remove":
-            entry_id = body.get("id", "")
-            if entry_id not in entries:
-                return self._error(f"Unknown entry: {entry_id}.", action=action)
-            # Clear the entry's scope
-            entry_scope = f"{self.key}/{entry_id}"
-            self._store.clear_scope(entry_scope)
-            entries.remove(entry_id)
-            self._save_structural(entries, next_id)
-            self._rebuild_entries()
-
-        else:
-            return self._error(f"Unknown action: {action}", action=action)
-
+    def _do_remove(self, body: dict) -> dict:
+        entries = list(self._entry_ids)
+        entry_id = body.get("id", "")
+        if entry_id not in entries:
+            return self._error(f"Unknown entry: {entry_id}.", action="remove")
+        entry_scope = f"{self.key}/{entry_id}"
+        self._store.clear_scope(entry_scope)
+        entries.remove(entry_id)
+        self._save_structural(entries, self._next_id)
+        self._rebuild_entries()
         return self.serialize()

@@ -28,6 +28,7 @@ from engine.templates import render_template
 class DynamicChoiceForm(Component):
     """Single selection from a dynamically computed set of options."""
     form = "dynamicchoice"
+    _callable_fields = ("options_fn",)
 
     depends_on: "str | SiblingRef" = ""
     options_fn: Callable[[Any], list[str]] | None = None
@@ -109,15 +110,19 @@ class DynamicChoiceForm(Component):
         return render_template("dynamicchoice.html", data=data, ef=self,
                                url_prefix=self._url_prefix)
 
-    def _handle(self, body: dict) -> dict:
-        action = body.get("action")
-        if action == "clear":
-            self._store.set(self._scope, self.key, None)
-            return self.serialize()
+    _actions = {
+        None: "_do_set",
+        "clear": "_do_clear",
+    }
 
+    def _do_set(self, body: dict) -> dict:
         value = body.get("value")
         if value in self.current_options:
             self._store.set(self._scope, self.key, value)
         else:
             return self._error(f"'{value}' is not a valid option.", body=body)
+        return self.serialize()
+
+    def _do_clear(self, body: dict) -> dict:
+        self._store.set(self._scope, self.key, None)
         return self.serialize()
