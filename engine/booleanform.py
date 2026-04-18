@@ -1,4 +1,4 @@
-"""BooleanComponent — binary yes/no toggle."""
+"""BooleanForm — binary yes/no toggle."""
 
 from __future__ import annotations
 
@@ -31,8 +31,10 @@ class ToggleAffordance(Affordance):
 
 
 @dataclass
-class BooleanComponent(Component):
-    """Binary yes/no toggle. Distinct from CheckboxComponent (multi-select)."""
+class BooleanForm(Component):
+    """Binary yes/no toggle. Distinct from CheckboxForm (multi-select)."""
+    form = "boolean"
+
     true_label: str = "Yes"
     false_label: str = "No"
 

@@ -1,6 +1,6 @@
-"""ActionComponent — a component that executes a function with side effects.
+"""Action — a component that executes a function with side effects.
 
-Unlike other components, ActionComponent is imperative: the user explicitly
+Unlike other components, Action is imperative: the user explicitly
 triggers it. The action_fn receives sibling context, the Store, and the
 current scope, enabling controlled writes to other components' state.
 
@@ -37,8 +37,10 @@ class DisabledAffordance(Affordance):
 
 
 @dataclass
-class ActionComponent(Component):
+class Action(Component):
     """A button that executes a function with access to sibling state and the store."""
+    form = "action"
+
     action_label: str = "Execute"
     action_fn: Callable[[dict, Store, str], dict] | None = None
     depends_on: "list[str | SiblingRef]" = field(default_factory=list)

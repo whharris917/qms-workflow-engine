@@ -1,6 +1,6 @@
-"""InfoComponent — read-only text display.
+"""InfoDisplay — read-only text display.
 
-Edit mode exposes an embedded TextComponent (multiline) for editing the content.
+Edit mode exposes an embedded TextForm (multiline) for editing the content.
 """
 
 from __future__ import annotations
@@ -13,16 +13,18 @@ from engine.templates import render_template
 
 
 @dataclass
-class InfoComponent(Component):
+class InfoDisplay(Component):
     """Display-only text. No interaction affordances, always complete.
 
-    Edit mode embeds a multiline TextComponent for content editing.
+    Edit mode embeds a multiline TextForm for content editing.
     """
+    form = "info"
+
     text: str | dict = ""  # dict is converted to "key: value" lines on bind
 
     def __post_init__(self):
-        from engine.textcomponent import TextComponent
-        self._text_form = TextComponent(
+        from engine.textform import TextForm
+        self._text_form = TextForm(
             key="__text",
             label="Content",
             multiline=True,
@@ -43,7 +45,7 @@ class InfoComponent(Component):
             if isinstance(seed, dict):
                 seed = "\n".join(f"{k}: {v}" for k, v in seed.items())
             self._text_form.handle({"value": seed})
-        # Wrap child handle so InfoComponent pushes undo before TextComponent changes
+        # Wrap child handle so InfoDisplay pushes undo before TextForm changes
         original_handle = self._text_form.handle
         parent = self
         def _handle_with_undo(body):
@@ -76,7 +78,7 @@ class InfoComponent(Component):
 
     def _serialize_full(self) -> dict:
         state = super()._serialize_full()
-        # InfoComponent has no interaction affordances — Batch is meaningless
+        # InfoDisplay has no interaction affordances — Batch is meaningless
         state["affordances"] = [
             a for a in state.get("affordances", [])
             if a.get("body", {}).get("action") != "batch"

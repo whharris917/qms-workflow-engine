@@ -1,7 +1,7 @@
 {# Sleek theme component wrapper.
 
    Data forms: dark card with titlebar (label + chrome).
-   NavigationComponent / GroupComponent: titlebar extends into LEFT margin (tab bar territory).
+   Navigation / Group: titlebar extends into LEFT margin (tab bar territory).
    Other containers: transparent, no card, chrome buttons only.
    No hidden elements — the template simply doesn't emit what isn't needed.
 
@@ -11,7 +11,7 @@
 #}
 {% set cls_str = classes|join(" ") %}
 {% if is_container and form == "navigation" %}
-{# --- NavigationComponent: titlebar always visible, chrome conditional on editable --- #}
+{# --- Navigation: titlebar always visible, chrome conditional on editable --- #}
 <div class="{{ cls_str }}{% if edit_mode %} component--editing{% endif %}" data-form="{{ form }}" data-key="{{ key }}">
 <div class="c-titlebar">
 <span class="c-titlebar__label">{{ label }}</span>
@@ -34,7 +34,7 @@
 {{ inner|safe }}
 </div>
 {% elif is_container and form == "group" %}
-{# --- GroupComponent: execute mode chrome in group bar; edit mode chrome in titlebar --- #}
+{# --- Group: execute mode chrome in group bar; edit mode chrome in titlebar --- #}
 <div class="{{ cls_str }}{% if edit_mode %} component--editing{% endif %}" data-form="{{ form }}" data-key="{{ key }}">
 {% if edit_mode %}
 <div class="c-titlebar">

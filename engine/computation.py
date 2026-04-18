@@ -1,16 +1,16 @@
-"""ComputedComponent — read-only derived display computed from sibling state.
+"""Computation — read-only derived display computed from sibling state.
 
-Generalizes ScoreComponent's sibling-reading pattern for arbitrary computations.
+Generalizes Score's sibling-reading pattern for arbitrary computations.
 The compute function receives a dict of sibling values and returns any
 JSON-serializable result.
 
 When store_result=True, the computed value is written to the store during
-serialization, enabling VisibilityComponent and other sibling-readers to depend
+serialization, enabling Visibility and other sibling-readers to depend
 on the result. This is idempotent — every serialize recomputes.
 
 ORDERING: When store_result=True, this component must appear BEFORE any
-VisibilityComponent that depends on its stored result in the parent's children
-list, since PageComponent serializes children in list order.
+Visibility that depends on its stored result in the parent's children
+list, since Page serializes children in list order.
 """
 
 from __future__ import annotations
@@ -24,8 +24,10 @@ from engine.templates import render_template
 
 
 @dataclass
-class ComputedComponent(Component):
+class Computation(Component):
     """Read-only component that computes a value from sibling state."""
+    form = "computed"
+
     depends_on: "list[str | SiblingRef]" = field(default_factory=list)
     compute_fn: Callable[[dict], Any] | None = None
     store_result: bool = False

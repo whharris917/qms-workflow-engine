@@ -358,10 +358,10 @@
             <h3 id="components">Component types</h3>
             <p class="hatnote">See also: <a href="/readme">Component Reference</a>.</p>
             <p>
-                Razem ships with 26 built-in component classes registered under 31 names, covering data leaves (<code>TextComponent</code>, <code>NumberComponent</code>, <code>DateComponent</code>, <code>BooleanComponent</code>, <code>ChoiceComponent</code>, <code>CheckboxComponent</code>, <code>MultiComponent</code>), collections (<code>ListComponent</code>, <code>SetComponent</code>, <code>DictionaryComponent</code>, <code>TableComponent</code>), containers (<code>PageComponent</code>, <code>GroupComponent</code>, <code>NavigationComponent</code>, <code>RepeaterComponent</code>), reactive components (<code>SwitchComponent</code>, <code>VisibilityComponent</code>, <code>DynamicChoiceComponent</code>, <code>ComputedComponent</code>, <code>ScoreComponent</code>, <code>ValidationComponent</code>), and wrappers (<code>HistoryComponent</code>, <code>ActionComponent</code>, <code>InfoComponent</code>).<sup class="ref"><a href="#ref-9">[9]</a></sup>
+                Razem ships with 26 built-in component classes registered under 31 names, covering data leaves (<code>TextForm</code>, <code>NumberForm</code>, <code>DateForm</code>, <code>BooleanForm</code>, <code>ChoiceForm</code>, <code>CheckboxForm</code>, <code>MultiForm</code>), collections (<code>ListForm</code>, <code>SetForm</code>, <code>DictionaryForm</code>, <code>TableForm</code>), containers (<code>Page</code>, <code>Group</code>, <code>Navigation</code>, <code>Repeater</code>), reactive components (<code>Switch</code>, <code>Visibility</code>, <code>DynamicChoiceForm</code>, <code>Computation</code>, <code>Score</code>, <code>Validation</code>), and wrappers (<code>Historizer</code>, <code>Action</code>, <code>InfoDisplay</code>).<sup class="ref"><a href="#ref-9">[9]</a></sup>
             </p>
             <p>
-                A single <code>NavigationComponent</code> class replaces what other frameworks expose as four separate widgets (tabs, wizards, sequences, accordions), switching behavior via a <code>mode</code> prop that accepts one of four <a href="https://en.wikipedia.org/wiki/Literal_type">literal</a> values.<sup class="ref"><a href="#ref-9">[9]</a></sup>
+                A single <code>Navigation</code> class replaces what other frameworks expose as four separate widgets (tabs, wizards, sequences, accordions), switching behavior via a <code>mode</code> prop that accepts one of four <a href="https://en.wikipedia.org/wiki/Literal_type">literal</a> values.<sup class="ref"><a href="#ref-9">[9]</a></sup>
             </p>
 
             <h3 id="faithful-projection">Faithful projection</h3>
@@ -371,7 +371,7 @@
 
             <h3 id="flotation">Affordance flotation</h3>
             <p>
-                Affordances marked <code>_floatable</code> by a component serialize through the tree and surface at the top-level <code>PageComponent</code>, collapsed into a single parameterized compound affordance with a structured <code>targets</code> dictionary. The mechanism is conceptually similar to React&rsquo;s <code>createPortal</code>, though applied to machine-readable JSON rather than DOM placement, and with a novel merge step that groups affordances of the same action kind together.<sup class="ref"><a href="#ref-10">[10]</a></sup>
+                Affordances marked <code>_floatable</code> by a component serialize through the tree and surface at the top-level <code>Page</code>, collapsed into a single parameterized compound affordance with a structured <code>targets</code> dictionary. The mechanism is conceptually similar to React&rsquo;s <code>createPortal</code>, though applied to machine-readable JSON rather than DOM placement, and with a novel merge step that groups affordances of the same action kind together.<sup class="ref"><a href="#ref-10">[10]</a></sup>
             </p>
             <p>
                 Flotation reduces the size of agent-facing JSON without affecting HTML rendering. On flat pages, affordance count drops by roughly 61%; on deeply nested pages the savings are larger.<sup class="ref"><a href="#ref-10">[10]</a></sup>
@@ -382,7 +382,7 @@
                 Pages declared with <code>mutable_structure=True</code> permit runtime editing of the component tree itself, including adding, removing, moving, reparenting, and grouping children. Edits persist to the page&rsquo;s <code>__structure</code> descriptor and survive restarts. The feature is exposed to both human users (via a tile-based structural editor and drag-and-drop) and to AI agents (via a documented action protocol with actions named <code>add_component</code>, <code>remove_component</code>, <code>move_component</code>, <code>reparent_component</code>, <code>group_components</code>, <code>ungroup_component</code>, and <code>rebuild_from_seed</code>).<sup class="ref"><a href="#ref-11">[11]</a></sup>
             </p>
             <p>
-                Components of type <code>ActionComponent</code> can additionally return <code>structural_actions</code> from their handlers, enabling <em>self-modifying pages</em> in which the tree reshapes itself in response to user interaction. This capability was introduced under the internal name &ldquo;fractal complexity plan&rdquo; in March 2026.<sup class="ref"><a href="#ref-5">[5]</a></sup>
+                Components of type <code>Action</code> can additionally return <code>structural_actions</code> from their handlers, enabling <em>self-modifying pages</em> in which the tree reshapes itself in response to user interaction. This capability was introduced under the internal name &ldquo;fractal complexity plan&rdquo; in March 2026.<sup class="ref"><a href="#ref-5">[5]</a></sup>
             </p>
 
             <h3 id="error-boundaries">Error boundaries</h3>
@@ -411,7 +411,7 @@
                 <dd>The operation that attaches a Store to a seed and produces a live tree. Analogous to React&rsquo;s component mount.</dd>
 
                 <dt>Component</dt>
-                <dd>Razem&rsquo;s base abstraction, previously called an <em>eigenform</em>. Each concrete component is a Python dataclass subclass (<code>TextComponent</code>, <code>NavigationComponent</code>, etc.) implementing the protocol: <code>serialize()</code>, <code>render()</code>, <code>_handle()</code>.</dd>
+                <dd>Razem&rsquo;s base abstraction, previously called an <em>eigenform</em>. Each concrete component is a Python dataclass subclass (<code>TextForm</code>, <code>Navigation</code>, etc.) implementing the protocol: <code>serialize()</code>, <code>render()</code>, <code>_handle()</code>.</dd>
 
                 <dt>Descriptor</dt>
                 <dd>A JSON-serializable snapshot of a component tree, stored at the <code>__structure</code> key inside the Store. Canonical source of truth for structure and props.</dd>
@@ -523,7 +523,7 @@
             </p>
             <ul>
                 <li><strong>Unstructured action dispatch.</strong> The engine has 88 <code>if action == "..."</code> branches across 20 files, implementing what amounts to a <a href="https://en.wikipedia.org/wiki/Redux_(JavaScript_library)">Redux</a>-style reducer pattern without the name or an explicit registry. A formal action registry is on the backlog.</li>
-                <li><strong>Silent callable-preservation failure.</strong> When a seed is renamed or deleted and reconciliation falls back to fresh construction, components with callable-valued fields (<code>ComputedComponent.compute</code>, <code>DynamicChoiceComponent.options_fn</code>) silently receive <code>None</code>. The fix requires the seed parameter when callable fields are declared, with a typed diagnostic on mismatch.</li>
+                <li><strong>Silent callable-preservation failure.</strong> When a seed is renamed or deleted and reconciliation falls back to fresh construction, components with callable-valued fields (<code>Computation.compute</code>, <code>DynamicChoiceForm.options_fn</code>) silently receive <code>None</code>. The fix requires the seed parameter when callable fields are declared, with a typed diagnostic on mismatch.</li>
                 <li><strong>No Context primitive.</strong> The engine has no ancestor-to-descendant data channel equivalent to React Context. Sibling references exist but propagate only laterally. A Context primitive has been considered and explicitly parked until a concrete use case arrives.</li>
                 <li><strong>No concurrency model.</strong> Two simultaneous writers to the same component produce last-write-wins. The Store uses atomic write-temp-then-rename on every write, but there is no optimistic concurrency or conflict detection.</li>
             </ul>

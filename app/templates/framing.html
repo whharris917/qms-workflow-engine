@@ -745,7 +745,7 @@
 
         <dl class="fr-vocab">
             <dt>Seed</dt>
-            <dd>The Python-code definition of a page&rsquo;s structure. Lives in <code>pages/*.py</code>, exported as <code>definition = PageComponent(...)</code>. Immutable at runtime. Holds callables (lambdas, validators) that cannot round-trip through JSON.</dd>
+            <dd>The Python-code definition of a page&rsquo;s structure. Lives in <code>pages/*.py</code>, exported as <code>definition = Page(...)</code>. Immutable at runtime. Holds callables (lambdas, validators) that cannot round-trip through JSON.</dd>
 
             <dt>Store</dt>
             <dd>A per-instance JSON file. One file per bound page instance, at <code>data/{instance_id}.json</code>. Holds all mutable state &mdash; current values, active tab, descriptor overrides.</dd>
@@ -775,21 +775,21 @@
             <dd>The method <code>_handle(body)</code> that each component implements to process an action. Interprets the action name, mutates the Store, returns the updated state.</dd>
 
             <dt>Container vs leaf</dt>
-            <dd>A <em>container</em> component holds children (PageComponent, NavigationComponent, GroupComponent, etc.). A <em>leaf</em> holds a primitive value (TextComponent, NumberComponent, BooleanComponent, etc.).</dd>
+            <dd>A <em>container</em> component holds children (Page, Navigation, Group, etc.). A <em>leaf</em> holds a primitive value (TextForm, NumberForm, BooleanForm, etc.).</dd>
         </dl>
 
         <h3>A minimal example</h3>
         <p>The smallest useful page: a label plus a single text input.</p>
 
 <pre class="code"><span class="c"># pages/hello.py</span>
-<span class="k">from</span> engine.pagecomponent <span class="k">import</span> PageComponent
-<span class="k">from</span> engine.textcomponent <span class="k">import</span> TextComponent
+<span class="k">from</span> engine.page <span class="k">import</span> Page
+<span class="k">from</span> engine.textform <span class="k">import</span> TextForm
 
-definition = PageComponent(
+definition = Page(
     key=<span class="s">"hello"</span>,
     label=<span class="s">"Hello Page"</span>,
     components=[
-        TextComponent(key=<span class="s">"name"</span>, label=<span class="s">"Your name"</span>),
+        TextForm(key=<span class="s">"name"</span>, label=<span class="s">"Your name"</span>),
     ],
 )</pre>
 
@@ -798,18 +798,18 @@ definition = PageComponent(
             <ol>
                 <li>Server discovers <code>pages/hello.py</code> and imports the seed.</li>
                 <li>Server calls <code>seed.bind(data_dir, scope="hello")</code>. Store is created if missing; empty.</li>
-                <li>PageComponent recursively binds its children. TextComponent is now a live instance scoped to <code>hello/name</code>.</li>
-                <li><strong>JSON request:</strong> <code>serialize()</code> returns <code>{key: "name", value: null, affordances: [{method: "POST", url: "/pages/hello/name", body: {action: "set_value", value: "&lt;str&gt;"}}]}</code>, wrapped by PageComponent&rsquo;s own serialization.</li>
+                <li>Page recursively binds its children. TextForm is now a live instance scoped to <code>hello/name</code>.</li>
+                <li><strong>JSON request:</strong> <code>serialize()</code> returns <code>{key: "name", value: null, affordances: [{method: "POST", url: "/pages/hello/name", body: {action: "set_value", value: "&lt;str&gt;"}}]}</code>, wrapped by Page&rsquo;s own serialization.</li>
                 <li><strong>HTML request:</strong> <code>render()</code> produces a styled input with the same URL as a <code>data-c-post</code> attribute. The parity test verifies the URL matches.</li>
             </ol>
             <h4>What happens when the user types &ldquo;Alice&rdquo; and submits</h4>
             <ol>
                 <li>Browser POSTs <code>{"action": "set_value", "value": "Alice"}</code> to <code>/pages/hello/name</code>.</li>
                 <li>Server binds the seed again (fresh tree; no memoization across requests).</li>
-                <li>Server walks path <code>name</code> to locate the TextComponent child, calls <code>_handle({"action": "set_value", "value": "Alice"})</code>.</li>
-                <li>TextComponent writes <code>"Alice"</code> to Store key <code>hello/name</code>.</li>
+                <li>Server walks path <code>name</code> to locate the TextForm child, calls <code>_handle({"action": "set_value", "value": "Alice"})</code>.</li>
+                <li>TextForm writes <code>"Alice"</code> to Store key <code>hello/name</code>.</li>
                 <li>Server re-serializes the full page. Returns JSON or morphs-in HTML, depending on the client.</li>
-                <li>Next GET reads the same Store. TextComponent binds with <code>value="Alice"</code>. <code>is_complete</code> returns <code>True</code>. Page reflects the update.</li>
+                <li>Next GET reads the same Store. TextForm binds with <code>value="Alice"</code>. <code>is_complete</code> returns <code>True</code>. Page reflects the update.</li>
             </ol>
         </div>
 
@@ -834,30 +834,30 @@ definition = PageComponent(
                 </tr>
             </thead>
             <tbody>
-                <tr><td class="type-name">PageComponent</td><td class="type-role">Container (top)</td><td>The outermost container. Owns the Store binding. Every page is one PageComponent.</td></tr>
-                <tr><td class="type-name">NavigationComponent</td><td class="type-role">Container</td><td>Unified tabs / chain / sequence / accordion container. One class, four modes selected by the <code>mode</code> prop.</td></tr>
-                <tr><td class="type-name">GroupComponent</td><td class="type-role">Container</td><td>A named grouping for reusable compositions. No special semantics; just a labeled wrapper.</td></tr>
-                <tr><td class="type-name">RepeaterComponent</td><td class="type-role">Container</td><td>Stamps a template component per dynamic entry. Compound-scoped children.</td></tr>
-                <tr><td class="type-name">TextComponent</td><td class="type-role">Data leaf</td><td>Free-form string. Optional <code>multiline</code>, <code>min_length</code>, <code>max_length</code>.</td></tr>
-                <tr><td class="type-name">NumberComponent</td><td class="type-role">Data leaf</td><td>Numeric input with optional <code>min_val</code> / <code>max_val</code> / <code>step</code> / <code>slider</code>.</td></tr>
-                <tr><td class="type-name">BooleanComponent / DateComponent</td><td class="type-role">Data leaf</td><td>Binary toggle / ISO date input.</td></tr>
-                <tr><td class="type-name">ChoiceComponent / CheckboxComponent</td><td class="type-role">Data leaf</td><td>Single-select / multi-select, each backed by an embedded ListComponent for the options.</td></tr>
-                <tr><td class="type-name">ListComponent / SetComponent / TableComponent</td><td class="type-role">Data collection</td><td>Ordered list / unique set / dynamic table with typed columns.</td></tr>
-                <tr><td class="type-name">MultiComponent</td><td class="type-role">Data composite</td><td>Groups several FieldDescriptors under a single affordance.</td></tr>
-                <tr><td class="type-name">InfoComponent</td><td class="type-role">Read-only display</td><td>Static text block. No interaction affordances. Always complete.</td></tr>
-                <tr><td class="type-name">ComputedComponent</td><td class="type-role">Sibling-reading</td><td>Derived display computed from sibling values via a <code>compute(siblings)</code> callable.</td></tr>
-                <tr><td class="type-name">ValidationComponent</td><td class="type-role">Sibling-reading</td><td>Cross-field validation rules. Produces pending / pass / fail status that can block page completion.</td></tr>
-                <tr><td class="type-name">VisibilityComponent</td><td class="type-role">Reactive wrapper</td><td>Shows its child only when a predicate over siblings holds.</td></tr>
-                <tr><td class="type-name">SwitchComponent</td><td class="type-role">Reactive structural</td><td>Selects one of N alternative subtrees based on a sibling&rsquo;s value.</td></tr>
-                <tr><td class="type-name">DynamicChoiceComponent</td><td class="type-role">Reactive</td><td>ChoiceComponent whose options depend on a sibling value via <code>options_fn</code>.</td></tr>
-                <tr><td class="type-name">ActionComponent</td><td class="type-role">Imperative</td><td>A button that triggers a side effect. Can return structural actions that reshape the page.</td></tr>
-                <tr><td class="type-name">HistoryComponent</td><td class="type-role">Wrapper</td><td>Wraps any component with append-only change history.</td></tr>
+                <tr><td class="type-name">Page</td><td class="type-role">Container (top)</td><td>The outermost container. Owns the Store binding. Every page is one Page.</td></tr>
+                <tr><td class="type-name">Navigation</td><td class="type-role">Container</td><td>Unified tabs / chain / sequence / accordion container. One class, four modes selected by the <code>mode</code> prop.</td></tr>
+                <tr><td class="type-name">Group</td><td class="type-role">Container</td><td>A named grouping for reusable compositions. No special semantics; just a labeled wrapper.</td></tr>
+                <tr><td class="type-name">Repeater</td><td class="type-role">Container</td><td>Stamps a template component per dynamic entry. Compound-scoped children.</td></tr>
+                <tr><td class="type-name">TextForm</td><td class="type-role">Data leaf</td><td>Free-form string. Optional <code>multiline</code>, <code>min_length</code>, <code>max_length</code>.</td></tr>
+                <tr><td class="type-name">NumberForm</td><td class="type-role">Data leaf</td><td>Numeric input with optional <code>min_val</code> / <code>max_val</code> / <code>step</code> / <code>slider</code>.</td></tr>
+                <tr><td class="type-name">BooleanForm / DateForm</td><td class="type-role">Data leaf</td><td>Binary toggle / ISO date input.</td></tr>
+                <tr><td class="type-name">ChoiceForm / CheckboxForm</td><td class="type-role">Data leaf</td><td>Single-select / multi-select, each backed by an embedded ListForm for the options.</td></tr>
+                <tr><td class="type-name">ListForm / SetForm / TableForm</td><td class="type-role">Data collection</td><td>Ordered list / unique set / dynamic table with typed columns.</td></tr>
+                <tr><td class="type-name">MultiForm</td><td class="type-role">Data composite</td><td>Groups several FieldDescriptors under a single affordance.</td></tr>
+                <tr><td class="type-name">InfoDisplay</td><td class="type-role">Read-only display</td><td>Static text block. No interaction affordances. Always complete.</td></tr>
+                <tr><td class="type-name">Computation</td><td class="type-role">Sibling-reading</td><td>Derived display computed from sibling values via a <code>compute(siblings)</code> callable.</td></tr>
+                <tr><td class="type-name">Validation</td><td class="type-role">Sibling-reading</td><td>Cross-field validation rules. Produces pending / pass / fail status that can block page completion.</td></tr>
+                <tr><td class="type-name">Visibility</td><td class="type-role">Reactive wrapper</td><td>Shows its child only when a predicate over siblings holds.</td></tr>
+                <tr><td class="type-name">Switch</td><td class="type-role">Reactive structural</td><td>Selects one of N alternative subtrees based on a sibling&rsquo;s value.</td></tr>
+                <tr><td class="type-name">DynamicChoiceForm</td><td class="type-role">Reactive</td><td>ChoiceForm whose options depend on a sibling value via <code>options_fn</code>.</td></tr>
+                <tr><td class="type-name">Action</td><td class="type-role">Imperative</td><td>A button that triggers a side effect. Can return structural actions that reshape the page.</td></tr>
+                <tr><td class="type-name">Historizer</td><td class="type-role">Wrapper</td><td>Wraps any component with append-only change history.</td></tr>
             </tbody>
         </table>
 
         <p>
-            Seven of those types &mdash; SwitchComponent, VisibilityComponent, DynamicChoiceComponent, ComputedComponent,
-            ValidationComponent, ActionComponent, ScoreComponent &mdash; read from their siblings via a string field called
+            Seven of those types &mdash; Switch, Visibility, DynamicChoiceForm, Computation,
+            Validation, Action, Score &mdash; read from their siblings via a string field called
             <code>depends_on</code>. That shadow dependency graph is one of the gaps this design plan addresses.
         </p>
 
@@ -890,8 +890,8 @@ definition = PageComponent(
 
         <p>
             The engine uses the standard vocabulary where the standard vocabulary fits. The base class is
-            <code>Component</code>; each concrete type is <code>TextComponent</code>, <code>PageComponent</code>,
-            <code>NavigationComponent</code>, and so on. Seed constructor arguments are props; Store entries are state;
+            <code>Component</code>; each concrete type is <code>TextForm</code>, <code>Page</code>,
+            <code>Navigation</code>, and so on. Seed constructor arguments are props; Store entries are state;
             everything else is derived. <code>from_descriptor</code> is reconciliation. Affordance flotation is a portal
             with a novel merge rule. Faithful projection is the controlled/uncontrolled state boundary applied to an
             agent-plus-human audience instead of just an in-browser one.
@@ -940,7 +940,7 @@ definition = PageComponent(
                 </tr>
                 <tr>
                     <td class="react">Derived state</td>
-                    <td class="eq"><code>is_complete</code>, <code>effective_*</code>, <code>ComputedComponent.compute</code></td>
+                    <td class="eq"><code>is_complete</code>, <code>effective_*</code>, <code>Computation.compute</code></td>
                     <td class="status"><span class="pill ok">Present</span></td>
                     <td class="note">Never persisted; recomputed each serialize.</td>
                 </tr>
@@ -984,7 +984,7 @@ definition = PageComponent(
                     <td class="react">Portal</td>
                     <td class="eq">Affordance flotation</td>
                     <td class="status"><span class="pill ok">Present</span></td>
-                    <td class="note">Deeply-nested affordances bubble up to the PageComponent level in the agent JSON, collapsed into one parameterized affordance per action kind (e.g. one <code>clear</code> that targets any child). Keeps agent context small. HTML rendering is unaffected.</td>
+                    <td class="note">Deeply-nested affordances bubble up to the Page level in the agent JSON, collapsed into one parameterized affordance per action kind (e.g. one <code>clear</code> that targets any child). Keeps agent context small. HTML rendering is unaffected.</td>
                 </tr>
                 <tr>
                     <td class="react">Controlled vs uncontrolled</td>
@@ -994,13 +994,13 @@ definition = PageComponent(
                 </tr>
                 <tr>
                     <td class="react">Fragment</td>
-                    <td class="eq">GroupComponent with no decoration</td>
+                    <td class="eq">Group with no decoration</td>
                     <td class="status"><span class="pill ok">Present</span></td>
-                    <td class="note">Implicit. A GroupComponent without label/instruction is a fragment.</td>
+                    <td class="note">Implicit. A Group without label/instruction is a fragment.</td>
                 </tr>
                 <tr>
                     <td class="react">Higher-order component</td>
-                    <td class="eq">GroupComponent subclassing</td>
+                    <td class="eq">Group subclassing</td>
                     <td class="status"><span class="pill partial">Partial</span></td>
                     <td class="note">Closest analog. Composition is supported; behavior-sharing beyond composition is not.</td>
                 </tr>
@@ -1064,9 +1064,9 @@ definition = PageComponent(
                 <ul>
                     <li><code>label</code>, <code>instruction</code></li>
                     <li><code>editable</code></li>
-                    <li><code>NavigationComponent.mode</code></li>
-                    <li><code>TextComponent.multiline</code>, <code>min_length</code>, <code>max_length</code></li>
-                    <li><code>NumberComponent.min_val</code>, <code>max_val</code></li>
+                    <li><code>Navigation.mode</code></li>
+                    <li><code>TextForm.multiline</code>, <code>min_length</code>, <code>max_length</code></li>
+                    <li><code>NumberForm.min_val</code>, <code>max_val</code></li>
                 </ul>
             </div>
             <div class="fr-triple-card state">
@@ -1074,11 +1074,11 @@ definition = PageComponent(
                 <span class="lives">Store at key scope</span>
                 <p>Persisted per instance, per component key, in the instance JSON file. Modifications flow through <code>_handle()</code> during action dispatch. This is what a user&rsquo;s interactions actually change.</p>
                 <ul>
-                    <li>TextComponent current text</li>
-                    <li>CheckboxComponent selected options</li>
-                    <li>NavigationComponent active tab</li>
-                    <li>ListComponent ordered items</li>
-                    <li>TableComponent row data</li>
+                    <li>TextForm current text</li>
+                    <li>CheckboxForm selected options</li>
+                    <li>Navigation active tab</li>
+                    <li>ListForm ordered items</li>
+                    <li>TableForm row data</li>
                 </ul>
             </div>
             <div class="fr-triple-card derived">
@@ -1088,8 +1088,8 @@ definition = PageComponent(
                 <ul>
                     <li><code>is_complete</code></li>
                     <li><code>has_data</code></li>
-                    <li><code>ComputedComponent.compute_result</code></li>
-                    <li><code>ListComponent.effective_must_follow</code></li>
+                    <li><code>Computation.compute_result</code></li>
+                    <li><code>ListForm.effective_must_follow</code></li>
                     <li>All <code>effective_*</code> properties</li>
                 </ul>
             </div>
@@ -1138,7 +1138,7 @@ definition = PageComponent(
         </p>
 
         <div class="fr-recon-caveat">
-            <strong>The callable problem.</strong> When a seed contains <code>ComputedComponent(key="score", compute=lambda s: ...)</code>,
+            <strong>The callable problem.</strong> When a seed contains <code>Computation(key="score", compute=lambda s: ...)</code>,
             the lambda cannot serialize to JSON. On reconciliation, the descriptor has no <code>compute</code>; only the seed does.
             If the seed is missing &mdash; because the Python definition moved, the key changed, or a sibling was renamed &mdash;
             the callable is silently dropped. The form renders but does nothing. No warning.
@@ -1233,7 +1233,7 @@ definition = PageComponent(
                 <tr><td class="react">Passing Store to children</td><td class="note">Already solved. <code>bind()</code> threads <code>_store</code>.</td></tr>
                 <tr><td class="react">Passing theme to templates</td><td class="note">Already solved. Thread-local in <code>templates.py</code> plus <code>data-theme</code> attribute.</td></tr>
                 <tr><td class="react">Passing user / permissions</td><td class="note">Does not exist yet. No authenticated user model.</td></tr>
-                <tr><td class="react">Passing validation scope</td><td class="note">Does not exist yet. ValidationComponent uses sibling refs.</td></tr>
+                <tr><td class="react">Passing validation scope</td><td class="note">Does not exist yet. Validation uses sibling refs.</td></tr>
             </tbody>
         </table>
 
@@ -1317,7 +1317,7 @@ definition = PageComponent(
                 <div class="fr-pass-label">Pass 2 &mdash; Typed composition</div>
                 <div class="fr-pass-body">
                     <strong>SiblingRef + field-type validation + Literal enums</strong>
-                    <span>Move 1: <code>SiblingRef(key, expects=)</code> as a <code>str</code>-subclass value. Seven sibling-reading components coerce on construction. <code>PageComponent._validate_sibling_refs()</code> raises <code>SiblingRefError</code> with actionable diagnostics on stale or type-mismatched refs at bind time. Move 2: <code>_set_my_field</code> / <code>_set_my_config</code> validate against the dataclass annotation (simple types, <code>X | None</code>, <code>Literal[...]</code>). Move 3: <code>NavigationComponent.mode</code> and <code>FieldDescriptor.type</code> tightened to <code>Literal</code>.</span>
+                    <span>Move 1: <code>SiblingRef(key, expects=)</code> as a <code>str</code>-subclass value. Seven sibling-reading components coerce on construction. <code>Page._validate_sibling_refs()</code> raises <code>SiblingRefError</code> with actionable diagnostics on stale or type-mismatched refs at bind time. Move 2: <code>_set_my_field</code> / <code>_set_my_config</code> validate against the dataclass annotation (simple types, <code>X | None</code>, <code>Literal[...]</code>). Move 3: <code>Navigation.mode</code> and <code>FieldDescriptor.type</code> tightened to <code>Literal</code>.</span>
                 </div>
                 <div class="fr-pass-meta">
                     <span class="effort">~1 day</span>
@@ -1339,7 +1339,7 @@ definition = PageComponent(
                 <div class="fr-pass-label">Pass 4 &mdash; Retiring the custom vocabulary</div>
                 <div class="fr-pass-body">
                     <strong>Eigenform &rarr; Component; *Form &rarr; *Component</strong>
-                    <span>The base class was originally named <code>Eigenform</code> &mdash; a path-dependent choice that obscured its plain nature as a component in the React sense. Rename propagated through: 25 concrete subclasses (<code>TextForm</code> &rarr; <code>TextComponent</code>, etc.), module filenames, the <code>eigenforms/</code> template directory, the <code>eigenform.js</code> static asset, CSS prefixes (<code>ef-</code> &rarr; <code>c-</code>), DOM data attributes (<code>data-ef-</code> &rarr; <code>data-c-</code>), action-protocol names (<code>add_eigenform</code> &rarr; <code>add_component</code>, etc.), and all documentation prose. Seventy-two parity tests held.</span>
+                    <span>The base class was originally named <code>Eigenform</code> &mdash; a path-dependent choice that obscured its plain nature as a component in the React sense. Rename propagated through: 25 concrete subclasses (<code>TextForm</code> &rarr; <code>TextForm</code>, etc.), module filenames, the <code>eigenforms/</code> template directory, the <code>eigenform.js</code> static asset, CSS prefixes (<code>ef-</code> &rarr; <code>c-</code>), DOM data attributes (<code>data-ef-</code> &rarr; <code>data-c-</code>), action-protocol names (<code>add_eigenform</code> &rarr; <code>add_component</code>, etc.), and all documentation prose. Seventy-two parity tests held.</span>
                 </div>
                 <div class="fr-pass-meta">
                     <span class="effort">~0.5 day</span>
@@ -1350,7 +1350,7 @@ definition = PageComponent(
 
         <h3>What&rsquo;s still open</h3>
         <ul>
-            <li><strong>Callable-preservation diagnostic.</strong> When a seed moves or is renamed and reconciliation falls back to fresh construction, callable fields (<code>ComputedComponent.compute</code>, <code>DynamicChoiceComponent.options_fn</code>, etc.) silently become <code>None</code>. Require the <code>seed</code> parameter for types with callables; return a typed diagnostic on seed-match failure.</li>
+            <li><strong>Callable-preservation diagnostic.</strong> When a seed moves or is renamed and reconciliation falls back to fresh construction, callable fields (<code>Computation.compute</code>, <code>DynamicChoiceForm.options_fn</code>, etc.) silently become <code>None</code>. Require the <code>seed</code> parameter for types with callables; return a typed diagnostic on seed-match failure.</li>
             <li><strong>Error-boundary expansion.</strong> <code>serialize_safely()</code> for JSON-side parity; bind-error scoping once we have a representation for &ldquo;component tree could not be built&rdquo;; <code>_handle()</code> scoping for partial-mutation risk.</li>
             <li><strong>Context primitive.</strong> Parked until a concrete ancestor-to-descendant channel is wanted &mdash; most likely user / permissions when the QMS workflows come online.</li>
             <li><strong>Action dispatch as a reducer pattern.</strong> 88 <code>if action == "xxx"</code> branches across 20 files are a reducer-in-disguise. A named <code>ActionRegistry</code> with dispatch by name would make the pattern explicit and open middleware / logging / replay for free. Not yet scheduled.</li>

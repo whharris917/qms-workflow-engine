@@ -12,16 +12,16 @@
 
 <h2>Containers hold children</h2>
 <p>
-    Every component is either a <em>leaf</em> (a single input like TextComponent) or a <em>container</em> (PageComponent, NavigationComponent, GroupComponent, RepeaterComponent, SwitchComponent). Containers hold other components and delegate behavior down the tree.
+    Every component is either a <em>leaf</em> (a single input like TextForm) or a <em>container</em> (Page, Navigation, Group, Repeater, Switch). Containers hold other components and delegate behavior down the tree.
 </p>
 
 <p>
-    The simplest container is <code>PageComponent</code> &mdash; which you already used. It takes a <code>components=[...]</code> argument: a list of children rendered in order. That&rsquo;s the whole API.
+    The simplest container is <code>Page</code> &mdash; which you already used. It takes a <code>components=[...]</code> argument: a list of children rendered in order. That&rsquo;s the whole API.
 </p>
 
-<h3>NavigationComponent — tabs, wizards, sequences, accordions</h3>
+<h3>Navigation — tabs, wizards, sequences, accordions</h3>
 <p>
-    The most common non-page container is <code>NavigationComponent</code>. It unifies what other frameworks split into four separate widgets:
+    The most common non-page container is <code>Navigation</code>. It unifies what other frameworks split into four separate widgets:
 </p>
 
 <ul>
@@ -36,26 +36,26 @@
 </p>
 
 <pre class="lesson-code"><span class="c"># pages/survey.py</span>
-<span class="k">from</span> engine.pagecomponent <span class="k">import</span> PageComponent
-<span class="k">from</span> engine.navigationcomponent <span class="k">import</span> NavigationComponent
-<span class="k">from</span> engine.textcomponent <span class="k">import</span> TextComponent
-<span class="k">from</span> engine.choicecomponent <span class="k">import</span> ChoiceComponent
-<span class="k">from</span> engine.booleancomponent <span class="k">import</span> BooleanComponent
+<span class="k">from</span> engine.page <span class="k">import</span> Page
+<span class="k">from</span> engine.navigation <span class="k">import</span> Navigation
+<span class="k">from</span> engine.textform <span class="k">import</span> TextForm
+<span class="k">from</span> engine.choiceform <span class="k">import</span> ChoiceForm
+<span class="k">from</span> engine.booleanform <span class="k">import</span> BooleanForm
 
-definition = PageComponent(
+definition = Page(
     key=<span class="s">"survey"</span>,
     label=<span class="s">"Quick Survey"</span>,
     components=[
-        NavigationComponent(
+        Navigation(
             key=<span class="s">"tabs"</span>,
             mode=<span class="s">"tabs"</span>,
             steps=[
-                TextComponent(key=<span class="s">"name"</span>, label=<span class="s">"Name"</span>),
-                ChoiceComponent(
+                TextForm(key=<span class="s">"name"</span>, label=<span class="s">"Name"</span>),
+                ChoiceForm(
                     key=<span class="s">"role"</span>, label=<span class="s">"Role"</span>,
                     options=[<span class="s">"Engineer"</span>, <span class="s">"Designer"</span>, <span class="s">"PM"</span>, <span class="s">"Other"</span>],
                 ),
-                BooleanComponent(
+                BooleanForm(
                     key=<span class="s">"subscribe"</span>, label=<span class="s">"Subscribe to updates?"</span>,
                 ),
             ],
@@ -77,11 +77,11 @@ definition = PageComponent(
     The <strong>scope</strong> is the namespace in which a key must be unique. Each container sets the scope for its children:
 </p>
 
-<pre class="lesson-code">  PageComponent(key=<span class="s">"survey"</span>)                  <span class="c"># scope for children: &quot;survey&quot;</span>
-  └─ NavigationComponent(key=<span class="s">"tabs"</span>)            <span class="c"># scope for children: &quot;tabs&quot;</span>
-     ├─ TextComponent(key=<span class="s">"name"</span>)               <span class="c"># full path: survey &gt; tabs &gt; name</span>
-     ├─ ChoiceComponent(key=<span class="s">"role"</span>)
-     └─ BooleanComponent(key=<span class="s">"subscribe"</span>)</pre>
+<pre class="lesson-code">  Page(key=<span class="s">"survey"</span>)                  <span class="c"># scope for children: &quot;survey&quot;</span>
+  └─ Navigation(key=<span class="s">"tabs"</span>)            <span class="c"># scope for children: &quot;tabs&quot;</span>
+     ├─ TextForm(key=<span class="s">"name"</span>)               <span class="c"># full path: survey &gt; tabs &gt; name</span>
+     ├─ ChoiceForm(key=<span class="s">"role"</span>)
+     └─ BooleanForm(key=<span class="s">"subscribe"</span>)</pre>
 
 <p>
     Two siblings may not share a key within the same scope (collisions silently overwrite state). Two components in different scopes can share a key with no conflict; the scope distinguishes them. That&rsquo;s why you can have a <code>name</code> field inside every tab of a repeated structure &mdash; each tab is its own scope.
@@ -101,12 +101,12 @@ definition = PageComponent(
 </p>
 
 <ul>
-    <li><strong><code>VisibilityComponent</code></strong> &mdash; wraps a child and shows/hides it based on a sibling&rsquo;s value</li>
-    <li><strong><code>SwitchComponent</code></strong> &mdash; picks one of several named subtrees to render, keyed on a sibling&rsquo;s value</li>
-    <li><strong><code>DynamicChoiceComponent</code></strong> &mdash; a Choice whose available options depend on a sibling&rsquo;s value</li>
-    <li><strong><code>ComputedComponent</code></strong> &mdash; read-only display of a value computed from siblings</li>
-    <li><strong><code>ValidationComponent</code></strong> &mdash; cross-field rules (&ldquo;end date must be after start date&rdquo;)</li>
-    <li><strong><code>ScoreComponent</code></strong> &mdash; auto-grades against an answer key</li>
+    <li><strong><code>Visibility</code></strong> &mdash; wraps a child and shows/hides it based on a sibling&rsquo;s value</li>
+    <li><strong><code>Switch</code></strong> &mdash; picks one of several named subtrees to render, keyed on a sibling&rsquo;s value</li>
+    <li><strong><code>DynamicChoiceForm</code></strong> &mdash; a Choice whose available options depend on a sibling&rsquo;s value</li>
+    <li><strong><code>Computation</code></strong> &mdash; read-only display of a value computed from siblings</li>
+    <li><strong><code>Validation</code></strong> &mdash; cross-field rules (&ldquo;end date must be after start date&rdquo;)</li>
+    <li><strong><code>Score</code></strong> &mdash; auto-grades against an answer key</li>
 </ul>
 
 <p>
@@ -115,35 +115,35 @@ definition = PageComponent(
 
 <pre class="lesson-code"><span class="c"># Example: show a follow-up only if role is &quot;Other&quot;</span>
 components=[
-    ChoiceComponent(
+    ChoiceForm(
         key=<span class="s">"role"</span>, label=<span class="s">"Role"</span>,
         options=[<span class="s">"Engineer"</span>, <span class="s">"Designer"</span>, <span class="s">"Other"</span>],
     ),
-    VisibilityComponent(
+    Visibility(
         key=<span class="s">"other-detail"</span>,
         depends_on=<span class="s">"role"</span>,              <span class="c"># sibling key</span>
         predicate=<span class="k">lambda</span> v: v == <span class="s">"Other"</span>, <span class="c"># show only when...</span>
-        component=TextComponent(key=<span class="s">"detail"</span>, label=<span class="s">"Please specify"</span>),
+        component=TextForm(key=<span class="s">"detail"</span>, label=<span class="s">"Please specify"</span>),
     ),
 ]</pre>
 
 <p>
-    When <code>role</code> is anything but <code>"Other"</code>, the wrapped TextComponent does not render in HTML <em>and</em> does not appear in the JSON serialization. This is <strong>faithful projection</strong>, the subject of Lesson 5.
+    When <code>role</code> is anything but <code>"Other"</code>, the wrapped TextForm does not render in HTML <em>and</em> does not appear in the JSON serialization. This is <strong>faithful projection</strong>, the subject of Lesson 5.
 </p>
 
-<h2>Dynamic repetition — RepeaterComponent</h2>
+<h2>Dynamic repetition — Repeater</h2>
 
 <p>
-    When the number of children is not known at seed time (&ldquo;let the user add N line items&rdquo;), <code>RepeaterComponent</code> stamps a template per dynamic entry.
+    When the number of children is not known at seed time (&ldquo;let the user add N line items&rdquo;), <code>Repeater</code> stamps a template per dynamic entry.
 </p>
 
 <pre class="lesson-code"><span class="c"># A page with a button to add line items</span>
-RepeaterComponent(
+Repeater(
     key=<span class="s">"items"</span>,
     label=<span class="s">"Line items"</span>,
     template=[
-        TextComponent(key=<span class="s">"description"</span>, label=<span class="s">"Description"</span>),
-        NumberComponent(key=<span class="s">"quantity"</span>, label=<span class="s">"Qty"</span>, min_val=<span class="n">1</span>),
+        TextForm(key=<span class="s">"description"</span>, label=<span class="s">"Description"</span>),
+        NumberForm(key=<span class="s">"quantity"</span>, label=<span class="s">"Qty"</span>, min_val=<span class="n">1</span>),
     ],
 )</pre>
 
@@ -154,19 +154,19 @@ RepeaterComponent(
 <h2>Groups — named compositions</h2>
 
 <p>
-    When a particular composition is reused across pages, wrap it in a <code>GroupComponent</code> subclass. A GroupComponent has its own class identity in the registry, so instances can be spawned by type name at runtime.
+    When a particular composition is reused across pages, wrap it in a <code>Group</code> subclass. A Group has its own class identity in the registry, so instances can be spawned by type name at runtime.
 </p>
 
 <pre class="lesson-code"><span class="c"># A reusable Contact block</span>
-<span class="k">class</span> Contact(GroupComponent):
+<span class="k">class</span> Contact(Group):
     form = <span class="s">"contact"</span>  <span class="c"># registry identifier</span>
 
     <span class="k">def</span> <span class="v">__init__</span>(self, key, label):
         <span class="k">super</span>().__init__(
             key=key, label=label,
             components=[
-                TextComponent(key=<span class="s">"name"</span>, label=<span class="s">"Name"</span>),
-                TextComponent(key=<span class="s">"email"</span>, label=<span class="s">"Email"</span>),
+                TextForm(key=<span class="s">"name"</span>, label=<span class="s">"Name"</span>),
+                TextForm(key=<span class="s">"email"</span>, label=<span class="s">"Email"</span>),
             ],
         )</pre>
 
@@ -177,7 +177,7 @@ RepeaterComponent(
 <h2>Try it live</h2>
 
 <div class="lesson-callout try">
-    <strong>Try it.</strong> In the Agent Portal, spawn a <em>Component Gallery</em> instance and click through the Containers tab &mdash; you&rsquo;ll see all four NavigationComponent modes, GroupComponent, RepeaterComponent, VisibilityComponent, and SwitchComponent demonstrated side by side with their seed code visible.
+    <strong>Try it.</strong> In the Agent Portal, spawn a <em>Component Gallery</em> instance and click through the Containers tab &mdash; you&rsquo;ll see all four Navigation modes, Group, Repeater, Visibility, and Switch demonstrated side by side with their seed code visible.
 </div>
 
 <div class="lesson-takeaways">
@@ -185,7 +185,7 @@ RepeaterComponent(
     <ul>
         <li><span class="lesson-chip">Core</span> Containers hold children via <code>components=[...]</code>, <code>steps=[...]</code>, <code>template=[...]</code>, <code>cases={...}</code> &mdash; the parameter name depends on container type, the shape is the same.</li>
         <li><span class="lesson-chip">Core</span> Keys are unique within scope; each container defines its children&rsquo;s scope. Paths through the tree become URLs.</li>
-        <li><span class="lesson-chip">Core</span> NavigationComponent does four behaviors with one class; pick the mode via prop.</li>
+        <li><span class="lesson-chip">Core</span> Navigation does four behaviors with one class; pick the mode via prop.</li>
         <li><span class="lesson-chip">Core</span> Sibling-reading components (Visibility, Switch, Computed, Validation, Score, DynamicChoice) express cross-field reactivity via <code>depends_on</code>.</li>
         <li><span class="lesson-chip">Tip</span> See the <a href="/portal">Agent Portal</a> &rarr; <em>Component Gallery</em> for live examples of every container pattern.</li>
     </ul>

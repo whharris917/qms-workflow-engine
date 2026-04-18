@@ -1,4 +1,4 @@
-"""ListComponent — an ordered list of items with add/remove/reorder."""
+"""ListForm — an ordered list of items with add/remove/reorder."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ class AddItemAffordance(Affordance):
 
 
 @dataclass
-class ListComponent(Component):
+class ListForm(Component):
     """An ordered list of string items with add, remove, edit, and reorder.
 
     If fixed_items is provided, those items are seeded into the list on
@@ -31,6 +31,8 @@ class ListComponent(Component):
     a constraint are excluded from affordances and rejected by the handler.
     Constraints are ID-based (not value-based) so they survive renames.
     """
+    form = "list"
+
     fixed_items: list[str] = field(default_factory=list)
     must_follow: dict[str, list[str]] = field(default_factory=dict)
     allow_constraints: bool = True

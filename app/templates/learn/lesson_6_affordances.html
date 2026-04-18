@@ -44,10 +44,10 @@
 <h3>A component generating its own affordances</h3>
 
 <p>
-    Here is a simplified TextComponent serialization. Notice the affordances list:
+    Here is a simplified TextForm serialization. Notice the affordances list:
 </p>
 
-<pre class="lesson-code"><span class="c"># TextComponent.serialize(), simplified</span>
+<pre class="lesson-code"><span class="c"># TextForm.serialize(), simplified</span>
 <span class="k">def</span> <span class="v">serialize</span>(self):
     value = self._store.get(self._scope, self.key, <span class="s">"value"</span>)
     return {
@@ -151,7 +151,7 @@
 </p>
 
 <p>
-    The engine handles this with <strong>affordance flotation</strong>: deeply-nested affordances marked as &ldquo;floatable&rdquo; bubble up to the PageComponent level in the agent JSON, collapsed into one parameterized affordance per action kind.
+    The engine handles this with <strong>affordance flotation</strong>: deeply-nested affordances marked as &ldquo;floatable&rdquo; bubble up to the Page level in the agent JSON, collapsed into one parameterized affordance per action kind.
 </p>
 
 <pre class="lesson-code"><span class="c"># An affordance opts into flotation by tagging itself.</span>
@@ -160,7 +160,7 @@ aff = ClearAffordance(label=<span class="s">"Clear"</span>, url=self._url, body=
 aff[<span class="s">"_floatable"</span>] = <span class="s">"clear"</span>   <span class="c"># merge marker</span></pre>
 
 <p>
-    PageComponent walks the tree on serialization, collects every affordance carrying a <code>_floatable</code> marker, groups them by marker, strips them from children, and emits one compound affordance per group. Each compound affordance carries a structured <code>targets</code> dict mapping URLs to child labels:
+    Page walks the tree on serialization, collects every affordance carrying a <code>_floatable</code> marker, groups them by marker, strips them from children, and emits one compound affordance per group. Each compound affordance carries a structured <code>targets</code> dict mapping URLs to child labels:
 </p>
 
 <pre class="lesson-code">{
@@ -238,7 +238,7 @@ aff[<span class="s">"_floatable"</span>] = <span class="s">"clear"</span>   <spa
     <li>In the component&rsquo;s <code>serialize()</code>, emit an instance of the new affordance class. Give it a label, method, URL, and body shape. Add an instruction for agents.</li>
     <li>If the component needs to render it specially, reference <code>render_hints.type</code> in the Jinja template. Otherwise <code>render_aff</code> will produce a generic button.</li>
     <li>In the component&rsquo;s <code>_handle()</code>, add a branch for the action name. Validate the body, mutate state, return the updated serialize().</li>
-    <li>Run parity tests. If the new affordance floats, register its merge marker in PageComponent&rsquo;s compound-affordance generator.</li>
+    <li>Run parity tests. If the new affordance floats, register its merge marker in Page&rsquo;s compound-affordance generator.</li>
 </ol>
 
 <p>
@@ -255,7 +255,7 @@ aff[<span class="s">"_floatable"</span>] = <span class="s">"clear"</span>   <spa
         <li><span class="lesson-chip">Core</span> Each component generates its own affordances in <code>serialize()</code>. URLs are built from the component&rsquo;s own scope + key.</li>
         <li><span class="lesson-chip">Core</span> Two-tier serialization: <code>_serialize_full()</code> has internal fields for HTML rendering; <code>serialize()</code> strips them for the agent API.</li>
         <li><span class="lesson-chip">Core</span> Five <code>data-c-*</code> attributes carry all URLs in the DOM. The parity test knows about all five.</li>
-        <li><span class="lesson-chip">Core</span> Affordance flotation is a Portal: floatable affordances bubble up to the PageComponent level in agent JSON, collapsed into parameterized compound affordances with <code>targets</code> dicts.</li>
+        <li><span class="lesson-chip">Core</span> Affordance flotation is a Portal: floatable affordances bubble up to the Page level in agent JSON, collapsed into parameterized compound affordances with <code>targets</code> dicts.</li>
         <li><span class="lesson-chip">Core</span> 72 parity tests (7 per page &times; 10 pages + 2 pan-page) catch URL/method/action-name mismatches at CI time.</li>
         <li><span class="lesson-chip">Tip</span> Read <code>tests/test_parity.py</code> end-to-end. It&rsquo;s both the enforcement mechanism and the precise spec of what parity means.</li>
     </ul>

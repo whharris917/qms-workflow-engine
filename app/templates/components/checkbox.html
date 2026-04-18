@@ -1,17 +1,17 @@
-{# CheckboxComponent template.
+{# CheckboxForm template.
 
    Context:
      data  — the serialized component dict
-     ef    — the CheckboxComponent instance
+     ef    — the CheckboxForm instance
      url   — the component's POST URL
      label — current label text
      instruction — current instruction text
-     items_html — rendered child ListComponent HTML (edit mode only)
+     items_html — rendered child ListForm HTML (edit mode only)
 #}
 {% if data.edit_mode %}
   {% include "_edit_header.html" with context %}
 
-  {# Items — render the child ListComponent #}
+  {# Items — render the child ListForm #}
   {{ items_html|safe }}
 
   {# Confirmed state #}

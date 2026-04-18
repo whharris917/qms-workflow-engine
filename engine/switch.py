@@ -1,4 +1,4 @@
-"""SwitchComponent — selects between named alternatives based on a sibling's value."""
+"""Switch — selects between named alternatives based on a sibling's value."""
 
 from __future__ import annotations
 
@@ -12,17 +12,19 @@ from engine.store import Store
 
 
 @dataclass
-class SwitchComponent(Component):
+class Switch(Component):
     """Container that swaps between pre-defined component subtrees
     based on a sibling component's current value.
 
-    Like VisibilityComponent but for N-way selection rather than show/hide.
+    Like Visibility but for N-way selection rather than show/hide.
     Only the active case is serialized and rendered (faithful projection).
     Previously-visited cases preserve their state in the store.
 
     If the dependency value doesn't match any case key, nothing is active
-    and the SwitchComponent serializes as empty / renders as a placeholder.
+    and the Switch serializes as empty / renders as a placeholder.
     """
+    form = "switch"
+
     depends_on: "str | SiblingRef" = ""
     cases: dict[str, Component] = field(default_factory=dict)
 

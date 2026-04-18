@@ -1,12 +1,12 @@
-{# InfoComponent template — read-only text display with optional edit mode.
+{# InfoDisplay template — read-only text display with optional edit mode.
 
    Context:
      data      — serialized component dict
-     ef        — the InfoComponent instance
+     ef        — the InfoDisplay instance
      url       — component POST URL
      label     — current label text
      instruction — current instruction text
-     text_html — rendered HTML of child TextComponent (edit mode only)
+     text_html — rendered HTML of child TextForm (edit mode only)
 #}
 {% if data.edit_mode %}
   {% include "_edit_header.html" with context %}

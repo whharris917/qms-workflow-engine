@@ -1,4 +1,4 @@
-"""MultiComponent — groups multiple components under a single affordance.
+"""MultiForm — groups multiple components under a single affordance.
 
 All fields are submitted together in one POST, reducing agent round-trips.
 The individual fields are value descriptors, not components — they have
@@ -23,7 +23,7 @@ FieldType = Literal["text", "choice"]
 
 @dataclass
 class FieldDescriptor:
-    """A single field within a MultiComponent. Not a component."""
+    """A single field within a MultiForm. Not a component."""
     key: str
     label: str
     type: FieldType = "text"
@@ -55,13 +55,15 @@ class SetFieldsAffordance(Affordance):
 
 
 @dataclass
-class MultiComponent(Component):
+class MultiForm(Component):
     """Groups multiple fields under a single affordance.
 
     Fields are value descriptors (FieldDescriptor), not components.
-    They have no independent identity or affordances. The MultiComponent
+    They have no independent identity or affordances. The MultiForm
     owns them entirely and submits them as one unit.
     """
+    form = "multi"
+
     fields: list[FieldDescriptor] = field(default_factory=list)
 
     def _descriptor_config(self) -> dict:

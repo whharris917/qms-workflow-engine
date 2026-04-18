@@ -1,6 +1,6 @@
-"""DynamicChoiceComponent — a choice whose options depend on a sibling's value.
+"""DynamicChoiceForm — a choice whose options depend on a sibling's value.
 
-Like ChoiceComponent, but options are computed dynamically from a dependency
+Like ChoiceForm, but options are computed dynamically from a dependency
 rather than fixed at definition time. Supports both a callable
 (options_fn) and a lookup table (static_options).
 
@@ -8,7 +8,7 @@ When the dependency changes and the currently selected value is no longer
 valid, the selection is marked "stale" rather than silently cleared.
 The user must explicitly re-select or clear.
 
-ORDERING: The dependency must appear before DynamicChoiceComponent in the
+ORDERING: The dependency must appear before DynamicChoiceForm in the
 parent's children list, since options are computed from the live store.
 """
 
@@ -18,15 +18,17 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from engine.affordances import Affordance, SimpleButtonAffordance
-from engine.choicecomponent import SelectAffordance
+from engine.choiceform import SelectAffordance
 from engine.component import Component
 from engine.sibling_ref import SiblingRef
 from engine.templates import render_template
 
 
 @dataclass
-class DynamicChoiceComponent(Component):
+class DynamicChoiceForm(Component):
     """Single selection from a dynamically computed set of options."""
+    form = "dynamicchoice"
+
     depends_on: "str | SiblingRef" = ""
     options_fn: Callable[[Any], list[str]] | None = None
     static_options: dict[Any, list[str]] | None = None

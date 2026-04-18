@@ -32,7 +32,7 @@
 </p>
 
 <pre class="lesson-code"><span class="c"># Props are passed as keyword arguments at seed time</span>
-TextComponent(
+TextForm(
     key=<span class="s">"name"</span>,
     label=<span class="s">"Your name"</span>,         <span class="c"># prop</span>
     instruction=<span class="s">"First and last"</span>, <span class="c"># prop</span>
@@ -42,7 +42,7 @@ TextComponent(
 )</pre>
 
 <p>
-    Where does the label actually live? Inside the parent <code>PageComponent</code>&rsquo;s Store entry at <code>__structure</code>, in the descriptor entry for this child. The runtime TextComponent instance is a <em>projection</em> of that descriptor &mdash; not an independent source of truth.
+    Where does the label actually live? Inside the parent <code>Page</code>&rsquo;s Store entry at <code>__structure</code>, in the descriptor entry for this child. The runtime TextForm instance is a <em>projection</em> of that descriptor &mdash; not an independent source of truth.
 </p>
 
 <p>
@@ -67,8 +67,8 @@ self._set_my_config(<span class="s">"multiline"</span>, <span class="k">True</sp
 {
   <span class="s">"hello"</span>: {
     <span class="s">"__structure"</span>: { <span class="c">/* props live here */</span> },
-    <span class="s">"name"</span>: { <span class="s">"value"</span>: <span class="s">"Alex"</span> },                <span class="c">// TextComponent state</span>
-    <span class="s">"preferences"</span>: { <span class="s">"selected"</span>: [<span class="s">"Email me"</span>] } <span class="c">// CheckboxComponent state</span>
+    <span class="s">"name"</span>: { <span class="s">"value"</span>: <span class="s">"Alex"</span> },                <span class="c">// TextForm state</span>
+    <span class="s">"preferences"</span>: { <span class="s">"selected"</span>: [<span class="s">"Email me"</span>] } <span class="c">// CheckboxForm state</span>
   }
 }</pre>
 
@@ -77,7 +77,7 @@ self._set_my_config(<span class="s">"multiline"</span>, <span class="k">True</sp
 </p>
 
 <p>
-    Mutations happen through the component&rsquo;s own <code>_handle()</code> method. A TextComponent&rsquo;s <code>_handle()</code> knows about <code>set_value</code> and <code>clear</code> actions; a CheckboxComponent&rsquo;s knows about <code>toggle_option</code> and <code>done</code>. Each one parses the POST body, validates, writes to the Store, and returns the updated state.
+    Mutations happen through the component&rsquo;s own <code>_handle()</code> method. A TextForm&rsquo;s <code>_handle()</code> knows about <code>set_value</code> and <code>clear</code> actions; a CheckboxForm&rsquo;s knows about <code>toggle_option</code> and <code>done</code>. Each one parses the POST body, validates, writes to the Store, and returns the updated state.
 </p>
 
 <div class="lesson-callout note">
@@ -91,7 +91,7 @@ self._set_my_config(<span class="s">"multiline"</span>, <span class="k">True</sp
 </p>
 
 <pre class="lesson-code"><span class="c"># Example: is_complete is derived — always computed, never stored</span>
-<span class="k">class</span> TextComponent(Component):
+<span class="k">class</span> TextForm(Component):
 
     @property
     <span class="k">def</span> is_complete(self) -&gt; bool:
@@ -112,10 +112,10 @@ self._set_my_config(<span class="s">"multiline"</span>, <span class="k">True</sp
 
 <ul>
     <li><code>has_data</code> &mdash; &ldquo;does this component have anything to clear?&rdquo;</li>
-    <li><code>ComputedComponent.compute_result</code> &mdash; runs a user-supplied function against sibling values</li>
-    <li><code>ValidationComponent</code> rule pass/fail</li>
-    <li><code>ScoreComponent</code> score from answer key</li>
-    <li><code>DynamicChoiceComponent.options</code> &mdash; which options are available based on a sibling&rsquo;s value</li>
+    <li><code>Computation.compute_result</code> &mdash; runs a user-supplied function against sibling values</li>
+    <li><code>Validation</code> rule pass/fail</li>
+    <li><code>Score</code> score from answer key</li>
+    <li><code>DynamicChoiceForm.options</code> &mdash; which options are available based on a sibling&rsquo;s value</li>
 </ul>
 
 <div class="lesson-callout note">
@@ -152,7 +152,7 @@ self._set_my_config(<span class="s">"multiline"</span>, <span class="k">True</sp
 <h2>A concrete example</h2>
 
 <p>
-    Say you&rsquo;re adding a <code>placeholder</code> field to <code>TextComponent</code>. Which category? Work through the rule:
+    Say you&rsquo;re adding a <code>placeholder</code> field to <code>TextForm</code>. Which category? Work through the rule:
 </p>
 
 <ul>
@@ -162,7 +162,7 @@ self._set_my_config(<span class="s">"multiline"</span>, <span class="k">True</sp
 </ul>
 
 <p>
-    So: add it as a dataclass field on <code>TextComponent</code>. That puts it in the descriptor. No Store entry needed. No mutation API needed beyond <code>_set_my_config("placeholder", ...)</code> if you want to edit it at runtime.
+    So: add it as a dataclass field on <code>TextForm</code>. That puts it in the descriptor. No Store entry needed. No mutation API needed beyond <code>_set_my_config("placeholder", ...)</code> if you want to edit it at runtime.
 </p>
 
 <p>

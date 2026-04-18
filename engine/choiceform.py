@@ -1,4 +1,4 @@
-"""ChoiceComponent — single selection from a list of options."""
+"""ChoiceForm — single selection from a list of options."""
 
 from __future__ import annotations
 
@@ -24,13 +24,15 @@ class SelectAffordance(Affordance):
 
 
 @dataclass
-class ChoiceComponent(Component):
+class ChoiceForm(Component):
     """Single selection from a fixed set of options."""
+    form = "choice"
+
     options: list[str] = field(default_factory=list)
 
     def __post_init__(self):
-        from engine.listcomponent import ListComponent
-        self._options_form = ListComponent(
+        from engine.listform import ListForm
+        self._options_form = ListForm(
             key="__options",
             label="Options",
             allow_constraints=False,
@@ -43,14 +45,14 @@ class ChoiceComponent(Component):
         return []
 
     def _bind_children(self, store, url_prefix):
-        from engine.listcomponent import ListComponent
+        from engine.listform import ListForm
         self._options_form = self._options_form.bind(
             store, scope=self.key, url_prefix=f"{url_prefix}/{self.key}")
-        # Seed initial options if no ListComponent data exists yet
+        # Seed initial options if no ListForm data exists yet
         if not self._options_form.value:
             for opt in self.options:
                 self._options_form.handle({"action": "add", "value": opt})
-        # Wrap child handle so ChoiceComponent pushes undo before ListComponent changes
+        # Wrap child handle so ChoiceForm pushes undo before ListForm changes
         original_handle = self._options_form.handle
         parent = self
         def _handle_with_undo(body):
@@ -70,7 +72,7 @@ class ChoiceComponent(Component):
 
     @property
     def _effective_options(self) -> list[str]:
-        """Read current options from the child ListComponent."""
+        """Read current options from the child ListForm."""
         return [item["value"] for item in self._options_form.items]
 
     @property

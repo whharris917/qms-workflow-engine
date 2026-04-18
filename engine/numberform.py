@@ -1,4 +1,4 @@
-"""NumberComponent — numeric input with min/max bounds, step, slider mode, and unit label."""
+"""NumberForm — numeric input with min/max bounds, step, slider mode, and unit label."""
 
 from __future__ import annotations
 
@@ -32,9 +32,11 @@ class NumberInputAffordance(Affordance):
 
 
 @dataclass
-class NumberComponent(Component):
+class NumberForm(Component):
     """Numeric input with optional bounds and step. Set slider=True for
     a range slider UI. Optional unit label for display."""
+    form = "number"
+
     min_val: float | None = None
     max_val: float | None = None
     step: float | None = None

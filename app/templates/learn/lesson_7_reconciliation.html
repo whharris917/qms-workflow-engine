@@ -106,7 +106,7 @@ component = from_descriptor(descriptor, seed=seed)</pre>
 <h3>The algorithm</h3>
 
 <ol>
-    <li>Look up the descriptor&rsquo;s type name in the registry (<code>"text"</code> &rarr; <code>TextComponent</code>).</li>
+    <li>Look up the descriptor&rsquo;s type name in the registry (<code>"text"</code> &rarr; <code>TextForm</code>).</li>
     <li>If a matching seed is provided (same type and key), <code>deepcopy</code> it. This preserves any callables the seed carries.</li>
     <li>Apply the descriptor&rsquo;s scalar fields on top of the copy. The descriptor wins over seed defaults &mdash; the on-disk representation is authoritative.</li>
     <li>Recurse into children, matching seed children by key for the deepcopy step.</li>
@@ -119,7 +119,7 @@ component = from_descriptor(descriptor, seed=seed)</pre>
 <h2>The callable-preservation problem</h2>
 
 <p>
-    Some component fields hold Python functions: <code>ComputedComponent.compute</code>, <code>DynamicChoiceComponent.options_fn</code>, <code>VisibilityComponent.predicate</code> (when given a callable). Functions can&rsquo;t serialize to JSON. The descriptor has no place for them.
+    Some component fields hold Python functions: <code>Computation.compute</code>, <code>DynamicChoiceForm.options_fn</code>, <code>Visibility.predicate</code> (when given a callable). Functions can&rsquo;t serialize to JSON. The descriptor has no place for them.
 </p>
 
 <p>
@@ -141,13 +141,13 @@ component = from_descriptor(descriptor, seed=seed)</pre>
 </p>
 
 <div class="lesson-callout warn">
-    <strong>This is a known silent failure mode.</strong> The mitigation today is that PageComponent threads the seed into every <code>from_descriptor</code> call during normal rebuild, so the gap only manifests when the seed and descriptor have genuinely diverged. The planned fix is to require the <code>seed</code> parameter for types declaring callable-valued fields, and return a typed diagnostic when seed-match fails &mdash; so the broken state is visible in the UI rather than silent.
+    <strong>This is a known silent failure mode.</strong> The mitigation today is that Page threads the seed into every <code>from_descriptor</code> call during normal rebuild, so the gap only manifests when the seed and descriptor have genuinely diverged. The planned fix is to require the <code>seed</code> parameter for types declaring callable-valued fields, and return a typed diagnostic when seed-match fails &mdash; so the broken state is visible in the UI rather than silent.
 </div>
 
 <h2>SiblingRef — references that fail loudly</h2>
 
 <p>
-    A parallel problem: components that depend on siblings (<code>SwitchComponent</code>, <code>VisibilityComponent</code>, <code>DynamicChoiceComponent</code>, <code>ComputedComponent</code>, <code>ValidationComponent</code>, <code>ScoreComponent</code>, <code>ActionComponent</code>) reference those siblings by key. If a referenced sibling gets renamed or removed, the reference goes stale.
+    A parallel problem: components that depend on siblings (<code>Switch</code>, <code>Visibility</code>, <code>DynamicChoiceForm</code>, <code>Computation</code>, <code>Validation</code>, <code>Score</code>, <code>Action</code>) reference those siblings by key. If a referenced sibling gets renamed or removed, the reference goes stale.
 </p>
 
 <p>
@@ -157,17 +157,17 @@ component = from_descriptor(descriptor, seed=seed)</pre>
 <pre class="lesson-code"><span class="k">from</span> engine.sibling_ref <span class="k">import</span> SiblingRef
 
 components=[
-    ChoiceComponent(key=<span class="s">"role"</span>, label=<span class="s">"Role"</span>, options=[<span class="s">"Engineer"</span>, <span class="s">"Other"</span>]),
-    VisibilityComponent(
+    ChoiceForm(key=<span class="s">"role"</span>, label=<span class="s">"Role"</span>, options=[<span class="s">"Engineer"</span>, <span class="s">"Other"</span>]),
+    Visibility(
         key=<span class="s">"other-detail"</span>,
-        depends_on=SiblingRef(<span class="s">"role"</span>, expects=ChoiceComponent),
+        depends_on=SiblingRef(<span class="s">"role"</span>, expects=ChoiceForm),
         predicate=<span class="k">lambda</span> v: v == <span class="s">"Other"</span>,
-        component=TextComponent(key=<span class="s">"detail"</span>, label=<span class="s">"Specify"</span>),
+        component=TextForm(key=<span class="s">"detail"</span>, label=<span class="s">"Specify"</span>),
     ),
 ]</pre>
 
 <p>
-    The sibling-reading components coerce their <code>depends_on</code> field into a <code>SiblingRef</code> at construction time &mdash; so even plain strings get the treatment. Then, after bind, <code>PageComponent._validate_sibling_refs()</code> walks the whole tree, builds a map of all available sibling keys per scope, and checks every <code>SiblingRef</code>:
+    The sibling-reading components coerce their <code>depends_on</code> field into a <code>SiblingRef</code> at construction time &mdash; so even plain strings get the treatment. Then, after bind, <code>Page._validate_sibling_refs()</code> walks the whole tree, builds a map of all available sibling keys per scope, and checks every <code>SiblingRef</code>:
 </p>
 
 <ul>
@@ -180,15 +180,15 @@ components=[
 </p>
 
 <pre class="lesson-code"><span class="c"># Example error message</span>
-SiblingRefError: VisibilityComponent(key=<span class="s">"other-detail"</span>) references
-sibling <span class="s">"role"</span> (expects ChoiceComponent), but no sibling with that key
+SiblingRefError: Visibility(key=<span class="s">"other-detail"</span>) references
+sibling <span class="s">"role"</span> (expects ChoiceForm), but no sibling with that key
 exists in scope <span class="s">"survey"</span>.
 Known siblings: [<span class="s">"name"</span>, <span class="s">"role_choice"</span>, <span class="s">"subscribe"</span>].</pre>
 
 <h2>Field-type validation at the boundary</h2>
 
 <p>
-    One more guard. When a prop changes at runtime (via <code>_set_my_field</code> for top-level fields or <code>_set_my_config</code> for config entries), the engine validates the value against the dataclass annotation. <code>Literal["tabs","chain","sequence","accordion"]</code> on <code>NavigationComponent.mode</code> means any attempt to <code>_set_my_config("mode", "carousel")</code> raises <code>TypeError</code> citing the allowed values.
+    One more guard. When a prop changes at runtime (via <code>_set_my_field</code> for top-level fields or <code>_set_my_config</code> for config entries), the engine validates the value against the dataclass annotation. <code>Literal["tabs","chain","sequence","accordion"]</code> on <code>Navigation.mode</code> means any attempt to <code>_set_my_config("mode", "carousel")</code> raises <code>TypeError</code> citing the allowed values.
 </p>
 
 <p>

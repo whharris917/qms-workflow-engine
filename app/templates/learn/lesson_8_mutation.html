@@ -32,11 +32,11 @@
 </p>
 
 <p>
-    Edit mode changes the affordance surface. The label and instruction become inline editable inputs. Type-specific config (like <code>multiline</code> on TextComponent, <code>min_val</code>/<code>max_val</code> on NumberComponent) appears as a config panel. Containers gain add/remove/reorder controls. Nothing about the component&rsquo;s <em>state</em> changes; only its props can be adjusted.
+    Edit mode changes the affordance surface. The label and instruction become inline editable inputs. Type-specific config (like <code>multiline</code> on TextForm, <code>min_val</code>/<code>max_val</code> on NumberForm) appears as a config panel. Containers gain add/remove/reorder controls. Nothing about the component&rsquo;s <em>state</em> changes; only its props can be adjusted.
 </p>
 
-<pre class="lesson-code"><span class="c"># A TextComponent that can be edited at runtime</span>
-TextComponent(
+<pre class="lesson-code"><span class="c"># A TextForm that can be edited at runtime</span>
+TextForm(
     key=<span class="s">"name"</span>,
     label=<span class="s">"Your name"</span>,
     editable=<span class="k">True</span>,         <span class="c"># show the pencil toggle</span>
@@ -85,7 +85,7 @@ self._set_my_config(<span class="s">"min_length"</span>, <span class="n">3</span
     Edit mode changes props. <strong>Mutable pages</strong> let the user change the tree shape itself &mdash; adding, removing, moving, reparenting components at runtime. Toggled at the page level:
 </p>
 
-<pre class="lesson-code">PageComponent(
+<pre class="lesson-code">Page(
     key=<span class="s">"builder"</span>,
     label=<span class="s">"Page Builder"</span>,
     mutable_structure=<span class="k">True</span>,   <span class="c"># enables structural editing</span>
@@ -97,7 +97,7 @@ self._set_my_config(<span class="s">"min_length"</span>, <span class="n">3</span
 </p>
 
 <p>
-    Each interaction produces an action POST that the PageComponent&rsquo;s <code>_handle()</code> dispatches. The server-side actions are:
+    Each interaction produces an action POST that the Page&rsquo;s <code>_handle()</code> dispatches. The server-side actions are:
 </p>
 
 <ul>
@@ -105,8 +105,8 @@ self._set_my_config(<span class="s">"min_length"</span>, <span class="n">3</span
     <li><code>remove_component</code> &mdash; delete by key, surgically cleaning state from the Store</li>
     <li><code>move_component</code> &mdash; reorder within or between containers</li>
     <li><code>reparent_component</code> &mdash; drop into a new container</li>
-    <li><code>group_components</code> &mdash; wrap selected siblings in a new GroupComponent</li>
-    <li><code>ungroup_component</code> &mdash; splice a GroupComponent&rsquo;s children into its parent</li>
+    <li><code>group_components</code> &mdash; wrap selected siblings in a new Group</li>
+    <li><code>ungroup_component</code> &mdash; splice a Group&rsquo;s children into its parent</li>
     <li><code>rebuild_from_seed</code> &mdash; wipe <code>__structure</code>, start fresh from the Python definition</li>
 </ul>
 
@@ -133,18 +133,18 @@ self._set_my_config(<span class="s">"min_length"</span>, <span class="n">3</span
     <code>pages/mutable_demo.py</code> is the canonical example of a mutable page. It starts empty, has a type palette on the left, and a schematic canvas in the middle showing the current tree. The <em>Page Builder</em> page in the Agent Portal is a more polished version that embeds the Component Reference Menu inside it &mdash; so you can browse type docs and drag types onto your page in the same view.
 </p>
 
-<h2>Self-modifying pages — structural actions from ActionComponent</h2>
+<h2>Self-modifying pages — structural actions from Action</h2>
 
 <p>
     One more piece. Mutable pages give the <em>user</em> power to reshape the tree. Self-modifying pages let the <em>page itself</em> reshape in response to user interaction, under its own logic.
 </p>
 
 <p>
-    An <code>ActionComponent</code> can return <code>structural_actions</code> from its <code>_handle()</code> in addition to its own state. PageComponent intercepts those structural actions, applies them to <code>__structure</code>, and the page reshapes on the next serialize.
+    An <code>Action</code> can return <code>structural_actions</code> from its <code>_handle()</code> in addition to its own state. Page intercepts those structural actions, applies them to <code>__structure</code>, and the page reshapes on the next serialize.
 </p>
 
-<pre class="lesson-code"><span class="c"># An ActionComponent that adds a follow-up question when triggered</span>
-ActionComponent(
+<pre class="lesson-code"><span class="c"># An Action that adds a follow-up question when triggered</span>
+Action(
     key=<span class="s">"add-followup"</span>,
     label=<span class="s">"Add follow-up question"</span>,
     on_trigger=<span class="k">lambda</span> state: {
@@ -161,7 +161,7 @@ ActionComponent(
 )</pre>
 
 <p>
-    The engine supports this in the Survey Builder demo (<code>pages/mutable_demo.py</code>). A user answers a question; the ActionComponent fires; a new question materializes below it. The &ldquo;fractal complexity plan&rdquo; in the project history (Phase E) made this possible.
+    The engine supports this in the Survey Builder demo (<code>pages/mutable_demo.py</code>). A user answers a question; the Action fires; a new question materializes below it. The &ldquo;fractal complexity plan&rdquo; in the project history (Phase E) made this possible.
 </p>
 
 <div class="lesson-callout warn">
@@ -200,7 +200,7 @@ ActionComponent(
 </p>
 
 <div class="lesson-callout try">
-    <strong>Try it.</strong> In the Agent Portal, spawn a <em>Page Builder</em> instance. Drag a TextComponent from the palette onto the canvas. Type a label. Drag a NavigationComponent in. Group two children together. Each action&rsquo;s POST body is visible as a tooltip on the button &mdash; you can see the structural-action protocol directly. Open <code>data/{instance}.json</code> and watch <code>__structure</code> change.
+    <strong>Try it.</strong> In the Agent Portal, spawn a <em>Page Builder</em> instance. Drag a TextForm from the palette onto the canvas. Type a label. Drag a Navigation in. Group two children together. Each action&rsquo;s POST body is visible as a tooltip on the button &mdash; you can see the structural-action protocol directly. Open <code>data/{instance}.json</code> and watch <code>__structure</code> change.
 </div>
 
 <div class="lesson-takeaways">
@@ -208,8 +208,8 @@ ActionComponent(
     <ul>
         <li><span class="lesson-chip">Core</span> Prop mutation changes the descriptor&rsquo;s scalars; structural mutation changes the descriptor&rsquo;s shape. Both flow through the Store; the next bind reads the result.</li>
         <li><span class="lesson-chip">Core</span> <code>_set_my_field</code> (top-level) and <code>_set_my_config</code> (type-specific) are the two mutation APIs. Both validate types at the boundary.</li>
-        <li><span class="lesson-chip">Core</span> <code>mutable_structure=True</code> on a PageComponent enables add/remove/move/reparent/group/ungroup via a structural editor and a public action protocol.</li>
-        <li><span class="lesson-chip">Core</span> ActionComponent can return <code>structural_actions</code> from its handler, enabling self-modifying pages where user interaction reshapes the tree.</li>
+        <li><span class="lesson-chip">Core</span> <code>mutable_structure=True</code> on a Page enables add/remove/move/reparent/group/ungroup via a structural editor and a public action protocol.</li>
+        <li><span class="lesson-chip">Core</span> Action can return <code>structural_actions</code> from its handler, enabling self-modifying pages where user interaction reshapes the tree.</li>
         <li><span class="lesson-chip">Core</span> Edit mode keeps per-component undo via snapshot stacks. Discard restores the initial snapshot and exits edit mode.</li>
         <li><span class="lesson-chip">Tip</span> Everything on-disk. No transient in-memory state, no sticky sessions, no crash-recovery concerns. Reliability falls out of the design.</li>
     </ul>

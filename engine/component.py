@@ -251,10 +251,10 @@ class Component:
     def _sibling_refs(self) -> list[SiblingRef]:
         """Sibling components this one reads from.
 
-        Sibling-reading components (SwitchComponent, VisibilityComponent,
-        DynamicChoiceComponent, ComputedComponent, ValidationComponent, ActionComponent,
-        ScoreComponent) override this to declare their dependencies as
-        SiblingRef values. PageComponent collects all refs after bind and
+        Sibling-reading components (Switch, Visibility,
+        DynamicChoiceForm, Computation, Validation, Action,
+        Score) override this to declare their dependencies as
+        SiblingRef values. Page collects all refs after bind and
         validates that each referenced sibling actually exists in the
         ref's scope — closing the silent-orphan bug where a renamed or
         deleted sibling would leave dependents quietly broken.
@@ -272,7 +272,7 @@ class Component:
 
         Containers that hold children should override _bind_children()
         rather than bind() itself, unless they need custom bind logic
-        (e.g., PageComponent creates its own Store).
+        (e.g., Page creates its own Store).
         """
         bound = copy.deepcopy(self)
         bound._store = store
@@ -355,7 +355,7 @@ class Component:
 
         Called by from_descriptor on the seed-match path so the descriptor
         wins over the seed's defaults. Subclasses override to handle
-        non-scalar fields (e.g., MultiComponent.fields = list[FieldDescriptor]).
+        non-scalar fields (e.g., MultiForm.fields = list[FieldDescriptor]).
         """
         if "label" in desc:
             self.label = desc["label"]
@@ -519,9 +519,10 @@ class Component:
 
     @property
     def form(self) -> str:
-        """The component's type name, derived from the class."""
-        name = type(self).__name__
-        return name.removesuffix("Component").lower()
+        """The component's registry type name. Subclasses must set form as a class attribute."""
+        raise NotImplementedError(
+            f"{type(self).__name__} must define a 'form' class attribute"
+        )
 
     # --- Structural descriptors (Phase C) ---
 

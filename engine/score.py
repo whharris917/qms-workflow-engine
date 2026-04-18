@@ -1,4 +1,4 @@
-"""ScoreComponent — a read-only component that grades sibling components against an answer key.
+"""Score — a read-only component that grades sibling components against an answer key.
 
 Reads sibling values from the shared store/scope. Computes results
 live on every serialize/render — no grading action needed.
@@ -15,14 +15,16 @@ from engine.templates import render_template
 
 
 @dataclass
-class ScoreComponent(Component):
+class Score(Component):
     """Grades sibling components by comparing stored values to an answer key.
 
     answer_key maps sibling component keys to their expected values:
-      - str: exact match (for TextComponent, ChoiceComponent)
-      - dict[str, bool]: exact match on checked items (for CheckboxComponent)
+      - str: exact match (for TextForm, ChoiceForm)
+      - dict[str, bool]: exact match on checked items (for CheckboxForm)
       - callable: receives the stored value, returns bool
     """
+    form = "score"
+
     answer_key: dict[str, Any] = field(default_factory=dict)
 
     def _sibling_refs(self) -> list[SiblingRef]:

@@ -1,4 +1,4 @@
-"""SetComponent — an unordered collection of unique items."""
+"""SetForm — an unordered collection of unique items."""
 
 from __future__ import annotations
 
@@ -17,13 +17,14 @@ class AddToSetAffordance(Affordance):
 
 
 @dataclass
-class SetComponent(Component):
+class SetForm(Component):
     """An unordered collection of unique string items.
 
-    Unlike ListComponent, items have no order, no stable IDs, and no
+    Unlike ListForm, items have no order, no stable IDs, and no
     duplicates. Adding an existing item is rejected. Removing is
     by value, not by ID.
     """
+    form = "set"
 
     @property
     def items(self) -> list[str]:

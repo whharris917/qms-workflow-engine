@@ -1,4 +1,4 @@
-"""DateComponent — date (or datetime) input with ISO 8601 strings."""
+"""DateForm — date (or datetime) input with ISO 8601 strings."""
 
 from __future__ import annotations
 
@@ -35,8 +35,10 @@ class DateInputAffordance(Affordance):
 
 
 @dataclass
-class DateComponent(Component):
+class DateForm(Component):
     """Date or datetime input, stored as ISO 8601 string."""
+    form = "date"
+
     include_time: bool = False
     min_date: str | None = None
     max_date: str | None = None

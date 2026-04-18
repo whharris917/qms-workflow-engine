@@ -1,11 +1,11 @@
-"""ValidationComponent — cross-field validation that reads sibling values and evaluates rules.
+"""Validation — cross-field validation that reads sibling values and evaluates rules.
 
-A passive, read-only component (like ScoreComponent). Evaluates validation rules
+A passive, read-only component (like Score). Evaluates validation rules
 on every serialize/render. Rules whose dependencies are not yet filled are
 "pending" rather than "failed" — the check function is not invoked.
 
-When block_completion=True (default), the ValidationComponent's is_complete
-returns False if any rule fails. Since PageComponent checks all children,
+When block_completion=True (default), the Validation's is_complete
+returns False if any rule fails. Since Page checks all children,
 this blocks page completion until all rules pass.
 """
 
@@ -33,7 +33,7 @@ class ValidationRule:
 
 
 @dataclass
-class ValidationComponent(Component):
+class Validation(Component):
     """Evaluates validation rules across sibling component values.
 
     Rules are evaluated live on every serialize. Each rule reads its
@@ -41,6 +41,8 @@ class ValidationComponent(Component):
     with a {key: value} dict. Rules with any None dependency are
     treated as "pending" (not failed).
     """
+    form = "validation"
+
     rules: list[ValidationRule] = field(default_factory=list)
     block_completion: bool = True
 

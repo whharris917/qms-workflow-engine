@@ -1,4 +1,4 @@
-"""DictionaryComponent — dynamic set of key-value pairs."""
+"""DictionaryForm — dynamic set of key-value pairs."""
 
 from __future__ import annotations
 
@@ -25,8 +25,10 @@ class KVAddAffordance(Affordance):
 
 
 @dataclass
-class DictionaryComponent(Component):
+class DictionaryForm(Component):
     """A dynamic set of key-value pairs with stable IDs."""
+    form = "dictionary"
+
     key_label: str = "Key"
     value_label: str = "Value"
 

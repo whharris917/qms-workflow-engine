@@ -1,4 +1,4 @@
-"""TableComponent — a tabular component with columns, rows, and cell-level interaction.
+"""TableForm — a tabular component with columns, rows, and cell-level interaction.
 
 A table is a self-contained HATEOAS-compliant application. Its state is a
 2D grid of typed cells. Its affordances allow structural operations (add/remove
@@ -46,7 +46,7 @@ class AddColumnAffordance(Affordance):
 class RowGroup(Component):
     """Lightweight routing node for one row's typed cell components.
 
-    Created by TableComponent._bind_children(). Enables find_component to
+    Created by TableForm._bind_children(). Enables find_component to
     traverse table_key -> row_id -> col_id for path-based access to
     typed cell components.
     """
@@ -54,7 +54,7 @@ class RowGroup(Component):
 
     @property
     def has_data(self) -> bool:
-        return False  # Parent TableComponent handles clearing
+        return False  # Parent TableForm handles clearing
 
     @property
     def children(self) -> list[Component]:
@@ -80,7 +80,7 @@ class RowGroup(Component):
 
 
 @dataclass
-class TableComponent(Component):
+class TableForm(Component):
     """A table with dynamic columns, stable row IDs, and row-level operations.
 
     Both rows and columns are backed by OrderedCollection, providing:
@@ -89,6 +89,8 @@ class TableComponent(Component):
     - Ordering constraints (must_follow)
     - Constraint-aware move up/down (rows) and left/right (columns)
     """
+    form = "table"
+
     fixed_columns: list[str] = field(default_factory=list)
     fixed_rows: list[dict] = field(default_factory=list)
     row_must_follow: dict[str, list[str]] = field(default_factory=dict)
@@ -111,7 +113,7 @@ class TableComponent(Component):
         return {}
 
     def _migrate_legacy(self, old: dict) -> dict:
-        """Convert legacy TableComponent state to new format."""
+        """Convert legacy TableForm state to new format."""
         col_items = [{"id": c["key"], "value": c["label"]}
                      for c in old.get("columns", [])]
         row_items = [{"id": rid, "value": ""}
@@ -669,8 +671,8 @@ class TableComponent(Component):
     ) -> str:
         """Render inline constraint dropdown + prerequisite pills (for column constraints)."""
         html = '<span style="display: inline-flex; flex-direction: column; align-items: center; gap: 2px;">'
-        html += TableComponent._render_constraint_dropdown(url, item_id, prereqs, all_items, add_action)
-        html += TableComponent._render_constraint_pills(url, item_id, prereqs, id_to_val, static_pairs, remove_action, pill_bg)
+        html += TableForm._render_constraint_dropdown(url, item_id, prereqs, all_items, add_action)
+        html += TableForm._render_constraint_pills(url, item_id, prereqs, id_to_val, static_pairs, remove_action, pill_bg)
         html += '</span>'
         return html
 

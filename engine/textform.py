@@ -31,9 +31,11 @@ class TextAffordance(Affordance):
 
 
 @dataclass
-class TextComponent(Component):
+class TextForm(Component):
     """Free-form string input. Single-line by default; set multiline=True for
     textarea behavior. Optional min_length/max_length for validation."""
+    form = "text"
+
     default: str | None = None
     multiline: bool = False
     min_length: int | None = None

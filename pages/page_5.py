@@ -1,10 +1,10 @@
-"""Example Table — TableComponent (dynamic columns and rows)."""
+"""Example Table — TableForm (dynamic columns and rows)."""
 
-from engine.pagecomponent import PageComponent
-from engine.tablecomponent import TableComponent
+from engine.page import Page
+from engine.tableform import TableForm
 
 
-definition = PageComponent(key="example-table", label="Example Table", instruction="Build and populate a table.", components=[
-    TableComponent(key="table", label="Data Table",
+definition = Page(key="example-table", label="Example Table", instruction="Build and populate a table.", components=[
+    TableForm(key="table", label="Data Table",
               instruction="Add columns, then rows, then fill in cells."),
 ])

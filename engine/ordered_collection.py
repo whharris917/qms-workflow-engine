@@ -7,7 +7,7 @@ This is a plain data structure, not a component. It manages:
 - Cycle detection and topological sort enforcement
 - Constraint-aware move up/down
 
-Components (ListComponent, TableComponent) compose this to get ordering logic
+Components (ListForm, TableForm) compose this to get ordering logic
 without duplicating it.
 """
 

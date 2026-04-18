@@ -1,22 +1,22 @@
 """Visibility Experiments — exploring conditional visibility patterns."""
 
-from engine.choicecomponent import ChoiceComponent
-from engine.checkboxcomponent import CheckboxComponent
-from engine.textcomponent import TextComponent
-from engine.pagecomponent import PageComponent
-from engine.visibilitycomponent import VisibilityComponent
+from engine.choiceform import ChoiceForm
+from engine.checkboxform import CheckboxForm
+from engine.textform import TextForm
+from engine.page import Page
+from engine.visibility import Visibility
 
 
-definition = PageComponent(key="visibility-experiments", label="Visibility Experiments", instruction="Experiments with conditional visibility.", components=[
-    ChoiceComponent(key="mode", label="Mode", instruction="Select a mode.",
+definition = Page(key="visibility-experiments", label="Visibility Experiments", instruction="Experiments with conditional visibility.", components=[
+    ChoiceForm(key="mode", label="Mode", instruction="Select a mode.",
                options=["Simple", "Advanced", "Expert"]),
-    VisibilityComponent(key="v-advanced", label="Advanced Options",
+    Visibility(key="v-advanced", label="Advanced Options",
                    depends_on="mode", visible_when=["Advanced", "Expert"],
-                   component=TextComponent(key="detail", label="Detail Level",
+                   component=TextForm(key="detail", label="Detail Level",
                                      instruction="How much detail do you want?")),
-    VisibilityComponent(key="v-expert", label="Expert Options",
+    Visibility(key="v-expert", label="Expert Options",
                    depends_on="mode", visible_when="Expert",
-                   component=CheckboxComponent(key="flags", label="Expert Flags",
+                   component=CheckboxForm(key="flags", label="Expert Flags",
                                           instruction="Select expert features.",
                                           items=["debug", "verbose", "unsafe"])),
 ])

@@ -9,16 +9,16 @@ Design: SiblingRef IS-A str. It is the sibling's key, with an optional
 `depends_on` as a string (URL composition, store lookups, JSON serialization,
 `render_dependency_line`) keeps working without modification — SiblingRef
 passes every `isinstance(x, str)` check. The only new behavior is the
-`.expects` attribute, used by PageComponent at bind time to validate that the
+`.expects` attribute, used by Page at bind time to validate that the
 referenced sibling exists and (optionally) has the expected type.
 
 Usage in seed files:
     # Plain string — no type assertion:
-    VisibilityComponent(key="advanced", depends_on="mode", ...)
+    Visibility(key="advanced", depends_on="mode", ...)
 
     # With type assertion — validated at bind time:
-    from engine.textcomponent import TextComponent
-    ComputedComponent(key="summary", depends_on=[SiblingRef("name", expects=TextComponent)], ...)
+    from engine.textform import TextForm
+    Computation(key="summary", depends_on=[SiblingRef("name", expects=TextForm)], ...)
 
 Either form works; the plain-string form is auto-coerced by the owning
 component's __post_init__.
@@ -42,7 +42,7 @@ class SiblingRef(str):
         expects: optional class to assert the sibling is an instance of.
                  When set, bind-time validation fails if the referenced
                  sibling is of a different type. Use for contracts like
-                 "this ComputedComponent expects its dependency to be a TextComponent."
+                 "this Computation expects its dependency to be a TextForm."
     """
 
     __slots__ = ("_expects",)

@@ -1,4 +1,4 @@
-"""VisibilityComponent — a component whose visibility depends on another component's value."""
+"""Visibility — a component whose visibility depends on another component's value."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from engine.store import Store
 
 
 @dataclass
-class VisibilityComponent(Component):
+class Visibility(Component):
     """Wraps a component with a visibility condition.
 
     The wrapped component is only visible (serialized, rendered, and
@@ -21,6 +21,8 @@ class VisibilityComponent(Component):
     has a matching value. When invisible, this form is complete by
     default and absent from the HTML.
     """
+    form = "visibility"
+
     component: Component = None
     depends_on: "str | SiblingRef" = ""
     visible_when: Any = None  # single value or list of values

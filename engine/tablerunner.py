@@ -1,15 +1,15 @@
-"""TableRunner — executes a TableComponent as a gated sequential workflow.
+"""TableRunner — executes a TableForm as a gated sequential workflow.
 
 A Runner reads a sibling component's structure and presents an executable
-interface derived from it. TableRunner reads a TableComponent and presents its
+interface derived from it. TableRunner reads a TableForm and presents its
 rows as a gated sequence: each row's cell components are rendered large,
 one row at a time, with navigation gated by the table's ordering constraints.
 
-The TableRunner owns no data. All cell data lives in the source TableComponent's
+The TableRunner owns no data. All cell data lives in the source TableForm's
 compound scopes. The runner only stores its own navigation state (which row
 is currently focused).
 
-    TableComponent defines structure  →  TableRunner executes it
+    TableForm defines structure  →  TableRunner executes it
     Columns = what to do         →  Cell components = do it
     Row constraints = gates      →  Gated navigation = enforcement
 """
@@ -29,15 +29,17 @@ from engine.store import Store
 
 @dataclass
 class TableRunner(Component):
-    """Execute a TableComponent as a gated sequential workflow.
+    """Execute a TableForm as a gated sequential workflow.
 
-    The source TableComponent defines the schema (columns, typed columns),
+    The source TableForm defines the schema (columns, typed columns),
     the rows (stages), and the ordering constraints (gates). The runner
     presents one row at a time, with cell components rendered large and
     interactive. Rows are accessible only when their prerequisite rows
     are complete.
     """
-    source: Any = None  # TableComponent instance — set at definition time
+    form = "tablerunner"
+
+    source: Any = None  # TableForm instance — set at definition time
 
     # --- Internal: bound source and cell components ---
 
@@ -50,8 +52,8 @@ class TableRunner(Component):
         table's templates, and text columns become TextComponents. This ensures
         every cell in execution mode is a proper component.
         """
-        from engine.tablecomponent import TableComponent
-        if self.source is None or not isinstance(self.source, TableComponent):
+        from engine.tableform import TableForm
+        if self.source is None or not isinstance(self.source, TableForm):
             return
         # Bind a copy of the source to the same store and scope so it reads
         # the same data.
@@ -97,7 +99,7 @@ class TableRunner(Component):
         return self._source_table._row_collection.effective_must_follow
 
     def _row_groups_by_id(self) -> dict[str, Any]:
-        from engine.tablecomponent import RowGroup
+        from engine.tableform import RowGroup
         if self._source_table is None:
             return {}
         return {rg.key: rg for rg in self._source_table.children}

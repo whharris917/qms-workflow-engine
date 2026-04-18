@@ -5,41 +5,41 @@ Organized as a tabbed walkthrough from simple to complex. Each section contains
 working examples with instructive labels showing off each type's key features.
 """
 
-from engine.textcomponent import TextComponent
-from engine.checkboxcomponent import CheckboxComponent
-from engine.infocomponent import InfoComponent
-from engine.pagecomponent import PageComponent
-from engine.navigationcomponent import NavigationComponent
-from engine.groupcomponent import GroupComponent
-from engine.choicecomponent import ChoiceComponent
-from engine.numbercomponent import NumberComponent
-from engine.datecomponent import DateComponent
-from engine.booleancomponent import BooleanComponent
-from engine.multicomponent import MultiComponent
-from engine.listcomponent import ListComponent
-from engine.setcomponent import SetComponent
-from engine.tablecomponent import TableComponent
+from engine.textform import TextForm
+from engine.checkboxform import CheckboxForm
+from engine.infodisplay import InfoDisplay
+from engine.page import Page
+from engine.navigation import Navigation
+from engine.group import Group
+from engine.choiceform import ChoiceForm
+from engine.numberform import NumberForm
+from engine.dateform import DateForm
+from engine.booleanform import BooleanForm
+from engine.multiform import MultiForm
+from engine.listform import ListForm
+from engine.setform import SetForm
+from engine.tableform import TableForm
 from engine.tablerunner import TableRunner
-from engine.dictionarycomponent import DictionaryComponent
-from engine.visibilitycomponent import VisibilityComponent
-from engine.switchcomponent import SwitchComponent
-from engine.dynamicchoicecomponent import DynamicChoiceComponent
-from engine.scorecomponent import ScoreComponent
-from engine.computedcomponent import ComputedComponent
-from engine.validationcomponent import ValidationComponent
-from engine.actioncomponent import ActionComponent
-from engine.repeatercomponent import RepeaterComponent
-from engine.historycomponent import HistoryComponent
-from engine.rubikscubecomponent import RubiksCubeComponent
-from engine.multicomponent import FieldDescriptor
-from engine.validationcomponent import ValidationRule
+from engine.dictionaryform import DictionaryForm
+from engine.visibility import Visibility
+from engine.switch import Switch
+from engine.dynamicchoiceform import DynamicChoiceForm
+from engine.score import Score
+from engine.computation import Computation
+from engine.validation import Validation
+from engine.action import Action
+from engine.repeater import Repeater
+from engine.historizer import Historizer
+from engine.rubikscubeapp import RubiksCubeApp
+from engine.multiform import FieldDescriptor
+from engine.validation import ValidationRule
 
 
 # ---------------------------------------------------------------------------
 # Section 1: Simple Value Forms
 # ---------------------------------------------------------------------------
 
-simple_values = GroupComponent(
+simple_values = Group(
     key="simple-values",
     label="Simple Value Forms",
     editable=True,
@@ -49,24 +49,24 @@ simple_values = GroupComponent(
         "each one — the green border appears when complete."
     ),
     components=[
-        TextComponent(
+        TextForm(
             key="text-demo",
-            label="TextComponent",
+            label="TextForm",
             instruction="The simplest interactive component. Accepts any string. POST {\"value\": \"hello\"} to set it. This one is editable — click the pencil icon to rename it.",
             editable=True,
         ),
-        TextComponent(
+        TextForm(
             key="memo-demo",
-            label="TextComponent (multiline)",
+            label="TextForm (multiline)",
             instruction="Multi-line textarea. This one requires at least 10 characters and caps at 500.",
             multiline=True,
             min_length=10,
             max_length=500,
             editable=True,
         ),
-        NumberComponent(
+        NumberForm(
             key="number-demo",
-            label="NumberComponent",
+            label="NumberForm",
             instruction=(
                 "Numeric input with constraints. This one accepts 1-100, "
                 "step 0.5. Out-of-range or invalid-step values are rejected "
@@ -77,9 +77,9 @@ simple_values = GroupComponent(
             step=0.5,
             editable=True,
         ),
-        NumberComponent(
+        NumberForm(
             key="range-demo",
-            label="NumberComponent (slider)",
+            label="NumberForm (slider)",
             instruction="Slider from 0-100%. POST {\"value\": \"75\"} to set. Step is 5.",
             min_val=0,
             max_val=100,
@@ -88,31 +88,31 @@ simple_values = GroupComponent(
             unit="%",
             editable=True,
         ),
-        BooleanComponent(
+        BooleanForm(
             key="boolean-demo",
-            label="BooleanComponent",
+            label="BooleanForm",
             instruction="Binary toggle. POST {\"value\": \"true\"} or {\"value\": \"false\"}.",
             editable=True,
         ),
-        BooleanComponent(
+        BooleanForm(
             key="boolean-custom-demo",
-            label="BooleanComponent (custom labels)",
+            label="BooleanForm (custom labels)",
             instruction="Same toggle, custom display labels.",
             true_label="Approve",
             false_label="Reject",
             editable=True,
         ),
-        DateComponent(
+        DateForm(
             key="date-demo",
-            label="DateComponent",
+            label="DateForm",
             instruction="ISO 8601 date. POST {\"value\": \"2026-03-28\"}. Bounded to 2026.",
             min_date="2026-01-01",
             max_date="2026-12-31",
             editable=True,
         ),
-        DateComponent(
+        DateForm(
             key="datetime-demo",
-            label="DateComponent (with time)",
+            label="DateForm (with time)",
             instruction="With include_time=True, accepts YYYY-MM-DDTHH:MM format.",
             include_time=True,
             editable=True,
@@ -125,7 +125,7 @@ simple_values = GroupComponent(
 # Section 1b: Static Output
 # ---------------------------------------------------------------------------
 
-display_forms = GroupComponent(
+display_forms = Group(
     key="display-forms",
     label="Display Forms",
     editable=True,
@@ -134,11 +134,11 @@ display_forms = GroupComponent(
         "user input — they're always complete."
     ),
     components=[
-        InfoComponent(
+        InfoDisplay(
             key="info-demo",
-            label="InfoComponent",
+            label="InfoDisplay",
             editable=True,
-            text="Read-only text display. No interaction affordances, always complete.\nIn edit mode, an embedded multiline TextComponent lets you change the content.",
+            text="Read-only text display. No interaction affordances, always complete.\nIn edit mode, an embedded multiline TextForm lets you change the content.",
         ),
     ],
 )
@@ -148,18 +148,18 @@ display_forms = GroupComponent(
 # Section 2: Selection Forms
 # ---------------------------------------------------------------------------
 
-selection_forms = GroupComponent(
+selection_forms = Group(
     key="selection-forms",
     label="Selection Forms",
     editable=True,
     instruction=(
-        "Forms for choosing among options. ChoiceComponent for single-select, "
-        "CheckboxComponent for multi-select."
+        "Forms for choosing among options. ChoiceForm for single-select, "
+        "CheckboxForm for multi-select."
     ),
     components=[
-        ChoiceComponent(
+        ChoiceForm(
             key="choice-demo",
-            label="ChoiceComponent",
+            label="ChoiceForm",
             instruction=(
                 "Single selection from a fixed list. "
                 "POST {\"value\": \"python\"} to select. "
@@ -168,9 +168,9 @@ selection_forms = GroupComponent(
             options=["python", "javascript", "rust", "go"],
             editable=True,
         ),
-        CheckboxComponent(
+        CheckboxForm(
             key="checkbox-demo",
-            label="CheckboxComponent",
+            label="CheckboxForm",
             instruction=(
                 "Multi-select with explicit confirmation. Check items, then click Done. "
                 "Done with nothing checked means 'none of these apply'. "
@@ -188,7 +188,7 @@ selection_forms = GroupComponent(
 # Section 3: Multi-Field & Collection Forms
 # ---------------------------------------------------------------------------
 
-collection_forms = GroupComponent(
+collection_forms = Group(
     key="collection-forms",
     label="Multi-Field & Collection Forms",
     editable=True,
@@ -197,9 +197,9 @@ collection_forms = GroupComponent(
         "All collection forms use stable IDs — removing an item never shifts other IDs."
     ),
     components=[
-        MultiComponent(
+        MultiForm(
             key="multi-demo",
-            label="MultiComponent",
+            label="MultiForm",
             instruction=(
                 "Groups several fields into a single affordance. All fields submitted in one POST. "
                 "Useful for reducing round-trips when an agent fills related fields together."
@@ -212,19 +212,19 @@ collection_forms = GroupComponent(
             ],
             editable=True,
         ),
-        SetComponent(
+        SetForm(
             key="set-demo",
-            label="SetComponent",
+            label="SetForm",
             instruction=(
-                "An unordered collection of unique items. Unlike ListComponent, there is "
+                "An unordered collection of unique items. Unlike ListForm, there is "
                 "no ordering and no duplicate values. Items are added and removed by "
                 "value. Try adding 'apple' twice — the duplicate is rejected."
             ),
             editable=True,
         ),
-        DictionaryComponent(
+        DictionaryForm(
             key="kv-demo",
-            label="DictionaryComponent",
+            label="DictionaryForm",
             instruction=(
                 "Dynamic key-value pairs with stable entry IDs. "
                 "POST {\"action\": \"add\", \"key\": \"color\", \"value\": \"blue\"} to add. "
@@ -239,20 +239,20 @@ collection_forms = GroupComponent(
 
 
 # ---------------------------------------------------------------------------
-# Section 3b: ListComponent Showcase
+# Section 3b: ListForm Showcase
 # ---------------------------------------------------------------------------
 
-list_forms = GroupComponent(
+list_forms = Group(
     key="list-forms",
-    label="ListComponent Showcase",
+    label="ListForm Showcase",
     editable=True,
     instruction=(
-        "ListComponent is a versatile ordered list with add/edit/remove/reorder. "
+        "ListForm is a versatile ordered list with add/edit/remove/reorder. "
         "It supports fixed seed items, ordering constraints, and several "
         "configuration options. Each example below highlights a different use case."
     ),
     components=[
-        ListComponent(
+        ListForm(
             key="list-basic",
             label="Basic List",
             instruction=(
@@ -263,7 +263,7 @@ list_forms = GroupComponent(
             allow_constraints=False,
             editable=True,
         ),
-        ListComponent(
+        ListForm(
             key="list-fixed",
             label="Fixed Seed Items",
             instruction=(
@@ -275,7 +275,7 @@ list_forms = GroupComponent(
             allow_constraints=False,
             editable=True,
         ),
-        ListComponent(
+        ListForm(
             key="list-static-constraints",
             label="Static Ordering Constraints",
             instruction=(
@@ -297,7 +297,7 @@ list_forms = GroupComponent(
             allow_constraints=False,
             editable=True,
         ),
-        ListComponent(
+        ListForm(
             key="list-dynamic-constraints",
             label="Dynamic Ordering Constraints",
             instruction=(
@@ -317,11 +317,11 @@ list_forms = GroupComponent(
 
 
 # ---------------------------------------------------------------------------
-# Section 3c: TableComponent Showcase
+# Section 3c: TableForm Showcase
 # ---------------------------------------------------------------------------
 
 # Defined here so the TableRunner demo can reference the same instance.
-_runner_source_table = TableComponent(
+_runner_source_table = TableForm(
     key="table-runner-source",
     label="Runner Source Table",
     instruction=(
@@ -334,12 +334,12 @@ _runner_source_table = TableComponent(
     ),
     fixed_columns=[
         "Stage",
-        TextComponent(key="_tpl", label="Description"),
-        ChoiceComponent(
+        TextForm(key="_tpl", label="Description"),
+        ChoiceForm(
             key="_tpl", label="Gate",
             options=["Approval", "Checklist", "Review", "Auto-Pass"],
         ),
-        BooleanComponent(key="_tpl", label="Complete"),
+        BooleanForm(key="_tpl", label="Complete"),
     ],
     fixed_rows=[
         {"col_0": "Design"},
@@ -349,18 +349,18 @@ _runner_source_table = TableComponent(
     row_must_follow={"row_1": ["row_0"], "row_2": ["row_1"]},
 )
 
-table_forms = GroupComponent(
+table_forms = Group(
     key="table-forms",
-    label="TableComponent Showcase",
+    label="TableForm Showcase",
     editable=True,
     instruction=(
-        "TableComponent manages a 2D grid with dynamic columns and rows. Both axes "
+        "TableForm manages a 2D grid with dynamic columns and rows. Both axes "
         "are backed by OrderedCollection, giving them stable IDs, fixed items, "
-        "ordering constraints, and reordering — the same capabilities as ListComponent, "
+        "ordering constraints, and reordering — the same capabilities as ListForm, "
         "applied to rows and columns independently."
     ),
     components=[
-        TableComponent(
+        TableForm(
             key="table-basic",
             label="Basic Table",
             instruction=(
@@ -370,7 +370,7 @@ table_forms = GroupComponent(
                 "by moving rows up/down and columns left/right."
             ),
         ),
-        TableComponent(
+        TableForm(
             key="table-fixed-cols",
             label="Fixed Columns",
             instruction=(
@@ -380,7 +380,7 @@ table_forms = GroupComponent(
             ),
             fixed_columns=["Name", "Role", "Status"],
         ),
-        TableComponent(
+        TableForm(
             key="table-row-constraints",
             label="Row Ordering Constraints",
             instruction=(
@@ -392,7 +392,7 @@ table_forms = GroupComponent(
             ),
             allow_row_constraints=True,
         ),
-        TableComponent(
+        TableForm(
             key="table-col-constraints",
             label="Column Ordering Constraints",
             instruction=(
@@ -403,7 +403,7 @@ table_forms = GroupComponent(
             ),
             allow_col_constraints=True,
         ),
-        TableComponent(
+        TableForm(
             key="table-full",
             label="Full-Featured Table",
             instruction=(
@@ -415,7 +415,7 @@ table_forms = GroupComponent(
             allow_row_constraints=True,
             allow_col_constraints=True,
         ),
-        TableComponent(
+        TableForm(
             key="table-typed",
             label="Typed Columns",
             instruction=(
@@ -427,15 +427,15 @@ table_forms = GroupComponent(
             ),
             fixed_columns=[
                 "Task Name",
-                ChoiceComponent(
+                ChoiceForm(
                     key="_tpl", label="Status",
                     options=["Not Started", "In Progress", "Done"],
                 ),
-                ChoiceComponent(
+                ChoiceForm(
                     key="_tpl", label="Priority",
                     options=["Low", "Medium", "High", "Critical"],
                 ),
-                BooleanComponent(key="_tpl", label="Approved"),
+                BooleanForm(key="_tpl", label="Approved"),
             ],
         ),
         _runner_source_table,
@@ -460,35 +460,35 @@ table_forms = GroupComponent(
 # Section 4: Container Forms
 # ---------------------------------------------------------------------------
 
-container_forms = GroupComponent(
+container_forms = Group(
     key="container-forms",
     label="Container Forms",
     editable=True,
     instruction=(
         "Containers organize components into navigable structures. "
-        "NavigationComponent modes (tabs, chain, sequence, accordion) all implement faithful projection — "
+        "Navigation modes (tabs, chain, sequence, accordion) all implement faithful projection — "
         "hidden content is absent from both JSON and HTML."
     ),
     components=[
-        GroupComponent(
+        Group(
             key="group-demo",
-            label="GroupComponent",
+            label="Group",
             editable=True,
             instruction=(
                 "The simplest container — just a named group. No tabs, no collapse, "
                 "no sequencing. Useful for reusable compositions: define once as a "
-                "GroupComponent subclass, use in multiple pages. "
+                "Group subclass, use in multiple pages. "
                 "Edit mode (pencil icon) enables adding, removing, and reordering "
                 "components within the group."
             ),
             components=[
-                TextComponent(key="group-child-1", label="Child 1"),
-                TextComponent(key="group-child-2", label="Child 2"),
+                TextForm(key="group-child-1", label="Child 1"),
+                TextForm(key="group-child-2", label="Child 2"),
             ],
         ),
-        NavigationComponent(
+        Navigation(
             key="tab-demo",
-            label="NavigationComponent (tabs)",
+            label="Navigation (tabs)",
             mode="tabs",
             editable=True,
             instruction=(
@@ -498,21 +498,21 @@ container_forms = GroupComponent(
                 "Edit mode (pencil icon) enables adding, removing, and reordering tabs."
             ),
             steps=[
-                TextComponent(
+                TextForm(
                     key="tab-a",
                     label="First Tab Content",
                     instruction="Fill this, then switch to the second tab.",
                 ),
-                TextComponent(
+                TextForm(
                     key="tab-b",
                     label="Second Tab Content",
                     instruction="Both tabs must be complete for the container to be complete.",
                 ),
             ],
         ),
-        NavigationComponent(
+        Navigation(
             key="chain-demo",
-            label="NavigationComponent (chain)",
+            label="Navigation (chain)",
             mode="chain",
             editable=True,
             instruction=(
@@ -522,19 +522,19 @@ container_forms = GroupComponent(
                 "Edit mode (pencil icon) enables adding, removing, and reordering steps."
             ),
             steps=[
-                TextComponent(key="step-1", label="Step 1: Your Name", instruction="Fill this to advance."),
-                ChoiceComponent(
+                TextForm(key="step-1", label="Step 1: Your Name", instruction="Fill this to advance."),
+                ChoiceForm(
                     key="step-2",
                     label="Step 2: Pick a Color",
                     instruction="Select one to advance to the final step.",
                     options=["red", "green", "blue"],
                 ),
-                TextComponent(key="step-3", label="Step 3: Summary", instruction="Last step. Fill to complete the chain."),
+                TextForm(key="step-3", label="Step 3: Summary", instruction="Last step. Fill to complete the chain."),
             ],
         ),
-        NavigationComponent(
+        Navigation(
             key="sequence-demo",
-            label="NavigationComponent",
+            label="Navigation",
             editable=True,
             instruction=(
                 "Gated sequential container — like chain mode but without auto-advance. "
@@ -544,19 +544,19 @@ container_forms = GroupComponent(
                 "Edit mode (pencil icon) enables adding, removing, and reordering steps."
             ),
             steps=[
-                TextComponent(key="sf-1", label="Step 1: Project Name", instruction="Enter a name to unlock Step 2."),
-                ChoiceComponent(
+                TextForm(key="sf-1", label="Step 1: Project Name", instruction="Enter a name to unlock Step 2."),
+                ChoiceForm(
                     key="sf-2",
                     label="Step 2: Category",
                     instruction="Select a category to unlock Step 3.",
                     options=["Infrastructure", "Feature", "Bug Fix"],
                 ),
-                TextComponent(key="sf-3", label="Step 3: Description", instruction="Describe the work to complete the sequence."),
+                TextForm(key="sf-3", label="Step 3: Description", instruction="Describe the work to complete the sequence."),
             ],
         ),
-        NavigationComponent(
+        Navigation(
             key="accordion-demo",
-            label="NavigationComponent (accordion)",
+            label="Navigation (accordion)",
             mode="accordion",
             editable=True,
             instruction=(
@@ -565,12 +565,12 @@ container_forms = GroupComponent(
                 "Edit mode (pencil icon) enables adding, removing, and reordering sections."
             ),
             steps=[
-                TextComponent(
+                TextForm(
                     key="acc-basics",
                     label="Basic Info",
                     instruction="This section starts expanded. Collapse it to hide from output.",
                 ),
-                TextComponent(
+                TextForm(
                     key="acc-details",
                     label="Additional Details",
                     instruction="Expand this section to interact with it.",
@@ -585,14 +585,14 @@ container_forms = GroupComponent(
 # Section 5: Conditional & Dynamic Forms
 # ---------------------------------------------------------------------------
 
-# GroupComponent subclasses for the SwitchComponent demo
-class CatProfile(GroupComponent):
+# Group subclasses for the Switch demo
+class CatProfile(Group):
     pass
 
-class DogProfile(GroupComponent):
+class DogProfile(Group):
     pass
 
-conditional_forms = GroupComponent(
+conditional_forms = Group(
     key="conditional-forms",
     label="Conditional & Dynamic Forms",
     editable=True,
@@ -602,20 +602,20 @@ conditional_forms = GroupComponent(
         "IMPORTANT: the depended-on component must appear BEFORE the dependent."
     ),
     components=[
-        # VisibilityComponent demo
-        BooleanComponent(
+        # Visibility demo
+        BooleanForm(
             key="show-details",
             label="Show Details?",
-            instruction="Toggle this to show/hide the detail field below via VisibilityComponent.",
+            instruction="Toggle this to show/hide the detail field below via Visibility.",
             editable=True,
         ),
-        VisibilityComponent(
+        Visibility(
             key="vis-demo",
-            label="VisibilityComponent",
+            label="Visibility",
             instruction="This wraps a child and hides it when the condition is false.",
             depends_on="show-details",
             visible_when=True,
-            component=TextComponent(
+            component=TextForm(
                 key="hidden-detail",
                 label="Conditional Detail",
                 instruction="You can only see (and fill) this when 'Show Details' is True.",
@@ -623,17 +623,17 @@ conditional_forms = GroupComponent(
                 min_length=5,
             ),
         ),
-        # SwitchComponent demo
-        ChoiceComponent(
+        # Switch demo
+        ChoiceForm(
             key="pet-type",
             label="Pet Type",
-            instruction="Select a pet type to see the SwitchComponent swap between case subtrees.",
+            instruction="Select a pet type to see the Switch swap between case subtrees.",
             options=["cat", "dog"],
             editable=True,
         ),
-        SwitchComponent(
+        Switch(
             key="switch-demo",
-            label="SwitchComponent",
+            label="Switch",
             instruction=(
                 "N-way switch driven by a sibling value. Each case is a full component subtree. "
                 "State is preserved when switching — go back to 'cat' and your answers are still there."
@@ -644,31 +644,31 @@ conditional_forms = GroupComponent(
                     key="cat-profile",
                     label="Cat Profile",
                     components=[
-                        TextComponent(key="cat-name", label="Cat's Name"),
-                        BooleanComponent(key="indoor", label="Indoor Cat?"),
+                        TextForm(key="cat-name", label="Cat's Name"),
+                        BooleanForm(key="indoor", label="Indoor Cat?"),
                     ],
                 ),
                 "dog": DogProfile(
                     key="dog-profile",
                     label="Dog Profile",
                     components=[
-                        TextComponent(key="dog-name", label="Dog's Name"),
-                        ChoiceComponent(key="size", label="Size", options=["small", "medium", "large"]),
+                        TextForm(key="dog-name", label="Dog's Name"),
+                        ChoiceForm(key="size", label="Size", options=["small", "medium", "large"]),
                     ],
                 ),
             },
         ),
-        # DynamicChoiceComponent demo
-        ChoiceComponent(
+        # DynamicChoiceForm demo
+        ChoiceForm(
             key="continent",
             label="Continent",
-            instruction="Select a continent to see DynamicChoiceComponent update its options.",
+            instruction="Select a continent to see DynamicChoiceForm update its options.",
             options=["Europe", "Asia", "Americas"],
             editable=True,
         ),
-        DynamicChoiceComponent(
+        DynamicChoiceForm(
             key="dynamic-demo",
-            label="DynamicChoiceComponent",
+            label="DynamicChoiceForm",
             instruction=(
                 "Options are computed from a sibling's value. If you change the continent, "
                 "your selection becomes 'stale' and you'll need to re-select. "
@@ -681,16 +681,16 @@ conditional_forms = GroupComponent(
                 "Americas": ["Brazil", "Canada", "Mexico", "USA"],
             },
         ),
-        # HistoryComponent demo
-        HistoryComponent(
+        # Historizer demo
+        Historizer(
             key="history-demo",
-            label="HistoryComponent",
+            label="Historizer",
             instruction=(
                 "Wraps any component with append-only change history. Every change "
                 "is recorded with a timestamp. Click 'View History' to browse "
                 "previous versions read-only. The history can never be edited or deleted."
             ),
-            component=TextComponent(
+            component=TextForm(
                 key="tracked-text",
                 label="Tracked Text",
                 instruction="Edit this value several times, then view the history to see every change recorded.",
@@ -704,49 +704,49 @@ conditional_forms = GroupComponent(
 # Section 6: Computed & Validation Forms
 # ---------------------------------------------------------------------------
 
-computed_forms = GroupComponent(
+computed_forms = Group(
     key="computed-forms",
     label="Computed, Scoring & Validation",
     editable=True,
     instruction=(
         "Read-only components that derive display from sibling values. "
-        "ScoreComponent grades against an answer key. ComputedComponent runs arbitrary "
-        "functions. ValidationComponent enforces cross-field rules."
+        "Score grades against an answer key. Computation runs arbitrary "
+        "functions. Validation enforces cross-field rules."
     ),
     components=[
-        # ScoreComponent demo — a mini quiz
-        TextComponent(
+        # Score demo — a mini quiz
+        TextForm(
             key="capital-of-france",
             label="What is the capital of France?",
-            instruction="Type the answer. ScoreComponent below will grade it (case-insensitive).",
+            instruction="Type the answer. Score below will grade it (case-insensitive).",
             editable=True,
         ),
-        ChoiceComponent(
+        ChoiceForm(
             key="largest-planet",
             label="What is the largest planet?",
             instruction="Select one.",
             options=["Mars", "Jupiter", "Saturn", "Earth"],
             editable=True,
         ),
-        ScoreComponent(
+        Score(
             key="score-demo",
-            label="ScoreComponent",
+            label="Score",
             instruction="Read-only. Grades siblings against the answer key automatically.",
             answer_key={
                 "capital-of-france": "Paris",
                 "largest-planet": "Jupiter",
             },
         ),
-        # ComputedComponent demo
-        NumberComponent(
+        # Computation demo
+        NumberForm(
             key="width",
             label="Width",
-            instruction="Enter a width. ComputedComponent below will compute the area.",
+            instruction="Enter a width. Computation below will compute the area.",
             min_val=0,
             max_val=1000,
             editable=True,
         ),
-        NumberComponent(
+        NumberForm(
             key="height",
             label="Height",
             instruction="Enter a height.",
@@ -754,13 +754,13 @@ computed_forms = GroupComponent(
             max_val=1000,
             editable=True,
         ),
-        ComputedComponent(
+        Computation(
             key="computed-demo",
-            label="ComputedComponent (Area)",
+            label="Computation (Area)",
             instruction=(
                 "Derived from width * height. Recomputed on every serialize. "
                 "With store_result=True, the result is written to the store so "
-                "downstream components (like VisibilityComponent) can depend on it."
+                "downstream components (like Visibility) can depend on it."
             ),
             depends_on=["width", "height"],
             compute_fn=lambda vals: (
@@ -770,34 +770,34 @@ computed_forms = GroupComponent(
             ),
             store_result=True,
         ),
-        VisibilityComponent(
+        Visibility(
             key="area-warning",
             label="Large Area Warning",
             depends_on="computed-demo",
             visible_when=lambda val: val is not None and val > 10000,
-            component=TextComponent(
+            component=TextForm(
                 key="area-note",
                 label="Warning: Large Area",
-                instruction="This only appears when width * height > 10,000. Demonstrates ComputedComponent + VisibilityComponent chaining.",
+                instruction="This only appears when width * height > 10,000. Demonstrates Computation + Visibility chaining.",
                 default="This area exceeds the recommended maximum.",
             ),
         ),
-        # ValidationComponent demo
-        TextComponent(
+        # Validation demo
+        TextForm(
             key="password",
             label="Password",
             instruction="Enter a password (at least 8 chars for the validation to pass).",
             editable=True,
         ),
-        TextComponent(
+        TextForm(
             key="confirm-password",
             label="Confirm Password",
             instruction="Must match the password above.",
             editable=True,
         ),
-        ValidationComponent(
+        Validation(
             key="validation-demo",
-            label="ValidationComponent",
+            label="Validation",
             instruction=(
                 "Cross-field validation. Rules are pending until dependencies are filled, "
                 "then pass or fail. With block_completion=True (default), a failing rule "
@@ -843,25 +843,25 @@ def guarded_action(context, store, scope):
     return {"message": "Access granted. The precondition was satisfied."}
 
 
-action_forms = GroupComponent(
+action_forms = Group(
     key="action-forms",
     label="Actions & Repeaters",
     editable=True,
     instruction=(
-        "ActionComponent executes side effects. RepeaterComponent stamps a template "
+        "Action executes side effects. Repeater stamps a template "
         "for each dynamic entry. Both are key to building real workflows."
     ),
     components=[
-        # Basic ActionComponent
-        TextComponent(
+        # Basic Action
+        TextForm(
             key="action-name",
             label="Your Name (for the action)",
             instruction="Fill this before clicking Execute below — it's passed as context.",
             editable=True,
         ),
-        ActionComponent(
+        Action(
             key="action-demo",
-            label="ActionComponent (basic)",
+            label="Action (basic)",
             instruction=(
                 "Reads 'action-name' sibling as context, increments a counter in the store, "
                 "returns a greeting. The action_fn receives (context, store, scope)."
@@ -870,16 +870,16 @@ action_forms = GroupComponent(
             action_fn=log_action,
             depends_on=["action-name"],
         ),
-        # ActionComponent with precondition + confirmation
-        BooleanComponent(
+        # Action with precondition + confirmation
+        BooleanForm(
             key="agree-terms",
             label="Agree to Terms",
             instruction="Toggle to True to satisfy the precondition for the action below.",
             editable=True,
         ),
-        ActionComponent(
+        Action(
             key="guarded-action-demo",
-            label="ActionComponent (precondition + confirm)",
+            label="Action (precondition + confirm)",
             instruction=(
                 "This action has two gates: a precondition (agree-terms must be True) "
                 "and a two-step confirmation (arm, then confirm or cancel). "
@@ -892,10 +892,10 @@ action_forms = GroupComponent(
             precondition_message="You must agree to the terms first.",
             confirm=True,
         ),
-        # RepeaterComponent demo
-        RepeaterComponent(
+        # Repeater demo
+        Repeater(
             key="repeater-demo",
-            label="RepeaterComponent",
+            label="Repeater",
             instruction=(
                 "Stamps a template of components for each entry. Add entries to see "
                 "the template repeated. Each entry gets its own compound scope "
@@ -903,8 +903,8 @@ action_forms = GroupComponent(
                 "min_entries=1, max_entries=5 here."
             ),
             template=[
-                TextComponent(key="item-name", label="Item Name"),
-                NumberComponent(key="item-qty", label="Quantity", min_val=1, max_val=999, step=1),
+                TextForm(key="item-name", label="Item Name"),
+                NumberForm(key="item-qty", label="Quantity", min_val=1, max_val=999, step=1),
             ],
             min_entries=1,
             max_entries=5,
@@ -918,19 +918,19 @@ action_forms = GroupComponent(
 # Section 8: Showcase
 # ---------------------------------------------------------------------------
 
-showcase = GroupComponent(
+showcase = Group(
     key="showcase",
     label="Showcase",
     editable=True,
     instruction=(
-        "Components can be arbitrarily complex. RubiksCubeComponent is a full "
+        "Components can be arbitrarily complex. RubiksCubeApp is a full "
         "Rubik's Cube with face rotations, shuffle, and restart — proving "
         "the protocol scales from simple text inputs to complete interactive applications."
     ),
     components=[
-        RubiksCubeComponent(
+        RubiksCubeApp(
             key="rubiks-demo",
-            label="RubiksCubeComponent",
+            label="RubiksCubeApp",
             instruction=(
                 "A complete Rubik's Cube. Rotate faces (U/D/L/R/F/B, cw/ccw), "
                 "shuffle (20 random moves), or restart. Complete when all faces are solved. "
@@ -945,7 +945,7 @@ showcase = GroupComponent(
 # Page Definition
 # ---------------------------------------------------------------------------
 
-definition = PageComponent(
+definition = Page(
     key="component-gallery",
     label="Component Gallery",
     instruction=(
@@ -953,7 +953,7 @@ definition = PageComponent(
         "with working examples you can interact with. This page IS the documentation."
     ),
     components=[
-        NavigationComponent(
+        Navigation(
             key="gallery",
             label="Gallery",
             mode="tabs",

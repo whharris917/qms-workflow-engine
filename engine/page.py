@@ -1,4 +1,4 @@
-"""PageComponent — a component that contains and delegates to nested components."""
+"""Page — a component that contains and delegates to nested components."""
 
 from __future__ import annotations
 
@@ -18,14 +18,14 @@ from engine.templates import render_template
 
 
 @dataclass
-class PageComponent(Component):
+class Page(Component):
     """A component whose content is other components.
 
-    PageComponent is responsible for rendering itself, but it delegates rendering
+    Page is responsible for rendering itself, but it delegates rendering
     of its nested components to the components themselves. It provides each
     nested component a region and lets them fill it.
 
-    PageComponent is the persistence boundary. Each page owns its own Store
+    Page is the persistence boundary. Each page owns its own Store
     backed by a separate JSON file (data_dir / "{scope}.json"). Children
     inherit this store via bind().
 
@@ -33,6 +33,8 @@ class PageComponent(Component):
     for adding, removing, and reordering components at runtime. Structural
     mutations modify __structure in the store and trigger a live rebuild.
     """
+    form = "page"
+
     components: list[Component] = field(default_factory=list)
     mutable_structure: bool = False
 
@@ -50,16 +52,16 @@ class PageComponent(Component):
         return desc
 
     def bind(self, data_dir_or_store=None, scope: str = "", url_prefix: str = "",
-             *, store=None, **kwargs) -> PageComponent:
+             *, store=None, **kwargs) -> Page:
         """Produce a bound copy of this page and all nested components.
 
-        Unlike other components, PageComponent creates its own Store. This
+        Unlike other components, Page creates its own Store. This
         makes the page the persistence boundary — one JSON file per page.
 
         When called as a top-level page, data_dir_or_store is a Path and
         the Store is created at data_dir / "{scope}.json".
 
-        When embedded as a child of another PageComponent, data_dir_or_store
+        When embedded as a child of another Page, data_dir_or_store
         is the parent's Store. The data directory is derived from the
         parent store's path, and an independent Store is created for the
         embedded page.
@@ -96,7 +98,7 @@ class PageComponent(Component):
 
         # --- Structural persistence ---
         # __structure is stored at scope=self.key (matching the convention
-        # used by NavigationComponent/GroupComponent) so that children — bound at
+        # used by Navigation/Group) so that children — bound at
         # scope=self.key — can locate their own descriptor entry via
         # self._scope and mutate it through _set_my_field/_set_my_config.
         stored_structure = store.get(bound.key, "__structure")
@@ -140,7 +142,7 @@ class PageComponent(Component):
         and the sibling keys that do exist — actionable diagnostics for the
         usual cause (sibling renamed or deleted without updating dependents).
 
-        Call site: PageComponent.bind(), after children are bound. This closes
+        Call site: Page.bind(), after children are bound. This closes
         the silent-orphan bug where a renamed sibling would leave its
         dependents quietly broken.
         """
@@ -409,7 +411,7 @@ class PageComponent(Component):
                         "group_label": "<group_label>",
                     },
                     instruction=(
-                        f"Wrap two or more components in a new GroupComponent. "
+                        f"Wrap two or more components in a new Group. "
                         f"The group replaces them at the first selected position. "
                         f"Available keys: {', '.join(keys)}."
                     ),
@@ -845,7 +847,7 @@ class PageComponent(Component):
             for field in ("components", "steps"):
                 children = desc.get(field)
                 if isinstance(children, list):
-                    result = PageComponent._find_siblings_list(children, key)
+                    result = Page._find_siblings_list(children, key)
                     if result is not None:
                         return result
         return None
@@ -859,7 +861,7 @@ class PageComponent(Component):
             for field in ("components", "steps"):
                 children = desc.get(field)
                 if isinstance(children, list):
-                    keys |= PageComponent._all_keys_in_tree(children)
+                    keys |= Page._all_keys_in_tree(children)
         return keys
 
     def _group_components(self, body: dict) -> dict:
@@ -906,7 +908,7 @@ class PageComponent(Component):
                 indices.append(i)
                 selected_descs.append(desc)
 
-        # Build GroupComponent descriptor wrapping the selected components
+        # Build Group descriptor wrapping the selected components
         group_desc = {
             "type": "group",
             "key": group_key,
@@ -950,7 +952,7 @@ class PageComponent(Component):
             # Recurse into container children
             children = desc.get("components") or desc.get("steps")
             if isinstance(children, list):
-                found = PageComponent._pluck_from_tree(children, key)
+                found = Page._pluck_from_tree(children, key)
                 if found is not None:
                     return found
         return None
@@ -968,7 +970,7 @@ class PageComponent(Component):
                 if desc.get("type") in ("group", "page"):
                     desc["components"] = desc.get("components", [])
                     return desc["components"]
-                # NavigationComponent uses 'steps'
+                # Navigation uses 'steps'
                 if desc.get("type") in ("navigation", "tab", "chain",
                                          "sequence", "accordion"):
                     desc["steps"] = desc.get("steps", [])
@@ -978,7 +980,7 @@ class PageComponent(Component):
             for field in ("components", "steps"):
                 children = desc.get(field)
                 if isinstance(children, list):
-                    result = PageComponent._find_container_children(children, key)
+                    result = Page._find_container_children(children, key)
                     if result is not None:
                         return result
         return None
@@ -986,7 +988,7 @@ class PageComponent(Component):
     def _sync_container_structure(self, structure: list[dict], container_key: str):
         """Sync a container's own __structure in the store from the page tree.
 
-        Editable containers (GroupComponent, NavigationComponent) store their own
+        Editable containers (Group, Navigation) store their own
         __structure.  After page-level mutations that modify their children,
         the container's stored structure must be updated to match.
         """
@@ -1005,7 +1007,7 @@ class PageComponent(Component):
                         if c.get("key") == child_key:
                             return desc["key"]
                     # Recurse deeper
-                    result = PageComponent._find_parent_key(children, child_key)
+                    result = Page._find_parent_key(children, child_key)
                     if result is not None:
                         return result
         return None

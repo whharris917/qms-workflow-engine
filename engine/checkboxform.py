@@ -1,4 +1,4 @@
-"""CheckboxComponent — multi-select with explicit confirmation."""
+"""CheckboxForm — multi-select with explicit confirmation."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from engine.templates import render_template
 
 
 @dataclass
-class CheckboxComponent(Component):
+class CheckboxForm(Component):
     """Multi-select: a set of items, each independently selectable.
 
     Requires explicit confirmation via a "Done" action to be considered
@@ -20,11 +20,13 @@ class CheckboxComponent(Component):
     Done with no items checked means "none of these apply."
     Toggling any item after confirmation clears the confirmed state.
     """
+    form = "checkbox"
+
     items: list[str] = field(default_factory=list)
 
     def __post_init__(self):
-        from engine.listcomponent import ListComponent
-        self._items_form = ListComponent(
+        from engine.listform import ListForm
+        self._items_form = ListForm(
             key="__items",
             label="Items",
             allow_constraints=False,
@@ -39,11 +41,11 @@ class CheckboxComponent(Component):
     def _bind_children(self, store, url_prefix):
         self._items_form = self._items_form.bind(
             store, scope=self.key, url_prefix=f"{url_prefix}/{self.key}")
-        # Seed initial items if no ListComponent data exists yet
+        # Seed initial items if no ListForm data exists yet
         if not self._items_form.value:
             for item in self.items:
                 self._items_form.handle({"action": "add", "value": item})
-        # Wrap child handle so CheckboxComponent pushes undo before ListComponent changes
+        # Wrap child handle so CheckboxForm pushes undo before ListForm changes
         original_handle = self._items_form.handle
         parent = self
         def _handle_with_undo(body):
@@ -63,7 +65,7 @@ class CheckboxComponent(Component):
 
     @property
     def _effective_items(self) -> list[str]:
-        """Read current items from the child ListComponent."""
+        """Read current items from the child ListForm."""
         return [item["value"] for item in self._items_form.items]
 
     @property

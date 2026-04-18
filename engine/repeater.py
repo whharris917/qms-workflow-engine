@@ -1,4 +1,4 @@
-"""RepeaterComponent — a container that stamps out a template of components per entry.
+"""Repeater — a container that stamps out a template of components per entry.
 
 Each entry is a group of components instantiated from a template. Entries
 have stable IDs (entry_0, entry_1, ...) and each entry's component data
@@ -22,16 +22,16 @@ from engine.store import Store
 
 @dataclass
 class EntryGroup(Component):
-    """A lightweight container representing one entry in a RepeaterComponent.
+    """A lightweight container representing one entry in a Repeater.
 
-    Not constructed directly — created by RepeaterComponent._bind_children().
+    Not constructed directly — created by Repeater._bind_children().
     Its children are the stamped-and-bound template components for this entry.
     """
     components: list[Component] = field(default_factory=list)
 
     @property
     def has_data(self) -> bool:
-        return False  # Internal container; parent RepeaterComponent handles clearing
+        return False  # Internal container; parent Repeater handles clearing
 
     @property
     def children(self) -> list[Component]:
@@ -61,16 +61,18 @@ class EntryGroup(Component):
 
 
 @dataclass
-class RepeaterComponent(Component):
+class Repeater(Component):
     """A container that stamps out a template of components per dynamic entry.
 
     Usage:
-        RepeaterComponent(key="employees", label="Employees", template=[
-            TextComponent(key="name", label="Name"),
-            ChoiceComponent(key="role", label="Role", options=["Dev", "QA", "PM"]),
-            DateComponent(key="start_date", label="Start Date"),
+        Repeater(key="employees", label="Employees", template=[
+            TextForm(key="name", label="Name"),
+            ChoiceForm(key="role", label="Role", options=["Dev", "QA", "PM"]),
+            DateForm(key="start_date", label="Start Date"),
         ], min_entries=1)
     """
+    form = "repeater"
+
     template: list[Component] = field(default_factory=list)
     min_entries: int = 0
     max_entries: int | None = None

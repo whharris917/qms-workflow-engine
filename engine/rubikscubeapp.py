@@ -1,4 +1,4 @@
-"""RubiksCubeComponent — an arbitrarily complex component that is a complete
+"""RubiksCubeApp — an arbitrarily complex component that is a complete
 self-contained HATEOAS-compliant application.
 
 Demonstrates that the component protocol imposes no limit on internal
@@ -165,8 +165,9 @@ def _render_face(stickers: list[str], label: str) -> str:
 
 
 @dataclass
-class RubiksCubeComponent(Component):
+class RubiksCubeApp(Component):
     """A fully functional Rubik's Cube — a complex component."""
+    form = "rubikscube"
 
     @property
     def cube(self) -> dict:

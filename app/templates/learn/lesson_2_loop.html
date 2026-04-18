@@ -31,7 +31,7 @@
 </p>
 
 <p>
-    A seed has structure but no identity. <code>TextComponent(key="name", label="Your name")</code> describes &ldquo;a field called <em>name</em>&rdquo;, but it does not know whose name, or what value is currently stored. It is a template.
+    A seed has structure but no identity. <code>TextForm(key="name", label="Your name")</code> describes &ldquo;a field called <em>name</em>&rdquo;, but it does not know whose name, or what value is currently stored. It is a template.
 </p>
 
 <h2>2. Bind</h2>
@@ -40,7 +40,7 @@
 </p>
 
 <pre class="lesson-code"><span class="c"># roughly what bind() does</span>
-page = PageComponent(key=<span class="s">"hello"</span>, components=[TextComponent(key=<span class="s">"name"</span>)])
+page = Page(key=<span class="s">"hello"</span>, components=[TextForm(key=<span class="s">"name"</span>)])
 bound = page.bind(data_dir=Path(<span class="s">"data"</span>), scope=<span class="s">"a3f9c2d1"</span>)
 <span class="c"># Now bound.components[0] has a Store reference and can read/write its value.</span></pre>
 
@@ -72,10 +72,10 @@ bound = page.bind(data_dir=Path(<span class="s">"data"</span>), scope=<span clas
 </p>
 
 <p>
-    <code>_handle()</code> is where each component type implements its own dispatch logic. TextComponent recognizes <code>set_value</code>, validates the input, writes to the Store, and returns the updated state. The response is the full re-serialized page, and the browser&rsquo;s <code>morphdom</code> helper diffs it against the current DOM and mutates only what changed.
+    <code>_handle()</code> is where each component type implements its own dispatch logic. TextForm recognizes <code>set_value</code>, validates the input, writes to the Store, and returns the updated state. The response is the full re-serialized page, and the browser&rsquo;s <code>morphdom</code> helper diffs it against the current DOM and mutates only what changed.
 </p>
 
-<pre class="lesson-code"><span class="c"># TextComponent._handle, roughly</span>
+<pre class="lesson-code"><span class="c"># TextForm._handle, roughly</span>
 <span class="k">def</span> <span class="v">_handle</span>(self, body):
     <span class="k">if</span> body[<span class="s">"action"</span>] == <span class="s">"set_value"</span>:
         value = body[<span class="s">"value"</span>]
@@ -92,8 +92,8 @@ bound = page.bind(data_dir=Path(<span class="s">"data"</span>), scope=<span clas
 <ol>
     <li>Browser fires <code>POST /pages/a3f9c2d1/name</code> with body <code>{"action": "set_value", "value": "Alex"}</code>.</li>
     <li>Server reads the URL, calls <code>discover_pages()</code>, grabs the <code>hello</code> seed, binds to <code>data/a3f9c2d1.json</code>.</li>
-    <li>Server walks the bound tree by path (<code>name</code> is a direct child), finds the TextComponent.</li>
-    <li>TextComponent <code>_handle</code> validates, writes <code>"Alex"</code> to the Store.</li>
+    <li>Server walks the bound tree by path (<code>name</code> is a direct child), finds the TextForm.</li>
+    <li>TextForm <code>_handle</code> validates, writes <code>"Alex"</code> to the Store.</li>
     <li>Server re-serializes the whole page (cheap), returns HTML.</li>
     <li>Browser&rsquo;s <code>component.js</code> receives the response, calls <code>morphdom</code>, which diffs the old DOM against the new and mutates only the changed nodes.</li>
     <li>User sees their new value. Focus, scroll position, any open <code>&lt;details&gt;</code> tags &mdash; all preserved because morphdom only touched what changed.</li>

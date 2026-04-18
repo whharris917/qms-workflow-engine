@@ -1,17 +1,17 @@
-{# ChoiceComponent template.
+{# ChoiceForm template.
 
    Context:
      data  — the serialized component dict
-     ef    — the ChoiceComponent instance
+     ef    — the ChoiceForm instance
      url   — the component's POST URL
      label — current label text
      instruction — current instruction text
-     options_html — rendered child ListComponent HTML (edit mode only)
+     options_html — rendered child ListForm HTML (edit mode only)
 #}
 {% if data.edit_mode %}
   {% include "_edit_header.html" with context %}
 
-  {# Options — render the child ListComponent #}
+  {# Options — render the child ListForm #}
   {{ options_html|safe }}
 
   {# Value #}

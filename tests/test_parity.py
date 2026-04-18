@@ -215,7 +215,7 @@ def test_serialized_page_has_required_shape(all_pages, page_key):
     """Every page's serialize() output must have the expected agent-facing shape.
 
     Deliberately NOT checking 'form' or 'key' on the top-level output —
-    PageComponent.serialize() strips both (agent-facing cleanliness). The internal
+    Page.serialize() strips both (agent-facing cleanliness). The internal
     representation with 'form' available via _serialize_full() is a separate
     concern.
     """
@@ -254,7 +254,7 @@ def test_no_empty_url_affordances(all_pages, page_key):
         a for a in affs
         if not a["url"]
         and not a["_chrome_rendered"]
-        # Disabled buttons (ActionComponent precondition-unmet) intentionally have no URL.
+        # Disabled buttons (Action precondition-unmet) intentionally have no URL.
         and "disabled" not in a.get("label", "").lower()
     ]
     if offenders:
@@ -407,7 +407,7 @@ def test_affordance_urls_resolve(all_pages, page_key):
 
     Exclusions:
       * URLs targeting the page itself (end with /pages/{key}) — always
-        resolvable to the PageComponent.
+        resolvable to the Page.
       * URLs into embedded pages (contain /{parent}/{child} with child
         having its own url_prefix) — resolve via the embedded store.
     """
@@ -420,7 +420,7 @@ def test_affordance_urls_resolve(all_pages, page_key):
         url = a["url"]
         if not url or a["_chrome_rendered"]:
             continue
-        # Page-level URLs resolve to the PageComponent itself.
+        # Page-level URLs resolve to the Page itself.
         if url == page_url:
             continue
         # Extract the path portion beyond the page URL.

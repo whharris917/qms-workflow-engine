@@ -51,14 +51,14 @@ instance so the live tree reflects the change before the next bind.
 | Component | Props |
 |---|---|
 | Base (all types) | `label`, `instruction`, `editable` |
-| TextComponent | `multiline`, `min_length`, `max_length` |
-| NumberComponent | `min_val`, `max_val`, `step`, `slider`, `unit` |
-| BooleanComponent | `true_label`, `false_label` |
-| DateComponent | `include_time`, `min_date`, `max_date` |
-| NavigationComponent | `mode`, `default_expanded` |
-| DictionaryComponent | `key_label`, `value_label` |
-| MultiComponent | `fields` (list of FieldDescriptor) |
-| ListComponent | `allow_constraints` |
+| TextForm | `multiline`, `min_length`, `max_length` |
+| NumberForm | `min_val`, `max_val`, `step`, `slider`, `unit` |
+| BooleanForm | `true_label`, `false_label` |
+| DateForm | `include_time`, `min_date`, `max_date` |
+| Navigation | `mode`, `default_expanded` |
+| DictionaryForm | `key_label`, `value_label` |
+| MultiForm | `fields` (list of FieldDescriptor) |
+| ListForm | `allow_constraints` |
 
 **Rule:** If a field is declared in the component's `@dataclass` and its value
 survives across requests because the container re-applies it on bind, it is a
@@ -80,15 +80,15 @@ the Store, and returns the updated state. Containers delegate via
 **Examples of state:**
 | Component | State |
 |---|---|
-| TextComponent | current text value |
-| NumberComponent | current number value |
-| BooleanComponent | current boolean value |
-| ChoiceComponent | current selected option |
-| CheckboxComponent | selected option set |
-| NavigationComponent | active tab / step / expanded sections |
-| ListComponent | ordered items |
-| TableComponent | cells, rows, columns, ordering constraints |
-| DictionaryComponent | key-value entries |
+| TextForm | current text value |
+| NumberForm | current number value |
+| BooleanForm | current boolean value |
+| ChoiceForm | current selected option |
+| CheckboxForm | selected option set |
+| Navigation | active tab / step / expanded sections |
+| ListForm | ordered items |
+| TableForm | cells, rows, columns, ordering constraints |
+| DictionaryForm | key-value entries |
 
 **Rule:** If a field's value changes because the *user did something*, it is
 state.
@@ -106,11 +106,11 @@ response.
 | Component | Derived |
 |---|---|
 | Base | `is_complete`, `has_data` |
-| ComputedComponent | `compute_result` (from `compute(siblings)`) |
-| ValidationComponent | rule pass/fail status |
-| ScoreComponent | score from answer-key comparison |
-| DynamicChoiceComponent | options (from `options_fn(siblings)`) |
-| ListComponent | `effective_must_follow` (constraints with fixed-demotion applied) |
+| Computation | `compute_result` (from `compute(siblings)`) |
+| Validation | rule pass/fail status |
+| Score | score from answer-key comparison |
+| DynamicChoiceForm | options (from `options_fn(siblings)`) |
+| ListForm | `effective_must_follow` (constraints with fixed-demotion applied) |
 
 **Rule:** If you can compute the value at serialize-time from other values,
 it is derived. Don't cache it. Don't persist it. Recompute.
@@ -159,22 +159,22 @@ inherited from the nearest container.
 
 | Container | Child scope | Rationale |
 |---|---|---|
-| PageComponent | `self.key` | Standardized in the stateless-server refactor |
-| NavigationComponent | `self.key` | Consistent with PageComponent |
-| GroupComponent | `self.key` | Consistent with PageComponent |
-| RepeaterComponent | `self.key/entry_id` | Compound scope for dynamic entries |
-| TableComponent (typed columns) | `table_key/row_id` | Compound scope per cell |
+| Page | `self.key` | Standardized in the stateless-server refactor |
+| Navigation | `self.key` | Consistent with Page |
+| Group | `self.key` | Consistent with Page |
+| Repeater | `self.key/entry_id` | Compound scope for dynamic entries |
+| TableForm (typed columns) | `table_key/row_id` | Compound scope per cell |
 
-**The PageComponent convention was aligned only in Session-2026-04-16-003.**
-Previously PageComponent wrote `__structure` at scope=binding-scope (instance ID)
+**The Page convention was aligned only in Session-2026-04-16-003.**
+Previously Page wrote `__structure` at scope=binding-scope (instance ID)
 but children bound at scope=self.key. That mismatch broke
 `_get_my_descriptor()` lookups. If you are adding a new container type,
-follow the NavigationComponent/GroupComponent convention — do not re-introduce the
+follow the Navigation/Group convention — do not re-introduce the
 divergence.
 
 ### 2.3 Compound scopes
 
-Some containers (RepeaterComponent, TableComponent) emit children with compound
+Some containers (Repeater, TableForm) emit children with compound
 scopes like `my_repeater/entry-abc123`. The Store treats scopes as opaque
 strings, so nesting works naturally — `my_repeater/entry-abc123/some-field`
 is a valid Store key. Path-based URL routing mirrors the compound scope.
@@ -233,10 +233,10 @@ be preserved through reconciliation via seed-match, because it cannot be
 stored in the descriptor.
 
 **Affected fields include:**
-- `ComputedComponent.compute: Callable[[siblings], value]`
-- `DynamicChoiceComponent.options_fn: Callable[[siblings], list]`
-- `VisibilityComponent.predicate: Callable[[siblings], bool]` (when callable)
-- `ValidationComponent` rule predicates
+- `Computation.compute: Callable[[siblings], value]`
+- `DynamicChoiceForm.options_fn: Callable[[siblings], list]`
+- `Visibility.predicate: Callable[[siblings], bool]` (when callable)
+- `Validation` rule predicates
 
 **When the seed is missing or does not match** (e.g., the Python definition
 moved, the key was renamed, a sibling was renamed), the fresh construction
@@ -244,7 +244,7 @@ path (step 3) cannot provide the callable. The component reconciles, binds,
 and renders — but does nothing. No warning is emitted; no diagnostic is
 visible in the UI.
 
-**Mitigations today:** PageComponent.bind() retains `_seed` and threads it into
+**Mitigations today:** Page.bind() retains `_seed` and threads it into
 all `from_descriptor` calls during `_rebuild`, so the seed is available
 during the normal lifecycle. The gap manifests when: the seed is edited
 between binds; a child is added via structural action with no matching seed
@@ -273,7 +273,7 @@ visible in the UI rather than silent.
 ## 4. Affordance flotation (Portal)
 
 **Affordance flotation** is the engine's equivalent of a React Portal: a
-mechanism for a deeply-nested child's affordance to surface at the PageComponent
+mechanism for a deeply-nested child's affordance to surface at the Page
 level in the agent-facing JSON, rather than being rendered where the child
 lives.
 
@@ -285,7 +285,7 @@ serialization emits 20 identical `Clear` affordances (one per child). The
 agent must parse all 20 to learn that "Clear" exists.
 
 Flotation collapses these: one parameterized `Clear` affordance at the
-PageComponent level, carrying a `targets` dict mapping full URLs to child
+Page level, carrying a `targets` dict mapping full URLs to child
 labels. The agent sees one action; the 20 sites remain addressable by URL.
 
 ### 4.2 What gets floated
@@ -303,11 +303,11 @@ collapse together. Current floatable markers:
 
 1. Each component's `_serialize_full()` tags its floatable affordances with
    `_floatable = "<marker>"` on the serialized dict.
-2. PageComponent's `_collect_floatable()` recursively walks `component`,
+2. Page's `_collect_floatable()` recursively walks `component`,
    `components`, `sections`, `steps`, and similar child fields, collecting
    floatable affordances from any depth.
-3. PageComponent strips the floated affordances from child serializations.
-4. PageComponent groups the collected affordances by merge marker and emits one
+3. Page strips the floated affordances from child serializations.
+4. Page groups the collected affordances by merge marker and emits one
    parameterized compound affordance per group, with a structured `targets`
    dict: `{full_url: child_label}`.
 
@@ -327,7 +327,7 @@ collapse together. Current floatable markers:
 1. In the emitting component's `_serialize_full()`, set
    `affordance._floatable = "<unique-marker>"` on the affordance object
    before it is serialized.
-2. In PageComponent's compound-affordance generation, register a template for
+2. In Page's compound-affordance generation, register a template for
    the new marker (label, body shape, instruction).
 3. No changes needed in the recursive walker — it uses only the
    `_floatable` marker presence.
@@ -345,7 +345,7 @@ causes cross-boundary bugs.
 serialization. Present identically in JSON and HTML responses.
 
 Controlled state includes:
-- All form values (TextComponent text, NumberComponent number, ChoiceComponent selection)
+- All form values (TextForm text, NumberForm number, ChoiceForm selection)
 - Container navigation state (active tab, open sections)
 - Structural configuration (descriptor entries)
 - Completion status (derived, but server-computed)
@@ -417,7 +417,7 @@ The table below covers the less-obvious alignments.
 | Affordance flotation | Portal (novel variant) | Agent-JSON-only; see §4. |
 | Faithful projection | Controlled/uncontrolled boundary | See §5. |
 | `onBeforeElUpdated` hook | `ref` for focus preservation | Same mechanism. |
-| Fragment | GroupComponent with no decoration | Implicit. |
+| Fragment | Group with no decoration | Implicit. |
 
 **Concepts this codebase does NOT have (by design):**
 
@@ -438,6 +438,7 @@ non-borrowings and §8 for the roadmap.
 
 ## Change log
 
+- Session-2026-04-18-001: Class taxonomy refactor — the flat `*Component` suffix replaced with role-specific suffixes. Forms (`*Form`) produce State: TextForm, NumberForm, etc. Containers are unsuffixed nouns: Page, Navigation, Group, Repeater, Switch, Visibility. Derivations are standalone nouns: Computation, Score, Validation. Display: InfoDisplay. Imperative: Action. Wrapper: Historizer. App: RubiksCubeApp. Runner: TableRunner (unchanged). Module files renamed to match (`engine/textform.py`, `engine/page.py`, `engine/computation.py`, etc.). The `form` property on Component replaced with an explicit class attribute on every subclass — registry type names (e.g., `"text"`, `"page"`, `"computed"`) are now declared, not derived. Note: `*Form` was previously used in Session-2026-03-25-001 as a universal suffix meaning "self-contained component" (every class was a Form, so Form meant nothing). This reintroduction is narrower: `*Form` now means specifically "data-entry widget," one of eight distinct categories. Not a reversion — a refinement.
 - Session-2026-04-17-002: `Eigenform` base class and all `*Form` subclasses renamed to `Component` / `*Component`. The `eigenforms/` template directory, `eigenform.js` static asset, and all `ef-*` / `data-ef-*` CSS/DOM prefixes renamed to `c-*` / `data-c-*`. Module files renamed to match (`engine/*component.py`). Registry type-name derivation now strips the `Component` suffix. Rationale: the custom name obscured that the base class is, by design, a plain component in the React sense — keeping the unfamiliar word was sunk cost, not a carrier of the actual invariant.
 - Session-2026-04-17-001: initial draft. Pass 1 of the framing design plan.
 - Session-2026-04-17-001: Pass 3 of the framing design plan landed.
@@ -447,7 +448,7 @@ non-borrowings and §8 for the roadmap.
   - `app/static/style.css` — theme-agnostic `.c-error-*` classes (red/amber palette, monospace exception details).
   - Scope deliberately excluded from Pass 3: `serialize_safely()` for JSON parity; `bind()` and `_handle()` error scoping. Bind errors have no in-place representation (the component tree literally does not exist post-bind-failure), so those remain 500s for now. Parked for a future pass.
 - Session-2026-04-17-001: Pass 2 of the framing design plan landed.
-  - `engine/sibling_ref.py` — `SiblingRef` str-subclass value type. Seven sibling-reading components (SwitchComponent, VisibilityComponent, DynamicChoiceComponent, ComputedComponent, ActionComponent, ValidationComponent, ScoreComponent) coerce their `depends_on` fields into `SiblingRef` at construction.
-  - `PageComponent._validate_sibling_refs()` — walks the bound tree after bind, builds a scope map, and validates every SiblingRef resolves. Raises `SiblingRefError` with actionable diagnostics on stale or type-mismatched refs.
+  - `engine/sibling_ref.py` — `SiblingRef` str-subclass value type. Seven sibling-reading components (Switch, Visibility, DynamicChoiceForm, Computation, Action, Validation, Score) coerce their `depends_on` fields into `SiblingRef` at construction.
+  - `Page._validate_sibling_refs()` — walks the bound tree after bind, builds a scope map, and validates every SiblingRef resolves. Raises `SiblingRefError` with actionable diagnostics on stale or type-mismatched refs.
   - `engine/component.py::_validate_field_value` — field-type validation at the `_set_my_field` / `_set_my_config` boundary. Supports simple types, `X | None` / Union, `Literal[...]`, and is permissive on complex/unknown annotations.
-  - `NavigationComponent.mode: Literal["tabs","chain","sequence","accordion"]` and `FieldDescriptor.type: Literal["text","choice"]` — enum-like fields now validated at the boundary by Move 2.
+  - `Navigation.mode: Literal["tabs","chain","sequence","accordion"]` and `FieldDescriptor.type: Literal["text","choice"]` — enum-like fields now validated at the boundary by Move 2.

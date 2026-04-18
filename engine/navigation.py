@@ -1,4 +1,4 @@
-"""NavigationComponent — unified container with four display modes.
+"""Navigation — unified container with four display modes.
 
 Modes:
     tabs:      Free access, one child visible. Classic tabbed interface.
@@ -29,8 +29,10 @@ NavigationMode = Literal["tabs", "chain", "sequence", "accordion"]
 
 
 @dataclass
-class NavigationComponent(Component):
+class Navigation(Component):
     """A container that presents children in one of four modes."""
+    form = "navigation"
+
     steps: list[Component] = field(default_factory=list)
     mode: NavigationMode = "sequence"
     default_expanded: bool = True  # accordion mode: initial section state

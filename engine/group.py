@@ -1,38 +1,38 @@
-"""GroupComponent — a named container for reusable component compositions.
+"""Group — a named container for reusable component compositions.
 
 The simplest container: holds children, renders them, has identity.
 No collapse, no tabs, no sequencing. Just grouping with a name.
 
-Use GroupComponent to define reusable named compositions:
+Use Group to define reusable named compositions:
 
     # Define once
-    address = GroupComponent(key="address", label="Address", components=[
-        TextComponent(key="street", label="Street"),
-        TextComponent(key="city", label="City"),
-        ChoiceComponent(key="country", label="Country", options=["US", "UK", "DE"]),
+    address = Group(key="address", label="Address", components=[
+        TextForm(key="street", label="Street"),
+        TextForm(key="city", label="City"),
+        ChoiceForm(key="country", label="Country", options=["US", "UK", "DE"]),
     ])
 
     # Use in multiple pages
-    PageComponent(key="shipping", components=[address, ...])
-    PageComponent(key="billing", components=[address, ...])
+    Page(key="shipping", components=[address, ...])
+    Page(key="billing", components=[address, ...])
 
-For parameterized compositions, subclass GroupComponent:
+For parameterized compositions, subclass Group:
 
-    class Address(GroupComponent):
+    class Address(Group):
         def __init__(self, key: str, countries: list[str] = None):
             super().__init__(key=key, label="Address", components=[
-                TextComponent(key="street", label="Street"),
-                TextComponent(key="city", label="City"),
-                ChoiceComponent(key="country", label="Country",
+                TextForm(key="street", label="Street"),
+                TextForm(key="city", label="City"),
+                ChoiceForm(key="country", label="Country",
                            options=countries or ["US", "UK", "DE"]),
             ])
 
-    PageComponent(key="page", components=[
+    Page(key="page", components=[
         Address("home", countries=["US", "CA", "MX"]),
         Address("work"),
     ])
 
-bind() deepcopies the GroupComponent, so the same definition can safely
+bind() deepcopies the Group, so the same definition can safely
 appear in multiple pages.
 
 Edit mode (when editable=True): exposes structural operations —
@@ -56,8 +56,10 @@ from engine.templates import render_template
 
 
 @dataclass
-class GroupComponent(Component):
+class Group(Component):
     """A named group of components. The simplest container."""
+    form = "group"
+
     components: list[Component] = field(default_factory=list)
 
     # Preserved during bind — unbound seed components for callable matching

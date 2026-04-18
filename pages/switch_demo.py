@@ -1,76 +1,76 @@
-"""Switch Demo — exercises SwitchComponent with different composition shapes.
+"""Switch Demo — exercises Switch with different composition shapes.
 
 Demonstrates:
-- Basic SwitchComponent: choice drives which form subtree is active
-- Nested containers inside cases (GroupComponent, ChainForm)
+- Basic Switch: choice drives which form subtree is active
+- Nested containers inside cases (Group, ChainForm)
 - State preservation across case switches
 """
 
-from engine.choicecomponent import ChoiceComponent
-from engine.checkboxcomponent import CheckboxComponent
-from engine.textcomponent import TextComponent
-from engine.groupcomponent import GroupComponent
-from engine.numbercomponent import NumberComponent
-from engine.pagecomponent import PageComponent
-from engine.switchcomponent import SwitchComponent
+from engine.choiceform import ChoiceForm
+from engine.checkboxform import CheckboxForm
+from engine.textform import TextForm
+from engine.group import Group
+from engine.numberform import NumberForm
+from engine.page import Page
+from engine.switch import Switch
 
 
 # --- Parameterized compositions for the cases ---
 
-class BugReport(GroupComponent):
+class BugReport(Group):
     """Bug report form: steps to reproduce, severity, affected area."""
     def __init__(self, key, **kwargs):
         super().__init__(key=key, label="Bug Report", components=[
-            TextComponent(key="summary", label="Summary",
+            TextForm(key="summary", label="Summary",
                      instruction="One-line description of the bug."),
-            TextComponent(key="steps", label="Steps to Reproduce",
+            TextForm(key="steps", label="Steps to Reproduce",
                      instruction="How to trigger the bug."),
-            ChoiceComponent(key="severity", label="Severity",
+            ChoiceForm(key="severity", label="Severity",
                        instruction="How severe is this?",
                        options=["Critical", "Major", "Minor", "Cosmetic"]),
-            CheckboxComponent(key="areas", label="Affected Areas",
+            CheckboxForm(key="areas", label="Affected Areas",
                          instruction="Select all affected areas.",
                          items=["UI", "Backend", "Database", "API", "Auth"]),
         ], **kwargs)
 
 
-class FeatureRequest(GroupComponent):
+class FeatureRequest(Group):
     """Feature request form: description, justification, priority."""
     def __init__(self, key, **kwargs):
         super().__init__(key=key, label="Feature Request", components=[
-            TextComponent(key="description", label="Description",
+            TextForm(key="description", label="Description",
                      instruction="What feature do you want?"),
-            TextComponent(key="justification", label="Justification",
+            TextForm(key="justification", label="Justification",
                      instruction="Why is this needed?"),
-            ChoiceComponent(key="priority", label="Priority",
+            ChoiceForm(key="priority", label="Priority",
                        instruction="How important is this?",
                        options=["Must Have", "Should Have", "Nice to Have"]),
-            NumberComponent(key="effort", label="Estimated Effort (days)",
+            NumberForm(key="effort", label="Estimated Effort (days)",
                        instruction="Rough estimate in person-days.",
                        min_val=1, max_val=365, step=1),
         ], **kwargs)
 
 
-class Question(GroupComponent):
+class Question(Group):
     """General question form: question text and context."""
     def __init__(self, key, **kwargs):
         super().__init__(key=key, label="Question", components=[
-            TextComponent(key="question", label="Your Question",
+            TextForm(key="question", label="Your Question",
                      instruction="What do you want to know?"),
-            TextComponent(key="context", label="Context",
+            TextForm(key="context", label="Context",
                      instruction="Any background that helps answer your question."),
         ], **kwargs)
 
 
-definition = PageComponent(
+definition = Page(
     key="switch-demo",
     label="Switch Demo",
     instruction="Select a ticket type to see the appropriate form.",
     components=[
-        ChoiceComponent(key="ticket_type", label="Ticket Type",
+        ChoiceForm(key="ticket_type", label="Ticket Type",
                    instruction="What kind of ticket is this?",
                    options=["bug", "feature", "question"]),
-        SwitchComponent(key="ticket_form", label="Ticket Details",
+        Switch(key="ticket_form", label="Ticket Details",
                    instruction="Fill out the details for your ticket.",
                    depends_on="ticket_type",
                    cases={

@@ -3,25 +3,24 @@
 The registry serves two purposes:
 
 1. **Lookup**: Given a type name string (e.g., "text"), return the
-   class (TextComponent) so a component can be instantiated at runtime.
+   class (TextForm) so a component can be instantiated at runtime.
 
 2. **Discovery**: Query what types are available, enabling structural
    persistence (Phase C) and structural actions (Phase D) to reference
    components by name rather than by Python import.
 
-Type names are derived from class names via the same rule as the
-Component.form property: strip the "Component" suffix and lowercase.
-GroupComponent subclasses (e.g., BugReport) register under their own
-derived names (e.g., "bugreport"), not under "group".
+Type names are read from each class's explicit ``form`` class attribute.
+Group subclasses (e.g., BugReport) register under their own
+form value (e.g., "bugreport"), not under "group".
 
 Usage:
     from engine.registry import registry
 
     # Auto-registers all built-in component types
-    registry.lookup("text")        # -> TextComponent
-    registry.lookup("rubikscube")  # -> RubiksCubeComponent
+    registry.lookup("text")        # -> TextForm
+    registry.lookup("rubikscube")  # -> RubiksCubeApp
 
-    # Register a custom GroupComponent subclass
+    # Register a custom Group subclass
     registry.register(BugReport)
     registry.lookup("bugreport")   # -> BugReport
 
@@ -38,8 +37,8 @@ if TYPE_CHECKING:
 
 
 def _type_name(cls: type) -> str:
-    """Derive the registry name from a class, matching Component.form."""
-    return cls.__name__.removesuffix("Component").lower()
+    """Read the registry name from the class's form attribute."""
+    return cls.form
 
 
 class ComponentRegistry:
@@ -51,8 +50,7 @@ class ComponentRegistry:
     def register(self, cls: type[Component], name: str | None = None) -> None:
         """Register a component class.
 
-        If name is not provided, it is derived from the class name
-        using the same rule as Component.form.
+        If name is not provided, it is read from the class's form attribute.
         """
         key = name if name is not None else _type_name(cls)
         self._types[key] = cls
@@ -81,52 +79,52 @@ class ComponentRegistry:
 def _build_default_registry() -> ComponentRegistry:
     """Create a registry pre-loaded with all built-in component types."""
     # Import here to avoid circular imports at module level
-    from engine.textcomponent import TextComponent
-    from engine.checkboxcomponent import CheckboxComponent
-    from engine.choicecomponent import ChoiceComponent
-    from engine.multicomponent import MultiComponent
-    from engine.listcomponent import ListComponent
-    from engine.tablecomponent import TableComponent
-    from engine.numbercomponent import NumberComponent
-    from engine.datecomponent import DateComponent
-    from engine.booleancomponent import BooleanComponent
-    from engine.dictionarycomponent import DictionaryComponent
-    from engine.pagecomponent import PageComponent
-    from engine.groupcomponent import GroupComponent
-    from engine.repeatercomponent import RepeaterComponent
-    from engine.switchcomponent import SwitchComponent
-    from engine.visibilitycomponent import VisibilityComponent
-    from engine.dynamicchoicecomponent import DynamicChoiceComponent
-    from engine.scorecomponent import ScoreComponent
-    from engine.computedcomponent import ComputedComponent
-    from engine.validationcomponent import ValidationComponent
-    from engine.actioncomponent import ActionComponent
-    from engine.rubikscubecomponent import RubiksCubeComponent
-    from engine.setcomponent import SetComponent
-    from engine.navigationcomponent import NavigationComponent
+    from engine.textform import TextForm
+    from engine.checkboxform import CheckboxForm
+    from engine.choiceform import ChoiceForm
+    from engine.multiform import MultiForm
+    from engine.listform import ListForm
+    from engine.tableform import TableForm
+    from engine.numberform import NumberForm
+    from engine.dateform import DateForm
+    from engine.booleanform import BooleanForm
+    from engine.dictionaryform import DictionaryForm
+    from engine.page import Page
+    from engine.group import Group
+    from engine.repeater import Repeater
+    from engine.switch import Switch
+    from engine.visibility import Visibility
+    from engine.dynamicchoiceform import DynamicChoiceForm
+    from engine.score import Score
+    from engine.computation import Computation
+    from engine.validation import Validation
+    from engine.action import Action
+    from engine.rubikscubeapp import RubiksCubeApp
+    from engine.setform import SetForm
+    from engine.navigation import Navigation
     from engine.tablerunner import TableRunner
-    from engine.historycomponent import HistoryComponent
-    from engine.infocomponent import InfoComponent
+    from engine.historizer import Historizer
+    from engine.infodisplay import InfoDisplay
     r = ComponentRegistry()
     for cls in [
-        TextComponent, CheckboxComponent, ChoiceComponent, MultiComponent, ListComponent, SetComponent,
-        TableComponent, NavigationComponent, TableRunner, HistoryComponent,
-        NumberComponent, DateComponent, BooleanComponent,
-        DictionaryComponent,
-        PageComponent, GroupComponent, RepeaterComponent,
-        SwitchComponent,
-        VisibilityComponent, DynamicChoiceComponent,
-        ScoreComponent, ComputedComponent, ValidationComponent,
-        ActionComponent, RubiksCubeComponent, InfoComponent,
+        TextForm, CheckboxForm, ChoiceForm, MultiForm, ListForm, SetForm,
+        TableForm, Navigation, TableRunner, Historizer,
+        NumberForm, DateForm, BooleanForm,
+        DictionaryForm,
+        Page, Group, Repeater,
+        Switch,
+        Visibility, DynamicChoiceForm,
+        Score, Computation, Validation,
+        Action, RubiksCubeApp, InfoDisplay,
     ]:
         r.register(cls)
-    # Aliases for the unified NavigationComponent modes
-    r.register(NavigationComponent, name="tab")
-    r.register(NavigationComponent, name="chain")
-    r.register(NavigationComponent, name="sequence")
-    r.register(NavigationComponent, name="accordion")
-    # Alias for renamed DictionaryComponent
-    r.register(DictionaryComponent, name="keyvalue")
+    # Aliases for the unified Navigation modes
+    r.register(Navigation, name="tab")
+    r.register(Navigation, name="chain")
+    r.register(Navigation, name="sequence")
+    r.register(Navigation, name="accordion")
+    # Alias for renamed DictionaryForm
+    r.register(DictionaryForm, name="keyvalue")
     return r
 
 
@@ -167,13 +165,13 @@ registry = _RegistryProxy()
 # Maps descriptor field names to child structure type.
 # "list" = list of child descriptors, "dict" = dict of key->descriptor, "single" = one descriptor.
 _CHILD_FIELDS = {
-    "components": "list",   # PageComponent, GroupComponent
-    "steps": "list",         # NavigationComponent (all modes)
+    "components": "list",   # Page, Group
+    "steps": "list",         # Navigation (all modes)
     "tabs": "dict",          # legacy TabForm descriptors
     "sections": "dict",      # legacy AccordionForm descriptors
-    "cases": "dict",         # SwitchComponent
-    "template": "list",      # RepeaterComponent
-    "component": "single",   # VisibilityComponent
+    "cases": "dict",         # Switch
+    "template": "list",      # Repeater
+    "component": "single",   # Visibility
 }
 
 
@@ -344,7 +342,7 @@ def from_descriptor(desc: dict, reg: ComponentRegistry | None = None,
 
     Callable-preservation limitation:
         When a descriptor's type declares callable-valued fields (e.g.,
-        ComputedComponent.compute, DynamicChoiceComponent.options_fn) and the seed
+        Computation.compute, DynamicChoiceForm.options_fn) and the seed
         is absent or does not match by (type, key), the fresh-construction
         path cannot supply the callable. The component reconciles, binds,
         and renders — but the callable behavior is silently dropped. No
@@ -362,7 +360,7 @@ def from_descriptor(desc: dict, reg: ComponentRegistry | None = None,
     type_name = desc["type"]
     key = desc["key"]
 
-    # Migrate legacy container descriptors to unified NavigationComponent
+    # Migrate legacy container descriptors to unified Navigation
     if type_name in ("tab", "chain", "sequence", "accordion"):
         desc = dict(desc)  # don't mutate the original
         if "tabs" in desc and "steps" not in desc:

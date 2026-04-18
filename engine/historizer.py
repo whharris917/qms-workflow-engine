@@ -1,4 +1,4 @@
-"""HistoryComponent — wraps a component and keeps an append-only history of all changes.
+"""Historizer — wraps a component and keeps an append-only history of all changes.
 
 Every time the wrapped component's state changes, a timestamped snapshot
 is appended to the history. The history is never editable — no delete, no
@@ -27,8 +27,10 @@ from engine.store import Store
 
 
 @dataclass
-class HistoryComponent(Component):
+class Historizer(Component):
     """Wraps a component with append-only change history."""
+    form = "history"
+
     component: Component = None
 
     def to_descriptor(self) -> dict:

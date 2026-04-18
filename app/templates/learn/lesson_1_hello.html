@@ -16,14 +16,14 @@
 </p>
 
 <pre class="lesson-code"><span class="c"># pages/hello.py</span>
-<span class="k">from</span> engine.pagecomponent <span class="k">import</span> PageComponent
-<span class="k">from</span> engine.textcomponent <span class="k">import</span> TextComponent
+<span class="k">from</span> engine.page <span class="k">import</span> Page
+<span class="k">from</span> engine.textform <span class="k">import</span> TextForm
 
-definition = PageComponent(
+definition = Page(
     key=<span class="s">"hello"</span>,
     label=<span class="s">"Hello Page"</span>,
     components=[
-        TextComponent(key=<span class="s">"name"</span>, label=<span class="s">"Your name"</span>),
+        TextForm(key=<span class="s">"name"</span>, label=<span class="s">"Your name"</span>),
     ],
 )</pre>
 
@@ -41,8 +41,8 @@ definition = PageComponent(
 </p>
 
 <ul>
-    <li><strong><code>PageComponent</code></strong> &mdash; the top-level container. Every page starts with one. It owns the Store (the JSON file where this page&rsquo;s state lives) and hands it down to children.</li>
-    <li><strong><code>TextComponent</code></strong> &mdash; a single text input. Has a <code>key</code> (how it&rsquo;s identified inside this page), a <code>label</code> (what humans see), and optional configuration like <code>multiline</code> or <code>min_length</code>.</li>
+    <li><strong><code>Page</code></strong> &mdash; the top-level container. Every page starts with one. It owns the Store (the JSON file where this page&rsquo;s state lives) and hands it down to children.</li>
+    <li><strong><code>TextForm</code></strong> &mdash; a single text input. Has a <code>key</code> (how it&rsquo;s identified inside this page), a <code>label</code> (what humans see), and optional configuration like <code>multiline</code> or <code>min_length</code>.</li>
     <li><strong><code>components=[...]</code></strong> &mdash; the container&rsquo;s children. Add more TextComponents, or other component types, and they appear in the rendered page in order.</li>
 </ul>
 
@@ -78,16 +78,16 @@ Accept: application/json</pre>
 </p>
 
 <pre class="lesson-code"><span class="c"># pages/hello.py</span>
-<span class="k">from</span> engine.pagecomponent <span class="k">import</span> PageComponent
-<span class="k">from</span> engine.textcomponent <span class="k">import</span> TextComponent
-<span class="k">from</span> engine.checkboxcomponent <span class="k">import</span> CheckboxComponent
+<span class="k">from</span> engine.page <span class="k">import</span> Page
+<span class="k">from</span> engine.textform <span class="k">import</span> TextForm
+<span class="k">from</span> engine.checkboxform <span class="k">import</span> CheckboxForm
 
-definition = PageComponent(
+definition = Page(
     key=<span class="s">"hello"</span>,
     label=<span class="s">"Hello Page"</span>,
     components=[
-        TextComponent(key=<span class="s">"name"</span>, label=<span class="s">"Your name"</span>),
-        CheckboxComponent(
+        TextForm(key=<span class="s">"name"</span>, label=<span class="s">"Your name"</span>),
+        CheckboxForm(
             key=<span class="s">"preferences"</span>,
             label=<span class="s">"Preferences"</span>,
             options=[<span class="s">"Email me"</span>, <span class="s">"Follow updates"</span>, <span class="s">"Send notifications"</span>],
@@ -102,7 +102,7 @@ definition = PageComponent(
 <div class="lesson-takeaways">
     <h3>What you learned</h3>
     <ul>
-        <li><span class="lesson-chip">Core</span> A page is a Python file in <code>pages/</code> exporting <code>definition = PageComponent(...)</code>.</li>
+        <li><span class="lesson-chip">Core</span> A page is a Python file in <code>pages/</code> exporting <code>definition = Page(...)</code>.</li>
         <li><span class="lesson-chip">Core</span> The engine auto-discovers pages, routes requests, renders HTML and JSON, and persists state &mdash; you just describe the tree.</li>
         <li><span class="lesson-chip">Core</span> Every component has a <code>key</code> (identity within its container) and participates in the same interaction model regardless of type.</li>
         <li><span class="lesson-chip">Tip</span> Page state lives in <code>data/{instance_id}.json</code>. You can inspect it or delete it to reset.</li>
