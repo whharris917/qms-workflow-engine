@@ -23,6 +23,7 @@ class InfoDisplay(Component):
     text: str | dict = ""  # dict is converted to "key: value" lines on bind
 
     def __post_init__(self):
+        super().__post_init__()
         from engine.textform import TextForm
         self._text_form = TextForm(
             key="__text",

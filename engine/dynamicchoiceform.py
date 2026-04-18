@@ -34,6 +34,7 @@ class DynamicChoiceForm(Component):
     static_options: dict[Any, list[str]] | None = None
 
     def __post_init__(self):
+        super().__post_init__()
         if self.depends_on:
             self.depends_on = SiblingRef.coerce(self.depends_on)
 

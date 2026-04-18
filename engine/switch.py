@@ -29,6 +29,7 @@ class Switch(Component):
     cases: dict[str, Component] = field(default_factory=dict)
 
     def __post_init__(self):
+        super().__post_init__()
         if self.depends_on:
             self.depends_on = SiblingRef.coerce(self.depends_on)
 

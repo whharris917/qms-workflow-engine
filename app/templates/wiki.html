@@ -168,6 +168,40 @@
         margin: 0.2rem 0 0.8rem 1rem;
     }
 
+    /* Code blocks */
+    .wiki-code {
+        background: #f8f9fa;
+        border: 1px solid #eaecf0;
+        padding: 0.7rem 1rem;
+        font-family: "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
+        font-size: 0.82rem;
+        line-height: 1.55;
+        overflow-x: auto;
+        margin: 0.75rem 0;
+        border-radius: 2px;
+        color: #202122;
+        white-space: pre;
+    }
+    .wiki-code .c { color: #6a737d; font-style: italic; }
+
+    /* Diagrams */
+    .wiki-diagram {
+        margin: 1.4rem 0;
+        text-align: center;
+    }
+    .wiki-diagram svg {
+        display: block;
+        margin: 0 auto;
+        max-width: 100%;
+        height: auto;
+    }
+    .wiki-diagram figcaption {
+        font-size: 0.82rem;
+        color: #54595d;
+        font-style: italic;
+        margin-top: 0.4rem;
+    }
+
     /* Refs */
     sup.ref {
         font-size: 0.76rem;
@@ -274,6 +308,7 @@
                     <li><a href="#history">History</a></li>
                     <li><a href="#architecture">Architecture</a>
                         <ol>
+                            <li><a href="#component-model">The component model</a></li>
                             <li><a href="#core-loop">The core loop</a></li>
                             <li><a href="#three-trees">Seed, descriptor, and bound tree</a></li>
                             <li><a href="#affordances">Affordances and HATEOAS</a></li>
@@ -317,6 +352,86 @@
             </p>
 
             <h2 id="architecture">Architecture</h2>
+            <p>
+                Razem is a server-side component framework with no client-side runtime. Pages are defined as trees of Python component instances, persisted as JSON, and rebuilt from scratch on every HTTP request. The architecture is shaped by two constraints: the server must be stateless (no in-memory tree between requests), and every page must serve two audiences &mdash; human browsers and AI agents &mdash; from a single definition. These constraints produce the three structures described below (seed, descriptor, bound tree) and the affordance model that makes both clients first-class.
+            </p>
+
+            <figure class="wiki-diagram">
+                <svg viewBox="0 0 560 185" width="560" role="img" aria-label="Diagram of the Razem request lifecycle showing Define, Bind, Serve, and Handle stages with a central Store" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif" fill="#202122">
+                    <defs><marker id="wk-a1" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#3b82f6"/></marker></defs>
+                    <rect x="15" y="15" width="100" height="46" rx="4" fill="#f8f9fa" stroke="#a2a9b1"/>
+                    <text x="65" y="34" text-anchor="middle" font-size="12" font-weight="bold">Define</text>
+                    <text x="65" y="50" text-anchor="middle" font-size="9.5" fill="#54595d">pages/*.py</text>
+                    <rect x="155" y="15" width="100" height="46" rx="4" fill="#f8f9fa" stroke="#a2a9b1"/>
+                    <text x="205" y="34" text-anchor="middle" font-size="12" font-weight="bold">Bind</text>
+                    <text x="205" y="50" text-anchor="middle" font-size="9.5" fill="#54595d">seed + store → tree</text>
+                    <rect x="295" y="15" width="100" height="46" rx="4" fill="#f8f9fa" stroke="#a2a9b1"/>
+                    <text x="345" y="34" text-anchor="middle" font-size="12" font-weight="bold">Serve</text>
+                    <text x="345" y="50" text-anchor="middle" font-size="9.5" fill="#54595d">JSON / HTML</text>
+                    <rect x="435" y="15" width="100" height="46" rx="4" fill="#f8f9fa" stroke="#a2a9b1"/>
+                    <text x="485" y="34" text-anchor="middle" font-size="12" font-weight="bold">Handle</text>
+                    <text x="485" y="50" text-anchor="middle" font-size="9.5" fill="#54595d">POST → _handle()</text>
+                    <rect x="230" y="120" width="110" height="46" rx="4" fill="#eaf3ff" stroke="#3b82f6"/>
+                    <text x="285" y="140" text-anchor="middle" font-size="12" font-weight="bold" fill="#1e40af">Store</text>
+                    <text x="285" y="155" text-anchor="middle" font-size="9.5" fill="#54595d">.json per instance</text>
+                    <line x1="115" y1="38" x2="153" y2="38" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#wk-a1)"/>
+                    <line x1="255" y1="38" x2="293" y2="38" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#wk-a1)"/>
+                    <line x1="395" y1="38" x2="433" y2="38" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#wk-a1)"/>
+                    <path d="M485,61 L485,143 L342,143" fill="none" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#wk-a1)"/>
+                    <text x="493" y="100" font-size="9" fill="#3b82f6" font-style="italic">write</text>
+                    <path d="M230,143 L205,143 L205,63" fill="none" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#wk-a1)"/>
+                    <text x="175" y="100" font-size="9" fill="#3b82f6" font-style="italic">read</text>
+                </svg>
+                <figcaption>Fig.&thinsp;1 &mdash; The request lifecycle. Every request rebuilds the tree from scratch; the Store is the only state that persists.</figcaption>
+            </figure>
+
+            <h3 id="component-model">The component model</h3>
+            <p>
+                The base abstraction in Razem is the <strong>component</strong>: a Python <a href="https://en.wikipedia.org/wiki/Data_class">dataclass</a> subclass that encapsulates a unit of interactive state. Every component has three defining properties: <em>state</em> (a scoped region of the <a href="https://en.wikipedia.org/wiki/JSON">JSON</a> Store), <em>affordances</em> (a state-dependent list of actions the user can take), and a <em>completion condition</em> (<code>is_complete</code>). The project&rsquo;s architectural analysis characterizes this triad as a small <a href="https://en.wikipedia.org/wiki/Computer_program">program</a>: the Store scope is memory, the affordances are the instruction set, and <code>is_complete</code> is the <a href="https://en.wikipedia.org/wiki/Halting_problem">halting condition</a>. The user &mdash; human or AI &mdash; acts as the runtime that executes the program by choosing which affordance to invoke next.<sup class="ref"><a href="#ref-1">[1]</a></sup><sup class="ref"><a href="#ref-12">[12]</a></sup>
+            </p>
+            <p>
+                Several design decisions follow from this model. The affordance list is state-dependent: a <code>CheckboxForm</code> in N/A mode offers different actions than one in normal mode; a solved Rubik&rsquo;s Cube exposes &ldquo;scramble&rdquo; where an unsolved one does not. <code>is_complete</code> is mandatory on every concrete type &mdash; a program without a termination criterion is not well-formed. Components that read sibling state (<code>Computation</code>, <code>Score</code>, <code>Switch</code>) are programs that take input rather than violations of self-containment; the <code>depends_on</code> graph between them is the data-flow topology. A <code>Page</code> is itself a composite program whose halting condition is the conjunction of its children&rsquo;s conditions.<sup class="ref"><a href="#ref-12">[12]</a></sup>
+            </p>
+            <p>
+                Every concrete component implements four operations: <code>affordances()</code> (return the state-dependent list of available actions), <code>serialize()</code> (produce JSON state plus affordances), <code>render()</code> (produce HTML), and <code>_handle()</code> (process a mutation). The affordance list is a first-class query &mdash; callers can inspect what a component offers without triggering serialization. Because both output surfaces include the component&rsquo;s affordances, a component is <em>self-describing</em>: its response tells the consumer what it is, what it holds, and what can be done to it next.<sup class="ref"><a href="#ref-3">[3]</a></sup>
+            </p>
+            <p>
+                A component&rsquo;s endpoint is its complete mutation interface for everything within its boundary: data state, configuration, labels, and edit-mode operations all flow through <code>_handle()</code>. Structural operations &mdash; a component&rsquo;s existence, position, and editability permission &mdash; belong to the parent container, which manages them as properties of its own tree structure rather than as mutations of the child.<sup class="ref"><a href="#ref-1">[1]</a></sup>
+            </p>
+            <p>The following simplified example illustrates the protocol (the actual base class provides additional infrastructure):</p>
+<pre class="wiki-code">class TextForm(Component):
+    form = "text"
+
+    @property
+    def is_complete(self):                     <span class="c"># halting condition</span>
+        return self.store.get(self.key) is not None
+
+    def get_affordances(self):                 <span class="c"># type-specific actions</span>
+        return [SetValueAffordance(label="Set", url=self.url,
+                body={"action": "set", "value": "&lt;text&gt;"})]
+
+    <span class="c"># affordances()  — inherited from Component; adds Clear, Edit/Undo/Discard, Batch</span>
+
+    def serialize(self):                       <span class="c"># JSON output + affordances</span>
+        return {"label": self.label, "value": self.store.get(self.key),
+                "is_complete": self.is_complete,
+                "affordances": [a.serialize() for a in self.affordances()]}
+
+    def render(self):                          <span class="c"># HTML output</span>
+        return render_template("text.html", data=self.serialize())
+
+    def _handle(self, body):                   <span class="c"># sole mutation entry point</span>
+        if body["action"] == "set":
+            self.store.set(self.key, body["value"])</pre>
+            <p>The boundary between component and container is visible in the URL routing:</p>
+<pre class="wiki-code"><span class="c"># Component&rsquo;s domain &mdash; self-mutations, routed to the child&rsquo;s _handle():</span>
+POST /pages/a1b2c3d4/name      {"action": "set", "value": "Acme Corp"}
+POST /pages/a1b2c3d4/name      {"action": "set_label", "value": "Legal Name"}
+
+<span class="c"># Container&rsquo;s domain &mdash; structural operations, routed to the Page&rsquo;s _handle():</span>
+POST /pages/a1b2c3d4            {"action": "add_component", "type": "text"}
+POST /pages/a1b2c3d4            {"action": "remove_component", "key": "name"}
+POST /pages/a1b2c3d4            {"action": "move_component", "key": "name", "position": 2}</pre>
 
             <h3 id="core-loop">The core loop</h3>
             <p>
@@ -328,6 +443,22 @@
                 <li><strong>Serve</strong>. The bound tree serializes to JSON (for agent clients) or renders to HTML (for browsers). Both outputs describe the same state and expose the same URLs.</li>
                 <li><strong>Handle</strong>. On a <code>POST</code>, the server rebinds, walks to the target component by URL path, and invokes its <code>_handle()</code> method, which validates the body, writes to the Store, and returns the updated state.</li>
             </ol>
+<pre class="wiki-code"><span class="c"># 1. Define &mdash; auto-discover page seeds</span>
+seed = discover_pages()["vendor-form"]
+
+<span class="c"># 2. Bind &mdash; attach Store to seed, produce live tree</span>
+page = seed.bind(data_dir=Path("data"), instance_id="a1b2c3d4")
+
+<span class="c"># 3. Serve &mdash; same tree, two projections</span>
+if accepts_json(request):
+    return jsonify(page.serialize())      <span class="c"># JSON with affordances</span>
+else:
+    return page.render()                  <span class="c"># HTML with buttons</span>
+
+<span class="c"># 4. Handle &mdash; on POST, mutate via the target component</span>
+component = page.find_component(url_path)
+component._handle(request.json)           <span class="c"># validates, writes to Store</span>
+return jsonify(component.serialize())     <span class="c"># return updated state</span></pre>
             <p>
                 The server holds no long-lived component tree in memory; every request rebuilds the tree from the seed plus the Store. Because the Store is the only authoritative mutable state, the engine is trivially horizontally scalable: any server can handle any request, and editing a page definition takes effect on the next request with no restart.<sup class="ref"><a href="#ref-7">[7]</a></sup>
             </p>
@@ -341,17 +472,78 @@
                 <li>The <strong>descriptor tree</strong> is a JSON-serializable snapshot stored in the Store at <code>__structure</code> keys. It is the canonical source of truth for any runtime-editable structure.</li>
                 <li>The <strong>bound tree</strong> is the live, scoped instance tree the engine renders and serializes. Rebuilt every request.</li>
             </ul>
+            <p>A seed defines structure and callables; the descriptor records runtime overrides:</p>
+<pre class="wiki-code"><span class="c"># Seed &mdash; Python definition (pages/vendor.py)</span>
+definition = Page("vendor", label="Vendor Form", children=[
+    TextForm("name", label="Company Name"),
+    ChoiceForm("category", label="Category",
+               options=["Preferred", "Approved", "Conditional"]),
+])</pre>
+<pre class="wiki-code"><span class="c"># Descriptor &mdash; JSON in Store (__structure key)</span>
+<span class="c"># The label for &ldquo;category&rdquo; was overridden at runtime.</span>
+[
+  {"key": "name",     "type": "text"},
+  {"key": "category", "type": "choice", "label": "Industry"}
+]</pre>
+<pre class="wiki-code"><span class="c"># Reconciliation &mdash; merge seed + descriptor into bound tree</span>
+bound = from_descriptor(descriptor, seed=definition)
+
+<span class="c"># Callables are preserved from the seed:</span>
+bound.children[1].options   <span class="c"># &rarr; ["Preferred", "Approved", "Conditional"]</span>
+
+<span class="c"># Scalar overrides are applied from the descriptor:</span>
+bound.children[1].label     <span class="c"># &rarr; "Industry"  (was "Category" in seed)</span></pre>
             <p>
                 The operation that produces the bound tree from a seed plus a descriptor is called <strong>reconciliation</strong>, and is exposed under both names (<code>from_descriptor</code> and <code>reconcile</code>) for discoverability. It walks the descriptor, matches each node against the seed by key, deepcopies the matched seed to preserve callables, and applies the descriptor&rsquo;s scalar overrides on top.<sup class="ref"><a href="#ref-8">[8]</a></sup>
             </p>
 
+            <figure class="wiki-diagram">
+                <svg viewBox="0 0 460 225" width="460" role="img" aria-label="Diagram showing Seed Tree and Descriptor converging through reconciliation into the Bound Tree" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif" fill="#202122">
+                    <defs><marker id="wk-a2" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#3b82f6"/></marker></defs>
+                    <rect x="15" y="10" width="165" height="58" rx="4" fill="#f8f9fa" stroke="#a2a9b1"/>
+                    <text x="97" y="30" text-anchor="middle" font-size="12" font-weight="bold">Seed Tree</text>
+                    <text x="97" y="45" text-anchor="middle" font-size="9.5" fill="#54595d">Python definition in pages/</text>
+                    <text x="97" y="58" text-anchor="middle" font-size="9" fill="#72777d">callables &middot; immutable</text>
+                    <rect x="280" y="10" width="165" height="58" rx="4" fill="#f8f9fa" stroke="#a2a9b1"/>
+                    <text x="362" y="30" text-anchor="middle" font-size="12" font-weight="bold">Descriptor</text>
+                    <text x="362" y="45" text-anchor="middle" font-size="9.5" fill="#54595d">JSON in Store (__structure)</text>
+                    <text x="362" y="58" text-anchor="middle" font-size="9" fill="#72777d">scalars &middot; structure edits</text>
+                    <rect x="148" y="108" width="164" height="30" rx="14" fill="#eaf3ff" stroke="#3b82f6"/>
+                    <text x="230" y="128" text-anchor="middle" font-size="11" font-weight="bold" fill="#1e40af">reconciliation</text>
+                    <rect x="120" y="170" width="220" height="46" rx="4" fill="#f8f9fa" stroke="#a2a9b1"/>
+                    <text x="230" y="190" text-anchor="middle" font-size="12" font-weight="bold">Bound Tree</text>
+                    <text x="230" y="205" text-anchor="middle" font-size="9.5" fill="#54595d">live, scoped &middot; rebuilt every request</text>
+                    <line x1="97" y1="68" x2="195" y2="106" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#wk-a2)"/>
+                    <text x="112" y="93" font-size="9" fill="#3b82f6" font-style="italic">callables</text>
+                    <line x1="362" y1="68" x2="266" y2="106" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#wk-a2)"/>
+                    <text x="316" y="93" font-size="9" fill="#3b82f6" font-style="italic">overrides</text>
+                    <line x1="230" y1="138" x2="230" y2="168" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#wk-a2)"/>
+                </svg>
+                <figcaption>Fig.&thinsp;2 &mdash; Reconciliation merges the seed&rsquo;s callables with the descriptor&rsquo;s runtime overrides to produce the bound tree.</figcaption>
+            </figure>
+
             <h3 id="affordances">Affordances and HATEOAS</h3>
             <p>
-                Every component&rsquo;s JSON serialization includes a list of <strong>affordances</strong>: dicts describing the actions currently available, with label, HTTP method, URL, POST-body template, and a natural-language instruction. Both browsers and agents consume affordances directly &mdash; browsers render them as buttons, agents interpolate values into the body template and POST.<sup class="ref"><a href="#ref-3">[3]</a></sup>
+                Every component exposes a public <code>affordances()</code> method that returns the complete list of actions available in the current state. Each affordance is a dataclass with label, HTTP method, URL, POST-body template, and a natural-language instruction. The base class assembles the list from type-specific affordances (via <code>get_affordances()</code>), universal operations (Clear, Edit/Execute/Undo/Discard), and the Batch meta-action. Both browsers and agents consume affordances directly &mdash; browsers render them as buttons, agents interpolate values into the body template and POST.<sup class="ref"><a href="#ref-3">[3]</a></sup>
             </p>
             <p>
                 This is the <a href="https://en.wikipedia.org/wiki/HATEOAS">HATEOAS</a> principle applied consistently: the server&rsquo;s response describes the actions available next, so no out-of-band API schema is required. An AI agent interacting with the engine can walk any workflow by reading each response and picking an affordance to follow, without holding a separate specification.<sup class="ref"><a href="#ref-3">[3]</a></sup>
             </p>
+            <p>The same action is exposed to both clients. In JSON (for an AI agent):</p>
+<pre class="wiki-code">{
+  "label": "Set",
+  "method": "POST",
+  "url": "/pages/a1b2c3d4/name",
+  "body": {"action": "set", "value": "&lt;text&gt;"},
+  "instruction": "Provide the company name as a string."
+}</pre>
+            <p>And in HTML (for a browser), the same URL and body shape appear as a form:</p>
+<pre class="wiki-code">&lt;form data-c-post="/pages/a1b2c3d4/name"
+      data-c-body='{"action":"set","value":"$value"}'&gt;
+  &lt;label&gt;Company Name&lt;/label&gt;
+  &lt;input type="text" name="value"&gt;
+  &lt;button type="submit"&gt;Set&lt;/button&gt;
+&lt;/form&gt;</pre>
 
             <h2 id="features">Features</h2>
 
@@ -363,11 +555,97 @@
             <p>
                 A single <code>Navigation</code> class replaces what other frameworks expose as four separate widgets (tabs, wizards, sequences, accordions), switching behavior via a <code>mode</code> prop that accepts one of four <a href="https://en.wikipedia.org/wiki/Literal_type">literal</a> values.<sup class="ref"><a href="#ref-9">[9]</a></sup>
             </p>
+            <p>A page definition composes types into a tree (see Fig.&thinsp;3):</p>
+<pre class="wiki-code"><span class="c"># pages/vendor.py</span>
+definition = Page("vendor-form", label="Vendor Assessment", children=[
+    Navigation("sections", mode="tabs", children=[
+        TextForm("name", label="Name"),
+        Group("contact", label="Contact Info", children=[
+            TextForm("address", label="Address"),
+            ChoiceForm("state", label="State",
+                       options=["CA", "NY", "TX", ...]),
+        ]),
+        CheckboxForm("categories", label="Categories",
+                     items=["Manufacturing", "Services"]),
+    ]),
+    Action("submit", label="Submit"),
+])</pre>
+
+            <figure class="wiki-diagram">
+                <svg viewBox="0 0 480 258" width="480" role="img" aria-label="Example component tree showing a Page containing Navigation with tabs, a Group with nested forms, and an Action button" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif" fill="#202122">
+                    <!-- Tree lines (behind boxes) -->
+                    <path d="M240,40 L240,56 L160,56 L160,72" fill="none" stroke="#c8ccd0" stroke-width="1.2"/>
+                    <path d="M240,56 L385,56 L385,72" fill="none" stroke="#c8ccd0" stroke-width="1.2"/>
+                    <path d="M160,106 L160,125 L55,125 L55,144" fill="none" stroke="#c8ccd0" stroke-width="1.2"/>
+                    <path d="M160,125 L175,125 L175,144" fill="none" stroke="#c8ccd0" stroke-width="1.2"/>
+                    <path d="M160,125 L310,125 L310,144" fill="none" stroke="#c8ccd0" stroke-width="1.2"/>
+                    <path d="M175,178 L175,197 L115,197 L115,216" fill="none" stroke="#c8ccd0" stroke-width="1.2"/>
+                    <path d="M175,197 L250,197 L250,216" fill="none" stroke="#c8ccd0" stroke-width="1.2"/>
+                    <!-- Level 0: Page -->
+                    <rect x="206" y="6" width="68" height="34" rx="3" fill="#eaf3ff" stroke="#3b82f6"/>
+                    <text x="240" y="28" text-anchor="middle" font-size="11.5" font-weight="bold" fill="#1e40af">Page</text>
+                    <!-- Level 1 -->
+                    <rect x="97" y="72" width="126" height="34" rx="3" fill="#eaf3ff" stroke="#3b82f6"/>
+                    <text x="160" y="86" text-anchor="middle" font-size="11" font-weight="bold" fill="#1e40af">Navigation</text>
+                    <text x="160" y="99" text-anchor="middle" font-size="8.5" fill="#54595d" font-style="italic">mode = &ldquo;tabs&rdquo;</text>
+                    <rect x="340" y="72" width="90" height="34" rx="3" fill="#f8f9fa" stroke="#a2a9b1"/>
+                    <text x="385" y="86" text-anchor="middle" font-size="11" font-weight="bold">Action</text>
+                    <text x="385" y="99" text-anchor="middle" font-size="8.5" fill="#54595d" font-style="italic">&ldquo;Submit&rdquo;</text>
+                    <!-- Level 2 -->
+                    <rect x="6" y="144" width="98" height="34" rx="3" fill="#f8f9fa" stroke="#a2a9b1"/>
+                    <text x="55" y="158" text-anchor="middle" font-size="11" font-weight="bold">TextForm</text>
+                    <text x="55" y="171" text-anchor="middle" font-size="8.5" fill="#54595d" font-style="italic">&ldquo;Name&rdquo;</text>
+                    <rect x="121" y="144" width="108" height="34" rx="3" fill="#eaf3ff" stroke="#3b82f6"/>
+                    <text x="175" y="158" text-anchor="middle" font-size="11" font-weight="bold" fill="#1e40af">Group</text>
+                    <text x="175" y="171" text-anchor="middle" font-size="8.5" fill="#54595d" font-style="italic">&ldquo;Contact Info&rdquo;</text>
+                    <rect x="253" y="144" width="114" height="34" rx="3" fill="#f8f9fa" stroke="#a2a9b1"/>
+                    <text x="310" y="158" text-anchor="middle" font-size="11" font-weight="bold">CheckboxForm</text>
+                    <text x="310" y="171" text-anchor="middle" font-size="8.5" fill="#54595d" font-style="italic">&ldquo;Categories&rdquo;</text>
+                    <!-- Level 3 -->
+                    <rect x="61" y="216" width="108" height="34" rx="3" fill="#f8f9fa" stroke="#a2a9b1"/>
+                    <text x="115" y="230" text-anchor="middle" font-size="11" font-weight="bold">TextForm</text>
+                    <text x="115" y="243" text-anchor="middle" font-size="8.5" fill="#54595d" font-style="italic">&ldquo;Address&rdquo;</text>
+                    <rect x="193" y="216" width="114" height="34" rx="3" fill="#f8f9fa" stroke="#a2a9b1"/>
+                    <text x="250" y="230" text-anchor="middle" font-size="11" font-weight="bold">ChoiceForm</text>
+                    <text x="250" y="243" text-anchor="middle" font-size="8.5" fill="#54595d" font-style="italic">&ldquo;State&rdquo;</text>
+                    <!-- Legend -->
+                    <rect x="380" y="220" width="10" height="10" rx="2" fill="#eaf3ff" stroke="#3b82f6" stroke-width="0.8"/>
+                    <text x="394" y="229" font-size="8.5" fill="#54595d">container</text>
+                    <rect x="380" y="236" width="10" height="10" rx="2" fill="#f8f9fa" stroke="#a2a9b1" stroke-width="0.8"/>
+                    <text x="394" y="245" font-size="8.5" fill="#54595d">leaf</text>
+                </svg>
+                <figcaption>Fig.&thinsp;3 &mdash; An example component tree. Containers (blue) hold children; leaf components (gray) collect or display data.</figcaption>
+            </figure>
 
             <h3 id="faithful-projection">Faithful projection</h3>
             <p>
                 <em>Faithful projection</em> is Razem&rsquo;s term for the invariant that JSON and HTML views of a page describe the same state and expose the same URL surface. The property is enforced at continuous-integration time by a 72-test parity suite spanning nine test categories, including forward parity (every JSON URL appears in HTML), reverse parity (every clickable HTML URL is declared in JSON), action-name parity, URL resolvability, and structural shape tests.<sup class="ref"><a href="#ref-4">[4]</a></sup>
             </p>
+
+            <figure class="wiki-diagram">
+                <svg viewBox="0 0 400 200" width="400" role="img" aria-label="Diagram showing a Component producing JSON and HTML outputs bridged by parity tests" xmlns="http://www.w3.org/2000/svg" font-family="sans-serif" fill="#202122">
+                    <defs><marker id="wk-a3" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#3b82f6"/></marker></defs>
+                    <rect x="130" y="6" width="140" height="40" rx="4" fill="#eaf3ff" stroke="#3b82f6"/>
+                    <text x="200" y="31" text-anchor="middle" font-size="12" font-weight="bold" fill="#1e40af">Component</text>
+                    <rect x="20" y="105" width="148" height="54" rx="4" fill="#f8f9fa" stroke="#a2a9b1"/>
+                    <text x="94" y="125" text-anchor="middle" font-size="12" font-weight="bold">JSON</text>
+                    <text x="94" y="140" text-anchor="middle" font-size="9.5" fill="#54595d">affordances + state</text>
+                    <text x="94" y="153" text-anchor="middle" font-size="9" fill="#72777d">&rarr; AI agents</text>
+                    <rect x="232" y="105" width="148" height="54" rx="4" fill="#f8f9fa" stroke="#a2a9b1"/>
+                    <text x="306" y="125" text-anchor="middle" font-size="12" font-weight="bold">HTML</text>
+                    <text x="306" y="140" text-anchor="middle" font-size="9.5" fill="#54595d">buttons + forms</text>
+                    <text x="306" y="153" text-anchor="middle" font-size="9" fill="#72777d">&rarr; browsers</text>
+                    <line x1="172" y1="46" x2="104" y2="103" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#wk-a3)"/>
+                    <text x="106" y="76" font-size="9.5" fill="#3b82f6" font-style="italic">serialize()</text>
+                    <line x1="228" y1="46" x2="296" y2="103" stroke="#3b82f6" stroke-width="1.5" marker-end="url(#wk-a3)"/>
+                    <text x="256" y="76" font-size="9.5" fill="#3b82f6" font-style="italic">render()</text>
+                    <line x1="94" y1="159" x2="94" y2="176" stroke="#a2a9b1" stroke-width="1" stroke-dasharray="3,2"/>
+                    <line x1="306" y1="159" x2="306" y2="176" stroke="#a2a9b1" stroke-width="1" stroke-dasharray="3,2"/>
+                    <line x1="94" y1="176" x2="306" y2="176" stroke="#a2a9b1" stroke-width="1.5" stroke-dasharray="4,3"/>
+                    <text x="200" y="193" text-anchor="middle" font-size="9.5" fill="#54595d" font-style="italic">parity tests &mdash; same URLs, same state (72 tests)</text>
+                </svg>
+                <figcaption>Fig.&thinsp;4 &mdash; Faithful projection: JSON and HTML are parallel outputs from the same component, verified equivalent by the parity suite.</figcaption>
+            </figure>
 
             <h3 id="flotation">Affordance flotation</h3>
             <p>
@@ -405,7 +683,7 @@
             <h2 id="terminology">Terminology</h2>
             <dl class="wiki-terminology">
                 <dt>Affordance</dt>
-                <dd>A dict describing an available action, with label, method, URL, body template, and instruction. Plural <em>affordances</em>. A component&rsquo;s serialization includes its current affordance list.</dd>
+                <dd>A dataclass describing an available action, with label, method, URL, body template, and instruction. Plural <em>affordances</em>. The public <code>affordances()</code> method returns the complete list for the current state; <code>serialize()</code> includes it in the JSON output.</dd>
 
                 <dt>Bind</dt>
                 <dd>The operation that attaches a Store to a seed and produces a live tree. Analogous to React&rsquo;s component mount.</dd>

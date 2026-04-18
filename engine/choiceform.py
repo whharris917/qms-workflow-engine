@@ -31,6 +31,7 @@ class ChoiceForm(Component):
     options: list[str] = field(default_factory=list)
 
     def __post_init__(self):
+        super().__post_init__()
         from engine.listform import ListForm
         self._options_form = ListForm(
             key="__options",

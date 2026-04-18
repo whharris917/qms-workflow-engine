@@ -19,6 +19,7 @@ from __future__ import annotations
 import copy
 import dataclasses
 import json
+import uuid
 from dataclasses import dataclass
 from html import escape
 from typing import Any
@@ -233,8 +234,8 @@ def _is_json_safe(val) -> bool:
 class Component:
     """Base protocol for all component types."""
 
-    key: str
     label: str
+    key: str | None = None
     instruction: str | None = None
     editable: bool = False
 
@@ -242,6 +243,11 @@ class Component:
     _store: Store | None = None
     _scope: str | None = None
     _url_prefix: str | None = None
+
+    def __post_init__(self):
+        if self.key is None:
+            form = getattr(self, 'form', 'component')
+            self.key = f"{form}-{uuid.uuid4().hex[:8]}"
 
     @property
     def children(self) -> list[Component]:
@@ -586,21 +592,13 @@ class Component:
         """Produce the affordances available on this component."""
         return []
 
-    def _serialize_full(self) -> dict:
-        """Produce the full internal representation including render-only fields.
-
-        Contains form, key, render_hints on affordances — everything the
-        HTML renderer needs. Not intended for agent consumption.
-        """
-        state = self._serialize_state()
-        state["complete"] = self.is_complete
-        if self.editable:
-            state["edit_mode"] = self.edit_mode
-        affordances = []
+    def affordances(self) -> list[Affordance]:
+        """Return the complete affordance list for the current state."""
+        affs = []
         if self.edit_mode:
-            affordances.extend(self._get_edit_affordances())
+            affs.extend(self._get_edit_affordances())
         else:
-            affordances.extend(self.get_affordances())
+            affs.extend(self.get_affordances())
         if self.has_data:
             _aff = SimpleButtonAffordance(
                 label="Clear",
@@ -610,11 +608,10 @@ class Component:
                 instruction=f"Clear all data from this {self.label}.",
             )
             _aff._floatable = "clear"
-            affordances.append(_aff)
+            affs.append(_aff)
         if self.editable:
-            # Chrome icons handle these visually; affordances exist for agent discoverability.
             if self.edit_mode:
-                affordances.append(Affordance(
+                affs.append(Affordance(
                     label="Execute",
                     method="POST",
                     url=self.url,
@@ -622,14 +619,14 @@ class Component:
                     instruction="Switch to execution mode.",
                 ))
                 if self._undo_depth > 0:
-                    affordances.append(Affordance(
+                    affs.append(Affordance(
                         label="Undo",
                         method="POST",
                         url=self.url,
                         body={"action": "undo"},
                         instruction=f"Undo the last edit-mode change ({self._undo_depth} available).",
                     ))
-                affordances.append(Affordance(
+                affs.append(Affordance(
                     label="Discard",
                     method="POST",
                     url=self.url,
@@ -645,7 +642,7 @@ class Component:
                     instruction="Switch to edit mode.",
                 )
                 _aff._floatable = "edit"
-                affordances.append(_aff)
+                affs.append(_aff)
         _aff = Affordance(
             label="Batch",
             method="POST",
@@ -658,9 +655,21 @@ class Component:
             ),
         )
         _aff._floatable = "batch"
-        affordances.append(_aff)
+        affs.append(_aff)
+        return affs
+
+    def _serialize_full(self) -> dict:
+        """Produce the full internal representation including render-only fields.
+
+        Contains form, key, render_hints on affordances — everything the
+        HTML renderer needs. Not intended for agent consumption.
+        """
+        state = self._serialize_state()
+        state["complete"] = self.is_complete
+        if self.editable:
+            state["edit_mode"] = self.edit_mode
         serialized_affs = []
-        for a in affordances:
+        for a in self.affordances():
             d = a.serialize()
             fkey = getattr(a, '_floatable', None)
             if fkey is not None:
