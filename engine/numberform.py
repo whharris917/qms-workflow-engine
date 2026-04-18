@@ -34,7 +34,12 @@ class NumberInputAffordance(Affordance):
 @dataclass
 class NumberForm(Component):
     """Numeric input with optional bounds and step. Set slider=True for
-    a range slider UI. Optional unit label for display."""
+    a range slider UI. Optional unit label for display.
+
+    `min_val`, `max_val`, and `step` may hold a `SiblingBind` — the bound
+    field resolves from the referenced sibling's current value at every
+    serialize and on every action.
+    """
     form = "number"
 
     min_val: float | None = None
@@ -48,28 +53,41 @@ class NumberForm(Component):
         return self.value is not None
 
     def _serialize_state(self) -> dict:
+        resolved_min = self._resolve_field("min_val")
+        resolved_max = self._resolve_field("max_val")
+        resolved_step = self._resolve_field("step")
         state = self._base_state() | {
             "value": self.value,
-            "min": self.min_val,
-            "max": self.max_val,
-            "step": self.step,
+            "min": resolved_min,
+            "max": resolved_max,
+            "step": resolved_step,
         }
         if self.slider:
             state["slider"] = True
         if self.unit:
             state["unit"] = self.unit
+        # Stale: a stored value that falls outside the currently resolved
+        # bounds is flagged rather than silently accepted.
+        val = self.value
+        if val is not None:
+            if (resolved_min is not None and val < resolved_min) or \
+               (resolved_max is not None and val > resolved_max):
+                state["stale"] = True
         return state
 
     def get_affordances(self) -> list[Affordance]:
+        resolved_min = self._resolve_field("min_val")
+        resolved_max = self._resolve_field("max_val")
+        resolved_step = self._resolve_field("step")
         parts = []
-        if self.min_val is not None:
-            parts.append(f"min {self.min_val}")
-        if self.max_val is not None:
-            parts.append(f"max {self.max_val}")
+        if resolved_min is not None:
+            parts.append(f"min {resolved_min}")
+        if resolved_max is not None:
+            parts.append(f"max {resolved_max}")
         hint = f" ({', '.join(parts)})" if parts else ""
         if self.slider:
-            body_hint = f"<{self.min_val if self.min_val is not None else 0}..{self.max_val if self.max_val is not None else 100}>"
-            instruction = f"Set a value between {self.min_val} and {self.max_val} (step {self.step or 1})."
+            body_hint = f"<{resolved_min if resolved_min is not None else 0}..{resolved_max if resolved_max is not None else 100}>"
+            instruction = f"Set a value between {resolved_min} and {resolved_max} (step {resolved_step or 1})."
         else:
             body_hint = "<number>"
             instruction = f"Enter a number{hint}."
@@ -80,9 +98,9 @@ class NumberForm(Component):
                 url=self.url,
                 body={"value": body_hint},
                 instruction=instruction,
-                min_val=self.min_val,
-                max_val=self.max_val,
-                step=self.step,
+                min_val=resolved_min,
+                max_val=resolved_max,
+                step=resolved_step,
                 slider=self.slider,
                 current=self.value,
             )
@@ -137,15 +155,18 @@ class NumberForm(Component):
             val = float(raw)
         except (TypeError, ValueError):
             return self._error(f"Invalid number: {raw}", body=body)
-        if self.min_val is not None and val < self.min_val:
-            return self._error(f"Value {val} is below minimum {self.min_val}", body=body)
-        if self.max_val is not None and val > self.max_val:
-            return self._error(f"Value {val} is above maximum {self.max_val}", body=body)
-        if self.step is not None:
-            base = self.min_val if self.min_val is not None else 0
-            remainder = abs((val - base) % self.step)
-            if min(remainder, self.step - remainder) > 1e-9:
-                return self._error(f"Value {val} is not a valid step (step {self.step} from {base})", body=body)
+        resolved_min = self._resolve_field("min_val")
+        resolved_max = self._resolve_field("max_val")
+        resolved_step = self._resolve_field("step")
+        if resolved_min is not None and val < resolved_min:
+            return self._error(f"Value {val} is below minimum {resolved_min}", body=body)
+        if resolved_max is not None and val > resolved_max:
+            return self._error(f"Value {val} is above maximum {resolved_max}", body=body)
+        if resolved_step is not None:
+            base = resolved_min if resolved_min is not None else 0
+            remainder = abs((val - base) % resolved_step)
+            if min(remainder, resolved_step - remainder) > 1e-9:
+                return self._error(f"Value {val} is not a valid step (step {resolved_step} from {base})", body=body)
         self._store.set(self._scope, self.key, val)
         return self.serialize()
 

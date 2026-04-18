@@ -166,6 +166,94 @@ def wiki():
     return render_template("wiki.html", active_page="wiki")
 
 
+# ── Components reference page ──
+#
+# Static taxonomy of every built-in component class. Categories, descriptions,
+# and completion rules are authored here; the class list is the source of truth
+# from which other surfaces (README table, README catalog count) should derive.
+
+_COMPONENT_TAXONOMY = [
+    {
+        "category": "Data Forms",
+        "blurb": "Single-field inputs. Each produces one piece of user state and reports its own completeness.",
+        "entries": [
+            ("TextForm", "text", "Free-form string input. Single-line by default; multiline=True renders a textarea. Optional min_length / max_length.", "Non-empty (and meets min_length if set)"),
+            ("NumberForm", "number", "Numeric input with min / max / step / integer constraints. Any of <code>min_val</code>, <code>max_val</code>, or <code>step</code> may be a <code>SiblingBind</code> that resolves from another component's current value. <code>slider=True</code> renders a range slider.", "Value is not None"),
+            ("DateForm", "date", "ISO 8601 date or datetime input, with optional bounds.", "Value is not None"),
+            ("BooleanForm", "boolean", "Binary yes/no toggle with customizable labels.", "Value is not None"),
+            ("ChoiceForm", "choice", "Single selection rendered as radio buttons. <code>options</code> may be a literal list or a <code>SiblingBind</code> that resolves from another component's current value; stale detection flags a stored value no longer present in the resolved options.", "A valid option is selected"),
+            ("CheckboxForm", "checkbox", "Multi-select with an explicit N/A mode — lets a user say \u201cnone apply\u201d rather than leaving blank.", "Any item checked, or N/A confirmed"),
+            ("MultiForm", "multi", "Groups multiple labeled fields under a single save affordance. Useful for compact structured records.", "All fields filled"),
+            ("ListForm", "list", "Ordered list with add / edit / remove / reorder operations, plus ordering constraints (static and dynamic) and N/A.", "Items > 0 or N/A"),
+            ("SetForm", "set", "Unordered collection of unique items. Duplicates rejected on add.", "Non-empty"),
+            ("TableForm", "table", "Dynamic table with editable cells and columns. Typed columns bind sub-components into each cell with compound scopes.", "All cells filled"),
+            ("DictionaryForm", "dictionary", "Dynamic key-value pairs with edit-by-key, remove-by-key, and key rename. Also registered as <code>keyvalue</code>.", "At least one entry with both key and value"),
+            ("InfoDisplay", "info", "Read-only text (or dict rendered as key/value lines). Edit mode embeds a TextForm for content editing.", "Always"),
+        ],
+    },
+    {
+        "category": "Containers",
+        "blurb": "Compose other components. A container\u2019s completeness depends on its children.",
+        "entries": [
+            ("Page", "page", "Top-level container and persistence boundary \u2014 creates its own Store. Exposes Reset Page. Optional <code>mutable_structure</code> turns on runtime add / remove / reorder.", "All visible children complete"),
+            ("Navigation", "navigation", "Unified tabbed/sequenced/accordion container. Modes: <code>tabs</code> (free access), <code>chain</code> (gated, auto-advance), <code>sequence</code> (gated, manual Back/Next), <code>accordion</code> (expandable, all visible). Aliases: <code>tab</code>, <code>chain</code>, <code>sequence</code>, <code>accordion</code>.", "All children complete"),
+            ("Group", "group", "Named sub-container for reusable compositions. Group subclasses register under their own names in the registry.", "All children complete"),
+            ("Visibility", "visibility", "Wraps a single child with conditional visibility based on a sibling\u2019s value. Predicate may be a scalar, a list, or a callable.", "Complete when hidden; delegates to child when visible"),
+            ("Repeater", "repeater", "Stamps a template component per dynamic entry. Compound scopes keep per-entry state isolated; stable IDs survive reordering and removal.", "<code>min_entries</code> met and all entries complete"),
+            ("Switch", "switch", "Selects between named alternative subtrees based on a sibling\u2019s value. Inactive subtrees are hidden from both JSON and HTML (faithful projection).", "Active case complete (or no case matches)"),
+        ],
+    },
+    {
+        "category": "Derivations",
+        "blurb": "Read-only components that compute their own state from siblings. They never produce user input.",
+        "entries": [
+            ("Computation", "computed", "Arbitrary compute function over sibling values. Optional <code>store_result</code> makes the result available to other components. The <code>graded()</code> factory in <code>engine/helpers.py</code> wraps this for answer-key quiz grading.", "Always"),
+            ("Validation", "validation", "Cross-field validation rules with pending / pass / fail states. Can block page completion via <code>block_completion</code>.", "All rules pass (or <code>block_completion=False</code>)"),
+        ],
+    },
+    {
+        "category": "Imperative",
+        "blurb": "Fires actions with side effects rather than gathering state.",
+        "entries": [
+            ("Action", "action", "Imperative button with preconditions, optional confirmation, side-effect callable. Can return <code>structural_actions</code> to reshape the page tree.", "Always"),
+        ],
+    },
+    {
+        "category": "Wrappers",
+        "blurb": "Modify another component\u2019s behavior without replacing it.",
+        "entries": [
+            ("Historizer", "history", "Wraps any component with an append-only change history. Lazy detection on serialize: compares current state to last snapshot, appends if different. History is read-only.", "Delegates to wrapped child"),
+        ],
+    },
+    {
+        "category": "Runners",
+        "blurb": "Drive execution from data produced elsewhere on the page.",
+        "entries": [
+            ("TableRunner", "tablerunner", "Reads a sibling TableForm and presents each row as a gated sequential workflow step. Only typed columns are executable; text columns supply row labels.", "All rows executed"),
+        ],
+    },
+    {
+        "category": "Apps",
+        "blurb": "Complex self-contained components that use the engine\u2019s protocol for an entire domain.",
+        "entries": [
+            ("RubiksCubeApp", "rubikscube", "Full Rubik\u2019s Cube with face rotations, shuffle, and restart. Affordance list changes conditionally when the cube is solved.", "Cube is solved"),
+        ],
+    },
+]
+
+
+@bp.route("/components")
+def components_taxonomy():
+    """Reference taxonomy of every built-in component class."""
+    total = sum(len(g["entries"]) for g in _COMPONENT_TAXONOMY)
+    return render_template(
+        "components_taxonomy.html",
+        taxonomy=_COMPONENT_TAXONOMY,
+        total=total,
+        active_page="components",
+    )
+
+
 # Learning Portal — progressive tutorial pages.
 # Each lesson is a hand-rolled HTML template extending learn/_lesson_base.html.
 # The slug maps to a template file under app/templates/learn/.

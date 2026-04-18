@@ -106,10 +106,9 @@ response.
 | Component | Derived |
 |---|---|
 | Base | `is_complete`, `has_data` |
-| Computation | `compute_result` (from `compute(siblings)`) |
+| Computation | `compute_result` (from `compute_fn(siblings)`) |
 | Validation | rule pass/fail status |
-| Score | score from answer-key comparison |
-| DynamicChoiceForm | options (from `options_fn(siblings)`) |
+| Any component with a `SiblingBind` field | the field's resolved value |
 | ListForm | `effective_must_follow` (constraints with fixed-demotion applied) |
 
 **Rule:** If you can compute the value at serialize-time from other values,
@@ -233,10 +232,11 @@ be preserved through reconciliation via seed-match, because it cannot be
 stored in the descriptor.
 
 **Affected fields include:**
-- `Computation.compute: Callable[[siblings], value]`
-- `DynamicChoiceForm.options_fn: Callable[[siblings], list]`
+- `Computation.compute_fn: Callable[[siblings], value]`
+- `Action.action_fn: Callable[[context, store, scope], result]`
 - `Visibility.predicate: Callable[[siblings], bool]` (when callable)
 - `Validation` rule predicates
+- Any reactive field holding a `SiblingBind(key, fn)` (e.g., `ChoiceForm.options`, `NumberForm.max_val`) — the callable `fn` is lost on fresh construction
 
 **When the seed is missing or does not match** (e.g., the Python definition
 moved, the key was renamed, a sibling was renamed), the fresh construction

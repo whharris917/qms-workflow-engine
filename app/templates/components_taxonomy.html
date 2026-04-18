@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% block title %}Components &middot; Razem{% endblock %}
+
+{% block head_extra %}
+<style>
+    .ct-wrap { max-width: 980px; margin: 0 auto; }
+
+    .ct-hero {
+        background: linear-gradient(135deg, #1a2a3c 0%, #0f1a28 100%);
+        color: #f5f7fa;
+        padding: 2.25rem 2rem;
+        border-radius: 10px;
+        margin-bottom: 1.75rem;
+    }
+    .ct-hero h1 {
+        font-size: 1.9rem;
+        margin-bottom: 0.4rem;
+        color: #fff;
+    }
+    .ct-hero .subtitle {
+        color: #9db0c6;
+        font-size: 1rem;
+        margin-bottom: 0.9rem;
+    }
+    .ct-hero p {
+        color: #cdd6e3;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        max-width: 780px;
+    }
+    .ct-hero p + p { margin-top: 0.6rem; }
+    .ct-hero code {
+        background: rgba(255, 255, 255, 0.08);
+        padding: 0.08rem 0.35rem;
+        border-radius: 3px;
+        font-size: 0.88em;
+    }
+
+    .ct-toc {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1.75rem;
+        font-size: 0.9rem;
+    }
+    .ct-toc-title {
+        font-weight: 700;
+        color: #475569;
+        font-size: 0.75rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        margin-bottom: 0.55rem;
+    }
+    .ct-toc ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem 1rem;
+    }
+    .ct-toc a {
+        color: #2563eb;
+        text-decoration: none;
+        font-weight: 500;
+    }
+    .ct-toc a:hover { text-decoration: underline; }
+    .ct-toc .count {
+        color: #94a3b8;
+        font-weight: 400;
+        font-size: 0.85em;
+    }
+
+    .ct-category {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 1.5rem 1.75rem;
+        margin-bottom: 1.25rem;
+        scroll-margin-top: 1rem;
+    }
+    .ct-category h2 {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #1a1a2e;
+        margin-bottom: 0.3rem;
+        display: flex;
+        align-items: baseline;
+        gap: 0.6rem;
+    }
+    .ct-category h2 .category-count {
+        font-size: 0.8em;
+        font-weight: 500;
+        color: #94a3b8;
+    }
+    .ct-category .category-blurb {
+        color: #64748b;
+        font-size: 0.95rem;
+        margin-bottom: 1.1rem;
+        line-height: 1.5;
+    }
+
+    .ct-item {
+        padding: 0.9rem 0;
+        border-top: 1px solid #f1f5f9;
+    }
+    .ct-item:first-of-type { border-top: none; padding-top: 0; }
+    .ct-item-head {
+        display: flex;
+        align-items: baseline;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.35rem;
+    }
+    .ct-item-name {
+        font-family: "SF Mono", Menlo, Consolas, monospace;
+        font-size: 1rem;
+        font-weight: 600;
+        color: #1a1a2e;
+    }
+    .ct-item-form {
+        font-family: "SF Mono", Menlo, Consolas, monospace;
+        font-size: 0.82rem;
+        color: #475569;
+        background: #f1f5f9;
+        padding: 0.1rem 0.5rem;
+        border-radius: 4px;
+        border: 1px solid #e2e8f0;
+    }
+    .ct-item-desc {
+        color: #334155;
+        font-size: 0.92rem;
+        line-height: 1.55;
+        margin-bottom: 0.35rem;
+    }
+    .ct-item-desc code {
+        background: #f1f5f9;
+        padding: 0.06rem 0.3rem;
+        border-radius: 3px;
+        font-size: 0.88em;
+    }
+    .ct-item-complete {
+        color: #64748b;
+        font-size: 0.82rem;
+        font-style: italic;
+    }
+    .ct-item-complete::before {
+        content: "Complete when: ";
+        font-style: normal;
+        font-weight: 600;
+        color: #475569;
+    }
+
+    .ct-footer {
+        margin-top: 2rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid #e2e8f0;
+        color: #64748b;
+        font-size: 0.88rem;
+        line-height: 1.6;
+    }
+    .ct-footer a { color: #2563eb; text-decoration: none; }
+    .ct-footer a:hover { text-decoration: underline; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ct-wrap">
+
+    <div class="ct-hero">
+        <h1>Components</h1>
+        <div class="subtitle">The built-in component catalog &mdash; {{ total }} classes across {{ taxonomy|length }} categories.</div>
+        <p>
+            A <strong>component</strong> is Razem&rsquo;s unit of composition: a self-contained dataclass that knows how to serialize itself to JSON, render itself to HTML, dispatch its own actions, and report its own completeness. Pages are composed by placing component instances in a tree.
+        </p>
+        <p>
+            Every component registers under a <code>form</code> name (shown as a pill next to each class). That name is what you use in structural descriptors and in the Agent Portal&rsquo;s type catalog. Navigation and DictionaryForm expose additional aliases for legacy compatibility.
+        </p>
+        <p>
+            Most component fields accept a <code>SiblingBind(sibling_key, fn)</code> in place of a literal value, making the field reactive &mdash; it resolves from the referenced sibling&rsquo;s current value at every serialize. That mechanism replaces what other frameworks expose as per-type &ldquo;Dynamic*&rdquo; variants. Stale detection (a stored value no longer valid under resolved constraints) is component-type-local: ChoiceForm checks option membership; NumberForm checks min/max bounds.
+        </p>
+    </div>
+
+    <div class="ct-toc">
+        <div class="ct-toc-title">Jump to</div>
+        <ul>
+            {% for group in taxonomy %}
+            <li>
+                <a href="#{{ group.category|lower|replace(' ', '-') }}">{{ group.category }}</a>
+                <span class="count">({{ group.entries|length }})</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    {% for group in taxonomy %}
+    <section class="ct-category" id="{{ group.category|lower|replace(' ', '-') }}">
+        <h2>
+            {{ group.category }}
+            <span class="category-count">&middot; {{ group.entries|length }} {% if group.entries|length == 1 %}class{% else %}classes{% endif %}</span>
+        </h2>
+        <p class="category-blurb">{{ group.blurb }}</p>
+
+        {% for cls, form, desc, complete in group.entries %}
+        <div class="ct-item">
+            <div class="ct-item-head">
+                <span class="ct-item-name">{{ cls }}</span>
+                <span class="ct-item-form">form = "{{ form }}"</span>
+            </div>
+            <div class="ct-item-desc">{{ desc|safe }}</div>
+            <div class="ct-item-complete">{{ complete|safe }}</div>
+        </div>
+        {% endfor %}
+    </section>
+    {% endfor %}
+
+    <div class="ct-footer">
+        For implementation details, see the <a href="/readme">README</a> (component catalog table + module paths), the <a href="/framing">Framing</a> page (architectural invariants), or the <a href="/learn">Learning Portal</a> (progressive tutorials). The <a href="/portal">Agent Portal</a> lists live page seeds that compose these components.
+    </div>
+
+</div>
+{% endblock %}

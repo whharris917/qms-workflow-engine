@@ -97,7 +97,7 @@ self._set_my_config(<span class="s">"min_length"</span>, <span class="n">3</span
 </p>
 
 <p>
-    Each interaction produces an action POST that the Page&rsquo;s <code>_handle()</code> dispatches. The server-side actions are:
+    Each interaction produces an action POST that the Page&rsquo;s <code>handle()</code> dispatches via its <code>_actions</code> registry. The server-side actions are:
 </p>
 
 <ul>
@@ -140,14 +140,14 @@ self._set_my_config(<span class="s">"min_length"</span>, <span class="n">3</span
 </p>
 
 <p>
-    An <code>Action</code> can return <code>structural_actions</code> from its <code>_handle()</code> in addition to its own state. Page intercepts those structural actions, applies them to <code>__structure</code>, and the page reshapes on the next serialize.
+    An <code>Action</code>&rsquo;s <code>action_fn</code> callable can return a dict containing <code>structural_actions</code> in addition to its own state. Page intercepts those structural actions, applies them to <code>__structure</code>, and the page reshapes on the next serialize.
 </p>
 
 <pre class="lesson-code"><span class="c"># An Action that adds a follow-up question when triggered</span>
 Action(
     key=<span class="s">"add-followup"</span>,
     label=<span class="s">"Add follow-up question"</span>,
-    on_trigger=<span class="k">lambda</span> state: {
+    action_fn=<span class="k">lambda</span> context, store, scope: {
         <span class="s">"structural_actions"</span>: [
             {
                 <span class="s">"action"</span>: <span class="s">"add_component"</span>,
@@ -209,7 +209,7 @@ Action(
         <li><span class="lesson-chip">Core</span> Prop mutation changes the descriptor&rsquo;s scalars; structural mutation changes the descriptor&rsquo;s shape. Both flow through the Store; the next bind reads the result.</li>
         <li><span class="lesson-chip">Core</span> <code>_set_my_field</code> (top-level) and <code>_set_my_config</code> (type-specific) are the two mutation APIs. Both validate types at the boundary.</li>
         <li><span class="lesson-chip">Core</span> <code>mutable_structure=True</code> on a Page enables add/remove/move/reparent/group/ungroup via a structural editor and a public action protocol.</li>
-        <li><span class="lesson-chip">Core</span> Action can return <code>structural_actions</code> from its handler, enabling self-modifying pages where user interaction reshapes the tree.</li>
+        <li><span class="lesson-chip">Core</span> Action&rsquo;s <code>action_fn</code> can return <code>structural_actions</code>, enabling self-modifying pages where user interaction reshapes the tree.</li>
         <li><span class="lesson-chip">Core</span> Edit mode keeps per-component undo via snapshot stacks. Discard restores the initial snapshot and exits edit mode.</li>
         <li><span class="lesson-chip">Tip</span> Everything on-disk. No transient in-memory state, no sticky sessions, no crash-recovery concerns. Reliability falls out of the design.</li>
     </ul>

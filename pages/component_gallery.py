@@ -23,9 +23,9 @@ from engine.tablerunner import TableRunner
 from engine.dictionaryform import DictionaryForm
 from engine.visibility import Visibility
 from engine.switch import Switch
-from engine.dynamicchoiceform import DynamicChoiceForm
-from engine.score import Score
+from engine.sibling_bind import SiblingBind
 from engine.computation import Computation
+from engine.helpers import graded
 from engine.validation import Validation
 from engine.action import Action
 from engine.repeater import Repeater
@@ -658,28 +658,30 @@ conditional_forms = Group(
                 ),
             },
         ),
-        # DynamicChoiceForm demo
+        # Reactive options (SiblingBind) demo
         ChoiceForm(
             key="continent",
             label="Continent",
-            instruction="Select a continent to see DynamicChoiceForm update its options.",
+            instruction="Select a continent to see the country list update its options.",
             options=["Europe", "Asia", "Americas"],
             editable=True,
         ),
-        DynamicChoiceForm(
-            key="dynamic-demo",
-            label="DynamicChoiceForm",
+        ChoiceForm(
+            key="country",
+            label="Country",
             instruction=(
-                "Options are computed from a sibling's value. If you change the continent, "
-                "your selection becomes 'stale' and you'll need to re-select. "
-                "Uses static_options here; options_fn supports arbitrary callables."
+                "Options are computed from a sibling's value via SiblingBind. If you change "
+                "the continent, your selection becomes 'stale' and a Clear affordance appears. "
+                "The callable can be arbitrary — here it's a dict lookup."
             ),
-            depends_on="continent",
-            static_options={
-                "Europe": ["France", "Germany", "Spain", "Italy"],
-                "Asia": ["Japan", "India", "China", "Thailand"],
-                "Americas": ["Brazil", "Canada", "Mexico", "USA"],
-            },
+            options=SiblingBind(
+                "continent",
+                lambda c: {
+                    "Europe": ["France", "Germany", "Spain", "Italy"],
+                    "Asia": ["Japan", "India", "China", "Thailand"],
+                    "Americas": ["Brazil", "Canada", "Mexico", "USA"],
+                }.get(c, []),
+            ),
         ),
         # Historizer demo
         Historizer(
@@ -710,15 +712,16 @@ computed_forms = Group(
     editable=True,
     instruction=(
         "Read-only components that derive display from sibling values. "
-        "Score grades against an answer key. Computation runs arbitrary "
-        "functions. Validation enforces cross-field rules."
+        "Computation runs arbitrary functions over sibling state; `graded()` is a "
+        "built-in factory that constructs a Computation that grades answers "
+        "against an answer key. Validation enforces cross-field rules."
     ),
     components=[
-        # Score demo — a mini quiz
+        # graded() demo — a mini quiz
         TextForm(
             key="capital-of-france",
             label="What is the capital of France?",
-            instruction="Type the answer. Score below will grade it (case-insensitive).",
+            instruction="Type the answer. The Computation below will grade it (case-insensitive).",
             editable=True,
         ),
         ChoiceForm(
@@ -728,14 +731,14 @@ computed_forms = Group(
             options=["Mars", "Jupiter", "Saturn", "Earth"],
             editable=True,
         ),
-        Score(
-            key="score-demo",
-            label="Score",
-            instruction="Read-only. Grades siblings against the answer key automatically.",
-            answer_key={
+        graded(
+            {
                 "capital-of-france": "Paris",
                 "largest-planet": "Jupiter",
             },
+            key="score-demo",
+            label="Score",
+            instruction="Read-only Computation. Grades siblings against the answer key automatically.",
         ),
         # Computation demo
         NumberForm(

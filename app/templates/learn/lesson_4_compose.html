@@ -103,10 +103,9 @@ definition = Page(
 <ul>
     <li><strong><code>Visibility</code></strong> &mdash; wraps a child and shows/hides it based on a sibling&rsquo;s value</li>
     <li><strong><code>Switch</code></strong> &mdash; picks one of several named subtrees to render, keyed on a sibling&rsquo;s value</li>
-    <li><strong><code>DynamicChoiceForm</code></strong> &mdash; a Choice whose available options depend on a sibling&rsquo;s value</li>
-    <li><strong><code>Computation</code></strong> &mdash; read-only display of a value computed from siblings</li>
+    <li><strong><code>ChoiceForm(options=SiblingBind(...))</code></strong> &mdash; a Choice whose available options depend on a sibling&rsquo;s value. Any component field can be made reactive the same way.</li>
+    <li><strong><code>Computation</code></strong> &mdash; read-only display of a value computed from siblings (the <code>graded()</code> factory in <code>engine/helpers.py</code> wraps this for answer-key quiz grading)</li>
     <li><strong><code>Validation</code></strong> &mdash; cross-field rules (&ldquo;end date must be after start date&rdquo;)</li>
-    <li><strong><code>Score</code></strong> &mdash; auto-grades against an answer key</li>
 </ul>
 
 <p>
@@ -186,7 +185,7 @@ Repeater(
         <li><span class="lesson-chip">Core</span> Containers hold children via <code>components=[...]</code>, <code>steps=[...]</code>, <code>template=[...]</code>, <code>cases={...}</code> &mdash; the parameter name depends on container type, the shape is the same.</li>
         <li><span class="lesson-chip">Core</span> Keys are unique within scope; each container defines its children&rsquo;s scope. Paths through the tree become URLs.</li>
         <li><span class="lesson-chip">Core</span> Navigation does four behaviors with one class; pick the mode via prop.</li>
-        <li><span class="lesson-chip">Core</span> Sibling-reading components (Visibility, Switch, Computed, Validation, Score, DynamicChoice) express cross-field reactivity via <code>depends_on</code>.</li>
+        <li><span class="lesson-chip">Core</span> Sibling-reading components (Visibility, Switch, Computation, Validation) express cross-field reactivity via <code>depends_on</code>; any other component can make a specific field reactive via <code>SiblingBind</code>.</li>
         <li><span class="lesson-chip">Tip</span> See the <a href="/portal">Agent Portal</a> &rarr; <em>Component Gallery</em> for live examples of every container pattern.</li>
     </ul>
 </div>

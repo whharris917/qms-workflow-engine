@@ -1,6 +1,6 @@
 """Validation — cross-field validation that reads sibling values and evaluates rules.
 
-A passive, read-only component (like Score). Evaluates validation rules
+A passive, read-only component (like Computation). Evaluates validation rules
 on every serialize/render. Rules whose dependencies are not yet filled are
 "pending" rather than "failed" — the check function is not invoked.
 

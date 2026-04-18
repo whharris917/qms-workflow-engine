@@ -77,7 +77,7 @@ self._set_my_config(<span class="s">"multiline"</span>, <span class="k">True</sp
 </p>
 
 <p>
-    Mutations happen through the component&rsquo;s own <code>_handle()</code> method. A TextForm&rsquo;s <code>_handle()</code> knows about <code>set_value</code> and <code>clear</code> actions; a CheckboxForm&rsquo;s knows about <code>toggle_option</code> and <code>done</code>. Each one parses the POST body, validates, writes to the Store, and returns the updated state.
+    Mutations happen through the component&rsquo;s <code>handle()</code> method, which dispatches through the class&rsquo;s <code>_actions</code> registry to a handler method. TextForm maps <code>set_value</code> and <code>clear</code> to their respective handlers; CheckboxForm maps <code>toggle_option</code> and <code>done</code>. Each handler parses the POST body, validates, writes to the Store, and returns the updated state.
 </p>
 
 <div class="lesson-callout note">
@@ -112,10 +112,9 @@ self._set_my_config(<span class="s">"multiline"</span>, <span class="k">True</sp
 
 <ul>
     <li><code>has_data</code> &mdash; &ldquo;does this component have anything to clear?&rdquo;</li>
-    <li><code>Computation.compute_result</code> &mdash; runs a user-supplied function against sibling values</li>
+    <li><code>Computation.compute_result</code> &mdash; runs a user-supplied function against sibling values (the <code>graded()</code> helper in <code>engine/helpers.py</code> is a thin wrapper for the answer-key quiz-grading case)</li>
     <li><code>Validation</code> rule pass/fail</li>
-    <li><code>Score</code> score from answer key</li>
-    <li><code>DynamicChoiceForm.options</code> &mdash; which options are available based on a sibling&rsquo;s value</li>
+    <li><code>ChoiceForm.options</code> when declared as a <code>SiblingBind</code> &mdash; which options are available based on a sibling&rsquo;s value</li>
 </ul>
 
 <div class="lesson-callout note">

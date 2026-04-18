@@ -270,17 +270,43 @@ class Component:
     def _sibling_refs(self) -> list[SiblingRef]:
         """Sibling components this one reads from.
 
-        Sibling-reading components (Switch, Visibility,
-        DynamicChoiceForm, Computation, Validation, Action,
-        Score) override this to declare their dependencies as
+        Sibling-reading components (Switch, Visibility, Computation,
+        Validation, Action) override this to declare their dependencies as
         SiblingRef values. Page collects all refs after bind and
         validates that each referenced sibling actually exists in the
         ref's scope — closing the silent-orphan bug where a renamed or
         deleted sibling would leave dependents quietly broken.
 
-        Default: no refs (leaf forms and most containers).
+        The base implementation auto-discovers refs from any dataclass
+        field whose value is a SiblingBind — reactive fields contribute
+        their own bind-time validation for free. Subclasses that declare
+        additional dependencies should call `super()._sibling_refs()` and
+        extend the result.
         """
-        return []
+        from engine.sibling_bind import SiblingBind
+        refs: list[SiblingRef] = []
+        for f in dataclasses.fields(self):
+            val = getattr(self, f.name, None)
+            if isinstance(val, SiblingBind):
+                refs.append(val.as_sibling_ref())
+        return refs
+
+    def _resolve_field(self, name: str) -> Any:
+        """Return the effective value of a (possibly reactive) field.
+
+        If the field holds a SiblingBind, resolve it from the current sibling
+        state in the shared store. If the component isn't bound, the resolver
+        returns the bind's `default` (no store to read from). Otherwise the
+        literal attribute value is returned unchanged.
+        """
+        from engine.sibling_bind import SiblingBind
+        val = getattr(self, name, None)
+        if not isinstance(val, SiblingBind):
+            return val
+        if self._store is None or self._scope is None:
+            return val.default
+        sibling_value = self._store.get(self._scope, val.key)
+        return val.resolve(sibling_value)
 
     def _bind_children(self, store: Store, url_prefix: str):
         """Bind all children. Containers with non-standard child storage override this."""

@@ -1,8 +1,8 @@
 """Computation — read-only derived display computed from sibling state.
 
-Generalizes Score's sibling-reading pattern for arbitrary computations.
-The compute function receives a dict of sibling values and returns any
-JSON-serializable result.
+A compute function receives a dict of sibling values and returns any
+JSON-serializable result. For answer-key quiz grading specifically, see
+the `graded()` factory and `grade()` compute-fn builder in `engine/helpers.py`.
 
 When store_result=True, the computed value is written to the store during
 serialization, enabling Visibility and other sibling-readers to depend

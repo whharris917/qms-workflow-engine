@@ -23,7 +23,7 @@ definition = Page(
     key=<span class="s">"hello"</span>,
     label=<span class="s">"Hello Page"</span>,
     components=[
-        TextForm(key=<span class="s">"name"</span>, label=<span class="s">"Your name"</span>),
+        TextForm(label=<span class="s">"Your name"</span>),
     ],
 )</pre>
 
@@ -42,8 +42,8 @@ definition = Page(
 
 <ul>
     <li><strong><code>Page</code></strong> &mdash; the top-level container. Every page starts with one. It owns the Store (the JSON file where this page&rsquo;s state lives) and hands it down to children.</li>
-    <li><strong><code>TextForm</code></strong> &mdash; a single text input. Has a <code>key</code> (how it&rsquo;s identified inside this page), a <code>label</code> (what humans see), and optional configuration like <code>multiline</code> or <code>min_length</code>.</li>
-    <li><strong><code>components=[...]</code></strong> &mdash; the container&rsquo;s children. Add more TextComponents, or other component types, and they appear in the rendered page in order.</li>
+    <li><strong><code>TextForm</code></strong> &mdash; a single text input. The only required argument is <code>label</code> (what humans see). Optional configuration includes <code>multiline</code>, <code>min_length</code>, and an explicit <code>key=</code> &mdash; see &ldquo;When keys matter&rdquo; below.</li>
+    <li><strong><code>components=[...]</code></strong> &mdash; the container&rsquo;s children. Add more <code>TextForm</code>s, or other component types, and they appear in the rendered page in order.</li>
 </ul>
 
 <p>
@@ -53,16 +53,90 @@ definition = Page(
 <h2>See it both ways</h2>
 
 <p>
-    With the page open in your browser, try this: in the address bar, keep the URL but change the browser&rsquo;s <code>Accept</code> header to <code>application/json</code> (or just use <code>curl</code>):
+    With the page open in your browser, you&rsquo;ve already seen the HTML view. To see the JSON view, the easiest path is <code>curl</code> from another terminal. The engine serves JSON by default &mdash; HTML is only returned when the request explicitly asks for it with <code>Accept: text/html</code> (which browsers always send, and <code>curl</code> never does):
 </p>
 
-<pre class="lesson-code"><span class="c"># Human view (browser default)</span>
-GET /pages/a3f9c2d1
-Accept: text/html
+<pre class="lesson-code"><span class="c"># Human view — what your browser gets (explicit Accept)</span>
+curl -H <span class="s">"Accept: text/html"</span> http://127.0.0.1:5000/pages/a3f9c2d1
 
-<span class="c"># Agent view</span>
-GET /pages/a3f9c2d1
-Accept: application/json</pre>
+<span class="c"># Agent view — the engine's default, no header needed</span>
+curl http://127.0.0.1:5000/pages/a3f9c2d1</pre>
+
+<p>
+    The agent view comes back as structured JSON &mdash; the same state the browser rendered, but every interactive element is listed as an <em>affordance</em> with its method, URL, and body shape. For the two-component page above (TextForm + CheckboxForm), the response looks like this:
+</p>
+
+<pre class="lesson-code">{
+  <span class="s">"label"</span>: <span class="s">"Hello Page"</span>,
+  <span class="s">"instruction"</span>: null,
+  <span class="s">"mutable_structure"</span>: <span class="k">false</span>,
+  <span class="s">"components"</span>: [
+    {
+      <span class="s">"label"</span>: <span class="s">"Your name"</span>,
+      <span class="s">"value"</span>: null,
+      <span class="s">"complete"</span>: <span class="k">false</span>,
+      <span class="s">"affordances"</span>: [
+        {
+          <span class="s">"label"</span>: <span class="s">"Set Your name"</span>,
+          <span class="s">"method"</span>: <span class="s">"POST"</span>,
+          <span class="s">"url"</span>: <span class="s">"/pages/a3f9c2d1/text-b72b50fa"</span>,
+          <span class="s">"body"</span>: {<span class="s">"value"</span>: <span class="s">"&lt;value&gt;"</span>},
+          <span class="s">"instruction"</span>: <span class="s">"Replace &lt;value&gt; with the desired your name."</span>
+        }
+      ]
+    },
+    {
+      <span class="s">"label"</span>: <span class="s">"Preferences"</span>,
+      <span class="s">"items"</span>: {
+        <span class="s">"Email me"</span>: <span class="k">false</span>,
+        <span class="s">"Follow updates"</span>: <span class="k">false</span>,
+        <span class="s">"Send notifications"</span>: <span class="k">false</span>
+      },
+      <span class="s">"confirmed"</span>: <span class="k">false</span>,
+      <span class="s">"complete"</span>: <span class="k">false</span>,
+      <span class="s">"affordances"</span>: [
+        {
+          <span class="s">"label"</span>: <span class="s">"Set Preferences"</span>,
+          <span class="s">"method"</span>: <span class="s">"POST"</span>,
+          <span class="s">"url"</span>: <span class="s">"/pages/a3f9c2d1/checkbox-70b15c71"</span>,
+          <span class="s">"body"</span>: {
+            <span class="s">"Email me"</span>: <span class="s">"&lt;true | false&gt;"</span>,
+            <span class="s">"Follow updates"</span>: <span class="s">"&lt;true | false&gt;"</span>,
+            <span class="s">"Send notifications"</span>: <span class="s">"&lt;true | false&gt;"</span>
+          },
+          <span class="s">"instruction"</span>: <span class="s">"Set one or more items. ..."</span>
+        },
+        {
+          <span class="s">"label"</span>: <span class="s">"Done"</span>,
+          <span class="s">"method"</span>: <span class="s">"POST"</span>,
+          <span class="s">"url"</span>: <span class="s">"/pages/a3f9c2d1/checkbox-70b15c71"</span>,
+          <span class="s">"body"</span>: {<span class="s">"action"</span>: <span class="s">"done"</span>},
+          <span class="s">"instruction"</span>: <span class="s">"Confirm the current selection."</span>
+        }
+      ]
+    }
+  ],
+  <span class="s">"complete"</span>: <span class="k">false</span>,
+  <span class="s">"affordances"</span>: [
+    {
+      <span class="s">"label"</span>: <span class="s">"Reset Page"</span>,
+      <span class="s">"method"</span>: <span class="s">"POST"</span>,
+      <span class="s">"url"</span>: <span class="s">"/pages/a3f9c2d1"</span>,
+      <span class="s">"body"</span>: {<span class="s">"action"</span>: <span class="s">"reset"</span>},
+      <span class="s">"instruction"</span>: <span class="s">"Clear all state on this page."</span>
+    }
+    <span class="c">// ... plus a "Batch" affordance for atomic multi-action POSTs</span>
+  ]
+}</pre>
+
+<p>
+    Things to notice:
+</p>
+<ul>
+    <li>Every form and button a human can click shows up as an affordance with the exact URL and body shape an agent would POST. There is no separate API schema &mdash; the schema <em>is</em> the response.</li>
+    <li>The auto-generated keys (<code>text-b72b50fa</code>, <code>checkbox-70b15c71</code>) appear in the affordance URLs. They&rsquo;ll differ on your machine &mdash; each instance gets its own.</li>
+    <li>The page-level URL (<code>/pages/a3f9c2d1</code>) and component paths (<code>/pages/a3f9c2d1/text-b72b50fa</code>) mirror the tree structure.</li>
+</ul>
 
 <p>
     Same URL. Different response shape. Same state. This is the property that makes the engine different from a typical web framework: <strong>one definition produces two surfaces</strong>, and they agree on every action you can take. Lesson 5 covers why that matters.
@@ -86,11 +160,10 @@ definition = Page(
     key=<span class="s">"hello"</span>,
     label=<span class="s">"Hello Page"</span>,
     components=[
-        TextForm(key=<span class="s">"name"</span>, label=<span class="s">"Your name"</span>),
+        TextForm(label=<span class="s">"Your name"</span>),
         CheckboxForm(
-            key=<span class="s">"preferences"</span>,
             label=<span class="s">"Preferences"</span>,
-            options=[<span class="s">"Email me"</span>, <span class="s">"Follow updates"</span>, <span class="s">"Send notifications"</span>],
+            items=[<span class="s">"Email me"</span>, <span class="s">"Follow updates"</span>, <span class="s">"Send notifications"</span>],
         ),
     ],
 )</pre>
@@ -99,12 +172,60 @@ definition = Page(
     Save. Reload the page in your browser (no server restart needed &mdash; <code>pages/</code> is auto-discovered every request). The checkbox appears. Each component is isolated: changing one doesn&rsquo;t affect the other. Each one persists its own state under its own key in the Store.
 </p>
 
+<h2>Extracting children for legibility</h2>
+<p>
+    The definition grows with every component you add. At some point it&rsquo;s clearer to lift children into named variables and reference them in the <code>components</code> list:
+</p>
+
+<pre class="lesson-code"><span class="c"># pages/hello.py</span>
+<span class="k">from</span> engine.page <span class="k">import</span> Page
+<span class="k">from</span> engine.textform <span class="k">import</span> TextForm
+<span class="k">from</span> engine.checkboxform <span class="k">import</span> CheckboxForm
+
+name = TextForm(label=<span class="s">"Your name"</span>)
+
+preferences = CheckboxForm(
+    label=<span class="s">"Preferences"</span>,
+    options=[<span class="s">"Email me"</span>, <span class="s">"Follow updates"</span>, <span class="s">"Send notifications"</span>],
+)
+
+definition = Page(
+    key=<span class="s">"hello"</span>,
+    label=<span class="s">"Hello Page"</span>,
+    components=[name, preferences],
+)</pre>
+
+<p>
+    Functionally identical &mdash; the variables are just handles for readability. This pays off once children have long configurations, once you want to group related definitions in the source, or once you start composing components into larger trees (Lesson 4).
+</p>
+
+<h2>When keys matter</h2>
+<p>
+    Notice that none of the child components above pass an explicit <code>key=</code>. When you omit one, the engine generates a stable identifier like <code>text-a3f9b2c1</code> at construction time &mdash; unique per component, preserved across deepcopy and server restart, and visible as the URL path segment for that component. For most cases that is enough.
+</p>
+<p>
+    You want to specify a key explicitly in two situations:
+</p>
+
+<ul>
+    <li><strong>Stable URLs.</strong> With an auto-generated key, the component&rsquo;s URL is <code>/pages/{id}/text-a3f9b2c1</code>. If you want <code>/pages/{id}/name</code> instead &mdash; for documentation, external links, or a <code>curl</code> script that has to keep working across edits &mdash; pass <code>key=&quot;name&quot;</code>.</li>
+    <li><strong>Cross-component references.</strong> Several component types react to a sibling by name (<code>Visibility</code>, <code>Switch</code>, <code>Computation</code>, and others use a string key to find their target). Those references need the target to have a stable, meaningful key. Lessons 4 and 7 cover this in detail.</li>
+</ul>
+
+<pre class="lesson-code"><span class="c"># Explicit key — URL becomes /pages/{id}/name, and siblings can reference "name"</span>
+TextForm(key=<span class="s">"name"</span>, label=<span class="s">"Your name"</span>)</pre>
+
+<p>
+    The rule of thumb: give your <code>Page</code> an explicit key &mdash; it&rsquo;s the seed identifier in the Agent Portal and in <code>instances.json</code>, and a meaningful name there beats <code>page-a3f9b2c1</code>. Child components can go unnamed until a stable URL or a sibling reference requires a specific name.
+</p>
+
 <div class="lesson-takeaways">
     <h3>What you learned</h3>
     <ul>
         <li><span class="lesson-chip">Core</span> A page is a Python file in <code>pages/</code> exporting <code>definition = Page(...)</code>.</li>
         <li><span class="lesson-chip">Core</span> The engine auto-discovers pages, routes requests, renders HTML and JSON, and persists state &mdash; you just describe the tree.</li>
-        <li><span class="lesson-chip">Core</span> Every component has a <code>key</code> (identity within its container) and participates in the same interaction model regardless of type.</li>
+        <li><span class="lesson-chip">Core</span> Every component has a <code>key</code> (auto-generated unless explicit) that identifies it within its container. For child components the key is also the URL path segment; for a <code>Page</code> it&rsquo;s the seed identifier in the Agent Portal &mdash; running instances get their own auto-generated ID in the URL.</li>
+        <li><span class="lesson-chip">Tip</span> Specify an explicit <code>key=</code> when you need a stable URL or when a sibling component will reference it by name; otherwise let the engine generate one.</li>
         <li><span class="lesson-chip">Tip</span> Page state lives in <code>data/{instance_id}.json</code>. You can inspect it or delete it to reset.</li>
     </ul>
 </div>

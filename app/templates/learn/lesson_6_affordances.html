@@ -237,7 +237,7 @@ aff[<span class="s">"_floatable"</span>] = <span class="s">"clear"</span>   <spa
     <li>Subclass <code>Affordance</code> in <code>engine/affordances.py</code>. Override <code>_render_hints()</code> if templates need to distinguish it.</li>
     <li>In the component&rsquo;s <code>serialize()</code>, emit an instance of the new affordance class. Give it a label, method, URL, and body shape. Add an instruction for agents.</li>
     <li>If the component needs to render it specially, reference <code>render_hints.type</code> in the Jinja template. Otherwise <code>render_aff</code> will produce a generic button.</li>
-    <li>In the component&rsquo;s <code>_handle()</code>, add a branch for the action name. Validate the body, mutate state, return the updated serialize().</li>
+    <li>Add an entry to the component class&rsquo;s <code>_actions</code> registry mapping the action name to a handler method (e.g., <code>_actions = {"export_pdf": "_export_pdf"}</code>), then implement the handler. Validate the body, mutate state, return the updated serialize(). The base <code>handle()</code> takes care of dispatch.</li>
     <li>Run parity tests. If the new affordance floats, register its merge marker in Page&rsquo;s compound-affordance generator.</li>
 </ol>
 

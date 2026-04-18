@@ -94,8 +94,6 @@ def _build_default_registry() -> ComponentRegistry:
     from engine.repeater import Repeater
     from engine.switch import Switch
     from engine.visibility import Visibility
-    from engine.dynamicchoiceform import DynamicChoiceForm
-    from engine.score import Score
     from engine.computation import Computation
     from engine.validation import Validation
     from engine.action import Action
@@ -113,8 +111,8 @@ def _build_default_registry() -> ComponentRegistry:
         DictionaryForm,
         Page, Group, Repeater,
         Switch,
-        Visibility, DynamicChoiceForm,
-        Score, Computation, Validation,
+        Visibility,
+        Computation, Validation,
         Action, RubiksCubeApp, InfoDisplay,
     ]:
         r.register(cls)
@@ -280,9 +278,7 @@ TYPE_CATALOG: list[dict] = [
         "types": [
             ("switch",        "\u2442", "Selects between subtrees based on a sibling's value."),
             ("visibility",    "\u25D0", "Shows or hides a child based on a condition."),
-            ("dynamicchoice", "\u25C8", "Choice whose options depend on a sibling's value."),
-            ("computed",      "\u0192", "Read-only value derived from other components."),
-            ("score",         "\u2605", "Auto-grading from an answer key."),
+            ("computed",      "\u0192", "Read-only value derived from other components. `graded()` helper builds an answer-key quiz grader on top of this."),
             ("validation",    "\u2713", "Cross-field validation rules (pass/fail)."),
         ],
     },
@@ -342,8 +338,9 @@ def from_descriptor(desc: dict, reg: ComponentRegistry | None = None,
 
     Callable-preservation limitation:
         When a descriptor's type declares callable-valued fields (e.g.,
-        Computation.compute, DynamicChoiceForm.options_fn) and the seed
-        is absent or does not match by (type, key), the fresh-construction
+        Computation.compute_fn, Action.action_fn, or any SiblingBind held
+        in a reactive field) and the seed is absent or does not match by
+        (type, key), the fresh-construction
         path cannot supply the callable. The component reconciles, binds,
         and renders — but the callable behavior is silently dropped. No
         warning is emitted. This is a known limitation; see
@@ -419,11 +416,28 @@ def from_descriptor(desc: dict, reg: ComponentRegistry | None = None,
 
     # Callable-preservation diagnostic: flag fields that were silently
     # lost because no matching seed was available for deepcopy.
+    missing: list[str] = []
     if cls._callable_fields:
-        missing = [f for f in cls._callable_fields
-                   if getattr(instance, f, None) is None]
-        if missing:
-            instance._missing_callables = missing
+        missing.extend(
+            f for f in cls._callable_fields
+            if getattr(instance, f, None) is None
+        )
+
+    # Reactive-field (SiblingBind) preservation: if the seed had any
+    # SiblingBind-valued fields that the fresh instance doesn't, those
+    # bindings were lost with the callable inside them.
+    if seed is not None:
+        import dataclasses as _dc
+        from engine.sibling_bind import SiblingBind
+        for f in _dc.fields(seed):
+            seed_val = getattr(seed, f.name, None)
+            if isinstance(seed_val, SiblingBind):
+                inst_val = getattr(instance, f.name, None)
+                if not isinstance(inst_val, SiblingBind) and f.name not in missing:
+                    missing.append(f.name)
+
+    if missing:
+        instance._missing_callables = missing
 
     return instance
 

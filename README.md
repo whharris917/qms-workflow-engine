@@ -57,8 +57,11 @@ app/
     sleek.css           Sleek theme
     component.js        Client-side affordance delegation + SSE handling
 engine/
-  component.py          Base Component protocol
-  pagecomponent.py           Page (persistence boundary, structural mutations)
+  component.py          Base Component protocol (action registry, callable diagnostics)
+  page.py               Page (persistence boundary)
+  page_mutations.py     PageMutationsMixin — structural-mutation handlers split out of page.py
+  tableform.py          TableForm (dynamic columns, typed cells)
+  tableform_actions.py  TableFormActionsMixin — TableForm action handlers split out of tableform.py
   store.py              JSON file store (one file per page, scoped by key)
   registry.py           Type registry (name -> class mapping, from_descriptor)
   templates.py          Jinja environment, theme resolution, render helpers
@@ -91,7 +94,8 @@ Every component implements:
 
 - **`serialize()`** — Canonical JSON: form type, key, label, value, completeness, affordances.
 - **`render()`** — Calls `serialize()` then `render_from_data(data)`. HTML is a pure function of the serialized dict.
-- **`handle(action)`** — Processes a POST body and persists to store.
+- **`affordances()`** — Returns the complete state-dependent affordance list. The base class adds standard actions (Clear, Edit/Undo/Discard, Batch); subclasses extend type-specific affordances via the `get_affordances()` hook. Both `serialize()` (JSON) and `_serialize_full()` (HTML) delegate to this method.
+- **`handle(action)`** — Processes a POST body and persists to store. Dispatches via the class-level `_actions = {name: method_name}` registry — subclasses declare handlers by mapping action names to method names rather than implementing an `if/elif` cascade.
 - **`is_complete`** — Whether this component's data is sufficient.
 
 Affordances are HATEOAS links: each carries `label`, `method`, `url`, `body` template, and `instruction`. Clients drive workflows entirely from the component's own output.
@@ -107,7 +111,7 @@ Affordances are HATEOAS links: each carries `label`, `method`, `url`, `body` tem
 
 ## Component Types
 
-26 unique component classes, registered under 31 names (5 aliases). Navigation unifies four navigation modes and registers as `navigation`, `tab`, `chain`, `sequence`, and `accordion`. DictionaryForm also registers as `keyvalue`.
+24 unique component classes, registered under 29 names (5 aliases). Navigation unifies four navigation modes and registers as `navigation`, `tab`, `chain`, `sequence`, and `accordion`. DictionaryForm also registers as `keyvalue`.
 
 ### Data Forms
 
@@ -117,7 +121,7 @@ Affordances are HATEOAS links: each carries `label`, `method`, `url`, `body` tem
 | **NumberForm** | `engine/numberform.py` | Numeric input with min/max/step/integer constraint. Optional slider mode. | Value is not None |
 | **DateForm** | `engine/dateform.py` | ISO 8601 date or datetime with optional bounds. | Value is not None |
 | **BooleanForm** | `engine/booleanform.py` | Binary yes/no toggle with custom labels. | Value is not None |
-| **ChoiceForm** | `engine/choiceform.py` | Single selection via radio buttons from fixed options. | Valid option selected |
+| **ChoiceForm** | `engine/choiceform.py` | Single selection via radio buttons. `options` can be a literal list or a `SiblingBind` that resolves from another component's current value. Stale detection when reactive options no longer include the stored value. | Valid option selected |
 | **CheckboxForm** | `engine/checkboxform.py` | Multi-select with N/A mode. | Any item checked or N/A |
 | **MultiForm** | `engine/multiform.py` | Groups FieldDescriptors under a single affordance. | All fields filled |
 | **ListForm** | `engine/listform.py` | Ordered list with add/edit/remove/reorder + N/A. Ordering constraints. | Items > 0 or N/A |
@@ -141,16 +145,18 @@ Affordances are HATEOAS links: each carries `label`, `method`, `url`, `body` tem
 
 | Type | Module | Description | Complete When |
 |------|--------|-------------|---------------|
-| **Score** | `engine/score.py` | Read-only grading from answer key. Reads sibling values. | Always |
-| **Computation** | `engine/computation.py` | Derived display from arbitrary compute function. Optional `store_result`. | Always |
+| **Computation** | `engine/computation.py` | Derived display from arbitrary compute function over sibling values. Optional `store_result`. The `graded()` factory in `engine/helpers.py` is a thin wrapper that constructs a Computation for the answer-key quiz-grading case. | Always |
 | **Validation** | `engine/validation.py` | Cross-field validation rules. Pending/pass/fail. Can block page completion. | All rules pass (or `block_completion=False`) |
 
-### Dynamic Forms
+### Imperative
 
 | Type | Module | Description | Complete When |
 |------|--------|-------------|---------------|
-| **DynamicChoiceForm** | `engine/dynamicchoiceform.py` | Options computed from a sibling's value. Stale detection. | Valid option selected |
 | **Action** | `engine/action.py` | Button with preconditions, optional confirmation, side effects. Can return `structural_actions`. | Always |
+
+### Reactive fields
+
+Any component field can be declared reactive by passing a `SiblingBind(sibling_key, fn)` instead of a literal — see `engine/sibling_bind.py`. At serialize time the field resolves from the referenced sibling's current value; at bind time the binding's target is validated for existence (via auto-derived `SiblingRef`). This eliminates per-type "Dynamic*" class variants. `ChoiceForm.options` and `NumberForm.min_val` / `max_val` / `step` are wired today; extending to other fields is a per-component one-liner swap (direct attribute access → `self._resolve_field(name)`). Stale detection (stored value no longer valid under resolved constraints) is type-local: ChoiceForm checks membership in resolved options; NumberForm checks resolved min/max bounds.
 
 ### Wrapper Forms
 
@@ -183,6 +189,8 @@ definition = Page(key="my-page", label="My Page", components=[
     TextForm(key="name", label="Your Name"),
 ])
 ```
+
+Keys are optional for child components. When `key=` is omitted, the engine generates a stable `{form}-{8-char-hex}` identifier at construction (e.g., `text-a3f9b2c1`); the generated key survives deepcopy and reconciliation. Explicit keys are still required whenever a sibling component needs to reference the component by name (e.g., `Visibility(watch="name")`, `SiblingRef(key="name")`) or when the URL path should be stable.
 
 ## Themes
 
@@ -220,7 +228,7 @@ Pages with `mutable_structure=True` expose affordances for runtime structure mod
 ## Ordering Constraints
 
 - **Computation** with `store_result=True` must appear before any Visibility that depends on its result (serialization is sequential).
-- **DynamicChoiceForm** dependencies must appear before the DynamicChoiceForm itself.
+- Any component whose field holds a `SiblingBind` must have its referenced sibling appear earlier in the parent's children list, so the sibling's value is already resolved when the bound field serializes.
 
 ## Component Type Registry
 
@@ -235,4 +243,4 @@ registry.lookup("tab")         # -> Navigation (alias)
 registry.available()           # -> sorted list of all 31 registered names
 ```
 
-Type names are derived by stripping the `Component` suffix and lowercasing (e.g., `TextForm` -> `"text"`). Group subclasses register under their own names. All types are auto-registered on first access.
+Each component class declares an explicit `form` class attribute that names its registry entry (e.g., `TextForm.form = "text"`, `Navigation.form = "navigation"`, `Computation.form = "computed"`, `Historizer.form = "history"`). Type names are declared, not derived — renaming a class does not change its registry identifier, and a single class can be registered under multiple aliases (Navigation registers as `navigation`, `tab`, `chain`, `sequence`, and `accordion`). Group subclasses register under their own names. All types are auto-registered on first access.

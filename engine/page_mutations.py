@@ -90,7 +90,7 @@ class PageMutationsMixin:
 
         label = body.get("label", "").strip()
         if not label:
-            label = type_name.replace("dynamicchoice", "dynamic choice").title()
+            label = type_name.title()
 
         if config:
             err = validate_config(type_name, config, reg)

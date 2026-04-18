@@ -4,7 +4,7 @@ from engine.choiceform import ChoiceForm
 from engine.checkboxform import CheckboxForm
 from engine.textform import TextForm
 from engine.page import Page
-from engine.score import Score
+from engine.helpers import graded
 from engine.navigation import Navigation
 
 
@@ -23,13 +23,16 @@ geography = Navigation(key="geography", label="Geography Quiz", mode="tabs", ins
     ChoiceForm(key="geo-q5", label="Q5",
                instruction="Which desert is the largest by area?",
                options=["Sahara", "Arabian", "Gobi", "Antarctic"]),
-    Score(key="geo-score", label="Results", instruction="Geography Quiz results.", answer_key={
-        "geo-q1": "Nile",
-        "geo-q2": "France",
-        "geo-q3": {"Spain": True, "Germany": False, "Egypt": True, "Turkey": True, "Brazil": False, "Italy": True},
-        "geo-q4": "Canberra",
-        "geo-q5": "Antarctic",
-    }),
+    graded(
+        {
+            "geo-q1": "Nile",
+            "geo-q2": "France",
+            "geo-q3": {"Spain": True, "Germany": False, "Egypt": True, "Turkey": True, "Brazil": False, "Italy": True},
+            "geo-q4": "Canberra",
+            "geo-q5": "Antarctic",
+        },
+        key="geo-score", label="Results", instruction="Geography Quiz results.",
+    ),
 ])
 
 science = Navigation(key="science", label="Science Quiz", mode="tabs", instruction="Five science questions.", steps=[
@@ -46,13 +49,16 @@ science = Navigation(key="science", label="Science Quiz", mode="tabs", instructi
                options=["Jupiter", "Saturn", "Uranus", "Neptune"]),
     TextForm(key="sci-q5", label="Q5",
              instruction="What force keeps planets in orbit around the Sun?"),
-    Score(key="sci-score", label="Results", instruction="Science Quiz results.", answer_key={
-        "sci-q1": "Au",
-        "sci-q2": "206",
-        "sci-q3": {"Helium": True, "Nitrogen": False, "Neon": True, "Oxygen": False, "Argon": True, "Krypton": True},
-        "sci-q4": "Saturn",
-        "sci-q5": "gravity",
-    }),
+    graded(
+        {
+            "sci-q1": "Au",
+            "sci-q2": "206",
+            "sci-q3": {"Helium": True, "Nitrogen": False, "Neon": True, "Oxygen": False, "Argon": True, "Krypton": True},
+            "sci-q4": "Saturn",
+            "sci-q5": "gravity",
+        },
+        key="sci-score", label="Results", instruction="Science Quiz results.",
+    ),
 ])
 
 history = Navigation(key="history", label="History Quiz", mode="tabs", instruction="Five history questions.", steps=[
@@ -69,13 +75,16 @@ history = Navigation(key="history", label="History Quiz", mode="tabs", instructi
                options=["Maya", "Aztec", "Inca", "Olmec"]),
     TextForm(key="hist-q5", label="Q5",
              instruction="What treaty ended World War I?"),
-    Score(key="hist-score", label="Results", instruction="History Quiz results.", answer_key={
-        "hist-q1": "1989",
-        "hist-q2": "Augustus",
-        "hist-q3": {"French Revolution": False, "Moon Landing": True, "World War I": True, "Printing Press Invention": False, "Fall of Constantinople": False, "Russian Revolution": True},
-        "hist-q4": "Inca",
-        "hist-q5": "Treaty of Versailles",
-    }),
+    graded(
+        {
+            "hist-q1": "1989",
+            "hist-q2": "Augustus",
+            "hist-q3": {"French Revolution": False, "Moon Landing": True, "World War I": True, "Printing Press Invention": False, "Fall of Constantinople": False, "Russian Revolution": True},
+            "hist-q4": "Inca",
+            "hist-q5": "Treaty of Versailles",
+        },
+        key="hist-score", label="Results", instruction="History Quiz results.",
+    ),
 ])
 
 quizzes = Navigation(key="quizzes", label="Quizzes", mode="tabs", instruction="Pick a quiz.", steps=[

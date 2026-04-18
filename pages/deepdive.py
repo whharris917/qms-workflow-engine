@@ -35,7 +35,7 @@ The lifecycle in five steps.
 
 5. Serialize/render. Two-tier output: `_serialize_full()` produces the internal dict for HTML rendering; `serialize()` strips render-only noise for agent/JSON consumption.
 
-This is well-defined, but it leaks complexity. The seed-match in step 3 exists because callables (lambdas in Computation.compute, options_fn in DynamicChoiceForm) cannot round-trip through JSON. That is the structural limit of the descriptor-as-truth principle: it is true for scalar configuration, partial for behavior.
+This is well-defined, but it leaks complexity. The seed-match in step 3 exists because callables (lambdas in Computation.compute_fn, Action.action_fn, and any SiblingBind held in a reactive field) cannot round-trip through JSON. That is the structural limit of the descriptor-as-truth principle: it is true for scalar configuration, partial for behavior.
 """
 
 _SECTION_3 = """\
@@ -79,7 +79,7 @@ Where the delta lives. Five honest gaps between ambition and delivery.
 
 1. Action dispatch is unstructured. 88 `if action == ...` checks across 20 files. Page._handle alone has 11 elif branches. Adding a new action requires finding the right file, deciding undo policy, deciding rebuild policy, and wiring through `handle_action` path resolution. No registry, no decorator, no metadata. Adding the 30th action will continue this organic growth.
 
-2. String-typed sibling references. Switch, Visibility, DynamicChoiceForm, Score, Computation, Validation, Action all reference siblings via `depends_on="some_key"`. Delete the referenced sibling and dependents silently orphan. The self-describing protocol cannot describe its own inter-form dependencies. No validation, no warning, no graph.
+2. String-typed sibling references. Switch, Visibility, Computation, Validation, Action, and any component with a SiblingBind-valued field all reference siblings via a string key (directly as `depends_on="some_key"` or indirectly via `SiblingBind("some_key", fn)`). Delete the referenced sibling and dependents silently orphan. The self-describing protocol cannot describe its own inter-form dependencies. No validation, no warning, no graph.
 
 3. No config-value validation. `_set_my_config("multiline", "abc")` writes a string into a boolean field and persists it. `validate_config()` (registry.py:180) checks field NAMES against dataclass fields but not value TYPES. The descriptor is truth, but nothing checks the truth's shape.
 

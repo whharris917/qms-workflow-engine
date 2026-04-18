@@ -68,16 +68,18 @@ bound = page.bind(data_dir=Path(<span class="s">"data"</span>), scope=<span clas
 
 <h2>4. Handle</h2>
 <p>
-    A user clicks &ldquo;Save&rdquo;. The browser POSTs a JSON body describing the action: <code>{"action": "set_value", "value": "Alex"}</code>. The server receives the POST, binds a fresh tree, walks to the target component by URL path, and calls its <code>_handle(body)</code> method.
+    A user clicks &ldquo;Save&rdquo;. The browser POSTs a JSON body describing the action: <code>{"action": "set_value", "value": "Alex"}</code>. The server receives the POST, binds a fresh tree, walks to the target component by URL path, and calls its <code>handle(body)</code> method.
 </p>
 
 <p>
-    <code>_handle()</code> is where each component type implements its own dispatch logic. TextForm recognizes <code>set_value</code>, validates the input, writes to the Store, and returns the updated state. The response is the full re-serialized page, and the browser&rsquo;s <code>morphdom</code> helper diffs it against the current DOM and mutates only what changed.
+    The base <code>handle()</code> reads <code>body["action"]</code>, looks it up in the component class&rsquo;s <code>_actions</code> registry (a class attribute mapping action names to handler method names), and calls the mapped method with the body. TextForm maps <code>set_value</code> to a <code>_set_value</code> method that validates the input, writes to the Store, and returns the updated state. The response is the full re-serialized page, and the browser&rsquo;s <code>morphdom</code> helper diffs it against the current DOM and mutates only what changed.
 </p>
 
-<pre class="lesson-code"><span class="c"># TextForm._handle, roughly</span>
-<span class="k">def</span> <span class="v">_handle</span>(self, body):
-    <span class="k">if</span> body[<span class="s">"action"</span>] == <span class="s">"set_value"</span>:
+<pre class="lesson-code"><span class="c"># TextForm, roughly</span>
+<span class="k">class</span> <span class="v">TextForm</span>(Component):
+    _actions = {<span class="s">"set_value"</span>: <span class="s">"_set_value"</span>}
+
+    <span class="k">def</span> <span class="v">_set_value</span>(self, body):
         value = body[<span class="s">"value"</span>]
         <span class="k">if</span> self.min_length <span class="k">and</span> len(value) &lt; self.min_length:
             <span class="k">return</span> self._error(<span class="s">"Too short"</span>)
@@ -93,7 +95,7 @@ bound = page.bind(data_dir=Path(<span class="s">"data"</span>), scope=<span clas
     <li>Browser fires <code>POST /pages/a3f9c2d1/name</code> with body <code>{"action": "set_value", "value": "Alex"}</code>.</li>
     <li>Server reads the URL, calls <code>discover_pages()</code>, grabs the <code>hello</code> seed, binds to <code>data/a3f9c2d1.json</code>.</li>
     <li>Server walks the bound tree by path (<code>name</code> is a direct child), finds the TextForm.</li>
-    <li>TextForm <code>_handle</code> validates, writes <code>"Alex"</code> to the Store.</li>
+    <li>TextForm <code>handle</code> dispatches <code>set_value</code> to <code>_set_value</code>, which validates and writes <code>"Alex"</code> to the Store.</li>
     <li>Server re-serializes the whole page (cheap), returns HTML.</li>
     <li>Browser&rsquo;s <code>component.js</code> receives the response, calls <code>morphdom</code>, which diffs the old DOM against the new and mutates only the changed nodes.</li>
     <li>User sees their new value. Focus, scroll position, any open <code>&lt;details&gt;</code> tags &mdash; all preserved because morphdom only touched what changed.</li>

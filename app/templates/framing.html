@@ -849,16 +849,15 @@ definition = Page(
                 <tr><td class="type-name">Validation</td><td class="type-role">Sibling-reading</td><td>Cross-field validation rules. Produces pending / pass / fail status that can block page completion.</td></tr>
                 <tr><td class="type-name">Visibility</td><td class="type-role">Reactive wrapper</td><td>Shows its child only when a predicate over siblings holds.</td></tr>
                 <tr><td class="type-name">Switch</td><td class="type-role">Reactive structural</td><td>Selects one of N alternative subtrees based on a sibling&rsquo;s value.</td></tr>
-                <tr><td class="type-name">DynamicChoiceForm</td><td class="type-role">Reactive</td><td>ChoiceForm whose options depend on a sibling value via <code>options_fn</code>.</td></tr>
                 <tr><td class="type-name">Action</td><td class="type-role">Imperative</td><td>A button that triggers a side effect. Can return structural actions that reshape the page.</td></tr>
                 <tr><td class="type-name">Historizer</td><td class="type-role">Wrapper</td><td>Wraps any component with append-only change history.</td></tr>
             </tbody>
         </table>
 
         <p>
-            Seven of those types &mdash; Switch, Visibility, DynamicChoiceForm, Computation,
-            Validation, Action, Score &mdash; read from their siblings via a string field called
-            <code>depends_on</code>. That shadow dependency graph is one of the gaps this design plan addresses.
+            Five of those types &mdash; Switch, Visibility, Computation,
+            Validation, Action &mdash; read from their siblings via a string field called
+            <code>depends_on</code>. A sixth mechanism, <code>SiblingBind</code>, lifts the same pattern to arbitrary reactive fields on any component (e.g., <code>ChoiceForm.options</code>, <code>NumberForm.max_val</code>); it participates in the same bind-time validation via auto-derived refs, eliminating the need for per-type <code>Dynamic*</code> variants.
         </p>
 
         <div class="fr-callout">
@@ -1138,7 +1137,7 @@ definition = Page(
         </p>
 
         <div class="fr-recon-caveat">
-            <strong>The callable problem.</strong> When a seed contains <code>Computation(key="score", compute=lambda s: ...)</code>,
+            <strong>The callable problem.</strong> When a seed contains <code>Computation(key="area", compute_fn=lambda s: s["w"] * s["h"])</code>,
             the lambda cannot serialize to JSON. On reconciliation, the descriptor has no <code>compute</code>; only the seed does.
             If the seed is missing &mdash; because the Python definition moved, the key changed, or a sibling was renamed &mdash;
             the callable is silently dropped. The form renders but does nothing. No warning.
@@ -1338,11 +1337,22 @@ definition = Page(
             <div class="fr-pass p4">
                 <div class="fr-pass-label">Pass 4 &mdash; Retiring the custom vocabulary</div>
                 <div class="fr-pass-body">
-                    <strong>Eigenform &rarr; Component; *Form &rarr; *Component</strong>
-                    <span>The base class was originally named <code>Eigenform</code> &mdash; a path-dependent choice that obscured its plain nature as a component in the React sense. Rename propagated through: 25 concrete subclasses (<code>TextForm</code> &rarr; <code>TextForm</code>, etc.), module filenames, the <code>eigenforms/</code> template directory, the <code>eigenform.js</code> static asset, CSS prefixes (<code>ef-</code> &rarr; <code>c-</code>), DOM data attributes (<code>data-ef-</code> &rarr; <code>data-c-</code>), action-protocol names (<code>add_eigenform</code> &rarr; <code>add_component</code>, etc.), and all documentation prose. Seventy-two parity tests held.</span>
+                    <strong>Eigenform &rarr; Component; role-specific subclass suffixes</strong>
+                    <span>The base class was originally named <code>Eigenform</code> &mdash; a path-dependent choice that obscured its plain nature as a component in the React sense. The rename landed in two moves: first, <code>Eigenform</code> &rarr; <code>Component</code> at the base, with every <code>*Form</code> subclass renamed to <code>*Component</code> (an intermediate step); then the flat <code>*Component</code> suffix was replaced by role-specific suffixes so class names carry their role &mdash; <code>TextForm</code>, <code>NumberForm</code>, etc. for state-producing forms; unsuffixed names for containers (<code>Page</code>, <code>Navigation</code>, <code>Group</code>, <code>Repeater</code>, <code>Switch</code>, <code>Visibility</code>) and derivations (<code>Computation</code>, <code>Validation</code>); <code>InfoDisplay</code> for read-only surfaces; <code>Action</code> for imperative components; <code>Historizer</code> for wrappers; <code>TableRunner</code> for runners; <code>RubiksCubeApp</code> for apps. Registry names were decoupled from class names at this point: each class declares an explicit <code>form</code> class attribute, so renames no longer mutate registry identifiers. The rename propagated through module filenames, the <code>components/</code> template directory, the <code>component.js</code> static asset, CSS prefixes (<code>ef-</code> &rarr; <code>c-</code>), DOM data attributes (<code>data-ef-</code> &rarr; <code>data-c-</code>), and action-protocol names (<code>add_eigenform</code> &rarr; <code>add_component</code>, etc.). Seventy-two parity tests held throughout.</span>
                 </div>
                 <div class="fr-pass-meta">
-                    <span class="effort">~0.5 day</span>
+                    <span class="effort">~1 day</span>
+                    <span class="status landed">Landed</span>
+                </div>
+            </div>
+            <div class="fr-pass p5">
+                <div class="fr-pass-label">Pass 5 &mdash; Harvest</div>
+                <div class="fr-pass-body">
+                    <strong>Action registry + callable diagnostic + megafile split</strong>
+                    <span>Three improvements the vocabulary alignment had unblocked. The 88 <code>if action == "..."</code> branches across 20 files collapsed into class-level <code>_actions = {name: method_name}</code> registries (89 branches eliminated); <code>Component.handle()</code> now dispatches by name and falls back to a base no-op. Callable-valued fields are declared per class via a <code>_callable_fields</code> tuple; after fresh-construction fallback in <code>from_descriptor</code>, the registry sets <code>_missing_callables</code> on the instance and <code>_base_state()</code> surfaces a warning in the serialized output &mdash; converting the silent failure from Pass 4&rsquo;s open list into a visible diagnostic. The two largest files split along role lines: <code>page.py</code> (1152 &rarr; 631 lines) via a <code>PageMutationsMixin</code> holding all structural-mutation handlers; <code>tableform.py</code> (1248 &rarr; 993 lines) via a <code>TableFormActionsMixin</code> holding the seventeen table-action handlers. Public API unchanged. Seventy-two parity tests held.</span>
+                </div>
+                <div class="fr-pass-meta">
+                    <span class="effort">~1 day</span>
                     <span class="status landed">Landed</span>
                 </div>
             </div>
@@ -1350,10 +1360,9 @@ definition = Page(
 
         <h3>What&rsquo;s still open</h3>
         <ul>
-            <li><strong>Callable-preservation diagnostic.</strong> When a seed moves or is renamed and reconciliation falls back to fresh construction, callable fields (<code>Computation.compute</code>, <code>DynamicChoiceForm.options_fn</code>, etc.) silently become <code>None</code>. Require the <code>seed</code> parameter for types with callables; return a typed diagnostic on seed-match failure.</li>
+            <li><strong>Callable-preservation root fix.</strong> Pass 5 made the reconciliation gap visible via <code>_missing_callables</code>, but the component still renders with <code>None</code> callables &mdash; the diagnostic reports the failure rather than preventing it. A true fix would either enforce seed-match at reconciliation (raising on failure) or lift callable fields into a distinct descriptor representation that survives fresh construction.</li>
             <li><strong>Error-boundary expansion.</strong> <code>serialize_safely()</code> for JSON-side parity; bind-error scoping once we have a representation for &ldquo;component tree could not be built&rdquo;; <code>_handle()</code> scoping for partial-mutation risk.</li>
             <li><strong>Context primitive.</strong> Parked until a concrete ancestor-to-descendant channel is wanted &mdash; most likely user / permissions when the QMS workflows come online.</li>
-            <li><strong>Action dispatch as a reducer pattern.</strong> 88 <code>if action == "xxx"</code> branches across 20 files are a reducer-in-disguise. A named <code>ActionRegistry</code> with dispatch by name would make the pattern explicit and open middleware / logging / replay for free. Not yet scheduled.</li>
         </ul>
 
         <h3>The second-order effect</h3>
