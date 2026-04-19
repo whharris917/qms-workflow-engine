@@ -166,6 +166,12 @@ def wiki():
     return render_template("wiki.html", active_page="wiki")
 
 
+@bp.route("/workshop")
+def workshop():
+    """Interactive canvas for mocking up Razem pages."""
+    return render_template("workshop.html", active_page="workshop")
+
+
 # ── Components reference page ──
 #
 # Static taxonomy of every built-in component class. Categories, descriptions,
