@@ -14,7 +14,7 @@
      json_str    — escaped JSON string for the JSON pane
 #}
 {% set cls_str = classes|join(" ") %}
-<div class="{{ cls_str }}" data-form="{{ form }}" data-key="{{ key }}">
+<div class="{{ cls_str }}" data-form="{{ form }}" data-key="{{ key }}" data-url="{{ url }}">
 {# --- Titlebar (only if editable) --- #}
 {% if editable %}
 <div class="c-titlebar">

@@ -382,6 +382,18 @@ def types():
     return jsonify(describe_types())
 
 
+@bp.route("/pages/<instance_id>/_store")
+def page_store(instance_id):
+    info = registry.get_instance(instance_id)
+    if info is None:
+        return jsonify({"error": f"Unknown instance: {instance_id}"}), 404
+    store_path = DATA_DIR / f"{instance_id}.json"
+    if not store_path.exists():
+        return jsonify({})
+    text = store_path.read_text()
+    return Response(text if text.strip() else "{}", content_type="application/json")
+
+
 @bp.route("/pages/<instance_id>", methods=["GET", "POST"])
 def page(instance_id):
     pg = get_page(instance_id)

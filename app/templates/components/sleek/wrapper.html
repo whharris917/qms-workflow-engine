@@ -12,7 +12,7 @@
 {% set cls_str = classes|join(" ") %}
 {% if is_container and form in ("tabs", "sequence", "accordion") %}
 {# --- Navigation: titlebar always visible, chrome conditional on editable --- #}
-<div class="{{ cls_str }}{% if edit_mode %} component--editing{% endif %}" data-form="{{ form }}" data-key="{{ key }}">
+<div class="{{ cls_str }}{% if edit_mode %} component--editing{% endif %}" data-form="{{ form }}" data-key="{{ key }}" data-url="{{ url }}">
 <div class="c-titlebar">
 <span class="c-titlebar__label">{{ label }}</span>
 <span class="c-titlebar__spacer"></span>
@@ -35,7 +35,7 @@
 </div>
 {% elif is_container and form == "group" %}
 {# --- Group: execute mode chrome in group bar; edit mode chrome in titlebar --- #}
-<div class="{{ cls_str }}{% if edit_mode %} component--editing{% endif %}" data-form="{{ form }}" data-key="{{ key }}">
+<div class="{{ cls_str }}{% if edit_mode %} component--editing{% endif %}" data-form="{{ form }}" data-key="{{ key }}" data-url="{{ url }}">
 {% if edit_mode %}
 <div class="c-titlebar">
 <span class="c-titlebar__label">{{ label }}</span>
@@ -53,7 +53,7 @@
 </div>
 {% elif is_container %}
 {# --- Other containers: transparent, minimal --- #}
-<div class="{{ cls_str }}" data-form="{{ form }}" data-key="{{ key }}">
+<div class="{{ cls_str }}" data-form="{{ form }}" data-key="{{ key }}" data-url="{{ url }}">
 {% if editable %}
 <div class="c-chrome">
 {% if edit_mode %}
@@ -71,7 +71,7 @@
 </div>
 {% else %}
 {# --- Data form wrapper: card with titlebar (always) --- #}
-<div class="{{ cls_str }}" data-form="{{ form }}" data-key="{{ key }}">
+<div class="{{ cls_str }}" data-form="{{ form }}" data-key="{{ key }}" data-url="{{ url }}">
 <div class="c-titlebar">
 <span class="c-titlebar__label">{{ label }}</span>
 <span class="c-titlebar__spacer"></span>
