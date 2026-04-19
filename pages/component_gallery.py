@@ -9,7 +9,7 @@ from engine.textform import TextForm
 from engine.checkboxform import CheckboxForm
 from engine.infodisplay import InfoDisplay
 from engine.page import Page
-from engine.navigation import Navigation
+from engine.navigation import Tabs, Sequence, Accordion
 from engine.group import Group
 from engine.choiceform import ChoiceForm
 from engine.numberform import NumberForm
@@ -486,10 +486,9 @@ container_forms = Group(
                 TextForm(key="group-child-2", label="Child 2"),
             ],
         ),
-        Navigation(
+        Tabs(
             key="tab-demo",
-            label="Navigation (tabs)",
-            mode="tabs",
+            label="Tabs",
             editable=True,
             instruction=(
                 "Tabbed container. Only the active tab appears in JSON and HTML. "
@@ -510,10 +509,10 @@ container_forms = Group(
                 ),
             ],
         ),
-        Navigation(
+        Sequence(
             key="chain-demo",
-            label="Navigation (chain)",
-            mode="chain",
+            label="Sequence (auto-advance)",
+            auto_advance=True,
             editable=True,
             instruction=(
                 "Sequential wizard. Auto-advances to the first incomplete step. "
@@ -532,9 +531,9 @@ container_forms = Group(
                 TextForm(key="step-3", label="Step 3: Summary", instruction="Last step. Fill to complete the chain."),
             ],
         ),
-        Navigation(
+        Sequence(
             key="sequence-demo",
-            label="Navigation",
+            label="Sequence",
             editable=True,
             instruction=(
                 "Gated sequential container — like chain mode but without auto-advance. "
@@ -554,10 +553,9 @@ container_forms = Group(
                 TextForm(key="sf-3", label="Step 3: Description", instruction="Describe the work to complete the sequence."),
             ],
         ),
-        Navigation(
+        Accordion(
             key="accordion-demo",
-            label="Navigation (accordion)",
-            mode="accordion",
+            label="Accordion",
             editable=True,
             instruction=(
                 "Collapsible sections. Collapsed sections are omitted from JSON and HTML "
@@ -956,10 +954,9 @@ definition = Page(
         "with working examples you can interact with. This page IS the documentation."
     ),
     components=[
-        Navigation(
+        Tabs(
             key="gallery",
             label="Gallery",
-            mode="tabs",
             editable=True,
             steps=[
                 simple_values,

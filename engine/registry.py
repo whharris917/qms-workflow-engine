@@ -99,14 +99,14 @@ def _build_default_registry() -> ComponentRegistry:
     from engine.action import Action
     from engine.rubikscubeapp import RubiksCubeApp
     from engine.setform import SetForm
-    from engine.navigation import Navigation
+    from engine.navigation import Tabs, Sequence, Accordion
     from engine.tablerunner import TableRunner
     from engine.historizer import Historizer
     from engine.infodisplay import InfoDisplay
     r = ComponentRegistry()
     for cls in [
         TextForm, CheckboxForm, ChoiceForm, MultiForm, ListForm, SetForm,
-        TableForm, Navigation, TableRunner, Historizer,
+        TableForm, Tabs, Sequence, Accordion, TableRunner, Historizer,
         NumberForm, DateForm, BooleanForm,
         DictionaryForm,
         Page, Group, Repeater,
@@ -116,11 +116,8 @@ def _build_default_registry() -> ComponentRegistry:
         Action, RubiksCubeApp, InfoDisplay,
     ]:
         r.register(cls)
-    # Aliases for the unified Navigation modes
-    r.register(Navigation, name="tab")
-    r.register(Navigation, name="chain")
-    r.register(Navigation, name="sequence")
-    r.register(Navigation, name="accordion")
+    # Alias for legacy descriptors
+    r.register(Tabs, name="navigation")
     # Alias for renamed DictionaryForm
     r.register(DictionaryForm, name="keyvalue")
     return r
@@ -164,7 +161,7 @@ registry = _RegistryProxy()
 # "list" = list of child descriptors, "dict" = dict of key->descriptor, "single" = one descriptor.
 _CHILD_FIELDS = {
     "components": "list",   # Page, Group
-    "steps": "list",         # Navigation (all modes)
+    "steps": "list",         # Tabs, Sequence, Accordion
     "tabs": "dict",          # legacy TabForm descriptors
     "sections": "dict",      # legacy AccordionForm descriptors
     "cases": "dict",         # Switch
@@ -267,7 +264,9 @@ TYPE_CATALOG: list[dict] = [
         "css": "containers",
         "types": [
             ("group",      "\u25A2", "Named container for grouping related components."),
-            ("navigation", "\u2B12", "Tabs, wizard chain, gated sequence, or accordion. Set mode in config."),
+            ("tabs",       "\u2B12", "Free access, one child visible at a time."),
+            ("sequence",   "\u25B6", "Gated access, in order. Optional auto-advance."),
+            ("accordion",  "\u2261", "Free access, all children visible with expand/collapse."),
             ("repeater",   "\u29C9", "Stamps template components per dynamic entry."),
         ],
     },
@@ -357,23 +356,41 @@ def from_descriptor(desc: dict, reg: ComponentRegistry | None = None,
     type_name = desc["type"]
     key = desc["key"]
 
-    # Migrate legacy container descriptors to unified Navigation
-    if type_name in ("tab", "chain", "sequence", "accordion"):
+    # Migrate legacy container descriptors to split Navigation subclasses
+    _NAV_TYPE_MAP = {
+        "tab": "tabs",
+        "chain": "sequence",
+        "navigation": "tabs",
+    }
+    if type_name in _NAV_TYPE_MAP or type_name in ("tabs", "sequence", "accordion"):
         desc = dict(desc)  # don't mutate the original
         if "tabs" in desc and "steps" not in desc:
             desc["steps"] = list(desc.pop("tabs").values())
         if "sections" in desc and "steps" not in desc:
             desc["steps"] = list(desc.pop("sections").values())
-        config = desc.setdefault("config", {})
-        if type_name == "tab":
-            config.setdefault("mode", "tabs")
-        elif type_name == "chain":
-            config.setdefault("mode", "chain")
-        elif type_name == "sequence":
-            config.setdefault("mode", "sequence")
-        elif type_name == "accordion":
-            config.setdefault("mode", "accordion")
-        desc["type"] = type_name = "navigation"
+        new_type = _NAV_TYPE_MAP.get(type_name, type_name)
+        # Legacy "chain" becomes Sequence with auto_advance
+        if type_name == "chain":
+            config = desc.setdefault("config", {})
+            config.setdefault("auto_advance", True)
+        # Legacy "navigation" with a mode config — route to correct subclass
+        if type_name == "navigation":
+            config = desc.get("config", {})
+            mode = config.pop("mode", "tabs")
+            if mode == "chain":
+                new_type = "sequence"
+                config.setdefault("auto_advance", True)
+            elif mode == "accordion":
+                new_type = "accordion"
+            elif mode == "sequence":
+                new_type = "sequence"
+            else:
+                new_type = "tabs"
+            if config:
+                desc["config"] = config
+            elif "config" in desc:
+                del desc["config"]
+        desc["type"] = type_name = new_type
 
     # If the seed matches at this level, use it (preserves callables).
     # Apply the descriptor's scalar fields onto a copy of the seed so the

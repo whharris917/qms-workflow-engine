@@ -166,10 +166,38 @@ def wiki():
     return render_template("wiki.html", active_page="wiki")
 
 
+_WORKSHOPS = [
+    {
+        "slug": "page-builder",
+        "title": "Page Builder",
+        "description": "Drag-and-drop canvas for mocking up Razem page layouts with live interactive component previews.",
+        "icon": "\u270e",
+        "template": "workshop_page_builder.html",
+    },
+    {
+        "slug": "component-creation",
+        "title": "Interactive Component Creation",
+        "description": "Create and configure Razem components interactively.",
+        "icon": "\u2728",
+        "template": "workshop_component_creation.html",
+    },
+]
+
+
 @bp.route("/workshop")
 def workshop():
-    """Interactive canvas for mocking up Razem pages."""
-    return render_template("workshop.html", active_page="workshop")
+    """Workshop index — hub for standalone interactive tools."""
+    workshops = [{"url": f"/workshop/{w['slug']}", **w} for w in _WORKSHOPS]
+    return render_template("workshop.html", active_page="workshop", workshops=workshops)
+
+
+@bp.route("/workshop/<slug>")
+def workshop_page(slug):
+    """Individual workshop page."""
+    for w in _WORKSHOPS:
+        if w["slug"] == slug:
+            return render_template(w["template"], active_page="workshop")
+    abort(404)
 
 
 # ── Components reference page ──
@@ -202,7 +230,9 @@ _COMPONENT_TAXONOMY = [
         "blurb": "Compose other components. A container\u2019s completeness depends on its children.",
         "entries": [
             ("Page", "page", "Top-level container and persistence boundary \u2014 creates its own Store. Exposes Reset Page. Optional <code>mutable_structure</code> turns on runtime add / remove / reorder.", "All visible children complete"),
-            ("Navigation", "navigation", "Unified tabbed/sequenced/accordion container. Modes: <code>tabs</code> (free access), <code>chain</code> (gated, auto-advance), <code>sequence</code> (gated, manual Back/Next), <code>accordion</code> (expandable, all visible). Aliases: <code>tab</code>, <code>chain</code>, <code>sequence</code>, <code>accordion</code>.", "All children complete"),
+            ("Tabs", "tabs", "Free access, one child visible at a time. Switch freely between tabs.", "All children complete"),
+            ("Sequence", "sequence", "Gated access, in order. <code>auto_advance=True</code> for automatic progression (wizard), <code>False</code> (default) for manual Back/Next.", "All children complete"),
+            ("Accordion", "accordion", "Free access, all children visible with expand/collapse. Collapsed sections omitted from output (faithful projection).", "All children complete"),
             ("Group", "group", "Named sub-container for reusable compositions. Group subclasses register under their own names in the registry.", "All children complete"),
             ("Visibility", "visibility", "Wraps a single child with conditional visibility based on a sibling\u2019s value. Predicate may be a scalar, a list, or a callable.", "Complete when hidden; delegates to child when visible"),
             ("Repeater", "repeater", "Stamps a template component per dynamic entry. Compound scopes keep per-entry state isolated; stable IDs survive reordering and removal.", "<code>min_entries</code> met and all entries complete"),
@@ -274,6 +304,8 @@ _LEARN_LESSONS = {
     "affordances":       "learn/lesson_6_affordances.html",
     "reconciliation":    "learn/lesson_7_reconciliation.html",
     "mutation":          "learn/lesson_8_mutation.html",
+    # Miscellaneous topics
+    "anatomy":           "learn/topic_anatomy.html",
 }
 
 

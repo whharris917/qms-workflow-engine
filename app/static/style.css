@@ -745,13 +745,13 @@ body.operator-view[data-theme="default"] .component.component--editing.component
 }
 /* Containers: no border in operator default */
 body.operator-view:not([data-theme]) .component[data-form="page"],
-body.operator-view:not([data-theme]) .component[data-form="navigation"],
+body.operator-view:not([data-theme]) .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]),
 body.operator-view:not([data-theme]) .component[data-form="group"],
 body.operator-view:not([data-theme]) .component[data-form="visibility"],
 body.operator-view:not([data-theme]) .component[data-form="switch"],
 body.operator-view:not([data-theme]) .component[data-form="repeater"],
 body.operator-view[data-theme="default"] .component[data-form="page"],
-body.operator-view[data-theme="default"] .component[data-form="navigation"],
+body.operator-view[data-theme="default"] .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]),
 body.operator-view[data-theme="default"] .component[data-form="group"],
 body.operator-view[data-theme="default"] .component[data-form="visibility"],
 body.operator-view[data-theme="default"] .component[data-form="switch"],

@@ -4,7 +4,7 @@ Self-referential by construction: this page is rendered by the engine it analyze
 """
 
 from engine.infodisplay import InfoDisplay
-from engine.navigation import Navigation
+from engine.navigation import Tabs
 from engine.page import Page
 
 
@@ -138,10 +138,9 @@ definition = Page(
     label="Deep Dive: What This Actually Is",
     instruction="An honest, code-grounded analysis. Each tab is a section. Read in order or jump around.",
     components=[
-        Navigation(
+        Tabs(
             key="sections",
             label="",
-            mode="tabs",
             steps=[
                 InfoDisplay(key="s1", label="1. What this is",
                          text=_SECTION_1),

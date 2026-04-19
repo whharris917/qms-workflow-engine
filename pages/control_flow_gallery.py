@@ -2,7 +2,7 @@
 
 from engine.page import Page
 from engine.historizer import Historizer
-from engine.navigation import Navigation
+from engine.navigation import Tabs, Sequence
 from engine.textform import TextForm
 from engine.checkboxform import CheckboxForm
 from engine.choiceform import ChoiceForm
@@ -10,7 +10,7 @@ from engine.booleanform import BooleanForm
 from engine.switch import Switch
 from engine.numberform import NumberForm
 
-SequenceDemo = Navigation(
+SequenceDemo = Sequence(
     key="sequence-demo",
     label="Navigation — Gated Sequential Workflow",
     instruction=(
@@ -39,7 +39,7 @@ SequenceDemo = Navigation(
     ],
 )
 
-TechnicalReview = Navigation(
+TechnicalReview = Sequence(
     key="technical-review",
     label="Technical Review",
     instruction="Complete the technical review.",
@@ -58,7 +58,7 @@ TechnicalReview = Navigation(
     ],
 )
 
-BusinessReview = Navigation(
+BusinessReview = Sequence(
     key="business-review",
     label="Business Review",
     instruction="Complete the business review.",
@@ -77,15 +77,14 @@ BusinessReview = Navigation(
     ],
 )
 
-ParallelReviews = Navigation(
+ParallelReviews = Tabs(
     key="parallel-reviews",
     label="2. Parallel Reviews",
-    mode="tabs",
     instruction="Both branches must be completed. Switch freely between them.",
     steps=[TechnicalReview, BusinessReview],
 )
 
-ForkMergeDemo = Navigation(
+ForkMergeDemo = Sequence(
     key="fork-merge-demo",
     label="Fork / Merge — Parallel Branches",
     instruction=(
@@ -111,7 +110,7 @@ ForkMergeDemo = Navigation(
     ],
 )
 
-BugBranch = Navigation(
+BugBranch = Sequence(
     key="bug-branch",
     label="Bug Report Branch",
     instruction="Describe the bug.",
@@ -130,7 +129,7 @@ BugBranch = Navigation(
     ],
 )
 
-FeatureBranch = Navigation(
+FeatureBranch = Sequence(
     key="feature-branch",
     label="Feature Request Branch",
     instruction="Describe the feature.",
@@ -167,7 +166,7 @@ IssueBranch = Switch(
     },
 )
 
-RoutingDemo = Navigation(
+RoutingDemo = Sequence(
     key="routing-demo",
     label="Routing — Conditional Branches",
     instruction=(

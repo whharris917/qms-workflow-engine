@@ -10,7 +10,7 @@
      undo_count, url, inner, json_str, is_container
 #}
 {% set cls_str = classes|join(" ") %}
-{% if is_container and form == "navigation" %}
+{% if is_container and form in ("tabs", "sequence", "accordion") %}
 {# --- Navigation: titlebar always visible, chrome conditional on editable --- #}
 <div class="{{ cls_str }}{% if edit_mode %} component--editing{% endif %}" data-form="{{ form }}" data-key="{{ key }}">
 <div class="c-titlebar">

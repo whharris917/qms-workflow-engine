@@ -81,10 +81,8 @@ class PageMutationsMixin:
 
         key = body.get("key", "").strip()
         if not key:
-            n = 1
-            while f"{type_name}-{n}" in existing_keys:
-                n += 1
-            key = f"{type_name}-{n}"
+            import uuid
+            key = f"{type_name}-{uuid.uuid4().hex[:8]}"
         elif key in existing_keys:
             return self._error(f"Key '{key}' already exists.", action="add_component")
 
@@ -354,8 +352,7 @@ class PageMutationsMixin:
                 if desc.get("type") in ("group", "page"):
                     desc["components"] = desc.get("components", [])
                     return desc["components"]
-                if desc.get("type") in ("navigation", "tab", "chain",
-                                         "sequence", "accordion"):
+                if desc.get("type") in ("tabs", "sequence", "accordion"):
                     desc["steps"] = desc.get("steps", [])
                     return desc["steps"]
                 return None

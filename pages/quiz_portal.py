@@ -5,10 +5,10 @@ from engine.checkboxform import CheckboxForm
 from engine.textform import TextForm
 from engine.page import Page
 from engine.helpers import graded
-from engine.navigation import Navigation
+from engine.navigation import Tabs
 
 
-geography = Navigation(key="geography", label="Geography Quiz", mode="tabs", instruction="Five geography questions.", steps=[
+geography = Tabs(key="geography", label="Geography Quiz", instruction="Five geography questions.", steps=[
     ChoiceForm(key="geo-q1", label="Q1",
                instruction="What is the longest river in the world?",
                options=["Amazon", "Nile", "Yangtze", "Mississippi"]),
@@ -35,7 +35,7 @@ geography = Navigation(key="geography", label="Geography Quiz", mode="tabs", ins
     ),
 ])
 
-science = Navigation(key="science", label="Science Quiz", mode="tabs", instruction="Five science questions.", steps=[
+science = Tabs(key="science", label="Science Quiz", instruction="Five science questions.", steps=[
     ChoiceForm(key="sci-q1", label="Q1",
                instruction="What is the chemical symbol for gold?",
                options=["Go", "Gd", "Au", "Ag"]),
@@ -61,7 +61,7 @@ science = Navigation(key="science", label="Science Quiz", mode="tabs", instructi
     ),
 ])
 
-history = Navigation(key="history", label="History Quiz", mode="tabs", instruction="Five history questions.", steps=[
+history = Tabs(key="history", label="History Quiz", instruction="Five history questions.", steps=[
     ChoiceForm(key="hist-q1", label="Q1",
                instruction="In what year did the Berlin Wall fall?",
                options=["1987", "1989", "1991", "1993"]),
@@ -87,7 +87,7 @@ history = Navigation(key="history", label="History Quiz", mode="tabs", instructi
     ),
 ])
 
-quizzes = Navigation(key="quizzes", label="Quizzes", mode="tabs", instruction="Pick a quiz.", steps=[
+quizzes = Tabs(key="quizzes", label="Quizzes", instruction="Pick a quiz.", steps=[
     geography,
     science,
     history,

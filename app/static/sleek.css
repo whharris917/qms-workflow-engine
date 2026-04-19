@@ -35,7 +35,7 @@ body.operator-view[data-theme="sleek"] .component {
 
 /* Containers and PageComponent: transparent, no card */
 body.operator-view[data-theme="sleek"] .component[data-form="page"],
-body.operator-view[data-theme="sleek"] .component[data-form="navigation"],
+body.operator-view[data-theme="sleek"] .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]),
 body.operator-view[data-theme="sleek"] .component[data-form="group"],
 body.operator-view[data-theme="sleek"] .component[data-form="visibility"],
 body.operator-view[data-theme="sleek"] .component[data-form="switch"],
@@ -101,7 +101,7 @@ body.operator-view[data-theme="sleek"] .component > h3,
 body.operator-view[data-theme="sleek"] .component h3:first-child {
     display: none;
 }
-body.operator-view[data-theme="sleek"] .component[data-form="navigation"] > h3 + p {
+body.operator-view[data-theme="sleek"] .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) > h3 + p {
     display: none;
 }
 /* Note: container titlebar rules removed — sleek/wrapper.html does not emit
@@ -125,7 +125,7 @@ body.operator-view[data-theme="sleek"] .component.component--complete {
     border-left: 2px solid #60a5fa;
 }
 body.operator-view[data-theme="sleek"] .component[data-form="page"].component--complete,
-body.operator-view[data-theme="sleek"] .component[data-form="navigation"].component--complete,
+body.operator-view[data-theme="sleek"] .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]).component--complete,
 body.operator-view[data-theme="sleek"] .component[data-form="group"].component--complete,
 body.operator-view[data-theme="sleek"] .component[data-form="visibility"].component--complete,
 body.operator-view[data-theme="sleek"] .component[data-form="switch"].component--complete,
@@ -229,11 +229,11 @@ body.operator-view[data-theme="sleek"] .c-aff-btn--tab:hover {
 
 /* --- NavigationComponent: horizontal tabs (default) --- */
 
-body.operator-view[data-theme="sleek"] .component[data-form="navigation"] {
+body.operator-view[data-theme="sleek"] .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) {
     border: 1px solid #1e1e1e !important;
     border-radius: 4px !important;
 }
-body.operator-view[data-theme="sleek"] .component[data-form="navigation"] > .c-remaining-affs {
+body.operator-view[data-theme="sleek"] .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) > .c-remaining-affs {
     background: #424850;
     border-left: 1px solid #555d66;
     border-right: 1px solid #555d66;
@@ -241,12 +241,12 @@ body.operator-view[data-theme="sleek"] .component[data-form="navigation"] > .c-r
     padding: 8px 20px;
     margin-top: 0;
 }
-body.operator-view[data-theme="sleek"] .component[data-form="navigation"] > .c-remaining-affs:empty {
+body.operator-view[data-theme="sleek"] .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) > .c-remaining-affs:empty {
     display: none;
 }
 
 /* Titlebar for NavigationComponent */
-body.operator-view[data-theme="sleek"] .component[data-form="navigation"] > .c-titlebar {
+body.operator-view[data-theme="sleek"] .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) > .c-titlebar {
     display: flex;
     align-items: center;
     background: #1e1e1e;
@@ -370,32 +370,32 @@ body.operator-view[data-theme="sleek"] .c-nav-tab--buttons {
     gap: 4px;
 }
 /* Nav affordance buttons */
-body.operator-view[data-theme="sleek"] .component[data-form="navigation"] .c-aff-btn {
+body.operator-view[data-theme="sleek"] .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) .c-aff-btn {
     color: #cccccc;
     background: #333;
     border: 1px solid #555;
 }
-body.operator-view[data-theme="sleek"] .component[data-form="navigation"] .c-aff-btn:hover {
+body.operator-view[data-theme="sleek"] .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) .c-aff-btn:hover {
     background: #444b53;
     border-color: #ff6b6b;
 }
 
 /* === PageComponent > NavigationComponent: vertical sidebar === */
 
-body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) {
     display: flex !important;
     flex-wrap: wrap !important;
     gap: 0 !important;
 }
 /* Titlebar and instruction span full width above the sidebar + content row */
-body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-titlebar,
-body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-nav-instruction {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) > .c-titlebar,
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) > .c-nav-instruction {
     width: 100%;
     flex-basis: 100%;
     box-sizing: border-box;
 }
 /* Tab bar: vertical column on the left */
-body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-nav-bar {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) > .c-nav-bar {
     flex-direction: column !important;
     border-top: 1px solid #444 !important;
     border-bottom: none !important;
@@ -407,7 +407,7 @@ body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component
     min-width: 120px;
 }
 /* Active tab: left-rounded, merges into content panel */
-body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-nav-bar > .c-nav-tab.c-nav-tab--active {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) > .c-nav-bar > .c-nav-tab.c-nav-tab--active {
     background: #2b3035 !important;
     border: none !important;
     border-bottom: 1px solid #444 !important;
@@ -420,32 +420,32 @@ body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component
     z-index: 1;
 }
 /* All tabs: left-aligned vertical style */
-body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-nav-bar > .c-nav-tab {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) > .c-nav-bar > .c-nav-tab {
     border: none !important;
     border-bottom: 1px solid #444 !important;
     border-radius: 0 !important;
     text-align: right;
 }
-body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-nav-bar > .c-nav-tab.c-nav-tab--complete {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) > .c-nav-bar > .c-nav-tab.c-nav-tab--complete {
     border: none !important;
     border-bottom: 1px solid #444 !important;
     border-radius: 0 !important;
     text-align: right;
 }
-body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-nav-bar > .c-nav-tab.c-nav-tab--accessible {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) > .c-nav-bar > .c-nav-tab.c-nav-tab--accessible {
     border: none !important;
     border-bottom: 1px solid #444 !important;
     border-radius: 0 !important;
     text-align: right;
 }
-body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-nav-bar > .c-nav-tab.c-nav-tab--locked {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) > .c-nav-bar > .c-nav-tab.c-nav-tab--locked {
     border: none !important;
     border-bottom: 1px solid #444 !important;
     border-radius: 0 !important;
     text-align: right;
 }
 /* Content panel: fills remaining space beside sidebar — darker than nested navs */
-body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-nav-content {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) > .c-nav-content {
     background: #2b3035;
     border-left: none;
     border-top: none;
@@ -455,24 +455,24 @@ body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component
     min-width: 0;
 }
 /* Remaining affordances span full width */
-body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-remaining-affs {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) > .c-remaining-affs {
     flex-basis: 100%;
     background: #2b3035;
 }
 /* Continue / Back / Next: push to bottom in vertical bar */
-body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-nav-bar > .c-nav-tab--continue,
-body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-nav-bar > .c-nav-tab--buttons {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) > .c-nav-bar > .c-nav-tab--continue,
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) > .c-nav-bar > .c-nav-tab--buttons {
     margin-top: auto;
     margin-left: 0;
 }
-body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component[data-form="navigation"] > .c-nav-bar > .c-nav-tab--buttons {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) > .c-nav-bar > .c-nav-tab--buttons {
     flex-direction: column;
 }
 
 /* Vertical sidebar edit mode: toolbar and header span full width above sidebar split */
-body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component--editing[data-form="navigation"] > .sleek-edit-toolbar,
-body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component--editing[data-form="navigation"] > .c-edit-label-form,
-body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component--editing[data-form="navigation"] > .c-edit-instr-form {
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component--editing:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) > .sleek-edit-toolbar,
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component--editing:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) > .c-edit-label-form,
+body.operator-view[data-theme="sleek"] .component[data-form="page"] > .component--editing:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]) > .c-edit-instr-form {
     width: 100%;
     flex-basis: 100%;
     box-sizing: border-box;

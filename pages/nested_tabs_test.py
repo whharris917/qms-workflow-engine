@@ -8,7 +8,7 @@ child of Navigation. This page exercises every combination we can think of.
 from engine.textform import TextForm
 from engine.group import Group
 from engine.page import Page
-from engine.navigation import Navigation
+from engine.navigation import Tabs, Sequence, Accordion
 from engine.checkboxform import CheckboxForm
 from engine.booleanform import BooleanForm
 from engine.numberform import NumberForm
@@ -26,29 +26,29 @@ definition = Page(
     components=[
 
         # ── TOP-LEVEL NAV: vertical sidebar (Page > Navigation) ─────
-        Navigation(key="main", label="Main Nav", instruction="Direct child of Page — should be vertical sidebar.", mode="tabs", steps=[
+        Tabs(key="main", label="Main Nav", instruction="Direct child of Page — should be vertical sidebar.", steps=[
 
             # ── Tab 1: All four nav modes nested inside tabs ────────────────
             Group(key="four-modes", label="Four Modes", instruction="Every Navigation mode nested inside a vertical tab.", components=[
 
-                Navigation(key="nested-tabs", label="Nested Tabs", instruction="Horizontal tabs (nested, not direct child of Page).", mode="tabs", steps=[
+                Tabs(key="nested-tabs", label="Nested Tabs", instruction="Horizontal tabs (nested, not direct child of Page).", steps=[
                     TextForm(key="t1", label="Tab One", instruction="First tab content."),
                     TextForm(key="t2", label="Tab Two", instruction="Second tab content."),
                     TextForm(key="t3", label="Tab Three", instruction="Third tab content."),
                 ]),
 
-                Navigation(key="nested-chain", label="Nested Chain", instruction="Gated chain with auto-advance.", mode="chain", steps=[
+                Sequence(key="nested-chain", label="Nested Chain", instruction="Gated chain with auto-advance.", auto_advance=True, steps=[
                     TextForm(key="c1", label="Step 1", instruction="Complete to unlock step 2."),
                     BooleanForm(key="c2", label="Step 2", instruction="Confirm to advance."),
                     TextForm(key="c3", label="Step 3", instruction="Final chain step."),
                 ]),
 
-                Navigation(key="nested-seq", label="Nested Sequence", instruction="Gated sequence with manual Back/Next.", mode="sequence", steps=[
+                Sequence(key="nested-seq", label="Nested Sequence", instruction="Gated sequence with manual Back/Next.", steps=[
                     CheckboxForm(key="s1", label="Checklist A", instruction="Pick items.", items=["Alpha", "Beta", "Gamma"]),
                     CheckboxForm(key="s2", label="Checklist B", instruction="Pick more.", items=["Delta", "Epsilon"]),
                 ]),
 
-                Navigation(key="nested-acc", label="Nested Accordion", instruction="All sections visible, expand/collapse.", mode="accordion", default_expanded=False, steps=[
+                Accordion(key="nested-acc", label="Nested Accordion", instruction="All sections visible, expand/collapse.", default_expanded=False, steps=[
                     TextForm(key="a1", label="Section A", instruction="Accordion section one."),
                     TextForm(key="a2", label="Section B", instruction="Accordion section two."),
                     NumberForm(key="a3", label="Section C", instruction="A number in an accordion.", min_val=0, max_val=100),
@@ -56,11 +56,11 @@ definition = Page(
             ]),
 
             # ── Tab 2: Deep nesting (3+ levels) ────────────────────────────
-            Navigation(key="deep", label="Deep Nesting", instruction="Horizontal tabs (level 2) containing more navigation.", mode="tabs", steps=[
+            Tabs(key="deep", label="Deep Nesting", instruction="Horizontal tabs (level 2) containing more navigation.", steps=[
 
                 # Level 3: tabs inside tabs inside tabs
-                Navigation(key="deep-tabs", label="L3 Tabs", instruction="Third nesting level — still horizontal.", mode="tabs", steps=[
-                    Navigation(key="deep-tabs-inner", label="L4 Tabs", instruction="Fourth level — tabs all the way down.", mode="tabs", steps=[
+                Tabs(key="deep-tabs", label="L3 Tabs", instruction="Third nesting level — still horizontal.", steps=[
+                    Tabs(key="deep-tabs-inner", label="L4 Tabs", instruction="Fourth level — tabs all the way down.", steps=[
                         TextForm(key="abyss", label="The Abyss", instruction="Four levels deep."),
                         InfoDisplay(key="abyss-info", label="Depth Check", text="If this renders as horizontal tabs, the layout rule is working."),
                     ]),
@@ -68,8 +68,8 @@ definition = Page(
                 ]),
 
                 # Mixed modes at depth
-                Navigation(key="deep-chain", label="L3 Chain", instruction="Chain at third level.", mode="chain", steps=[
-                    Navigation(key="chain-inner-acc", label="L4 Accordion", instruction="Accordion inside a chain step.", mode="accordion", steps=[
+                Sequence(key="deep-chain", label="L3 Chain", instruction="Chain at third level.", auto_advance=True, steps=[
+                    Accordion(key="chain-inner-acc", label="L4 Accordion", instruction="Accordion inside a chain step.", steps=[
                         TextForm(key="cia1", label="Acc Section 1", instruction="Accordion in chain in tabs in tabs."),
                         TextForm(key="cia2", label="Acc Section 2", instruction="Second section."),
                     ]),
@@ -77,9 +77,9 @@ definition = Page(
                 ]),
 
                 # Sequence containing a chain containing tabs
-                Navigation(key="deep-mix", label="L3 Seq>Chain>Tabs", instruction="Sequence wrapping a chain wrapping tabs.", mode="sequence", steps=[
-                    Navigation(key="mix-chain", label="Inner Chain", instruction="Chain inside sequence.", mode="chain", steps=[
-                        Navigation(key="mix-tabs", label="Innermost Tabs", instruction="Tabs inside chain inside sequence.", mode="tabs", steps=[
+                Sequence(key="deep-mix", label="L3 Seq>Chain>Tabs", instruction="Sequence wrapping a chain wrapping tabs.", steps=[
+                    Sequence(key="mix-chain", label="Inner Chain", instruction="Chain inside sequence.", auto_advance=True, steps=[
+                        Tabs(key="mix-tabs", label="Innermost Tabs", instruction="Tabs inside chain inside sequence.", steps=[
                             TextForm(key="mix-a", label="Mix A"),
                             TextForm(key="mix-b", label="Mix B"),
                         ]),
@@ -106,14 +106,14 @@ definition = Page(
 
                 # Group containing navigation
                 Group(key="group-with-nav", label="Group With Nav", instruction="Navigation inside a Group — should be horizontal.", components=[
-                    Navigation(key="group-nav", label="Nav In Group", mode="tabs", steps=[
+                    Tabs(key="group-nav", label="Nav In Group", steps=[
                         TextForm(key="gn1", label="Tab 1"),
                         TextForm(key="gn2", label="Tab 2"),
                     ]),
                 ]),
 
                 # Navigation containing a Group (dissolve test)
-                Navigation(key="nav-with-group", label="Nav With Group", instruction="Group as direct child of Navigation — should dissolve.", mode="tabs", steps=[
+                Tabs(key="nav-with-group", label="Nav With Group", instruction="Group as direct child of Navigation — should dissolve.", steps=[
                     Group(key="dissolve-me", label="Dissolve Test", instruction="This Group should dissolve (no border/chrome).", components=[
                         TextForm(key="dm1", label="Dissolved Field 1"),
                         TextForm(key="dm2", label="Dissolved Field 2"),
@@ -128,17 +128,17 @@ definition = Page(
             Group(key="edge-cases", label="Edge Cases", instruction="Unusual but valid configurations.", components=[
 
                 # Single-child Navigation
-                Navigation(key="single-tab", label="Single Tab Nav", instruction="Navigation with only one child — tab bar should still render.", mode="tabs", steps=[
+                Tabs(key="single-tab", label="Single Tab Nav", instruction="Navigation with only one child — tab bar should still render.", steps=[
                     TextForm(key="lonely", label="The Only Tab", instruction="Solo tab content."),
                 ]),
 
                 # Single-child chain
-                Navigation(key="single-chain", label="Single Step Chain", instruction="Chain with one step — should be immediately active.", mode="chain", steps=[
+                Sequence(key="single-chain", label="Single Step Chain", instruction="Chain with one step — should be immediately active.", auto_advance=True, steps=[
                     TextForm(key="only-step", label="Only Step", instruction="The sole chain step."),
                 ]),
 
                 # Single-child accordion
-                Navigation(key="single-acc", label="Single Accordion", instruction="One section accordion.", mode="accordion", default_expanded=True, steps=[
+                Accordion(key="single-acc", label="Single Accordion", instruction="One section accordion.", default_expanded=True, steps=[
                     TextForm(key="only-section", label="Only Section", instruction="Lone accordion section."),
                 ]),
 
@@ -146,7 +146,7 @@ definition = Page(
                 InfoDisplay(key="bare-info", label="Bare InfoDisplay", text="This InfoDisplay is a direct child of the edge-cases Group, not wrapped in any Navigation."),
 
                 # Accordion with mixed content types
-                Navigation(key="mixed-types-acc", label="Mixed Types Accordion", instruction="Each section is a different component type.", mode="accordion", default_expanded=False, steps=[
+                Accordion(key="mixed-types-acc", label="Mixed Types Accordion", instruction="Each section is a different component type.", default_expanded=False, steps=[
                     TextForm(key="mta-text", label="Text Section", instruction="A text field."),
                     NumberForm(key="mta-num", label="Number Section", instruction="A slider.", slider=True, min_val=0, max_val=50, unit="units"),
                     CheckboxForm(key="mta-check", label="Checkbox Section", instruction="Pick things.", items=["One", "Two", "Three"]),
@@ -163,12 +163,12 @@ definition = Page(
                 # Switch that swaps entire navigation structures
                 Switch(key="mode-switch", label="Mode Switch", depends_on="view-mode", cases={
                     "Simple": InfoDisplay(key="simple-view", label="Simple", text="Minimal view — just an InfoDisplay."),
-                    "Detailed": Navigation(key="detail-nav", label="Detail Tabs", mode="tabs", steps=[
+                    "Detailed": Tabs(key="detail-nav", label="Detail Tabs", steps=[
                         TextForm(key="d1", label="Detail A", instruction="First detail tab."),
                         TextForm(key="d2", label="Detail B", instruction="Second detail tab."),
                     ]),
-                    "Advanced": Navigation(key="adv-nav", label="Advanced Tabs", mode="tabs", steps=[
-                        Navigation(key="adv-inner", label="Sub-Navigation", mode="sequence", steps=[
+                    "Advanced": Tabs(key="adv-nav", label="Advanced Tabs", steps=[
+                        Sequence(key="adv-inner", label="Sub-Navigation", steps=[
                             TextForm(key="adv1", label="Step 1", instruction="Advanced step 1."),
                             TextForm(key="adv2", label="Step 2", instruction="Advanced step 2."),
                             TextForm(key="adv3", label="Step 3", instruction="Advanced step 3."),
@@ -186,7 +186,7 @@ definition = Page(
                     label="Conditional Navigation",
                     depends_on="view-mode",
                     visible_when="Advanced",
-                    component=Navigation(key="vis-nav", label="Advanced-Only Nav", instruction="Only visible when Advanced is selected.", mode="accordion", steps=[
+                    component=Accordion(key="vis-nav", label="Advanced-Only Nav", instruction="Only visible when Advanced is selected.", steps=[
                         TextForm(key="vn1", label="Extra Config A"),
                         TextForm(key="vn2", label="Extra Config B"),
                     ]),
@@ -196,7 +196,7 @@ definition = Page(
             # ── Tab 6: Wide containers (many children) ─────────────────────
             Group(key="wide", label="Wide Containers", instruction="NavigationComponents with many children to test tab overflow and scrolling.", components=[
 
-                Navigation(key="many-tabs", label="Many Tabs (8)", instruction="Eight tabs — tests horizontal overflow.", mode="tabs", steps=[
+                Tabs(key="many-tabs", label="Many Tabs (8)", instruction="Eight tabs — tests horizontal overflow.", steps=[
                     TextForm(key="w1", label="Tab 1"),
                     TextForm(key="w2", label="Tab 2"),
                     TextForm(key="w3", label="Tab 3"),
@@ -207,7 +207,7 @@ definition = Page(
                     TextForm(key="w8", label="Tab 8"),
                 ]),
 
-                Navigation(key="many-acc", label="Many Sections (6)", instruction="Six accordion sections.", mode="accordion", default_expanded=False, steps=[
+                Accordion(key="many-acc", label="Many Sections (6)", instruction="Six accordion sections.", default_expanded=False, steps=[
                     InfoDisplay(key="ma1", label="Section 1", text="Content one."),
                     InfoDisplay(key="ma2", label="Section 2", text="Content two."),
                     InfoDisplay(key="ma3", label="Section 3", text="Content three."),
@@ -216,7 +216,7 @@ definition = Page(
                     InfoDisplay(key="ma6", label="Section 6", text="Content six."),
                 ]),
 
-                Navigation(key="long-chain", label="Long Chain (5)", instruction="Five-step chain.", mode="chain", steps=[
+                Sequence(key="long-chain", label="Long Chain (5)", instruction="Five-step chain.", auto_advance=True, steps=[
                     TextForm(key="lc1", label="Step 1"),
                     TextForm(key="lc2", label="Step 2"),
                     TextForm(key="lc3", label="Step 3"),
@@ -228,7 +228,7 @@ definition = Page(
 
         # ── SECOND TOP-LEVEL NAV: also vertical sidebar ────────────────────
         # Two direct Page children — both should get vertical layout.
-        Navigation(key="secondary", label="Secondary Nav", instruction="Second direct child of Page — also vertical sidebar.", mode="tabs", steps=[
+        Tabs(key="secondary", label="Secondary Nav", instruction="Second direct child of Page — also vertical sidebar.", steps=[
 
             Group(key="sec-basics", label="Parallel Sidebar", instruction="Proves two top-level NavigationComponents coexist.", components=[
                 InfoDisplay(key="sec-info", label="Layout Verification", text={
@@ -240,7 +240,7 @@ definition = Page(
             ]),
 
             # Tabs inside the second top-level nav (should be horizontal)
-            Navigation(key="sec-nested", label="Nested In Secondary", instruction="Horizontal tabs inside second vertical sidebar.", mode="tabs", steps=[
+            Tabs(key="sec-nested", label="Nested In Secondary", instruction="Horizontal tabs inside second vertical sidebar.", steps=[
                 TextForm(key="sn1", label="Tab A"),
                 TextForm(key="sn2", label="Tab B"),
             ]),

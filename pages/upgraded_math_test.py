@@ -4,7 +4,7 @@ from engine.choiceform import ChoiceForm
 from engine.checkboxform import CheckboxForm
 from engine.textform import TextForm
 from engine.page import Page
-from engine.navigation import Navigation
+from engine.navigation import Tabs, Sequence
 
 
 definition = Page(key="upgraded-math-test", label="Upgraded Math Test", instruction=(
@@ -14,13 +14,13 @@ definition = Page(key="upgraded-math-test", label="Upgraded Math Test", instruct
     "To act, POST to the affordance's URL with the specified body. "
     "Every POST returns the full updated page state, so you do not need to GET again after acting."
 ), components=[
-    Navigation(key="test", label="Questions", mode="chain", instruction="Complete each question to proceed.", steps=[
+    Sequence(key="test", label="Questions", auto_advance=True, instruction="Complete each question to proceed.", steps=[
         TextForm(key="q1", label="Question 1", instruction="What is 2 + 2?"),
         ChoiceForm(key="q2", label="Question 2", instruction="What is 7 * 8?",
                    options=["49", "54", "56", "63"]),
         CheckboxForm(key="q3", label="Question 3", instruction="Which of the following are prime numbers?",
                      items=["2", "9", "13", "15", "23"]),
-        Navigation(key="q4", label="Question 4", mode="tabs", instruction="Follow the instructions on each tab. You will need to jump between tabs.", steps=[
+        Tabs(key="q4", label="Question 4", instruction="Follow the instructions on each tab. You will need to jump between tabs.", steps=[
             TextForm(key="step-1", label="Step 1",
                      instruction="Pick any number between 1 and 10. Enter it here, then go to Tab 3."),
             TextForm(key="step-2", label="Step 2",
@@ -36,7 +36,7 @@ definition = Page(key="upgraded-math-test", label="Upgraded Math Test", instruct
             TextForm(key="step-6", label="Step 6",
                      instruction="Final answer: subtract 33 from your Tab 2 result. Enter the answer here."),
         ]),
-        Navigation(key="q5", label="Question 5", mode="chain", instruction="A sequence of clues. Each step unlocks the next.", steps=[
+        Sequence(key="q5", label="Question 5", auto_advance=True, instruction="A sequence of clues. Each step unlocks the next.", steps=[
             ChoiceForm(key="clue-1", label="Clue 1",
                        instruction="I am a two-digit number. My digits sum to 10 and their product is 21. What am I?",
                        options=["37", "46", "55", "73"]),

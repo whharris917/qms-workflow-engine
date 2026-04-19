@@ -1,13 +1,16 @@
-"""Navigation — unified container with four display modes.
+"""Navigation containers — Tabs, Sequence, and Accordion.
 
-Modes:
-    tabs:      Free access, one child visible. Classic tabbed interface.
-    chain:     Gated access, auto-advance to first incomplete. Wizard.
-    sequence:  Gated access, manual Back/Next navigation.
-    accordion: Free access, all children visible with expand/collapse.
+Three container types that present children with different policies:
 
-All modes share: bind, edit mode (add/remove/move/toggle_editable),
+    Tabs:      Free access, one child visible at a time.
+    Sequence:  Gated access, in order. auto_advance=True for automatic
+               progression, False (default) for manual Back/Next.
+    Accordion: Free access, all children visible with expand/collapse.
+
+All three share: bind, edit mode (add/remove/move/toggle_editable),
 structural persistence, snapshot/restore, is_complete.
+
+Navigation is the shared base class — not registered directly.
 """
 
 from __future__ import annotations
@@ -25,17 +28,19 @@ from engine.store import Store
 from engine.templates import render_template
 
 
-NavigationMode = Literal["tabs", "chain", "sequence", "accordion"]
+NavigationMode = Literal["tabs", "sequence", "accordion"]
 
 
 @dataclass
 class Navigation(Component):
-    """A container that presents children in one of four modes."""
+    """Base container for sequential/parallel child presentation.
+
+    Not registered in the registry directly — use Tabs, Sequence, or Accordion.
+    """
     form = "navigation"
 
     steps: list[Component] = field(default_factory=list)
     mode: NavigationMode = "sequence"
-    default_expanded: bool = True  # accordion mode: initial section state
 
     _seed: list[Component] = field(default_factory=list, repr=False)
 
@@ -77,23 +82,25 @@ class Navigation(Component):
         if self.mode == "accordion":
             return None
         active_key = self._active_key
-        if self.mode == "chain":
-            # Explicit focus overrides auto-advance
+        if self._is_auto_advance:
             if active_key:
                 for ef in self.steps:
                     if ef.key == active_key:
                         return ef
-            # Auto-advance: first incomplete
             for ef in self.steps:
                 if not ef.is_complete:
                     return ef
             return self.steps[-1] if self.steps else None
-        # tabs / sequence: validate accessibility
+        # tabs / sequence (manual): validate accessibility
         if active_key:
             for i, ef in enumerate(self.steps):
                 if ef.key == active_key and self._is_accessible(i):
                     return ef
         return self.steps[0] if self.steps else None
+
+    @property
+    def _is_auto_advance(self) -> bool:
+        return False
 
     @property
     def active_index(self) -> int:
@@ -114,18 +121,13 @@ class Navigation(Component):
         return {}
 
     def _is_expanded(self, key: str) -> bool:
-        return self._expanded_state.get(key, self.default_expanded)
+        return self._expanded_state.get(key, getattr(self, 'default_expanded', True))
 
     # --- Structural persistence ---
 
     def _bind_children(self, store: Store, url_prefix: str):
-        # self.mode / self.default_expanded are populated by from_descriptor
-        # via _apply_descriptor on every reconstruct, so no extra override
-        # read is needed here.
         self._seed = list(self.steps)
 
-        # __structure is the on-disk source of truth — always written so
-        # children's descriptor entries are available for _set_my_*.
         stored = store.get(self.key, "__structure")
         if stored is None:
             structure = [ef.to_descriptor() for ef in self._seed]
@@ -202,69 +204,69 @@ class Navigation(Component):
                 aff._chrome_rendered = True
                 affordances.append(aff)
 
-        elif self.mode == "chain":
-            active = self.active_step
-            if active and active.is_complete and self._active_key is not None:
-                affordances.append(SimpleButtonAffordance(
-                    label="Continue",
-                    method="POST", url=url,
-                    body={"action": "continue"},
-                    instruction="Resume from the next incomplete step.",
-                ))
-            completed = {
-                ef.key: ef.label
-                for ef in self.steps
-                if ef.is_complete
-                and ef.key != (active.key if active else None)
-            }
-            if completed:
-                aff = Affordance(
-                    label="Back to Step",
-                    method="POST", url=url,
-                    body={"step": "<step_key>"},
-                    instruction="Jump back to a completed step.",
-                )
-                aff._steps = completed
-                aff._chrome_rendered = True
-                affordances.append(aff)
-
         elif self.mode == "sequence":
-            idx = self.active_index
-            if idx > 0:
-                prev = self.steps[idx - 1]
-                affordances.append(SimpleButtonAffordance(
-                    label=f"\u2190 Back: {prev.label}",
-                    method="POST", url=url,
-                    body={"step": prev.key},
-                    instruction=f"Go back to {prev.label}.",
-                ))
-            if idx < len(self.steps) - 1 and self.steps[idx].is_complete:
-                nxt = self.steps[idx + 1]
-                affordances.append(SimpleButtonAffordance(
-                    label=f"Next: {nxt.label} \u2192",
-                    method="POST", url=url,
-                    body={"step": nxt.key},
-                    instruction=f"Advance to {nxt.label}.",
-                ))
-            active = self.active_step
-            highest = self._highest_accessible_index()
-            completed = {
-                ef.key: ef.label
-                for i, ef in enumerate(self.steps)
-                if i <= highest
-                and ef.key != (active.key if active else None)
-                and ef.is_complete
-            }
-            if completed:
-                aff = Affordance(
-                    label="Go to Step",
-                    method="POST", url=url,
-                    body={"step": "<step_key>"},
-                    instruction="Jump to a completed step.",
-                )
-                aff._steps = completed
-                aff._chrome_rendered = True
-                affordances.append(aff)
+            if self._is_auto_advance:
+                active = self.active_step
+                if active and active.is_complete and self._active_key is not None:
+                    affordances.append(SimpleButtonAffordance(
+                        label="Continue",
+                        method="POST", url=url,
+                        body={"action": "continue"},
+                        instruction="Resume from the next incomplete step.",
+                    ))
+                completed = {
+                    ef.key: ef.label
+                    for ef in self.steps
+                    if ef.is_complete
+                    and ef.key != (active.key if active else None)
+                }
+                if completed:
+                    aff = Affordance(
+                        label="Back to Step",
+                        method="POST", url=url,
+                        body={"step": "<step_key>"},
+                        instruction="Jump back to a completed step.",
+                    )
+                    aff._steps = completed
+                    aff._chrome_rendered = True
+                    affordances.append(aff)
+            else:
+                idx = self.active_index
+                if idx > 0:
+                    prev = self.steps[idx - 1]
+                    affordances.append(SimpleButtonAffordance(
+                        label=f"\u2190 Back: {prev.label}",
+                        method="POST", url=url,
+                        body={"step": prev.key},
+                        instruction=f"Go back to {prev.label}.",
+                    ))
+                if idx < len(self.steps) - 1 and self.steps[idx].is_complete:
+                    nxt = self.steps[idx + 1]
+                    affordances.append(SimpleButtonAffordance(
+                        label=f"Next: {nxt.label} \u2192",
+                        method="POST", url=url,
+                        body={"step": nxt.key},
+                        instruction=f"Advance to {nxt.label}.",
+                    ))
+                active = self.active_step
+                highest = self._highest_accessible_index()
+                completed = {
+                    ef.key: ef.label
+                    for i, ef in enumerate(self.steps)
+                    if i <= highest
+                    and ef.key != (active.key if active else None)
+                    and ef.is_complete
+                }
+                if completed:
+                    aff = Affordance(
+                        label="Go to Step",
+                        method="POST", url=url,
+                        body={"step": "<step_key>"},
+                        instruction="Jump to a completed step.",
+                    )
+                    aff._steps = completed
+                    aff._chrome_rendered = True
+                    affordances.append(aff)
 
         elif self.mode == "accordion":
             if self.steps:
@@ -294,22 +296,6 @@ class Navigation(Component):
         from engine.registry import get_registry
         reg = get_registry()
         available = reg.available()
-
-        for m in ("tabs", "chain", "sequence", "accordion"):
-            is_current = m == self.mode
-            aff = SimpleButtonAffordance(
-                label=f"Mode: {m}" + (" (current)" if is_current else ""),
-                method="POST",
-                url=self.url,
-                body={"action": "set_nav_mode", "mode": m},
-                instruction=(
-                    f"Switch to {m} mode."
-                    + ("" if not is_current else " (Already active.)")
-                    + " Changing mode clears the current navigation value."
-                ),
-            )
-            aff._chrome_rendered = True
-            affs.append(aff)
 
         affs.append(SetValueAffordance(
             label="Add Step",
@@ -380,14 +366,19 @@ class Navigation(Component):
         from engine.registry import get_registry
 
         type_name = body.get("type")
-        key = body.get("key")
-        label = body.get("label", key)
+        key = body.get("key", "").strip() if body.get("key") else ""
         config = body.get("config", {})
         after = body.get("after")
 
-        if not type_name or not key:
-            return self._error("Both 'type' and 'key' are required.",
+        if not type_name:
+            return self._error("'type' is required.",
                                action="add_step")
+
+        if not key:
+            import uuid
+            key = f"{type_name}-{uuid.uuid4().hex[:8]}"
+
+        label = body.get("label", key)
 
         reg = get_registry()
         if type_name not in reg:
@@ -437,7 +428,6 @@ class Navigation(Component):
         structure = [d for d in structure if d["key"] != key]
         self._save_structure(structure)
 
-        # If the removed step was active, reset
         if self._active_key == key:
             self._store.delete(self._scope, self.key)
 
@@ -504,7 +494,6 @@ class Navigation(Component):
         "remove_step": "_do_remove_step",
         "move_step": "_do_move_step",
         "toggle_editable": "_do_toggle_editable",
-        "set_nav_mode": "_do_set_nav_mode",
     }
 
     def _do_navigate_step(self, body: dict) -> dict:
@@ -527,7 +516,7 @@ class Navigation(Component):
         return self.serialize()
 
     def _do_continue(self, body: dict) -> dict:
-        if self.mode != "chain":
+        if not self._is_auto_advance:
             return self.serialize()
         self._store.set(self._scope, self.key, None)
         return self.serialize()
@@ -556,32 +545,6 @@ class Navigation(Component):
         self._push_undo()
         return self._toggle_editable(body)
 
-    def _do_set_nav_mode(self, body: dict) -> dict:
-        if not self.edit_mode:
-            return self.serialize()
-        self._push_undo()
-        return self._set_nav_mode(body)
-
-    def _set_nav_mode(self, body: dict) -> dict:
-        valid_modes = ("tabs", "chain", "sequence", "accordion")
-        new_mode = body.get("mode")
-        if new_mode not in valid_modes:
-            return self._error(
-                f"Invalid mode: {new_mode!r}. "
-                f"Must be one of: {', '.join(valid_modes)}.",
-                action="set_nav_mode",
-            )
-        if new_mode == self.mode:
-            return self.serialize()
-
-        self._set_my_config("mode", new_mode)
-
-        # Stored self.value has a mode-specific shape (step key for
-        # tabs/chain/sequence, dict for accordion). Clear it so the
-        # new mode starts from a clean state.
-        self._store.delete(self._scope, self.key)
-        return self.serialize()
-
     # --- Serialization ---
 
     def _serialize_state(self) -> dict:
@@ -601,7 +564,7 @@ class Navigation(Component):
                     "label": ef.label,
                     "complete": ef.is_complete,
                 }
-                if self.mode in ("sequence", "chain"):
+                if self.mode == "sequence":
                     entry["accessible"] = i <= highest
                 progress.append(entry)
             state["progress"] = progress
@@ -635,7 +598,7 @@ class Navigation(Component):
         if self.mode == "accordion":
             section_html = {}
             for i, ef in enumerate(self.steps):
-                expanded = self._is_expanded(ef.key) if not data.get("edit_mode") else self._is_expanded(ef.key)
+                expanded = self._is_expanded(ef.key)
                 step_items.append({
                     "key": ef.key, "label": ef.label,
                     "expanded": expanded, "editable": ef.editable, "index": i,
@@ -652,16 +615,21 @@ class Navigation(Component):
                     "is_active": ef.key == active_key, "editable": ef.editable,
                     "index": i, "complete": ef.is_complete,
                 }
-                if self.mode in ("sequence", "chain"):
+                if self.mode == "sequence":
                     item["accessible"] = self._is_accessible(i)
                 step_items.append(item)
             active = self.active_step
             active_html = active.render_safely() if active else ""
 
+        # Template receives mode for rendering branches
+        template_mode = self.mode
+        if self.mode == "sequence" and self._is_auto_advance:
+            template_mode = "chain"
+
         available_types = sorted(get_registry().available()) if data.get("edit_mode") else []
         return render_template(
             "navigation.html",
-            data=data, ef=self, url=self.url, mode=self.mode,
+            data=data, ef=self, url=self.url, mode=template_mode,
             label=data.get("label", ""),
             instruction=data.get("instruction") or "",
             step_items=step_items,
@@ -675,7 +643,6 @@ class Navigation(Component):
             self.handle(body)
             return True
         if self.mode == "accordion":
-            # Route to any child
             for ef in self.steps:
                 if ef.key == key:
                     ef.handle(body)
@@ -686,8 +653,37 @@ class Navigation(Component):
             active = self.active_step
             if active and active.key == key:
                 active.handle(body)
-                # Chain mode: clear focus so auto-advance resumes
-                if self.mode == "chain":
+                if self._is_auto_advance:
                     self._store.set(self._scope, self.key, None)
                 return True
         return False
+
+
+# --- Concrete subclasses ---
+
+
+@dataclass
+class Tabs(Navigation):
+    """Free access, one child visible at a time."""
+    form = "tabs"
+    mode: NavigationMode = "tabs"
+
+
+@dataclass
+class Sequence(Navigation):
+    """Gated access, in order. auto_advance=True for automatic progression."""
+    form = "sequence"
+    mode: NavigationMode = "sequence"
+    auto_advance: bool = False
+
+    @property
+    def _is_auto_advance(self) -> bool:
+        return self.auto_advance
+
+
+@dataclass
+class Accordion(Navigation):
+    """Free access, all children visible with expand/collapse."""
+    form = "accordion"
+    mode: NavigationMode = "accordion"
+    default_expanded: bool = True

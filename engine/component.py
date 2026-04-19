@@ -777,7 +777,7 @@ class Component:
         aff["_rendered"] = True
 
 # Forms that are containers (transparent wrapper, no card styling in themes)
-    _CONTAINER_FORMS = {"page", "navigation", "group", "visibility", "switch", "repeater"}
+    _CONTAINER_FORMS = {"page", "tabs", "sequence", "accordion", "group", "visibility", "switch", "repeater"}
 
     def render_safely(self) -> str:
         """Render this component, catching any exception and returning an

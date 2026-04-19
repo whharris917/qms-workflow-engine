@@ -38,14 +38,7 @@
       <button type="submit" class="sleek-edit-toolbar__btn">+ Add</button>
     </form>
     <div class="sleek-mode-switcher" role="group" aria-label="Display mode">
-      <span class="sleek-mode-switcher__label">Mode</span>
-      {% for m in ("tabs", "chain", "sequence", "accordion") %}
-        {% if m == mode %}
-          <span class="sleek-mode-pill sleek-mode-pill--active" aria-current="true">{{ m }}</span>
-        {% else %}
-          {{ render_btn(url, {"action": "set_nav_mode", "mode": m}, m, "sleek-mode-pill") }}
-        {% endif %}
-      {% endfor %}
+      <span class="sleek-mode-pill sleek-mode-pill--active" aria-current="true">{{ mode }}</span>
     </div>
   </div>
 

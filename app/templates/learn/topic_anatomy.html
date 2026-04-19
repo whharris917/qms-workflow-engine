@@ -1,0 +1,261 @@
+{% extends "learn/_lesson_base.html" %}
+
+{% set lesson_num = "M1" %}
+{% set lesson_title = "Anatomy of a Component" %}
+{% set lesson_objective = "Learn the visual and structural parts that every component is made of — label, instruction, value, completion, and affordances." %}
+{% set prev_url = "" %}
+{% set prev_title = "" %}
+{% set next_url = "" %}
+{% set next_title = "" %}
+
+{% block head_extra %}
+{{ super() }}
+<style>
+    .anatomy-diagram {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 2rem 1.5rem;
+        margin: 1.5rem 0;
+        display: flex;
+        justify-content: center;
+    }
+    .anatomy-diagram svg {
+        max-width: 100%;
+        height: auto;
+    }
+    .anatomy-part {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 0.75rem;
+    }
+    .anatomy-part h3 {
+        margin-top: 0 !important;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .anatomy-part h3 .tag {
+        display: inline-block;
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 0.1rem 0.45rem;
+        border-radius: 3px;
+    }
+    .tag-identity { background: #dbeafe; color: #1e40af; }
+    .tag-state    { background: #dcfce7; color: #166534; }
+    .tag-protocol { background: #fef3c7; color: #92400e; }
+    .tag-chrome   { background: #f3e8ff; color: #6b21a8; }
+</style>
+{% endblock %}
+
+{% block lesson_content %}
+
+<h2>What is a component made of?</h2>
+
+<p>
+    Every component in Razem &mdash; whether it&rsquo;s a simple text input or a complex navigation container &mdash; is built from the same small set of parts. Understanding these parts makes the entire system predictable: once you&rsquo;ve seen one component, you know the shape of all of them.
+</p>
+
+<p>Here is a TextForm as it appears on screen, with each part labeled:</p>
+
+<div class="anatomy-diagram">
+<svg viewBox="0 0 520 370" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, -apple-system, sans-serif">
+  <!-- Component card -->
+  <rect x="40" y="20" width="340" height="260" rx="6" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>
+  <!-- Complete indicator -->
+  <rect x="40" y="20" width="4" height="260" rx="2" fill="#22c55e"/>
+
+  <!-- Label -->
+  <text x="60" y="50" font-size="14" font-weight="600" fill="#1e293b">Full Name</text>
+
+  <!-- Instruction -->
+  <text x="60" y="72" font-size="11.5" fill="#64748b" font-style="italic">Enter your legal name as it appears on official documents.</text>
+
+  <!-- Value area -->
+  <rect x="60" y="86" width="300" height="34" rx="4" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1"/>
+  <text x="72" y="108" font-size="13" fill="#334155">Jane Doe</text>
+
+  <!-- Affordances section -->
+  <rect x="60" y="138" width="64" height="28" rx="4" fill="#f0fdf4" stroke="#86efac" stroke-width="1"/>
+  <text x="73" y="157" font-size="11" fill="#166534" font-weight="500">Clear</text>
+
+  <rect x="134" y="138" width="96" height="28" rx="4" fill="#eff6ff" stroke="#93c5fd" stroke-width="1"/>
+  <text x="145" y="157" font-size="11" fill="#1e40af" font-weight="500">Set Value &rarr;</text>
+
+  <!-- View toggle -->
+  <rect x="318" y="28" width="50" height="18" rx="3" fill="#555"/>
+  <text x="325" y="40" font-size="8.5" fill="#fff" font-weight="500">Human</text>
+
+  <!-- Complete badge -->
+  <circle cx="362" y="50" r="6" fill="none" stroke="#22c55e" stroke-width="2"/>
+  <polyline points="358,50 361,53 366,47" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- JSON pane hint -->
+  <rect x="60" y="184" width="300" height="80" rx="4" fill="#0f172a"/>
+  <text x="72" y="206" font-size="10" fill="#7c8ba0" font-family="monospace">{</text>
+  <text x="82" y="220" font-size="10" fill="#e2e8f0" font-family="monospace">"label": "Full Name",</text>
+  <text x="82" y="234" font-size="10" fill="#e2e8f0" font-family="monospace">"value": "Jane Doe",</text>
+  <text x="82" y="248" font-size="10" fill="#e2e8f0" font-family="monospace">"complete": true, ...</text>
+  <text x="72" y="260" font-size="10" fill="#7c8ba0" font-family="monospace">}</text>
+
+  <!-- Annotation lines + labels -->
+  <!-- Label annotation -->
+  <line x1="390" y1="47" x2="420" y2="47" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3 2"/>
+  <text x="425" y="44" font-size="10" fill="#64748b" font-weight="600">LABEL</text>
+  <text x="425" y="55" font-size="9" fill="#94a3b8">identity</text>
+
+  <!-- Instruction annotation -->
+  <line x1="390" y1="69" x2="420" y2="75" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3 2"/>
+  <text x="425" y="73" font-size="10" fill="#64748b" font-weight="600">INSTRUCTION</text>
+  <text x="425" y="84" font-size="9" fill="#94a3b8">guidance</text>
+
+  <!-- Value annotation -->
+  <line x1="390" y1="103" x2="420" y2="110" stroke="#22c55e" stroke-width="1" stroke-dasharray="3 2"/>
+  <text x="425" y="108" font-size="10" fill="#64748b" font-weight="600">VALUE</text>
+  <text x="425" y="119" font-size="9" fill="#94a3b8">state</text>
+
+  <!-- Affordances annotation -->
+  <line x1="390" y1="152" x2="420" y2="148" stroke="#f59e0b" stroke-width="1" stroke-dasharray="3 2"/>
+  <text x="425" y="146" font-size="10" fill="#64748b" font-weight="600">AFFORDANCES</text>
+  <text x="425" y="157" font-size="9" fill="#94a3b8">actions</text>
+
+  <!-- JSON annotation -->
+  <line x1="390" y1="224" x2="420" y2="218" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="3 2"/>
+  <text x="425" y="216" font-size="10" fill="#64748b" font-weight="600">JSON VIEW</text>
+  <text x="425" y="227" font-size="9" fill="#94a3b8">agent surface</text>
+
+  <!-- Complete indicator annotation -->
+  <line x1="37" y1="150" x2="20" y2="150" stroke="#22c55e" stroke-width="1" stroke-dasharray="3 2"/>
+  <text x="0" y="140" font-size="9" fill="#64748b" font-weight="600" text-anchor="start">COMPLETE</text>
+  <text x="0" y="150" font-size="9" fill="#94a3b8" text-anchor="start">indicator</text>
+</svg>
+</div>
+
+<p>
+    Let&rsquo;s walk through each part.
+</p>
+
+<h2>The parts</h2>
+
+<div class="anatomy-part">
+    <h3>Label <span class="tag tag-identity">Identity</span></h3>
+    <p>
+        The component&rsquo;s name, displayed as its heading. Every component has one. It&rsquo;s what the user sees first, and it&rsquo;s how the component identifies itself in affordance instructions and error messages. Set in the Python definition, overridable at runtime via edit mode.
+    </p>
+    <div class="lesson-code"><span class="v">TextForm</span>(label=<span class="s">"Full Name"</span>)</div>
+</div>
+
+<div class="anatomy-part">
+    <h3>Key <span class="tag tag-identity">Identity</span></h3>
+    <p>
+        A unique identifier within the component&rsquo;s scope (its sibling group). Keys are used for store paths, URL routing, and <code>SiblingRef</code> references. When omitted, a key is auto-generated as <code>{form}-{8-char-hex}</code>. You only need explicit keys when another component refers to this one.
+    </p>
+    <div class="lesson-code"><span class="v">TextForm</span>(label=<span class="s">"Full Name"</span>, key=<span class="s">"name"</span>)
+<span class="c"># URL becomes: /pages/{page}/name</span>
+<span class="c"># Store path:  scope/name</span></div>
+</div>
+
+<div class="anatomy-part">
+    <h3>Instruction <span class="tag tag-identity">Identity</span></h3>
+    <p>
+        Optional guidance text, displayed below the label in a lighter style. Instructions tell the user (or agent) <em>how</em> to interact with the component &mdash; what to enter, what format is expected, what the constraints are. If absent, no instruction line is rendered.
+    </p>
+    <div class="lesson-code"><span class="v">TextForm</span>(
+    label=<span class="s">"Full Name"</span>,
+    instruction=<span class="s">"Enter your legal name as it appears on official documents."</span>,
+)</div>
+</div>
+
+<div class="anatomy-part">
+    <h3>Value <span class="tag tag-state">State</span></h3>
+    <p>
+        The component&rsquo;s current data &mdash; what the user has entered or selected. For a <code>TextForm</code> this is a string; for a <code>ChoiceForm</code>, the selected option; for a <code>CheckboxForm</code>, a list of checked items. The value lives in the Store (a JSON file on disk) and persists between requests. The shape of the value is type-specific.
+    </p>
+</div>
+
+<div class="anatomy-part">
+    <h3>Completion <span class="tag tag-state">State</span></h3>
+    <p>
+        Every component exposes <code>is_complete</code> &mdash; a boolean answering &ldquo;has this component collected enough data?&rdquo; The rule is type-specific: a <code>TextForm</code> is complete when non-empty, a <code>CheckboxForm</code> when at least one item is checked, a container when all children are complete. The UI renders a green left accent and a completion ring when true.
+    </p>
+    <p>
+        Completion flows upward: a <code>Page</code> is complete when every child is complete. A gated <code>Navigation</code> (chain/sequence mode) uses child completion to control which steps are unlocked.
+    </p>
+</div>
+
+<div class="anatomy-part">
+    <h3>Affordances <span class="tag tag-protocol">Protocol</span></h3>
+    <p>
+        The actions available on this component <em>right now</em>. Each affordance is a self-describing instruction: a label, an HTTP method, a URL, and a body template. Together they form a HATEOAS contract &mdash; the component tells you exactly what you can do with it, and exactly how to do it.
+    </p>
+    <p>
+        Affordances are <strong>state-dependent</strong>. A solved Rubik&rsquo;s Cube stops offering rotation moves. A <code>TextForm</code> with data gains a Clear affordance. A component in edit mode offers different affordances than one in execution mode. The affordance list is the component&rsquo;s <em>instruction set</em> at this moment.
+    </p>
+    <div class="lesson-code"><span class="c"># A typical affordance (serialized):</span>
+{
+    <span class="s">"label"</span>: <span class="s">"Set Value"</span>,
+    <span class="s">"method"</span>: <span class="s">"POST"</span>,
+    <span class="s">"url"</span>: <span class="s">"/pages/my-page/name"</span>,
+    <span class="s">"body"</span>: { <span class="s">"action"</span>: <span class="s">"set"</span>, <span class="s">"value"</span>: <span class="s">"&lt;value&gt;"</span> },
+    <span class="s">"instruction"</span>: <span class="s">"Set the text value."</span>
+}</div>
+</div>
+
+<div class="anatomy-part">
+    <h3>Dual rendering <span class="tag tag-protocol">Protocol</span></h3>
+    <p>
+        Every component is rendered twice from the same serialized state: once as interactive HTML (for humans in a browser) and once as JSON (for AI agents via content negotiation). The HTML and JSON surfaces are <strong>faithful projections</strong> of the same underlying data &mdash; neither contains information the other lacks, enforced by parity tests.
+    </p>
+    <p>
+        The view toggle in the top-right corner lets you switch between them. Agents never see this toggle; they simply request <code>Accept: application/json</code> and get the JSON surface directly.
+    </p>
+</div>
+
+<div class="anatomy-part">
+    <h3>Edit mode <span class="tag tag-chrome">Chrome</span></h3>
+    <p>
+        Components with <code>editable=True</code> gain a pencil button (&#9998;) in their titlebar. Clicking it enters edit mode, where the label, instruction, and type-specific configuration become editable inline. In edit mode, the pencil is replaced by a play button (&#9654;) to return to execution, an undo button (&#8630;), and a discard button (&#10005;).
+    </p>
+    <p>
+        Edit mode is a <em>meta-level</em> concern &mdash; it changes the component definition itself, not its value. It&rsquo;s the difference between filling out a form and redesigning one.
+    </p>
+</div>
+
+<h2>How the parts compose</h2>
+
+<p>
+    These parts are not arbitrary &mdash; they map to a program analogy. A component is a small program:
+</p>
+
+<ul>
+    <li><strong>State</strong> (value + completion) = the program&rsquo;s memory</li>
+    <li><strong>Affordances</strong> = the instruction set &mdash; what operations are available</li>
+    <li><strong>is_complete</strong> = the halt condition &mdash; when the program has collected enough input</li>
+    <li><strong>The user or agent</strong> = the runtime that executes the program by choosing affordances</li>
+</ul>
+
+<p>
+    This analogy holds at every level of composition. A <code>Page</code> is a program whose instruction set is the union of its children&rsquo;s instruction sets, and whose halt condition is the conjunction of its children&rsquo;s halt conditions. Containers don&rsquo;t add new concepts &mdash; they compose the same ones recursively.
+</p>
+
+<div class="lesson-callout try">
+    <strong>Try it:</strong> Open any page in the <a href="/portal">Agent Portal</a> and toggle between Human View and JSON. Match each part of the JSON output to the visual element on screen. Notice how affordances appear as buttons in HTML and as structured objects in JSON &mdash; same actions, two surfaces.
+</div>
+
+<div class="lesson-takeaways">
+    <h3>What you learned</h3>
+    <ul>
+        <li><strong>Label</strong>, <strong>key</strong>, and <strong>instruction</strong> are the component&rsquo;s identity &mdash; who it is, where it lives, what it expects.</li>
+        <li><strong>Value</strong> and <strong>completion</strong> are its state &mdash; what data it holds and whether it has enough.</li>
+        <li><strong>Affordances</strong> are its protocol &mdash; the actions it offers right now, state-dependent and self-describing.</li>
+        <li><strong>Dual rendering</strong> projects the same state as HTML for humans and JSON for agents, kept in sync by parity tests.</li>
+        <li>A component is a program: state + instruction set + halt condition. Users and agents are the runtime.</li>
+    </ul>
+</div>
+
+{% endblock %}
