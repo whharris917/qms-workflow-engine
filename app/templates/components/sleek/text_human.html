@@ -36,29 +36,24 @@
   {% if instruction %}
   <p class="sleek-text__hint">{{ instruction }}</p>
   {% endif %}
+  <p><strong>Value:</strong> {{ value|string }}</p>
+  {% set set_body = {"action": "set", "value": ""}|tojson %}
+  {% set set_tooltip = "POST " ~ url ~ " " ~ set_body %}
   <form data-c-submit="{{ url }}" class="sleek-text__form">
     {% if multiline %}
     <textarea id="sleek-{{ ef.uid }}" name="value" rows="4"
-      class="sleek-text__input sleek-text__input--area"
-      placeholder="{{ label }}">{{ value or "" }}</textarea>
+      class="sleek-text__input sleek-text__input--area" title="{{ set_tooltip }}"></textarea>
     {% else %}
     <input id="sleek-{{ ef.uid }}" name="value" type="text"
-      class="sleek-text__input"
-      placeholder="{{ label }}"
-      value="{{ value or '' }}">
+      class="sleek-text__input" title="{{ set_tooltip }}">
     {% endif %}
     <div class="sleek-text__actions">
-      <button type="submit" class="sleek-text__btn sleek-text__btn--primary">Save</button>
+      <button type="submit" class="sleek-text__btn sleek-text__btn--primary" title="{{ set_tooltip }}">Save</button>
       {% if has_data %}
       <button type="button" class="sleek-text__btn sleek-text__btn--ghost"
         data-c-post="{{ url }}" data-c-body='{"action": "clear"}'>Clear</button>
       {% endif %}
     </div>
   </form>
-  {% if multiline and value %}
-  <div class="sleek-text__preview">{{ value }}</div>
-  {% elif value %}
-  <p class="sleek-text__value">{{ value }}</p>
-  {% endif %}
 </div>
 {% endif %}

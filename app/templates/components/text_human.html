@@ -63,16 +63,12 @@
 {% else %}
 <h3>{{ label }}</h3>
 {% if instruction %}<p>{{ instruction }}</p>{% endif %}
-{% if multiline and value %}
-  <div style="white-space: pre-wrap; background: #f5f5f5; padding: 8px; margin: 4px 0; border-radius: 4px;">{{ value }}</div>
-{% else %}
-  <p><strong>Value:</strong> {{ value|string }}</p>
-{% endif %}
+<p><strong>Value:</strong> {{ value|string }}</p>
 {% set set_body = {"action": "set", "value": ""}|tojson %}
 {% set set_tooltip = "POST " ~ url ~ " " ~ set_body %}
 <form data-c-submit="{{ url }}">
 {% if multiline %}
-  <textarea name="value" rows="4" style="width: 100%; box-sizing: border-box;" title="{{ set_tooltip }}">{{ value or "" }}</textarea>
+  <textarea name="value" rows="4" style="width: 100%; box-sizing: border-box;" title="{{ set_tooltip }}"></textarea>
 {% else %}
   <input name="value" type="text" title="{{ set_tooltip }}">
 {% endif %}

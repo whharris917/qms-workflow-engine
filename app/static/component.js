@@ -414,12 +414,23 @@ document.addEventListener('click', function(e) {
     }));
 });
 
-/* Synthesize POST-body tooltips on every element whose POST body
-   is deterministic at render time.  Covers two protocols:
+/* Synthesize POST-body tooltips.  Covers three protocols:
      1. data-c-post + data-c-body  (static-body buttons)
      2. data-c-add  + data-c-palette-type  (palette one-click add)
-   Input-dependent protocols (forms, change, group) are left alone
-   since their bodies depend on user input at interaction time. */
+     3. form[data-c-submit]  (form submit — body built from fields) */
+function _cFormBody(form) {
+    var body = {};
+    new FormData(form).forEach(function(v, k) { body[k] = v; });
+    return 'POST ' + form.getAttribute('data-c-submit') + ' ' + JSON.stringify(body);
+}
+function _cSyncFormTooltip(form) {
+    var tip = _cFormBody(form);
+    var btn = form.querySelector('button[type="submit"]');
+    if (btn) btn.setAttribute('title', tip);
+    form.querySelectorAll('input[name], textarea[name], select[name]').forEach(function(el) {
+        el.setAttribute('title', tip);
+    });
+}
 function _cSyncTooltips() {
     document.querySelectorAll('[data-c-post][data-c-body]').forEach(function(el) {
         el.setAttribute('title',
@@ -432,8 +443,13 @@ function _cSyncTooltips() {
             ' {"action":"add_component","type":"' +
             el.getAttribute('data-c-palette-type') + '"}');
     });
+    document.querySelectorAll('form[data-c-submit]').forEach(_cSyncFormTooltip);
 }
 _cSyncTooltips();
+document.addEventListener('input', function(e) {
+    var form = e.target.closest('form[data-c-submit]');
+    if (form) _cSyncFormTooltip(form);
+});
 
 /* Morphdom integration: in-place DOM diff instead of innerHTML swap.
  * Preserves focus, scroll (window + nested), caret position, in-progress
@@ -932,9 +948,10 @@ function _cSwap(html) {
             fetch(storeUrl)
                 .then(function(r) { return r.json(); })
                 .then(function(storeData) {
-                    var scoped = storeData[key] || {};
+                    var urlParts = componentUrl.split('/');
+                    var scope = urlParts.length > 4 ? urlParts[urlParts.length - 2] : key;
                     body.innerHTML = '';
-                    body.appendChild(buildTree(scoped, null, 0, null).el);
+                    body.appendChild(buildTree(storeData[scope] || {}, null, 0, null).el);
                     /* Also fetch page data for toolbar buttons */
                     return fetch(pageUrl, { headers: { 'Accept': 'application/json' } });
                 })
@@ -998,7 +1015,9 @@ function _cSwap(html) {
                 .then(function(r) { return r.json(); })
                 .then(function(storeData) {
                     body.innerHTML = '';
-                    body.appendChild(buildTree(storeData[s.key] || {}, null, 0, null).el);
+                    var urlParts = s.componentUrl.split('/');
+                    var scope = urlParts.length > 4 ? urlParts[urlParts.length - 2] : s.key;
+                    body.appendChild(buildTree(storeData[scope] || {}, null, 0, null).el);
                     body.scrollTop = scrollTop;
                 });
         } else if (v === 'allAffordances') {

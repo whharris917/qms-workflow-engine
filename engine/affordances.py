@@ -178,7 +178,8 @@ def render_affordance_html(aff: dict) -> str:
     if aff_type == "text_input":
         return _render_text_input(label, url, endpoint)
     elif aff_type == "button":
-        return _render_button(label, url, endpoint, body)
+        cls = "c-btn-clear" if body.get("action") == "clear" else ""
+        return _render_button(label, url, endpoint, body, cls)
     elif aff_type == "checkbox":
         return _render_checkbox(url, endpoint, hints.get("items", {}))
     elif aff_type == "radio":
@@ -214,7 +215,8 @@ def render_affordance_html(aff: dict) -> str:
         param_keys = [k for k, v in body.items() if isinstance(v, str) and v.startswith("<")]
         if param_keys:
             return _render_parameterized(label, url, endpoint, body, param_keys)
-        return _render_button(label, url, endpoint, body)
+        cls = "c-btn-clear" if body.get("action") == "clear" else ""
+        return _render_button(label, url, endpoint, body, cls)
 
 
 
@@ -230,10 +232,13 @@ def _render_text_input(label: str, url: str, endpoint: str) -> str:
     )
 
 
-def _render_button(label: str, url: str, endpoint: str, body: dict) -> str:
+def _render_button(label: str, url: str, endpoint: str, body: dict,
+                   css_class: str = "") -> str:
+    cls_attr = f' class="{escape(css_class)}"' if css_class else ""
     return (
         f'<div style="margin: 4px 0;">'
         f'<button data-c-post="{escape(url)}" data-c-body="{_body_attr(body)}"'
+        f'{cls_attr}'
         f' style="cursor: pointer; font-size: 12px; padding: 4px 10px;"'
         f' title="{escape(endpoint)} {escape(json.dumps(body))}">'
         f'{escape(label)}</button>'
