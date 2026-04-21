@@ -1,0 +1,19 @@
+{# Chat InfoDisplay — wrapper already placed us inside a .ch-system div
+   with a system avatar. Render label + text as system content. #}
+{% if data.edit_mode %}
+  {% include "info.html" %}
+{% else %}
+  {% if data.label %}<h4>{{ data.label }}</h4>{% endif %}
+  {% if data.text %}
+    {% for line in data.text.split('\n') %}
+      {% if line %}<p>{{ line }}</p>{% endif %}
+    {% endfor %}
+  {% endif %}
+  {% set pending = [] %}
+  {% for aff in data.affordances %}
+    {% if not aff._rendered %}{% set _ = pending.append(aff) %}{% endif %}
+  {% endfor %}
+  {% if pending %}
+    <div style="margin-top: 8px;">{% for aff in pending %}{{ render_aff(aff) }}{% endfor %}</div>
+  {% endif %}
+{% endif %}

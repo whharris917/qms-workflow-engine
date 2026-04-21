@@ -1,0 +1,39 @@
+{# Stage ChoiceForm — option cards. #}
+{% if data.edit_mode %}
+  {% include "choice.html" %}
+{% else %}
+  {% set selected = data.value %}
+  {% set ns = namespace(set_aff=none) %}
+  {% for aff in data.affordances %}
+    {% if ns.set_aff is none and aff.render_hints is defined and aff.render_hints.type == "radio" %}
+      {% set ns.set_aff = aff %}
+    {% endif %}
+  {% endfor %}
+  {% set set_aff = ns.set_aff %}
+
+  {% if selected and set_aff %}
+    {% set clear_body = {"action": "clear"}|tojson %}
+    <div class="st-plaque">
+      <span class="st-plaque-label">Answer</span>
+      <span class="st-plaque-value">{{ selected }}</span>
+      <button class="st-plaque-edit" data-c-post="{{ url }}" data-c-body='{{ clear_body }}' title="POST {{ url }} {{ clear_body }}">edit</button>
+    </div>
+    {% for aff in data.affordances %}{% set _ = aff.update({"_rendered": true}) %}{% endfor %}
+  {% elif set_aff %}
+    {% set _ = set_aff.update({"_rendered": true}) %}
+    <div class="st-options">
+      {% for opt in set_aff.render_hints.options %}
+        {% set opt_body = {"value": opt}|tojson %}
+        {% set is_sel = (opt == selected) %}
+        <button class="st-option{% if is_sel %} st-option--selected{% endif %}" data-c-post="{{ set_aff.url }}" data-c-body='{{ opt_body }}' title="POST {{ set_aff.url }} {{ opt_body }}">{{ opt }}</button>
+      {% endfor %}
+    </div>
+    {% set pending = [] %}
+    {% for aff in data.affordances %}
+      {% if not aff._rendered %}{% set _ = pending.append(aff) %}{% endif %}
+    {% endfor %}
+    {% if pending %}
+      <div class="st-input" style="margin-top: 10px;">{% for aff in pending %}{{ render_aff(aff) }}{% endfor %}</div>
+    {% endif %}
+  {% endif %}
+{% endif %}

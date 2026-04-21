@@ -1,0 +1,36 @@
+{# Stage page body: feedback, children, page-level actions. #}
+{% if mutable %}
+  {% include "page.html" %}
+{% else %}
+  {% if feedback %}
+    {% set affs = data.affordances|default([]) %}
+    {% set dismiss_affs = {} %}
+    {% for aff in affs %}
+      {% if aff.body.action == "dismiss_feedback" %}
+        {% set _ = dismiss_affs.update({aff.body.target|default(""): aff}) %}
+      {% endif %}
+    {% endfor %}
+    {% for err in feedback.errors|default([]) %}
+      {% set target = err.target|default("") %}
+      {% set aff = dismiss_affs.get(target) %}
+      {% if aff %}{% set _ = aff.update({"_rendered": true}) %}{% endif %}
+      <div class="c-feedback c-feedback--error">{{ err.message }}{% if target %} <span style="opacity: 0.7">({{ target }})</span>{% endif %}</div>
+    {% endfor %}
+    {% set succ = feedback.success %}
+    {% if succ %}
+      <div class="c-feedback c-feedback--success">{{ succ.message }}{% if succ.target %} <span style="opacity: 0.7">({{ succ.target }})</span>{% endif %}</div>
+    {% endif %}
+  {% endif %}
+
+  {% for html in children_html %}{{ html|safe }}{% endfor %}
+
+  {% set pending = [] %}
+  {% for aff in data.affordances %}
+    {% if not aff._rendered %}{% set _ = pending.append(aff) %}{% endif %}
+  {% endfor %}
+  {% if pending %}
+    <div style="display: flex; justify-content: center; gap: 12px; margin-top: 40px;">
+      {% for aff in pending %}{{ render_aff(aff) }}{% endfor %}
+    </div>
+  {% endif %}
+{% endif %}

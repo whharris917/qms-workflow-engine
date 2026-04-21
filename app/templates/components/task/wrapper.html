@@ -1,0 +1,138 @@
+{# Task theme wrapper — dispatches every component shape to a distinct
+   theatrical primitive.
+
+   Page       → st-stage-head + children
+   TABS       → st-carousel (centered active tab, flanking thumbnails)
+   SEQUENCE   → st-trail (milestone stations connected by a path)
+   GROUP      → st-huddle (organic blob cluster)
+   Other ctr  → st-frame (generic framed scene)
+   Info       → st-performer--note (whispered from the wings)
+   Data form  → st-performer (spotlit or stepped-back by completion)
+#}
+{% set cls_str = classes|join(" ") %}
+{% set complete = "component--complete" in classes %}
+
+<div class="{{ cls_str }}" data-form="{{ form }}" data-key="{{ key }}" data-url="{{ url }}">
+
+{% if form == "page" %}
+  {% set comps = data.components|default([]) %}
+  {% set actionable = comps|rejectattr('form', 'equalto', 'info')|list %}
+  {% set total = actionable|length %}
+  {% set done = actionable|selectattr('complete')|list|length %}
+  <div class="st-stage-head">
+    <h1 class="st-stage-title">{{ label }}</h1>
+    {% if instruction %}<p class="st-stage-sub">{{ instruction }}</p>{% endif %}
+    {% if total > 0 %}
+    <div class="st-ribbon">
+      <span class="st-ribbon-dot"></span>
+      Act {{ done if done < total else total }} of {{ total }}
+    </div>
+    {% endif %}
+  </div>
+  {{ inner|safe }}
+
+{% elif form == "info" %}
+  <div class="st-performer st-performer--note">
+    <div class="st-performer-frame">
+      <div class="st-performer-header">
+        <h3 class="st-performer-label">{{ label }}</h3>
+        <span class="st-tag st-tag--note">Aside</span>
+      </div>
+      {{ inner|safe }}
+    </div>
+  </div>
+
+{% elif is_container %}
+  {# Each container KIND gets its own scene. #}
+  {% set chrome_html %}
+    {% if editable %}
+    <span class="c-chrome" style="display: inline-flex; gap: 6px; margin-top: 8px;">
+    {% if edit_mode %}
+      <button data-c-post="{{ url }}" data-c-body="{{ {"action": "set_mode", "mode": "execute"}|tojson }}" class="c-chrome-btn" title="exit edit mode">done editing</button>
+      {% if undo_count > 0 %}<button data-c-post="{{ url }}" data-c-body="{{ {"action": "undo"}|tojson }}" class="c-chrome-btn" title="Undo ({{ undo_count }})">undo</button>{% endif %}
+      <button data-c-post="{{ url }}" data-c-body="{{ {"action": "discard"}|tojson }}" class="c-chrome-btn" title="discard">discard</button>
+    {% else %}
+      <button data-c-post="{{ url }}" data-c-body="{{ {"action": "set_mode", "mode": "edit"}|tojson }}" class="c-chrome-btn" title="edit">edit</button>
+    {% endif %}
+    </span>
+    {% endif %}
+  {% endset %}
+
+  {% if form == "tabs" %}
+    <div class="st-carousel">
+      <h2 class="st-carousel-title">
+        <span class="st-carousel-title-kind">◇ Marquee ◇</span>
+        {{ label }}
+      </h2>
+      {% if instruction %}<p class="st-stage-sub" style="margin-top: -12px;">{{ instruction }}</p>{% endif %}
+      <div style="text-align: center;">{{ chrome_html }}</div>
+      {{ inner|safe }}
+    </div>
+
+  {% elif form == "sequence" %}
+    <div class="st-trail">
+      <h2 class="st-trail-title">
+        <span class="st-trail-title-kind">◈ Expedition ◈</span>
+        {{ label }}
+      </h2>
+      {% if instruction %}<p class="st-stage-sub" style="margin-top: -12px;">{{ instruction }}</p>{% endif %}
+      <div style="text-align: center;">{{ chrome_html }}</div>
+      {{ inner|safe }}
+    </div>
+
+  {% elif form == "group" %}
+    <div class="st-huddle">
+      <h2 class="st-huddle-title">
+        <span class="st-huddle-title-kind">☉ Huddle ☉</span>
+        {{ label }}
+      </h2>
+      {% if instruction %}<p class="st-huddle-instr">{{ instruction }}</p>{% endif %}
+      <div style="text-align: center;">{{ chrome_html }}</div>
+      {{ inner|safe }}
+    </div>
+
+  {% else %}
+    {# Accordion, Switch, Visibility, Repeater, etc. — generic frame #}
+    <div class="st-frame">
+      <h2 class="st-frame-title">
+        <span class="st-frame-title-kind">{{ form }}</span>
+        {{ label }}
+      </h2>
+      {% if instruction %}<p class="st-frame-instr">{{ instruction }}</p>{% endif %}
+      {{ chrome_html }}
+      {{ inner|safe }}
+    </div>
+  {% endif %}
+
+{% else %}
+  {# Data form = Performer on stage #}
+  <div class="st-performer {% if complete %}st-performer--done{% else %}st-performer--active{% endif %}">
+    <div class="st-performer-frame">
+      <div class="st-performer-header">
+        <h3 class="st-performer-label">{{ label }}</h3>
+        {% if complete %}
+          <span class="st-tag st-tag--done">Done</span>
+        {% else %}
+          <span class="st-tag st-tag--active">Your turn</span>
+        {% endif %}
+        {% if editable %}
+        <span class="c-chrome" style="display: inline-flex; gap: 6px;">
+        {% if edit_mode %}
+          <button data-c-post="{{ url }}" data-c-body="{{ {"action": "set_mode", "mode": "execute"}|tojson }}" class="c-chrome-btn" title="exit edit mode">done editing</button>
+          {% if undo_count > 0 %}<button data-c-post="{{ url }}" data-c-body="{{ {"action": "undo"}|tojson }}" class="c-chrome-btn" title="Undo ({{ undo_count }})">undo</button>{% endif %}
+          <button data-c-post="{{ url }}" data-c-body="{{ {"action": "discard"}|tojson }}" class="c-chrome-btn" title="discard">discard</button>
+        {% else %}
+          <button data-c-post="{{ url }}" data-c-body="{{ {"action": "set_mode", "mode": "edit"}|tojson }}" class="c-chrome-btn" title="edit">edit</button>
+        {% endif %}
+        </span>
+        {% endif %}
+      </div>
+      {% if instruction and not complete %}
+        <p class="st-performer-instr">{{ instruction }}</p>
+      {% endif %}
+      {{ inner|safe }}
+    </div>
+  </div>
+{% endif %}
+
+</div>

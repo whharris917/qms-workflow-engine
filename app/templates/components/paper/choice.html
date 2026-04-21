@@ -1,0 +1,53 @@
+{# Paper ChoiceForm.
+
+   Complete: "<selected option> [change]"
+   Incomplete: list of clickable choice cards.
+#}
+{% if data.edit_mode %}
+  {% include "choice.html" %}
+{% else %}
+  {% set selected = data.value %}
+
+  {# Find the SelectAffordance (carries options in render_hints). #}
+  {% set ns = namespace(set_aff=none) %}
+  {% for aff in data.affordances %}
+    {% if ns.set_aff is none and aff.render_hints is defined and aff.render_hints.type == "radio" %}
+      {% set ns.set_aff = aff %}
+    {% endif %}
+  {% endfor %}
+  {% set set_aff = ns.set_aff %}
+
+  {% if selected and set_aff %}
+    {% set clear_body = {"action": "clear"}|tojson %}
+    <div class="p-completed">
+      <span class="p-completed-value">{{ selected }}</span>
+      <button class="p-link" data-c-post="{{ url }}" data-c-body='{{ clear_body }}' title="POST {{ url }} {{ clear_body }}">change</button>
+    </div>
+    {% for aff in data.affordances %}{% set _ = aff.update({"_rendered": true}) %}{% endfor %}
+  {% elif set_aff %}
+    {% set _ = set_aff.update({"_rendered": true}) %}
+    <div class="p-choices">
+      {% for opt in set_aff.render_hints.options %}
+        {% set is_sel = (opt == selected) %}
+        {% set opt_body = {"value": opt}|tojson %}
+        <button class="p-choice{% if is_sel %} p-choice--selected{% endif %}"
+                data-c-post="{{ set_aff.url }}"
+                data-c-body='{{ opt_body }}'
+                title="POST {{ set_aff.url }} {{ opt_body }}"
+                style="width: 100%; text-align: left; font-family: var(--p-serif); font-size: 1em; color: var(--p-text); box-shadow: none;">
+          {{ opt }}
+        </button>
+      {% endfor %}
+    </div>
+    {# Remaining affordances (none typically for ChoiceForm mid-selection) #}
+    {% set pending = [] %}
+    {% for aff in data.affordances %}
+      {% if not aff._rendered %}{% set _ = pending.append(aff) %}{% endif %}
+    {% endfor %}
+    {% if pending %}
+      <div class="p-form-actions">
+        {% for aff in pending %}{{ render_aff(aff) }}{% endfor %}
+      </div>
+    {% endif %}
+  {% endif %}
+{% endif %}

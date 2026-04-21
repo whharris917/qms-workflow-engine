@@ -1,0 +1,64 @@
+{# Paper Navigation — horizontal tabs with a navy underline on active.
+   Sequence adds complete/accessible/locked states.
+   Accordion falls back to default because the expand/collapse pattern
+   works fine with paper's typography. #}
+{% if data.edit_mode %}
+  {% include "navigation.html" %}
+{% elif mode == "tabs" %}
+  {% for aff in data.affordances %}
+    {% if aff.tabs is defined or aff.body.step is defined %}
+      {% set _ = aff.update({"_rendered": true}) %}
+    {% endif %}
+  {% endfor %}
+  <div class="c-nav-bar">
+    {% for step in step_items %}
+      {% if step.is_active %}
+        <span class="c-nav-tab c-nav-tab--active">{{ step.label }}</span>
+      {% else %}
+        {{ render_btn(url, {"step": step.key}, step.label, "c-nav-tab") }}
+      {% endif %}
+    {% endfor %}
+  </div>
+  {% if active_html %}<div class="c-nav-content">{{ active_html|safe }}</div>{% endif %}
+  {% set pending = [] %}
+  {% for aff in data.affordances %}
+    {% if not aff._rendered %}{% set _ = pending.append(aff) %}{% endif %}
+  {% endfor %}
+  {% if pending %}
+    <div class="p-form-actions">{% for aff in pending %}{{ render_aff(aff) }}{% endfor %}</div>
+  {% endif %}
+
+{% elif mode == "sequence" %}
+  {% for aff in data.affordances %}
+    {% if aff.steps is defined or aff.body.step is defined %}
+      {% set _ = aff.update({"_rendered": true}) %}
+    {% endif %}
+  {% endfor %}
+  {% set progress = data.progress|default([]) %}
+  {% set active_key = data.active_step %}
+  <div class="c-nav-bar">
+    {% for step in progress %}
+      {% if step.key == active_key %}
+        <span class="c-nav-tab c-nav-tab--active">{{ step.label }}</span>
+      {% elif step.complete %}
+        {{ render_btn(url, {"step": step.key}, step.label, "c-nav-tab c-nav-tab--complete") }}
+      {% elif step.accessible|default(false) %}
+        {{ render_btn(url, {"step": step.key}, step.label, "c-nav-tab") }}
+      {% else %}
+        <span class="c-nav-tab c-nav-tab--locked">{{ step.label }}</span>
+      {% endif %}
+    {% endfor %}
+  </div>
+  {% if active_html %}<div class="c-nav-content">{{ active_html|safe }}</div>{% endif %}
+  {% set pending = [] %}
+  {% for aff in data.affordances %}
+    {% if not aff._rendered %}{% set _ = pending.append(aff) %}{% endif %}
+  {% endfor %}
+  {% if pending %}
+    <div class="p-form-actions">{% for aff in pending %}{{ render_aff(aff) }}{% endfor %}</div>
+  {% endif %}
+
+{% else %}
+  {# accordion or anything unhandled: use the default template #}
+  {% include "navigation.html" %}
+{% endif %}

@@ -27,21 +27,47 @@ def seeds() -> dict:
     return discover_pages()
 
 
-THEMES = {"default", "sleek"}
-THEME_CSS = {"sleek": "sleek.css"}
+# Ordered list so the theme picker renders predictably.
+THEME_NAMES = ["default", "sleek", "debug", "liquid-glass", "paper", "chat", "task"]
+THEMES = set(THEME_NAMES)
+THEME_CSS = {
+    "sleek": "sleek.css",
+    "debug": "debug.css",
+    "liquid-glass": "liquid-glass.css",
+    "paper": "paper.css",
+    "chat": "chat.css",
+    "task": "task.css",
+}
+DEFAULT_THEME = "sleek"
 
 
 @bp.before_request
 def _apply_theme():
-    theme = request.cookies.get("c-theme", "sleek")
-    set_theme(theme if theme in THEMES and theme != "default" else None)
+    theme = request.cookies.get("c-theme", DEFAULT_THEME)
+    if theme not in THEMES:
+        theme = DEFAULT_THEME
+    # None tells render_template() to skip the themed lookup.
+    set_theme(theme if theme != "default" else None)
+
+
+def _active_theme() -> str:
+    """Return the resolved active theme name (never None)."""
+    from engine.templates import get_theme
+    return get_theme() or "default"
 
 
 def _theme_css() -> str | None:
     """Return the CSS filename for the active theme, or None."""
-    from engine.templates import get_theme
-    theme = get_theme()
-    return THEME_CSS.get(theme) if theme else None
+    return THEME_CSS.get(_active_theme())
+
+
+def _page_context() -> dict:
+    """Shared context for page.html: theme CSS + selector state."""
+    return {
+        "theme_css": _theme_css(),
+        "theme_names": THEME_NAMES,
+        "active_theme": _active_theme(),
+    }
 
 
 def get_page(instance_id: str):
@@ -114,8 +140,8 @@ def deepdive():
     if wants_html(request):
         html = Markup(pg.render())
         return render_template("page.html", page_html=html, title=pg.label,
-                               instance_id="deepdive", theme_css=_theme_css(),
-                               active_page="deepdive")
+                               instance_id="deepdive", active_page="deepdive",
+                               **_page_context())
     return jsonify(pg.serialize())
 
 
@@ -132,8 +158,8 @@ def deepdive_component(path):
         if wants_html(request):
             html = Markup(ef.render())
             return render_template("page.html", page_html=html, title=ef.label,
-                                   instance_id="deepdive", theme_css=_theme_css(),
-                                   active_page="deepdive")
+                                   instance_id="deepdive", active_page="deepdive",
+                                   **_page_context())
         return jsonify(ef.serialize())
     result = pg.handle_action(path, request.json)
     if result is None:
@@ -411,8 +437,8 @@ def page(instance_id):
     if wants_html(request):
         html = Markup(pg.render())
         return render_template("page.html", page_html=html, title=pg.label,
-                               instance_id=instance_id, theme_css=_theme_css(),
-                               active_page="portal")
+                               instance_id=instance_id, active_page="portal",
+                               **_page_context())
     if request.args.get("depth") == "shallow":
         return jsonify(_shallow_serialize(pg))
     return jsonify(pg.serialize())
@@ -470,8 +496,8 @@ def component(instance_id, path):
         if wants_html(request):
             html = Markup(ef.render())
             return render_template("page.html", page_html=html, title=ef.label,
-                                   instance_id=instance_id, theme_css=_theme_css(),
-                                   active_page="portal")
+                                   instance_id=instance_id, active_page="portal",
+                                   **_page_context())
         return jsonify(ef.serialize())
 
     # POST — mutate

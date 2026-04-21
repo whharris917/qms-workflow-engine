@@ -1,0 +1,25 @@
+{# Stage BooleanForm — two large option cards. #}
+{% if data.edit_mode %}
+  {% include "boolean.html" %}
+{% else %}
+  {% set val = data.value %}
+
+  {% if val is not none %}
+    {% set display = data.true_label if val else data.false_label %}
+    {% set clear_body = {"action": "clear"}|tojson %}
+    <div class="st-plaque">
+      <span class="st-plaque-label">Answer</span>
+      <span class="st-plaque-value">{{ display }}</span>
+      <button class="st-plaque-edit" data-c-post="{{ url }}" data-c-body='{{ clear_body }}' title="POST {{ url }} {{ clear_body }}">edit</button>
+    </div>
+    {% for aff in data.affordances %}{% set _ = aff.update({"_rendered": true}) %}{% endfor %}
+  {% else %}
+    {% set true_body = {"value": true}|tojson %}
+    {% set false_body = {"value": false}|tojson %}
+    <div class="st-options">
+      <button class="st-option" data-c-post="{{ url }}" data-c-body='{{ true_body }}' title="POST {{ url }} {{ true_body }}">{{ data.true_label }}</button>
+      <button class="st-option" data-c-post="{{ url }}" data-c-body='{{ false_body }}' title="POST {{ url }} {{ false_body }}">{{ data.false_label }}</button>
+    </div>
+    {% for aff in data.affordances %}{% set _ = aff.update({"_rendered": true}) %}{% endfor %}
+  {% endif %}
+{% endif %}

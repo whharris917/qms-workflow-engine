@@ -8,20 +8,24 @@
     padding: 8px 12px;
 }
 
-/* --- Component wrapper (component.py render()) --- */
+/* --- Component wrapper (component.py render()) ---
 
-/* Base: full surrounding border (Default Theme / Supervisor View) */
+   Base is intentionally minimal — no border, no padding. Themes layer
+   their chrome on top via body[data-theme="..."] selectors. The empty-
+   slate baseline is what lets multiple themes coexist without fighting
+   each other with !important. */
 .component {
-    border: 2px solid #888;
-    padding: 30px 12px 12px 12px;
     margin: 8px 0;
     position: relative;
 }
-.component.component--complete {
-    border-color: #2a2;
+
+/* JSON pane / view toggle: hidden by default; the "debug" theme
+   reveals them. All other themes treat the agent JSON as noise. */
+.c-view-toggle {
+    display: none;
 }
-.component.component--editing {
-    border-style: dashed;
+.c-json-pane {
+    display: none;
 }
 
 /* Titlebar (label + chrome buttons) */
@@ -689,7 +693,7 @@
     background: #f0f0f0;
 }
 
-/* --- Page footer (debug toggle) --- */
+/* --- Page footer (theme picker) --- */
 .c-page-footer {
     display: flex;
     justify-content: flex-end;
@@ -697,77 +701,51 @@
     margin-top: 24px;
     border-top: 1px solid #e0e0e0;
 }
-.c-debug-toggle {
+.c-theme-picker {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 11px;
-    cursor: pointer;
     color: #aaa;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     user-select: none;
 }
-.c-debug-toggle input[type="checkbox"] {
+.c-theme-picker select {
+    font: inherit;
     cursor: pointer;
+    padding: 2px 4px;
 }
 
-/* === Operator View ===
-   Suppresses chrome (view toggle, edit buttons, JSON pane).
-   Default theme: left accent on data forms, no border on containers.
-   Non-default themes: no prescription — theme CSS handles it. */
-body.operator-view .c-view-toggle {
-    display: none !important;
-}
-body.operator-view .c-json-pane {
-    display: none !important;
-}
-
-/* Operator View + Default theme: left accent on data forms only */
-body.operator-view:not([data-theme]) .component,
-body.operator-view[data-theme="default"] .component {
-    border: none;
+/* === Default theme ===
+   Minimal: left accent on data forms, nothing on containers.
+   Empty-slate convention: data forms get a left stripe that turns
+   green when complete; containers stay transparent. */
+body:not([data-theme]) .component,
+body[data-theme="default"] .component {
     border-left: 3px solid #d0d0d0;
     padding: 8px 12px;
     margin: 6px 0;
 }
-body.operator-view:not([data-theme]) .component.component--complete,
-body.operator-view[data-theme="default"] .component.component--complete {
+body:not([data-theme]) .component.component--complete,
+body[data-theme="default"] .component.component--complete {
     border-left-color: #2a2;
 }
-body.operator-view:not([data-theme]) .component.component--editing,
-body.operator-view[data-theme="default"] .component.component--editing {
+body:not([data-theme]) .component.component--editing,
+body[data-theme="default"] .component.component--editing {
     border: 2px dashed #d0d0d0;
     padding: 8px 12px;
 }
-body.operator-view:not([data-theme]) .component.component--editing.component--complete,
-body.operator-view[data-theme="default"] .component.component--editing.component--complete {
+body:not([data-theme]) .component.component--editing.component--complete,
+body[data-theme="default"] .component.component--editing.component--complete {
     border-color: #2a2;
 }
-/* Containers: no border in operator default */
-body.operator-view:not([data-theme]) .component[data-form="page"],
-body.operator-view:not([data-theme]) .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]),
-body.operator-view:not([data-theme]) .component[data-form="group"],
-body.operator-view:not([data-theme]) .component[data-form="visibility"],
-body.operator-view:not([data-theme]) .component[data-form="switch"],
-body.operator-view:not([data-theme]) .component[data-form="repeater"],
-body.operator-view[data-theme="default"] .component[data-form="page"],
-body.operator-view[data-theme="default"] .component:is([data-form="tabs"],[data-form="sequence"],[data-form="accordion"]),
-body.operator-view[data-theme="default"] .component[data-form="group"],
-body.operator-view[data-theme="default"] .component[data-form="visibility"],
-body.operator-view[data-theme="default"] .component[data-form="switch"],
-body.operator-view[data-theme="default"] .component[data-form="repeater"] {
+/* Containers: no accent stripe — they don't carry a "complete"
+   signal the way data forms do. */
+body:not([data-theme]) .c-container,
+body[data-theme="default"] .c-container {
     border-left: none;
     padding-left: 0;
 }
-
-/* Operator View + non-default theme: strip all component borders so
-   the theme CSS starts from a clean slate */
-body.operator-view[data-theme]:not([data-theme="default"]) .component {
-    border: none;
-}
-
-/* === Supervisor View (Debug Mode: On) ===
-   Default theme. Full surrounding borders. All chrome visible. */
 
 /* === Error boundary (render_safely on render failure) ===
    Structured placeholder rendered when a component's render() raises.

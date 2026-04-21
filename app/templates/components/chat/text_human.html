@@ -1,0 +1,30 @@
+{# Chat TextForm — Q bubble + reply area (input) OR answer bubble (value). #}
+{% if edit_mode %}
+  {% include "text_human.html" %}
+{% else %}
+  {% for aff in data.affordances %}{% set _ = aff.update({"_rendered": true}) %}{% endfor %}
+
+  {% include "chat/_ask.html" %}
+
+  {% if has_data and value %}
+    {% set clear_body = {"action": "clear"}|tojson %}
+    <div class="ch-bubble ch-bubble--reply">
+      <div class="ch-avatar ch-avatar--reply">You</div>
+      <div class="ch-bubble-body">
+        <p class="ch-bubble-value">{{ value|string }}</p>
+        <button class="ch-bubble-edit" data-c-post="{{ url }}" data-c-body='{{ clear_body }}' title="POST {{ url }} {{ clear_body }}">edit</button>
+      </div>
+    </div>
+  {% else %}
+    <div class="ch-reply-area">
+      <form data-c-submit="{{ url }}">
+        {% if multiline %}
+          <textarea name="value" placeholder="Type your answer…" rows="3"></textarea>
+        {% else %}
+          <input name="value" type="text" placeholder="Type your answer…">
+        {% endif %}
+        <button type="submit" class="ch-send">Send</button>
+      </form>
+    </div>
+  {% endif %}
+{% endif %}

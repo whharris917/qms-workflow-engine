@@ -1,0 +1,80 @@
+{# Paper theme wrapper.
+
+   Three wrapper shapes by role:
+
+   - Page: large title + lead paragraph, no border.
+   - Container (tabs/sequence/accordion/group/etc.): light section header.
+   - Data form: left-border block with title row (label + status + chrome).
+
+   The completion state is indicated by the left-border color on data
+   forms and by a small "complete" tag in the title row.
+
+   Context: same as default wrapper.html —
+     classes, form, key, uid, label, instruction, editable, edit_mode,
+     undo_count, url, inner, json_str, is_container
+#}
+{% set cls_str = classes|join(" ") %}
+{% set complete = "component--complete" in classes %}
+<div class="{{ cls_str }}" data-form="{{ form }}" data-key="{{ key }}" data-url="{{ url }}">
+
+{% if form == "page" %}
+  <h1 class="p-page-title">{{ label }}</h1>
+  {% if instruction %}<p class="p-page-lead">{{ instruction }}</p>{% endif %}
+  {{ inner|safe }}
+
+{% elif form == "info" %}
+  {# InfoDisplay is content, not interaction — let the template own the
+     whole presentation without the form-title chrome. #}
+  {{ inner|safe }}
+
+{% elif is_container %}
+  <section class="p-section">
+    <h2 class="p-section-title">
+      {{ label }}
+      {% if editable %}
+      <span class="c-chrome" style="margin-left: 0.8em; font-size: 0.7em; font-weight: 400;">
+      {% if edit_mode %}
+        <button data-c-post="{{ url }}" data-c-body="{{ {"action": "set_mode", "mode": "execute"}|tojson }}" class="c-chrome-btn" title="exit edit mode">done editing</button>
+        {% if undo_count > 0 %}
+        <button data-c-post="{{ url }}" data-c-body="{{ {"action": "undo"}|tojson }}" class="c-chrome-btn" title="Undo ({{ undo_count }})">undo</button>
+        {% endif %}
+        <button data-c-post="{{ url }}" data-c-body="{{ {"action": "discard"}|tojson }}" class="c-chrome-btn" title="discard">discard</button>
+      {% else %}
+        <button data-c-post="{{ url }}" data-c-body="{{ {"action": "set_mode", "mode": "edit"}|tojson }}" class="c-chrome-btn" title="edit">edit</button>
+      {% endif %}
+      </span>
+      {% endif %}
+    </h2>
+    {% if instruction %}<p class="p-section-instr">{{ instruction }}</p>{% endif %}
+    {{ inner|safe }}
+  </section>
+
+{% else %}
+  <div class="p-form">
+    <div class="p-form-title">
+      <span>{{ label }}</span>
+      {% if complete and not edit_mode %}
+        <span class="p-status">complete</span>
+      {% elif edit_mode %}
+        <span class="p-status">editing</span>
+      {% endif %}
+      {% if editable %}
+      <span class="c-chrome" style="margin-left: auto;">
+      {% if edit_mode %}
+        <button data-c-post="{{ url }}" data-c-body="{{ {"action": "set_mode", "mode": "execute"}|tojson }}" class="c-chrome-btn" title="exit edit mode">done editing</button>
+        {% if undo_count > 0 %}
+        <button data-c-post="{{ url }}" data-c-body="{{ {"action": "undo"}|tojson }}" class="c-chrome-btn" title="Undo ({{ undo_count }})">undo</button>
+        {% endif %}
+        <button data-c-post="{{ url }}" data-c-body="{{ {"action": "discard"}|tojson }}" class="c-chrome-btn" title="discard">discard</button>
+      {% else %}
+        <button data-c-post="{{ url }}" data-c-body="{{ {"action": "set_mode", "mode": "edit"}|tojson }}" class="c-chrome-btn" title="edit">edit</button>
+      {% endif %}
+      </span>
+      {% endif %}
+    </div>
+    {% if instruction and not complete %}<p class="p-form-instr">{{ instruction }}</p>{% endif %}
+    {{ inner|safe }}
+  </div>
+{% endif %}
+
+</div>

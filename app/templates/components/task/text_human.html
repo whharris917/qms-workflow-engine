@@ -1,0 +1,26 @@
+{# Stage TextForm: DONE → plaque; active → input + Send CTA. #}
+{% if edit_mode %}
+  {% include "text_human.html" %}
+{% else %}
+  {% for aff in data.affordances %}{% set _ = aff.update({"_rendered": true}) %}{% endfor %}
+
+  {% if has_data and value %}
+    {% set clear_body = {"action": "clear"}|tojson %}
+    <div class="st-plaque">
+      <span class="st-plaque-label">Answer</span>
+      <span class="st-plaque-value">{{ value|string }}</span>
+      <button class="st-plaque-edit" data-c-post="{{ url }}" data-c-body='{{ clear_body }}' title="POST {{ url }} {{ clear_body }}">edit</button>
+    </div>
+  {% else %}
+    <div class="st-input">
+      <form data-c-submit="{{ url }}">
+        {% if multiline %}
+          <textarea name="value" rows="3" placeholder="Speak your line…"></textarea>
+        {% else %}
+          <input name="value" type="text" placeholder="Speak your line…">
+        {% endif %}
+        <button type="submit">Take the stage →</button>
+      </form>
+    </div>
+  {% endif %}
+{% endif %}

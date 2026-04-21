@@ -1,0 +1,498 @@
+/* ===================================================================
+   Bright Liquid Glass Theme
+
+   Pastel-gradient background with frosted-glass component cards.
+   Apple-inspired: translucent white surfaces, backdrop blur, soft
+   blue-tinted shadows, rounded everything. High-legibility dark text
+   on bright surfaces — "bright" over "frosted dark".
+
+   Everything layers on top of the bare-bones base in style.css.
+   No template overrides — structure is unchanged; only presentation.
+   =================================================================== */
+
+/* ---------- Palette (local custom properties for legibility) ---------- */
+body[data-theme="liquid-glass"] {
+    --lg-surface: rgba(255, 255, 255, 0.55);
+    --lg-surface-hover: rgba(255, 255, 255, 0.75);
+    --lg-surface-solid: rgba(255, 255, 255, 0.9);
+    --lg-border: rgba(255, 255, 255, 0.8);
+    --lg-border-soft: rgba(140, 160, 200, 0.25);
+    --lg-sheen: inset 0 1px 0 rgba(255, 255, 255, 0.95);
+    --lg-shadow: 0 8px 32px rgba(31, 38, 135, 0.12);
+    --lg-shadow-raised: 0 12px 40px rgba(31, 38, 135, 0.18);
+    --lg-blur: saturate(180%) blur(20px);
+
+    --lg-text: #1a1a2e;
+    --lg-text-muted: #4a5168;
+    --lg-text-subtle: #7682a0;
+
+    --lg-accent: #007aff;
+    --lg-accent-soft: rgba(0, 122, 255, 0.12);
+    --lg-complete: #34c759;
+    --lg-complete-soft: rgba(52, 199, 89, 0.18);
+    --lg-editing: #af52de;
+    --lg-danger: #ff3b30;
+    --lg-danger-soft: rgba(255, 59, 48, 0.12);
+
+    --lg-radius-card: 16px;
+    --lg-radius-control: 10px;
+    --lg-radius-pill: 999px;
+}
+
+/* ---------- Body / page canvas ---------- */
+body[data-theme="liquid-glass"] {
+    background:
+        radial-gradient(at 20% 10%, #ffd6ec 0%, transparent 50%),
+        radial-gradient(at 80% 0%, #c8e0ff 0%, transparent 50%),
+        radial-gradient(at 50% 100%, #e8d5ff 0%, transparent 50%),
+        linear-gradient(135deg, #e8f1ff 0%, #f0e6ff 50%, #ffe6f2 100%);
+    background-attachment: fixed;
+    color: var(--lg-text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "SF Pro Display", sans-serif;
+    font-size: 13px;
+}
+
+body[data-theme="liquid-glass"] #page-content {
+    padding-left: 8%;
+    padding-right: 8%;
+    padding-top: 16px;
+}
+
+/* ---------- Component card (glass surface) ---------- */
+body[data-theme="liquid-glass"] .component {
+    background: var(--lg-surface);
+    backdrop-filter: var(--lg-blur);
+    -webkit-backdrop-filter: var(--lg-blur);
+    border: 1px solid var(--lg-border);
+    border-radius: var(--lg-radius-card);
+    box-shadow: var(--lg-shadow), var(--lg-sheen);
+    padding: 16px 20px;
+    margin: 14px 0;
+    transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+}
+
+/* Containers: transparent — don't double-glass the nesting. Let the
+   top-level glass card be the only visible pane unless a container
+   specifically needs its own surface. */
+body[data-theme="liquid-glass"] .c-container {
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 14px 0;
+}
+
+/* Page: transparent outermost wrapper with bottom margin */
+body[data-theme="liquid-glass"] .component[data-form="page"] {
+    padding: 0;
+    margin: 0;
+}
+
+body[data-theme="liquid-glass"] .component[data-form="page"] > h2 {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--lg-text);
+    margin: 0 0 4px 0;
+    letter-spacing: -0.01em;
+}
+body[data-theme="liquid-glass"] .component[data-form="page"] > h2 + p {
+    color: var(--lg-text-muted);
+    margin: 0 0 20px 0;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--lg-border-soft);
+}
+
+/* Completion glow */
+body[data-theme="liquid-glass"] .component.component--complete {
+    border-color: var(--lg-complete);
+    box-shadow:
+        var(--lg-shadow),
+        var(--lg-sheen),
+        0 0 0 3px var(--lg-complete-soft);
+}
+body[data-theme="liquid-glass"] .c-container.component--complete {
+    border: none;
+    box-shadow: none;
+}
+
+/* Editing outline (subtle violet instead of harsh dashed) */
+body[data-theme="liquid-glass"] .component.component--editing {
+    border-color: var(--lg-editing);
+    box-shadow:
+        var(--lg-shadow),
+        var(--lg-sheen),
+        0 0 0 3px rgba(175, 82, 222, 0.18);
+}
+
+/* ---------- Typography ---------- */
+body[data-theme="liquid-glass"] h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--lg-text);
+    margin: 0 0 6px 0;
+    letter-spacing: -0.005em;
+}
+body[data-theme="liquid-glass"] p {
+    color: var(--lg-text-muted);
+    line-height: 1.55;
+    margin: 0 0 10px 0;
+}
+body[data-theme="liquid-glass"] label {
+    color: var(--lg-text-muted);
+    font-size: 12px;
+}
+
+/* ---------- Titlebar ---------- */
+body[data-theme="liquid-glass"] .c-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: -4px -4px 10px -4px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--lg-border-soft);
+}
+body[data-theme="liquid-glass"] .c-titlebar__label {
+    display: inline;
+    font-weight: 600;
+    color: var(--lg-text);
+    font-size: 13px;
+}
+body[data-theme="liquid-glass"] .c-titlebar__spacer {
+    display: inline;
+    flex: 1;
+}
+
+/* ---------- Chrome buttons ---------- */
+body[data-theme="liquid-glass"] .c-chrome-btn {
+    background: var(--lg-surface-solid);
+    border: 1px solid var(--lg-border-soft);
+    border-radius: var(--lg-radius-pill);
+    color: var(--lg-text-muted);
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(31, 38, 135, 0.08);
+}
+body[data-theme="liquid-glass"] .c-chrome-btn:hover {
+    background: white;
+    color: var(--lg-text);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(31, 38, 135, 0.12);
+}
+
+/* ---------- Inputs / textareas / selects ---------- */
+body[data-theme="liquid-glass"] input[type="text"],
+body[data-theme="liquid-glass"] input[type="number"],
+body[data-theme="liquid-glass"] input[type="date"],
+body[data-theme="liquid-glass"] input[type="datetime-local"],
+body[data-theme="liquid-glass"] input[type="email"],
+body[data-theme="liquid-glass"] input[type="url"],
+body[data-theme="liquid-glass"] input[type="password"],
+body[data-theme="liquid-glass"] input[type="search"],
+body[data-theme="liquid-glass"] textarea,
+body[data-theme="liquid-glass"] select {
+    background: var(--lg-surface-solid);
+    border: 1px solid var(--lg-border-soft);
+    border-radius: var(--lg-radius-control);
+    color: var(--lg-text);
+    padding: 6px 10px;
+    font: inherit;
+    font-size: 13px;
+    box-shadow: inset 0 1px 2px rgba(31, 38, 135, 0.04);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+body[data-theme="liquid-glass"] input:focus,
+body[data-theme="liquid-glass"] textarea:focus,
+body[data-theme="liquid-glass"] select:focus {
+    outline: none;
+    border-color: var(--lg-accent);
+    box-shadow:
+        inset 0 1px 2px rgba(31, 38, 135, 0.04),
+        0 0 0 3px var(--lg-accent-soft);
+}
+body[data-theme="liquid-glass"] textarea {
+    line-height: 1.5;
+    resize: vertical;
+}
+
+/* Checkbox / radio — keep native look but recolor */
+body[data-theme="liquid-glass"] input[type="checkbox"],
+body[data-theme="liquid-glass"] input[type="radio"] {
+    accent-color: var(--lg-accent);
+    transform: scale(1.05);
+    cursor: pointer;
+}
+
+/* Range slider */
+body[data-theme="liquid-glass"] input[type="range"] {
+    accent-color: var(--lg-accent);
+}
+
+/* ---------- Buttons (generic POST buttons and affordances) ---------- */
+body[data-theme="liquid-glass"] button[data-c-post],
+body[data-theme="liquid-glass"] button[data-c-submit],
+body[data-theme="liquid-glass"] .c-aff-btn {
+    background: var(--lg-accent);
+    color: white;
+    border: none;
+    border-radius: var(--lg-radius-pill);
+    padding: 6px 14px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow:
+        0 1px 2px rgba(0, 122, 255, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    transition: all 0.18s ease;
+}
+body[data-theme="liquid-glass"] button[data-c-post]:hover,
+body[data-theme="liquid-glass"] button[data-c-submit]:hover,
+body[data-theme="liquid-glass"] .c-aff-btn:hover {
+    background: #0069e5;
+    transform: translateY(-1px);
+    box-shadow:
+        0 3px 8px rgba(0, 122, 255, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* Chrome, icon, confirm, remove, arrow, clear buttons need their own
+   treatments — the generic blue pill would be wrong. We re-override
+   with higher specificity below. */
+
+/* Chrome buttons keep the ghost treatment (already defined above) */
+body[data-theme="liquid-glass"] button.c-chrome-btn {
+    background: var(--lg-surface-solid);
+    color: var(--lg-text-muted);
+    border: 1px solid var(--lg-border-soft);
+    box-shadow: 0 1px 3px rgba(31, 38, 135, 0.08);
+    padding: 0;
+}
+body[data-theme="liquid-glass"] button.c-chrome-btn:hover {
+    background: white;
+    color: var(--lg-text);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(31, 38, 135, 0.12);
+}
+
+/* Icon buttons (small 24x24 pencil/lock/delete) */
+body[data-theme="liquid-glass"] button.c-icon-btn {
+    background: var(--lg-surface-solid);
+    color: var(--lg-text-muted);
+    border: 1px solid var(--lg-border-soft);
+    border-radius: var(--lg-radius-control);
+    box-shadow: 0 1px 2px rgba(31, 38, 135, 0.06);
+    padding: 0;
+    transition: all 0.18s ease;
+}
+body[data-theme="liquid-glass"] button.c-icon-btn:hover {
+    background: white;
+    color: var(--lg-text);
+}
+body[data-theme="liquid-glass"] button.c-icon-btn--active {
+    background: var(--lg-accent-soft);
+    color: var(--lg-accent);
+    border-color: var(--lg-accent);
+}
+body[data-theme="liquid-glass"] button.c-icon-btn--danger {
+    background: var(--lg-danger-soft);
+    color: var(--lg-danger);
+    border-color: rgba(255, 59, 48, 0.3);
+}
+body[data-theme="liquid-glass"] button.c-icon-btn--danger:hover {
+    background: var(--lg-danger);
+    color: white;
+    border-color: var(--lg-danger);
+}
+
+/* Confirm (green), remove (red), arrow (blue) inline action buttons */
+body[data-theme="liquid-glass"] button.c-btn-confirm {
+    background: var(--lg-complete-soft);
+    color: var(--lg-complete);
+    border: 1px solid rgba(52, 199, 89, 0.4);
+    border-radius: var(--lg-radius-control);
+}
+body[data-theme="liquid-glass"] button.c-btn-confirm:hover {
+    background: var(--lg-complete);
+    color: white;
+}
+body[data-theme="liquid-glass"] button.c-btn-remove {
+    background: var(--lg-surface-solid);
+    color: var(--lg-text-muted);
+    border: 1px solid var(--lg-border-soft);
+    border-radius: var(--lg-radius-control);
+}
+body[data-theme="liquid-glass"] button.c-btn-remove:hover {
+    background: var(--lg-danger);
+    color: white;
+    border-color: var(--lg-danger);
+}
+body[data-theme="liquid-glass"] button.c-btn-arrow {
+    background: var(--lg-surface-solid);
+    color: var(--lg-text-muted);
+    border: 1px solid var(--lg-border-soft);
+    border-radius: var(--lg-radius-control);
+}
+body[data-theme="liquid-glass"] button.c-btn-arrow:hover {
+    background: var(--lg-accent-soft);
+    color: var(--lg-accent);
+    border-color: var(--lg-accent);
+}
+
+/* Clear (ghost) button */
+body[data-theme="liquid-glass"] button.c-btn-clear {
+    background: transparent;
+    color: var(--lg-text-subtle);
+    border: 1px solid var(--lg-border-soft);
+    border-radius: var(--lg-radius-pill);
+    box-shadow: none;
+}
+body[data-theme="liquid-glass"] button.c-btn-clear:hover {
+    background: var(--lg-danger-soft);
+    color: var(--lg-danger);
+    border-color: rgba(255, 59, 48, 0.3);
+    transform: none;
+}
+
+/* ---------- Navigation (tabs) ---------- */
+/* The .c-nav-bar is the tab strip; .c-nav-tab is each tab button. */
+body[data-theme="liquid-glass"] .c-nav-bar {
+    display: flex;
+    gap: 6px;
+    background: var(--lg-surface);
+    backdrop-filter: var(--lg-blur);
+    -webkit-backdrop-filter: var(--lg-blur);
+    border: 1px solid var(--lg-border);
+    border-radius: var(--lg-radius-pill);
+    padding: 4px;
+    box-shadow: var(--lg-shadow), var(--lg-sheen);
+    margin-bottom: 12px;
+}
+
+body[data-theme="liquid-glass"] .c-nav-tab {
+    background: transparent;
+    border: none;
+    color: var(--lg-text-muted);
+    border-radius: var(--lg-radius-pill);
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    box-shadow: none;
+}
+body[data-theme="liquid-glass"] .c-nav-tab:hover {
+    background: var(--lg-surface-hover);
+    color: var(--lg-text);
+    transform: none;
+}
+body[data-theme="liquid-glass"] .c-nav-tab.c-nav-tab--active {
+    background: white;
+    color: var(--lg-accent);
+    box-shadow: 0 1px 3px rgba(31, 38, 135, 0.12);
+}
+body[data-theme="liquid-glass"] .c-nav-tab.c-nav-tab--complete {
+    color: var(--lg-complete);
+}
+body[data-theme="liquid-glass"] .c-nav-tab.c-nav-tab--locked {
+    color: var(--lg-text-subtle);
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+body[data-theme="liquid-glass"] .c-nav-content {
+    padding: 4px 0;
+}
+
+/* Navigation instruction sits under the titlebar, above the tab bar */
+body[data-theme="liquid-glass"] .c-nav-instruction {
+    color: var(--lg-text-muted);
+    font-size: 12px;
+    margin: 0 0 10px 0;
+}
+
+/* Page > Navigation stays horizontal here — we skip the sleek
+   vertical-sidebar treatment because the glass language already
+   provides enough visual separation via card edges. */
+
+/* ---------- Group ---------- */
+body[data-theme="liquid-glass"] .component[data-form="group"] {
+    background: var(--lg-surface);
+    backdrop-filter: var(--lg-blur);
+    -webkit-backdrop-filter: var(--lg-blur);
+    border: 1px solid var(--lg-border);
+    border-radius: var(--lg-radius-card);
+    box-shadow: var(--lg-shadow), var(--lg-sheen);
+    padding: 14px 18px;
+    margin: 14px 0;
+}
+
+/* ---------- Remaining affordances row (end of a container) ---------- */
+body[data-theme="liquid-glass"] .c-remaining-affs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 12px;
+}
+
+/* ---------- Feedback banner ---------- */
+body[data-theme="liquid-glass"] .c-feedback,
+body[data-theme="liquid-glass"] .ef-feedback {
+    background: var(--lg-surface-solid);
+    backdrop-filter: var(--lg-blur);
+    -webkit-backdrop-filter: var(--lg-blur);
+    border: 1px solid var(--lg-border);
+    border-radius: var(--lg-radius-control);
+    padding: 10px 14px;
+    margin: 10px 0;
+    box-shadow: var(--lg-shadow);
+}
+
+/* ---------- Edit mode header ---------- */
+body[data-theme="liquid-glass"] .c-edit-label-form input,
+body[data-theme="liquid-glass"] .c-edit-instr-form input,
+body[data-theme="liquid-glass"] .c-edit-instr-form textarea {
+    background: rgba(255, 255, 255, 0.75);
+    border: 1px dashed var(--lg-editing);
+    border-radius: var(--lg-radius-control);
+}
+
+/* Depends-on line (sibling dependency visibility) */
+body[data-theme="liquid-glass"] .c-depends-on {
+    color: var(--lg-text-subtle);
+    font-size: 11px;
+    font-style: italic;
+}
+body[data-theme="liquid-glass"] .c-depends-on a {
+    color: var(--lg-accent);
+    text-decoration: none;
+}
+body[data-theme="liquid-glass"] .c-depends-on a:hover {
+    text-decoration: underline;
+}
+
+/* ---------- Theme picker in footer ---------- */
+body[data-theme="liquid-glass"] .c-page-footer {
+    border-top: 1px solid var(--lg-border-soft);
+}
+body[data-theme="liquid-glass"] .c-theme-picker {
+    color: var(--lg-text-muted);
+}
+body[data-theme="liquid-glass"] .c-theme-picker select {
+    background: var(--lg-surface-solid);
+    border: 1px solid var(--lg-border-soft);
+    border-radius: var(--lg-radius-pill);
+    padding: 4px 10px;
+    color: var(--lg-text);
+}
+
+/* ---------- Error boundary ---------- */
+body[data-theme="liquid-glass"] .c-error-boundary {
+    background: rgba(255, 220, 220, 0.7);
+    backdrop-filter: var(--lg-blur);
+    -webkit-backdrop-filter: var(--lg-blur);
+    border: 1px solid rgba(255, 59, 48, 0.4);
+    border-radius: var(--lg-radius-card);
+    box-shadow: var(--lg-shadow);
+    color: #5a1010;
+}

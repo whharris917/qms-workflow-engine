@@ -1,0 +1,18 @@
+{# Stage InfoDisplay — rendered in wrapper as the note performer. Just
+   produce body text. #}
+{% if data.edit_mode %}
+  {% include "info.html" %}
+{% else %}
+  {% if data.text %}
+    {% for line in data.text.split('\n') %}
+      {% if line %}<p style="margin: 3px 0; color: var(--st-text-dim); font-size: 0.93em;">{{ line }}</p>{% endif %}
+    {% endfor %}
+  {% endif %}
+  {% set pending = [] %}
+  {% for aff in data.affordances %}
+    {% if not aff._rendered %}{% set _ = pending.append(aff) %}{% endif %}
+  {% endfor %}
+  {% if pending %}
+    <div class="st-input" style="margin-top: 8px;">{% for aff in pending %}{{ render_aff(aff) }}{% endfor %}</div>
+  {% endif %}
+{% endif %}

@@ -1,0 +1,27 @@
+{# Paper BooleanForm.
+
+   Complete: "<label> [change]"
+   Incomplete: two large buttons ([true_label] / [false_label]).
+#}
+{% if data.edit_mode %}
+  {% include "boolean.html" %}
+{% else %}
+  {% set val = data.value %}
+
+  {% if val is not none %}
+    {% set clear_body = {"action": "clear"}|tojson %}
+    {% set display = data.true_label if val else data.false_label %}
+    <div class="p-completed">
+      <span class="p-completed-value">{{ display }}</span>
+      <button class="p-link" data-c-post="{{ url }}" data-c-body='{{ clear_body }}' title="POST {{ url }} {{ clear_body }}">change</button>
+    </div>
+    {# Mark all affordances rendered — we handled the interaction as 'change'. #}
+    {% for aff in data.affordances %}{% set _ = aff.update({"_rendered": true}) %}{% endfor %}
+  {% else %}
+    <div class="p-form-actions">
+    {% for aff in data.affordances %}
+      {% if not aff._rendered %}{{ render_aff(aff) }}{% endif %}
+    {% endfor %}
+    </div>
+  {% endif %}
+{% endif %}

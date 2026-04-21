@@ -1,0 +1,39 @@
+{# Chat NumberForm. #}
+{% if data.edit_mode %}
+  {% include "number.html" %}
+{% else %}
+  {% for aff in data.affordances %}{% set _ = aff.update({"_rendered": true}) %}{% endfor %}
+
+  {% set val = data.value %}
+  {% set unit = data.unit or "" %}
+  {% set constraint_parts = [] %}
+  {% if data.min is not none %}{% set _ = constraint_parts.append("min " ~ data.min|string) %}{% endif %}
+  {% if data.max is not none %}{% set _ = constraint_parts.append("max " ~ data.max|string) %}{% endif %}
+  {% if data.step is not none %}{% set _ = constraint_parts.append("step " ~ data.step|string) %}{% endif %}
+  {% if unit %}{% set _ = constraint_parts.append(unit) %}{% endif %}
+  {% set hint = constraint_parts|join(" · ") if constraint_parts else "" %}
+
+  {% include "chat/_ask.html" %}
+
+  {% if val is not none %}
+    {% set clear_body = {"action": "clear"}|tojson %}
+    <div class="ch-bubble ch-bubble--reply">
+      <div class="ch-avatar ch-avatar--reply">You</div>
+      <div class="ch-bubble-body">
+        <p class="ch-bubble-value">{{ val }}{% if unit %} {{ unit }}{% endif %}</p>
+        <button class="ch-bubble-edit" data-c-post="{{ url }}" data-c-body='{{ clear_body }}' title="POST {{ url }} {{ clear_body }}">edit</button>
+      </div>
+    </div>
+  {% else %}
+    <div class="ch-reply-area">
+      <form data-c-submit="{{ url }}">
+        <input name="value" type="number"
+          {% if data.min is not none %}min="{{ data.min }}"{% endif %}
+          {% if data.max is not none %}max="{{ data.max }}"{% endif %}
+          {% if data.step is not none %}step="{{ data.step }}"{% endif %}
+          placeholder="Type a number…">
+        <button type="submit" class="ch-send">Send</button>
+      </form>
+    </div>
+  {% endif %}
+{% endif %}

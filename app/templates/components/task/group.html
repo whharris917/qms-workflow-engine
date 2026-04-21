@@ -1,0 +1,13 @@
+{# Stage Group — wrapper rendered the huddle shell. Children chain inside. #}
+{% if data.edit_mode %}
+  {% include "group.html" %}
+{% else %}
+  {% for html in children_html %}{{ html|safe }}{% endfor %}
+  {% set pending = [] %}
+  {% for aff in data.affordances %}
+    {% if not aff._rendered %}{% set _ = pending.append(aff) %}{% endif %}
+  {% endfor %}
+  {% if pending %}
+    <div style="display: flex; justify-content: center; gap: 10px; margin-top: 14px;">{% for aff in pending %}{{ render_aff(aff) }}{% endfor %}</div>
+  {% endif %}
+{% endif %}

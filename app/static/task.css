@@ -1,0 +1,985 @@
+/* ===================================================================
+   Task Theme — Theatrical Stage
+   ===================================================================
+
+   The page is a stage. Each container type has its own visual
+   idiom — not a variant, but a distinct shape:
+
+     Tabs      → MARQUEE CAROUSEL: active tab centered in a spotlight,
+                 siblings fan out as dim peripheral thumbnails.
+
+     Sequence  → MILESTONE TRAIL: horizontal path with numbered
+                 stations; past stations are lit, active pulses, future
+                 wait in shadow. Active station's content is in the
+                 foreground stage.
+
+     Accordion → DRESSER DRAWERS: stacked panels; each closed drawer
+                 shows just its spine + handle; open drawer slides
+                 forward with content displayed.
+
+     Group     → HUDDLE: children clustered inside an organic rounded
+                 blob, no rectilinear boundaries.
+
+   Data forms are PERFORMERS on the stage:
+     - Active:  front-and-center, bright, spotlit
+     - Done:    stepped back, smaller frame, answer on a plaque
+     - Note:    whispered from the wings, italic, sidelined
+
+   Deep indigo backdrop with warm cream typography and a single golden
+   spotlight. Gradients and radial lights do the visual heavy lifting;
+   the engine's existing DOM shape is unchanged.
+   =================================================================== */
+
+body[data-theme="task"] {
+    --st-bg:          #0a0a1e;
+    --st-bg-mid:      #13132e;
+    --st-stage:       #1c1c3a;
+    --st-frame:       #3a2f5c;
+    --st-frame-soft:  rgba(58, 47, 92, 0.5);
+    --st-inset:       rgba(255, 220, 94, 0.08);
+
+    --st-gold:        #ffdc5e;        /* spotlight primary */
+    --st-gold-soft:   rgba(255, 220, 94, 0.25);
+    --st-gold-deep:   #d4a82d;
+    --st-done:        #5eeac8;        /* mint-teal */
+    --st-done-soft:   rgba(94, 234, 200, 0.20);
+    --st-accent:      #ff6b9e;        /* coral pink */
+    --st-accent-soft: rgba(255, 107, 158, 0.22);
+    --st-violet:      #a78bfa;
+
+    --st-text:        #f5f0e0;        /* warm cream */
+    --st-text-dim:    #b8b2cf;
+    --st-muted:       #7d769c;
+    --st-subtle:      #4e4870;
+
+    --st-serif:       "Playfair Display", "Didot", "Bodoni MT", Georgia,
+                       "Times New Roman", serif;
+    --st-sans:        -apple-system, BlinkMacSystemFont, "Inter",
+                       "Segoe UI", Roboto, sans-serif;
+
+    background:
+        radial-gradient(ellipse at top, var(--st-gold-soft) 0%, transparent 45%),
+        radial-gradient(ellipse at 20% 70%, rgba(167, 139, 250, 0.14) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(255, 107, 158, 0.10) 0%, transparent 50%),
+        linear-gradient(180deg, var(--st-bg) 0%, var(--st-bg-mid) 100%);
+    background-attachment: fixed;
+    color: var(--st-text);
+    font-family: var(--st-sans);
+    font-size: 14px;
+    line-height: 1.55;
+    min-height: 100vh;
+}
+
+body[data-theme="task"] #page-content {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 32px 96px 32px;
+    position: relative;
+}
+
+/* Base component wrapper: no frame of its own. All visual structure
+   is provided by the containers and performer templates. */
+body[data-theme="task"] .component {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+}
+body[data-theme="task"] .c-container {
+    margin: 0;
+}
+
+/* =============================================================
+   THE STAGE — Page header
+   ============================================================= */
+body[data-theme="task"] .st-stage-head {
+    text-align: center;
+    margin: 0 0 40px 0;
+    padding: 24px 0 32px 0;
+    position: relative;
+}
+body[data-theme="task"] .st-stage-head::before {
+    /* Proscenium arch — a subtle top-curtain hint */
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -10%;
+    right: -10%;
+    height: 6px;
+    background: linear-gradient(90deg,
+        transparent 0%, var(--st-gold-deep) 50%, transparent 100%);
+    border-radius: 999px;
+    opacity: 0.55;
+}
+body[data-theme="task"] .st-stage-title {
+    font-family: var(--st-serif);
+    font-size: 3em;
+    font-weight: 700;
+    font-style: italic;
+    margin: 0 0 4px 0;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #ffedaa 0%, var(--st-gold) 40%,
+                                        var(--st-accent) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 4px 32px var(--st-gold-soft);
+}
+body[data-theme="task"] .st-stage-sub {
+    font-family: var(--st-sans);
+    color: var(--st-text-dim);
+    font-size: 1em;
+    margin: 8px auto 18px auto;
+    max-width: 56ch;
+    font-style: italic;
+}
+
+/* Progress ribbon — like a theater intermission clock */
+body[data-theme="task"] .st-ribbon {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    padding: 6px 20px;
+    background: rgba(255, 220, 94, 0.08);
+    border: 1px solid var(--st-gold-soft);
+    border-radius: 999px;
+    font-family: var(--st-sans);
+    font-size: 0.82em;
+    color: var(--st-gold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+body[data-theme="task"] .st-ribbon-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--st-gold);
+    box-shadow: 0 0 8px var(--st-gold);
+    animation: st-pulse 2s ease-in-out infinite;
+}
+@keyframes st-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.35; }
+}
+
+/* =============================================================
+   PERFORMER — Data-form task card
+   ============================================================= */
+body[data-theme="task"] .st-performer {
+    margin: 18px 0;
+    padding: 0;
+    position: relative;
+    transition: transform 0.2s ease;
+}
+
+body[data-theme="task"] .st-performer-frame {
+    background: linear-gradient(180deg, var(--st-stage) 0%, var(--st-bg-mid) 100%);
+    border: 1px solid var(--st-frame);
+    border-radius: 14px;
+    padding: 20px 24px;
+    position: relative;
+    box-shadow:
+        0 6px 24px rgba(0, 0, 0, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Active performer: spotlight from above + golden edge + hover lift */
+body[data-theme="task"] .st-performer--active .st-performer-frame {
+    background:
+        radial-gradient(ellipse at top,
+            var(--st-gold-soft) 0%, transparent 55%),
+        linear-gradient(180deg,
+            var(--st-stage) 0%, var(--st-bg-mid) 100%);
+    border-color: var(--st-gold);
+    box-shadow:
+        0 -4px 28px var(--st-gold-soft),
+        0 10px 32px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255, 220, 94, 0.25);
+}
+body[data-theme="task"] .st-performer--active::before {
+    /* Spotlight beam from above — subtle cone of light */
+    content: "";
+    position: absolute;
+    top: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 140px;
+    height: 40px;
+    background: radial-gradient(ellipse at bottom,
+        var(--st-gold-soft) 0%, transparent 70%);
+    pointer-events: none;
+    filter: blur(4px);
+}
+
+/* Done performer: stepped back, smaller, teal border */
+body[data-theme="task"] .st-performer--done .st-performer-frame {
+    background: linear-gradient(180deg,
+        rgba(28, 28, 58, 0.6) 0%, rgba(19, 19, 46, 0.6) 100%);
+    border-color: var(--st-done-soft);
+    padding: 14px 20px;
+    opacity: 0.85;
+}
+body[data-theme="task"] .st-performer--done:hover .st-performer-frame {
+    opacity: 1;
+}
+
+/* Note performer: no frame — whispered from the wings */
+body[data-theme="task"] .st-performer--note {
+    margin: 24px 8%;
+}
+body[data-theme="task"] .st-performer--note .st-performer-frame {
+    background: transparent;
+    border: none;
+    border-left: 3px solid var(--st-violet);
+    border-radius: 0;
+    padding: 8px 16px;
+    box-shadow: none;
+}
+body[data-theme="task"] .st-performer--note::before {
+    display: none;
+}
+
+/* Performer header: label + status tag */
+body[data-theme="task"] .st-performer-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+}
+body[data-theme="task"] .st-performer-label {
+    font-family: var(--st-serif);
+    font-size: 1.2em;
+    font-weight: 600;
+    color: var(--st-text);
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+    letter-spacing: -0.005em;
+}
+body[data-theme="task"] .st-performer--done .st-performer-label {
+    font-size: 1em;
+    color: var(--st-text-dim);
+}
+body[data-theme="task"] .st-performer--note .st-performer-label {
+    font-size: 0.98em;
+    font-style: italic;
+    color: var(--st-violet);
+}
+
+/* Status tags */
+body[data-theme="task"] .st-tag {
+    font-family: var(--st-sans);
+    font-size: 0.68em;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 999px;
+    white-space: nowrap;
+    line-height: 1.4;
+}
+body[data-theme="task"] .st-tag--active {
+    background: var(--st-gold);
+    color: #1a1100;
+    box-shadow: 0 0 14px var(--st-gold-soft);
+}
+body[data-theme="task"] .st-tag--active::before { content: "◆ "; }
+body[data-theme="task"] .st-tag--done {
+    background: var(--st-done-soft);
+    color: var(--st-done);
+    border: 1px solid rgba(94, 234, 200, 0.4);
+}
+body[data-theme="task"] .st-tag--done::before { content: "✓ "; }
+body[data-theme="task"] .st-tag--note {
+    background: rgba(167, 139, 250, 0.14);
+    color: var(--st-violet);
+    border: 1px solid rgba(167, 139, 250, 0.35);
+}
+
+body[data-theme="task"] .st-performer-instr {
+    color: var(--st-text-dim);
+    font-size: 0.94em;
+    margin: 0 0 12px 0;
+    font-style: italic;
+    line-height: 1.5;
+}
+body[data-theme="task"] .st-performer--note .st-performer-instr {
+    color: var(--st-muted);
+}
+
+/* Answer plaque for DONE performers */
+body[data-theme="task"] .st-plaque {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: linear-gradient(135deg,
+        rgba(94, 234, 200, 0.10) 0%, transparent 100%);
+    border: 1px solid var(--st-done-soft);
+    border-left-width: 3px;
+    border-radius: 8px;
+    padding: 8px 14px;
+    margin-top: 4px;
+}
+body[data-theme="task"] .st-plaque-label {
+    font-family: var(--st-sans);
+    font-size: 0.76em;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--st-muted);
+    font-weight: 600;
+}
+body[data-theme="task"] .st-plaque-value {
+    font-family: var(--st-serif);
+    font-size: 1.05em;
+    color: var(--st-done);
+    font-weight: 600;
+}
+body[data-theme="task"] .st-plaque-edit {
+    background: transparent;
+    color: var(--st-muted);
+    border: none;
+    padding: 0 0 0 6px;
+    font-family: var(--st-sans);
+    font-size: 0.78em;
+    text-decoration: underline;
+    cursor: pointer;
+    box-shadow: none;
+}
+body[data-theme="task"] .st-plaque-edit:hover {
+    color: var(--st-gold);
+    transform: none;
+}
+
+/* Input row for ACTIVE performers */
+body[data-theme="task"] .st-input {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-top: 10px;
+}
+body[data-theme="task"] .st-input form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+}
+body[data-theme="task"] input[type="text"],
+body[data-theme="task"] input[type="number"],
+body[data-theme="task"] input[type="date"],
+body[data-theme="task"] input[type="datetime-local"],
+body[data-theme="task"] input[type="email"],
+body[data-theme="task"] input[type="url"],
+body[data-theme="task"] input[type="search"],
+body[data-theme="task"] textarea,
+body[data-theme="task"] select {
+    background: rgba(10, 10, 30, 0.55);
+    border: 1px solid var(--st-frame);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-family: var(--st-sans);
+    font-size: 1em;
+    color: var(--st-text);
+    flex: 1;
+    min-width: 180px;
+}
+body[data-theme="task"] input::placeholder,
+body[data-theme="task"] textarea::placeholder {
+    color: var(--st-muted);
+    font-style: italic;
+}
+body[data-theme="task"] input:focus,
+body[data-theme="task"] textarea:focus,
+body[data-theme="task"] select:focus {
+    outline: none;
+    border-color: var(--st-gold);
+    box-shadow: 0 0 0 3px var(--st-gold-soft);
+}
+body[data-theme="task"] textarea {
+    width: 100%;
+    resize: vertical;
+    min-height: 80px;
+}
+body[data-theme="task"] input[type="checkbox"],
+body[data-theme="task"] input[type="radio"] {
+    accent-color: var(--st-gold);
+}
+
+/* =============================================================
+   THE CTA — the primary action button
+   ============================================================= */
+body[data-theme="task"] button[data-c-post],
+body[data-theme="task"] button[data-c-submit],
+body[data-theme="task"] button[type="submit"],
+body[data-theme="task"] .c-aff-btn {
+    background: linear-gradient(135deg, var(--st-gold) 0%, var(--st-gold-deep) 100%);
+    color: #1a1100;
+    border: none;
+    border-radius: 999px;
+    padding: 9px 22px;
+    font-family: var(--st-sans);
+    font-size: 0.92em;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    box-shadow:
+        0 4px 18px rgba(255, 220, 94, 0.32),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    white-space: nowrap;
+}
+body[data-theme="task"] button[data-c-post]:hover,
+body[data-theme="task"] button[data-c-submit]:hover,
+body[data-theme="task"] button[type="submit"]:hover {
+    transform: translateY(-1px);
+    box-shadow:
+        0 8px 28px rgba(255, 220, 94, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+body[data-theme="task"] button.c-btn-clear {
+    background: transparent;
+    color: var(--st-muted);
+    border: 1px solid var(--st-frame);
+    border-radius: 999px;
+    box-shadow: none;
+}
+body[data-theme="task"] button.c-btn-clear:hover {
+    color: var(--st-accent);
+    border-color: var(--st-accent);
+    background: var(--st-accent-soft);
+    transform: none;
+    box-shadow: none;
+}
+body[data-theme="task"] .c-chrome-btn {
+    background: transparent;
+    color: var(--st-muted);
+    border: 1px solid var(--st-frame);
+    padding: 3px 10px;
+    font-family: var(--st-sans);
+    font-size: 0.78em;
+    width: auto;
+    height: auto;
+    border-radius: 999px;
+    box-shadow: none;
+    cursor: pointer;
+}
+body[data-theme="task"] .c-chrome-btn:hover {
+    color: var(--st-gold);
+    border-color: var(--st-gold-soft);
+    background: transparent;
+}
+
+/* =============================================================
+   OPTION CARDS — ChoiceForm / CheckboxForm / Boolean
+   ============================================================= */
+body[data-theme="task"] .st-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 10px 0 4px 0;
+}
+body[data-theme="task"] .st-option {
+    background: rgba(10, 10, 30, 0.55);
+    border: 1px solid var(--st-frame);
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-family: var(--st-sans);
+    font-size: 0.95em;
+    color: var(--st-text);
+    cursor: pointer;
+    box-shadow: none;
+    transition: all 0.15s ease;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+body[data-theme="task"] .st-option:hover {
+    border-color: var(--st-gold-soft);
+    background: rgba(255, 220, 94, 0.05);
+    transform: translateY(-1px);
+}
+body[data-theme="task"] .st-option--selected {
+    border-color: var(--st-gold);
+    background: var(--st-gold-soft);
+    color: var(--st-gold);
+    font-weight: 600;
+    box-shadow: 0 0 12px var(--st-gold-soft);
+}
+body[data-theme="task"] .st-option--selected::after {
+    content: "✓";
+    margin-left: auto;
+    color: var(--st-gold);
+    font-weight: 700;
+}
+
+/* =============================================================
+   CONTAINER:  TABS → MARQUEE CAROUSEL
+   =============================================================
+   The tab bar is a horizontal arc of "marquee cards": active is
+   big and spotlit, siblings are smaller and dimmer on either side,
+   simulating a stage front with a star performer in center and
+   stage hands flanking. */
+body[data-theme="task"] .st-carousel {
+    position: relative;
+    padding: 28px 0 0 0;
+    margin: 12px 0 28px 0;
+}
+body[data-theme="task"] .st-carousel-title {
+    text-align: center;
+    font-family: var(--st-serif);
+    font-size: 1.5em;
+    font-style: italic;
+    color: var(--st-gold);
+    margin: 0 0 18px 0;
+    text-shadow: 0 2px 16px var(--st-gold-soft);
+}
+body[data-theme="task"] .st-carousel-title-kind {
+    font-family: var(--st-sans);
+    font-style: normal;
+    font-size: 0.5em;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--st-muted);
+    display: block;
+    margin-bottom: 2px;
+}
+
+/* The strip of tab labels */
+body[data-theme="task"] .st-carousel .c-nav-bar {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0;
+    padding: 0;
+    margin: 0 0 24px 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+/* Generic tab (inactive) */
+body[data-theme="task"] .st-carousel .c-nav-tab {
+    background: transparent;
+    color: var(--st-muted);
+    border: 1px solid var(--st-frame);
+    border-right-width: 0;
+    padding: 8px 16px;
+    margin: 0;
+    font-family: var(--st-sans);
+    font-size: 0.85em;
+    cursor: pointer;
+    box-shadow: none;
+    border-radius: 0;
+    opacity: 0.55;
+    transition: all 0.2s ease;
+    position: relative;
+    z-index: 1;
+}
+body[data-theme="task"] .st-carousel .c-nav-tab:first-child {
+    border-top-left-radius: 999px;
+    border-bottom-left-radius: 999px;
+}
+body[data-theme="task"] .st-carousel .c-nav-tab:last-child {
+    border-right-width: 1px;
+    border-top-right-radius: 999px;
+    border-bottom-right-radius: 999px;
+}
+body[data-theme="task"] .st-carousel .c-nav-tab:hover {
+    opacity: 1;
+    color: var(--st-text);
+    transform: none;
+    background: rgba(255, 220, 94, 0.05);
+}
+
+/* ACTIVE tab: big, elevated, spotlit — center stage */
+body[data-theme="task"] .st-carousel .c-nav-tab--active {
+    background: linear-gradient(135deg, var(--st-gold) 0%, var(--st-gold-deep) 100%);
+    color: #1a1100;
+    border-color: var(--st-gold);
+    opacity: 1;
+    font-weight: 700;
+    padding: 14px 26px;
+    font-size: 0.95em;
+    transform: scale(1.15);
+    margin: 0 8px;
+    z-index: 3;
+    box-shadow:
+        0 6px 30px var(--st-gold-soft),
+        inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    letter-spacing: 0.02em;
+}
+
+/* Tab immediately adjacent to active: medium emphasis */
+body[data-theme="task"] .st-carousel .c-nav-tab--active + .c-nav-tab,
+body[data-theme="task"] .st-carousel .c-nav-tab:has(+ .c-nav-tab--active) {
+    opacity: 0.8;
+    font-size: 0.9em;
+    z-index: 2;
+}
+body[data-theme="task"] .st-carousel .c-nav-tab--complete {
+    color: var(--st-done);
+    border-color: var(--st-done-soft);
+}
+
+body[data-theme="task"] .st-carousel .c-nav-content {
+    padding: 0;
+    /* Stage frame around the active tab's content */
+    border: 1px solid var(--st-frame);
+    border-radius: 16px;
+    background: linear-gradient(180deg,
+        rgba(28, 28, 58, 0.55) 0%, rgba(10, 10, 30, 0.55) 100%);
+    padding: 20px 24px;
+    box-shadow:
+        0 0 40px rgba(255, 220, 94, 0.05) inset,
+        0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+/* =============================================================
+   CONTAINER:  SEQUENCE → MILESTONE TRAIL
+   =============================================================
+   A horizontal adventure trail with numbered milestones connected by
+   a line. Past = lit teal, active = pulsing gold, future = dim gray.
+   Active station's content is in a "quest scroll" below. */
+body[data-theme="task"] .st-trail {
+    margin: 12px 0 28px 0;
+    padding: 24px 0 0 0;
+}
+body[data-theme="task"] .st-trail-title {
+    text-align: center;
+    font-family: var(--st-serif);
+    font-size: 1.5em;
+    font-style: italic;
+    color: var(--st-gold);
+    margin: 0 0 24px 0;
+}
+body[data-theme="task"] .st-trail-title-kind {
+    font-family: var(--st-sans);
+    font-style: normal;
+    font-size: 0.5em;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--st-muted);
+    display: block;
+    margin-bottom: 2px;
+}
+
+/* The milestones row: position:relative for the connecting line */
+body[data-theme="task"] .st-trail .c-nav-bar {
+    position: relative;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    gap: 0;
+    padding: 0;
+    margin: 0 0 28px 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    min-height: 60px;
+}
+/* Horizontal connecting line behind milestones */
+body[data-theme="task"] .st-trail .c-nav-bar::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 5%;
+    right: 5%;
+    height: 2px;
+    background: linear-gradient(90deg,
+        var(--st-done) 0%, var(--st-gold) 50%, var(--st-frame) 100%);
+    transform: translateY(-50%);
+    opacity: 0.4;
+    z-index: 0;
+}
+
+/* Each milestone: a circular station */
+body[data-theme="task"] .st-trail .c-nav-tab {
+    background: var(--st-bg-mid);
+    color: var(--st-muted);
+    border: 2px solid var(--st-frame);
+    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    margin: 0;
+    font-family: var(--st-serif);
+    font-size: 1.05em;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+    transition: all 0.2s ease;
+    overflow: hidden;
+    white-space: nowrap;
+    position: relative;
+    z-index: 1;
+    /* Hide the label text — use counter for number */
+    text-indent: -9999px;
+}
+body[data-theme="task"] .st-trail .c-nav-tab::after {
+    /* Replaced label with a number via CSS counter */
+    text-indent: 0;
+    content: counter(st-station);
+    counter-increment: st-station;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--st-serif);
+    font-weight: 700;
+    color: inherit;
+}
+body[data-theme="task"] .st-trail .c-nav-bar {
+    counter-reset: st-station;
+}
+body[data-theme="task"] .st-trail .c-nav-tab:hover {
+    transform: translateY(-2px);
+    border-color: var(--st-gold-soft);
+    color: var(--st-text);
+    background: var(--st-stage);
+}
+
+body[data-theme="task"] .st-trail .c-nav-tab--complete {
+    background: linear-gradient(135deg, var(--st-done) 0%, #3fc8a5 100%);
+    border-color: var(--st-done);
+    color: var(--st-bg);
+    box-shadow:
+        0 0 16px var(--st-done-soft),
+        0 2px 10px rgba(0, 0, 0, 0.4);
+}
+body[data-theme="task"] .st-trail .c-nav-tab--complete::after {
+    content: "✓";
+}
+
+body[data-theme="task"] .st-trail .c-nav-tab--active {
+    background: radial-gradient(circle, var(--st-gold) 0%, var(--st-gold-deep) 100%);
+    border-color: var(--st-gold);
+    color: var(--st-bg);
+    width: 56px;
+    height: 56px;
+    transform: scale(1);
+    box-shadow:
+        0 0 0 6px var(--st-gold-soft),
+        0 0 32px var(--st-gold-soft),
+        0 4px 14px rgba(0, 0, 0, 0.5);
+    animation: st-station-pulse 2.4s ease-in-out infinite;
+}
+@keyframes st-station-pulse {
+    0%, 100% { box-shadow: 0 0 0 6px var(--st-gold-soft),
+                            0 0 32px var(--st-gold-soft),
+                            0 4px 14px rgba(0, 0, 0, 0.5); }
+    50%      { box-shadow: 0 0 0 12px rgba(255, 220, 94, 0.05),
+                            0 0 44px rgba(255, 220, 94, 0.35),
+                            0 4px 14px rgba(0, 0, 0, 0.5); }
+}
+
+body[data-theme="task"] .st-trail .c-nav-tab--locked {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Active station's content — the "quest scroll" */
+body[data-theme="task"] .st-trail .c-nav-content {
+    padding: 20px 28px;
+    border: 1px solid var(--st-frame);
+    border-radius: 14px;
+    background:
+        radial-gradient(ellipse at top,
+            var(--st-gold-soft) 0%, transparent 60%),
+        linear-gradient(180deg,
+            rgba(28, 28, 58, 0.6) 0%, rgba(10, 10, 30, 0.6) 100%);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    position: relative;
+}
+body[data-theme="task"] .st-trail .c-nav-content::before {
+    content: "";
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 16px;
+    height: 16px;
+    background: inherit;
+    background-color: rgba(28, 28, 58, 0.6);
+    border-left: 1px solid var(--st-frame);
+    border-top: 1px solid var(--st-frame);
+}
+
+/* =============================================================
+   CONTAINER:  GROUP → HUDDLE (organic cluster)
+   =============================================================
+   Children clustered inside an organic rounded blob with an off-
+   axis soft highlight — feels like items held in a cupped hand. */
+body[data-theme="task"] .st-huddle {
+    position: relative;
+    margin: 18px 0 24px 0;
+    padding: 24px 28px 20px 28px;
+    background: linear-gradient(135deg,
+        rgba(167, 139, 250, 0.12) 0%,
+        rgba(255, 107, 158, 0.08) 50%,
+        rgba(94, 234, 200, 0.08) 100%);
+    border: 1px solid var(--st-frame-soft);
+    border-radius: 40% 60% 55% 45% / 50% 55% 45% 50%;
+    box-shadow:
+        0 8px 30px rgba(167, 139, 250, 0.10),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+/* Soft highlight blob in the upper-left — gives the "cupped" feel */
+body[data-theme="task"] .st-huddle::before {
+    content: "";
+    position: absolute;
+    top: 6px;
+    left: 10%;
+    right: 30%;
+    height: 40%;
+    background: radial-gradient(ellipse,
+        rgba(255, 255, 255, 0.08) 0%, transparent 70%);
+    border-radius: 50%;
+    pointer-events: none;
+}
+body[data-theme="task"] .st-huddle-title {
+    text-align: center;
+    font-family: var(--st-serif);
+    font-size: 1.3em;
+    font-style: italic;
+    color: var(--st-violet);
+    margin: 0 0 4px 0;
+}
+body[data-theme="task"] .st-huddle-title-kind {
+    font-family: var(--st-sans);
+    font-style: normal;
+    font-size: 0.55em;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--st-muted);
+    display: block;
+    margin-bottom: 2px;
+}
+body[data-theme="task"] .st-huddle-instr {
+    text-align: center;
+    color: var(--st-text-dim);
+    font-size: 0.92em;
+    font-style: italic;
+    margin: 0 auto 16px auto;
+    max-width: 52ch;
+}
+
+/* =============================================================
+   CONTAINER:  GENERIC (accordion, etc.) — classic vertical panel
+   =============================================================
+   Accordion and other container types we don't have a bespoke
+   idiom for — use a simple framed block so they still feel
+   "contained". */
+body[data-theme="task"] .st-frame {
+    margin: 18px 0;
+    padding: 20px 24px;
+    background: linear-gradient(180deg,
+        rgba(28, 28, 58, 0.5) 0%, rgba(10, 10, 30, 0.5) 100%);
+    border: 1px solid var(--st-frame);
+    border-radius: 12px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+}
+body[data-theme="task"] .st-frame-title {
+    font-family: var(--st-serif);
+    font-size: 1.2em;
+    font-style: italic;
+    color: var(--st-gold);
+    margin: 0 0 4px 0;
+}
+body[data-theme="task"] .st-frame-title-kind {
+    font-family: var(--st-sans);
+    font-style: normal;
+    font-size: 0.58em;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--st-muted);
+    display: block;
+    margin-bottom: 2px;
+}
+body[data-theme="task"] .st-frame-instr {
+    color: var(--st-text-dim);
+    font-size: 0.92em;
+    margin: 0 0 16px 0;
+    font-style: italic;
+}
+
+/* =============================================================
+   FEEDBACK, THEME PICKER, MISC
+   ============================================================= */
+body[data-theme="task"] .c-feedback {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    margin: 14px 0;
+    border-radius: 12px;
+    font-family: var(--st-sans);
+    font-size: 0.92em;
+    background: rgba(10, 10, 30, 0.7);
+    border: 1px solid var(--st-frame);
+}
+body[data-theme="task"] .c-feedback--error {
+    color: var(--st-accent);
+    border-left: 3px solid var(--st-accent);
+}
+body[data-theme="task"] .c-feedback--error::before {
+    content: "✗"; font-weight: 700;
+}
+body[data-theme="task"] .c-feedback--success {
+    color: var(--st-done);
+    border-left: 3px solid var(--st-done);
+}
+body[data-theme="task"] .c-feedback--success::before {
+    content: "✓"; font-weight: 700;
+}
+
+body[data-theme="task"] .c-page-footer {
+    margin-top: 48px;
+    padding-top: 20px;
+    border-top: 1px solid var(--st-frame);
+    color: var(--st-muted);
+}
+body[data-theme="task"] .c-theme-picker {
+    color: var(--st-muted);
+    font-family: var(--st-sans);
+}
+body[data-theme="task"] .c-theme-picker select {
+    background: var(--st-stage);
+    border: 1px solid var(--st-frame);
+    border-radius: 999px;
+    padding: 4px 12px;
+    color: var(--st-text);
+    font-family: var(--st-sans);
+}
+body[data-theme="task"] .c-depends-on {
+    color: var(--st-muted);
+    font-size: 0.82em;
+    font-style: italic;
+}
+body[data-theme="task"] .c-depends-on a {
+    color: var(--st-gold);
+    text-decoration: none;
+}
+body[data-theme="task"] .c-error-boundary {
+    background: rgba(255, 107, 158, 0.12);
+    border: 1px solid var(--st-accent);
+    border-radius: 12px;
+    color: var(--st-accent);
+    font-family: var(--st-sans);
+}
+
+body[data-theme="task"] form {
+    margin: 0;
+}

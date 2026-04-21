@@ -1,0 +1,31 @@
+{# Chat BooleanForm — "Yes / No" chip pair in reply area. #}
+{% if data.edit_mode %}
+  {% include "boolean.html" %}
+{% else %}
+  {% set val = data.value %}
+
+  {% include "chat/_ask.html" %}
+
+  {% if val is not none %}
+    {% for aff in data.affordances %}{% set _ = aff.update({"_rendered": true}) %}{% endfor %}
+    {% set display = data.true_label if val else data.false_label %}
+    {% set clear_body = {"action": "clear"}|tojson %}
+    <div class="ch-bubble ch-bubble--reply">
+      <div class="ch-avatar ch-avatar--reply">You</div>
+      <div class="ch-bubble-body">
+        <p class="ch-bubble-value">{{ display }}</p>
+        <button class="ch-bubble-edit" data-c-post="{{ url }}" data-c-body='{{ clear_body }}' title="POST {{ url }} {{ clear_body }}">edit</button>
+      </div>
+    </div>
+  {% else %}
+    <div class="ch-reply-area">
+      <div class="ch-chips">
+        {% set true_body = {"value": true}|tojson %}
+        {% set false_body = {"value": false}|tojson %}
+        <button class="ch-chip" data-c-post="{{ url }}" data-c-body='{{ true_body }}' title="POST {{ url }} {{ true_body }}">{{ data.true_label }}</button>
+        <button class="ch-chip" data-c-post="{{ url }}" data-c-body='{{ false_body }}' title="POST {{ url }} {{ false_body }}">{{ data.false_label }}</button>
+      </div>
+    </div>
+    {% for aff in data.affordances %}{% set _ = aff.update({"_rendered": true}) %}{% endfor %}
+  {% endif %}
+{% endif %}

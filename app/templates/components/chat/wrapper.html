@@ -1,0 +1,66 @@
+{# Chat wrapper.
+
+   Four presentation shapes, dispatched by role:
+     - Page:         "intro" — app avatar + title + lead paragraph
+     - Container:    section divider + children (inherits chat stream)
+     - InfoDisplay:  centered "system" bubble
+     - Data form:    turn (ask + optional reply)
+
+   The per-component template renders only the INNER of each turn —
+   the question text goes in the ask bubble, the answer / reply UI
+   goes below. This wrapper composes the chrome around them.
+
+   For data forms, the wrapper decides:
+     complete  -> turn--complete:  ask bubble + reply bubble (value)
+     incomplete -> turn--active:   ask bubble + reply area (from inner)
+
+   Context: same as default wrapper.html.
+#}
+{% set cls_str = classes|join(" ") %}
+{% set complete = "component--complete" in classes %}
+<div class="{{ cls_str }}" data-form="{{ form }}" data-key="{{ key }}" data-url="{{ url }}">
+
+{% if form == "page" %}
+  <div class="ch-intro">
+    <div class="ch-avatar ch-avatar--ask">✨</div>
+    <div class="ch-intro-body">
+      <h1>{{ label }}</h1>
+      {% if instruction %}<p>{{ instruction }}</p>{% endif %}
+    </div>
+  </div>
+  {{ inner|safe }}
+
+{% elif form == "info" %}
+  <div class="ch-system">
+    <div class="ch-avatar ch-avatar--system">i</div>
+    <div>{{ inner|safe }}</div>
+  </div>
+
+{% elif is_container %}
+  <div class="ch-container">
+    <div class="ch-container-header">
+      <div class="ch-container-title">
+        <span class="ch-container-badge">{{ form }}</span>
+        <span>{{ label }}</span>
+      </div>
+      {% if instruction %}<p class="ch-container-instr">{{ instruction }}</p>{% endif %}
+    </div>
+    <div class="ch-container-body">
+      {{ inner|safe }}
+    </div>
+  </div>
+
+{% else %}
+  {# Data form — split into Q-bubble + A-area.
+     Per-component templates output two pieces:
+       {{ ask_body }}   — the bubble body content (title, hints, constraints)
+       {{ reply_body }} — the reply side (answer prose if complete, input UI if not)
+     We emit both pieces via the 'inner' split. Templates coordinate
+     by wrapping their output in: <div class="ch-ask">...</div><div class="ch-reply">...</div>
+     and we just emit it as-is.  #}
+  <div class="ch-turn{% if complete and not edit_mode %} ch-turn--complete{% else %} ch-turn--active{% endif %}">
+    {{ inner|safe }}
+  </div>
+{% endif %}
+
+</div>

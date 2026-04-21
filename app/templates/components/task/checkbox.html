@@ -1,0 +1,43 @@
+{# Stage CheckboxForm — multi-option cards + commit. #}
+{% if data.edit_mode %}
+  {% include "checkbox.html" %}
+{% else %}
+  {% set ns = namespace(box_aff=none) %}
+  {% for aff in data.affordances %}
+    {% if ns.box_aff is none and aff.render_hints is defined and aff.render_hints.type == "checkbox" %}
+      {% set ns.box_aff = aff %}
+    {% endif %}
+  {% endfor %}
+  {% set box_aff = ns.box_aff %}
+
+  {% if data.confirmed and box_aff %}
+    {% set chosen = [] %}
+    {% for item, is_on in box_aff.render_hints.items.items() %}
+      {% if is_on %}{% set _ = chosen.append(item) %}{% endif %}
+    {% endfor %}
+    {% set clear_body = {"action": "clear"}|tojson %}
+    <div class="st-plaque">
+      <span class="st-plaque-label">Answer</span>
+      {% if chosen %}
+        <span class="st-plaque-value">{{ chosen|join(", ") }}</span>
+      {% else %}
+        <span class="st-plaque-value" style="font-style: italic; color: var(--st-muted)">(none)</span>
+      {% endif %}
+      <button class="st-plaque-edit" data-c-post="{{ url }}" data-c-body='{{ clear_body }}' title="POST {{ url }} {{ clear_body }}">edit</button>
+    </div>
+    {% for aff in data.affordances %}{% set _ = aff.update({"_rendered": true}) %}{% endfor %}
+  {% elif box_aff %}
+    {% set _ = box_aff.update({"_rendered": true}) %}
+    <div class="st-options">
+      {% for item, is_on in box_aff.render_hints.items.items() %}
+        {% set toggle_body = {item: (false if is_on else true)}|tojson %}
+        <button class="st-option{% if is_on %} st-option--selected{% endif %}" data-c-post="{{ box_aff.url }}" data-c-body='{{ toggle_body }}' title="POST {{ box_aff.url }} {{ toggle_body }}">{{ item }}</button>
+      {% endfor %}
+    </div>
+    <div class="st-input" style="margin-top: 10px;">
+    {% for aff in data.affordances %}
+      {% if not aff._rendered %}{{ render_aff(aff) }}{% endif %}
+    {% endfor %}
+    </div>
+  {% endif %}
+{% endif %}

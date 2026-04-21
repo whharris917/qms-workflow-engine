@@ -1,0 +1,27 @@
+{# Paper TextForm.
+
+   Complete (has value): one-line prose — "<value> [change]"
+   Incomplete: full form — input + save + clear.
+#}
+{% if edit_mode %}
+  {% include "text_human.html" %}
+{% else %}
+  {% for aff in data.affordances %}{% set _ = aff.update({"_rendered": true}) %}{% endfor %}
+
+  {% if has_data and value %}
+    {% set clear_body = {"action": "clear"}|tojson %}
+    <div class="p-completed">
+      <span class="p-completed-value">{{ value|string }}</span>
+      <button class="p-link" data-c-post="{{ url }}" data-c-body='{{ clear_body }}' title="POST {{ url }} {{ clear_body }}">change</button>
+    </div>
+  {% else %}
+    <form data-c-submit="{{ url }}" class="p-form-actions">
+      {% if multiline %}
+        <textarea name="value" rows="4" placeholder="Enter {{ label|lower }}…"></textarea>
+      {% else %}
+        <input name="value" type="text" placeholder="Enter {{ label|lower }}…">
+      {% endif %}
+      <button type="submit">Save</button>
+    </form>
+  {% endif %}
+{% endif %}

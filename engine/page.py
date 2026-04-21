@@ -461,10 +461,9 @@ class Page(PageMutationsMixin, Component):
         child_dicts = [s for ef in self.components
                        if (s := ef._serialize_full()) is not None]
         self._float_affordances(child_dicts, page_affs)
-        # Strip render noise from children (what serialize() normally does)
+        # Strip agent-facing render noise from children, but keep
+        # "form" and "key" — themes read these to pick per-type idioms.
         for d in child_dicts:
-            d.pop("form", None)
-            d.pop("key", None)
             for aff in d.get("affordances", []):
                 aff.pop("render_hints", None)
                 aff.pop("_chrome_rendered", None)

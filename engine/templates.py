@@ -10,6 +10,7 @@ Templates that embed child component HTML use the |safe filter.
 from __future__ import annotations
 
 import re
+from contextvars import ContextVar
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
@@ -66,18 +67,18 @@ _env.filters["tojson"] = _tojson_filter
 _COLLAPSE_BLANK_LINES = re.compile(r'\n{3,}')
 
 # Active theme (None = default). Set per-request via set_theme().
-_active_theme: str | None = None
+# ContextVar so concurrent requests on different themes don't race.
+_active_theme: ContextVar[str | None] = ContextVar("_active_theme", default=None)
 
 
 def set_theme(theme: str | None):
     """Set the active theme for template resolution."""
-    global _active_theme
-    _active_theme = theme
+    _active_theme.set(theme)
 
 
 def get_theme() -> str | None:
     """Return the active theme name, or None for default."""
-    return _active_theme
+    return _active_theme.get()
 
 
 def render_template(template_name: str, **context) -> str:
@@ -86,8 +87,9 @@ def render_template(template_name: str, **context) -> str:
     If a theme is active, tries {theme}/{template_name} first,
     then falls back to {template_name} in the default directory.
     """
-    if _active_theme:
-        themed = f"{_active_theme}/{template_name}"
+    theme = _active_theme.get()
+    if theme:
+        themed = f"{theme}/{template_name}"
         try:
             html = _env.get_template(themed).render(**context)
             return _COLLAPSE_BLANK_LINES.sub('\n\n', html)

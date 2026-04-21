@@ -1,0 +1,43 @@
+{# Paper Page — the wrapper already drew <h1> and the lead paragraph.
+   We just render feedback + children + page-level affordances. #}
+{% if mutable %}
+  {% include "page.html" %}
+{% else %}
+  {# Feedback banners #}
+  {% if feedback %}
+    {% set affs = data.affordances|default([]) %}
+    {% set dismiss_affs = {} %}
+    {% for aff in affs %}
+      {% if aff.body.action == "dismiss_feedback" %}
+        {% set _ = dismiss_affs.update({aff.body.target|default(""): aff}) %}
+      {% endif %}
+    {% endfor %}
+    {% for err in feedback.errors|default([]) %}
+      {% set target = err.target|default("") %}
+      {% set aff = dismiss_affs.get(target) %}
+      {% if aff %}{% set _ = aff.update({"_rendered": true}) %}{% endif %}
+      <div class="c-feedback c-feedback--error">
+        <strong>Error:</strong> {{ err.message }}{% if target %} ({{ target }}){% endif %}
+      </div>
+    {% endfor %}
+    {% set succ = feedback.success %}
+    {% if succ %}
+      <div class="c-feedback c-feedback--success">
+        {{ succ.message }}{% if succ.target %} <span style="opacity:.7">({{ succ.target }})</span>{% endif %}
+      </div>
+    {% endif %}
+  {% endif %}
+
+  {% for html in children_html %}{{ html|safe }}{% endfor %}
+
+  {# Page-level actions (Reset Page, etc.) #}
+  {% set pending = [] %}
+  {% for aff in data.affordances %}
+    {% if not aff._rendered %}{% set _ = pending.append(aff) %}{% endif %}
+  {% endfor %}
+  {% if pending %}
+    <div class="p-form-actions" style="margin-top: 2em; padding-top: 1em; border-top: 1px solid var(--p-rule);">
+      {% for aff in pending %}{{ render_aff(aff) }}{% endfor %}
+    </div>
+  {% endif %}
+{% endif %}

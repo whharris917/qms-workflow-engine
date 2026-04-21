@@ -1,0 +1,29 @@
+/* ===================================================================
+   Debug Theme
+   What "Supervisor View" used to be: full surrounding borders on every
+   component, per-component view toggle exposed so the agent-facing JSON
+   can be inspected alongside the HTML. Used when you want to see the
+   engine's plumbing rather than the UI.
+   =================================================================== */
+
+/* Full border around every component. Green when complete, dashed while
+   editing — the baseline the engine shipped with before theming. */
+body[data-theme="debug"] .component {
+    border: 2px solid #888;
+    padding: 30px 12px 12px 12px;
+    margin: 8px 0;
+}
+body[data-theme="debug"] .component.component--complete {
+    border-color: #2a2;
+}
+body[data-theme="debug"] .component.component--editing {
+    border-style: dashed;
+}
+
+/* Surface the per-component view toggle (select dropdown in the top-
+   right corner of each component wrapper). The dropdown's onchange
+   handler toggles inline display on the JSON/Human panes — no further
+   CSS needed for the panes themselves. */
+body[data-theme="debug"] .c-view-toggle {
+    display: inline-block;
+}

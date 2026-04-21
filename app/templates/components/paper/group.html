@@ -1,0 +1,14 @@
+{# Paper Group — wrapper provided the <section><h2>Label</h2>...</section>
+   chrome. Just render children and remaining affordances. #}
+{% if data.edit_mode %}
+  {% include "group.html" %}
+{% else %}
+  {% for html in children_html %}{{ html|safe }}{% endfor %}
+  {% set pending = [] %}
+  {% for aff in data.affordances %}
+    {% if not aff._rendered %}{% set _ = pending.append(aff) %}{% endif %}
+  {% endfor %}
+  {% if pending %}
+    <div class="p-form-actions">{% for aff in pending %}{{ render_aff(aff) }}{% endfor %}</div>
+  {% endif %}
+{% endif %}

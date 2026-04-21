@@ -11,49 +11,25 @@
 {% block content %}
 <div id="page-content">{{ page_html }}</div>
 <div class="c-page-footer">
-    <label class="c-debug-toggle" id="debug-toggle">
-        <input type="checkbox" id="debug-checkbox" onchange="toggleDebug(this.checked)">
-        Debug Mode
+    <label class="c-theme-picker">
+        Theme
+        <select id="theme-select" onchange="setTheme(this.value)">
+            {% for name in theme_names %}
+            <option value="{{ name }}"{% if name == active_theme %} selected{% endif %}>{{ name }}</option>
+            {% endfor %}
+        </select>
     </label>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    /* Debug Mode toggle:
-       Off = operator-view + sleek theme (clean production look)
-       On  = supervisor-view + default theme (full borders, chrome, JSON pane) */
-    function _applyDebug() {
-        var debug = localStorage.getItem('c-debug') === 'true';
-        document.body.classList.toggle('supervisor-view', debug);
-        document.body.classList.toggle('operator-view', !debug);
-        document.getElementById('debug-checkbox').checked = debug;
-        if (debug) {
-            document.body.removeAttribute('data-theme');
-        } else {
-            document.body.setAttribute('data-theme', 'sleek');
-        }
+    function setTheme(name) {
+        document.cookie = 'c-theme=' + encodeURIComponent(name) + ';path=/;max-age=31536000';
+        // Theme change requires server reload: templates + CSS + body
+        // data-theme are all server-rendered to avoid FOUC.
+        location.reload();
     }
-    function toggleDebug(on) {
-        var wasDebug = localStorage.getItem('c-debug') === 'true';
-        localStorage.setItem('c-debug', on ? 'true' : 'false');
-        /* Theme change requires server reload (templates are theme-dependent) */
-        var needsReload = (on && _getThemeCookie() !== 'default') ||
-                          (!on && _getThemeCookie() !== 'sleek');
-        document.cookie = 'c-theme=' + (on ? 'default' : 'sleek') + ';path=/;max-age=31536000';
-        if (needsReload) {
-            location.reload();
-        } else {
-            _applyDebug();
-        }
-    }
-    function _getThemeCookie() {
-        var m = document.cookie.match(/(?:^|;\s*)c-theme=(\w+)/);
-        return m ? m[1] : null;
-    }
-
-    /* Apply on load */
-    _applyDebug();
 </script>
 <script src="{{ url_for('static', filename='morphdom-umd.min.js') }}"></script>
 <script src="{{ url_for('static', filename='component.js') }}"></script>

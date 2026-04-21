@@ -1,0 +1,496 @@
+/* ===================================================================
+   Paper Theme
+
+   A document-style rendering. Serif body text, high contrast, generous
+   whitespace, real typographic hierarchy. The template-level change:
+   completed components render as inline prose ("Priority: High [change]")
+   while incomplete components stay as full forms. A filled-out page
+   reads like a filled-out form, not a stack of identical widgets.
+   =================================================================== */
+
+body[data-theme="paper"] {
+    --p-bg:        #fefcf7;          /* warm off-white */
+    --p-panel:     #ffffff;          /* pure white for cards */
+    --p-text:      #1a1a1a;          /* near-black */
+    --p-muted:     #555555;          /* metadata, hints */
+    --p-subtle:    #8a8a8a;          /* less important */
+    --p-rule:      #d8d4c8;          /* hair-line divider */
+    --p-rule-strong: #a8a498;
+    --p-accent:    #2c4a7c;          /* navy — links + primary actions */
+    --p-accent-hover: #1a365d;
+    --p-complete:  #2f7a2f;          /* green — complete state */
+    --p-complete-soft: #eaf5ea;
+    --p-editing:   #8b6508;          /* amber */
+    --p-editing-soft: #faf3e0;
+    --p-error:     #b52020;
+    --p-error-soft: #fbeaea;
+
+    --p-serif: "Charter", "Georgia", "Iowan Old Style", "Palatino Linotype", serif;
+    --p-sans:  -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --p-mono:  "SFMono-Regular", "Consolas", "Menlo", monospace;
+
+    background: var(--p-bg);
+    color: var(--p-text);
+    font-family: var(--p-serif);
+    font-size: 17px;
+    line-height: 1.6;
+}
+
+body[data-theme="paper"] #page-content {
+    max-width: 72ch;
+    margin: 0 auto;
+    padding: 48px 32px 64px 32px;
+}
+
+/* ---------- Typography ---------- */
+body[data-theme="paper"] h1,
+body[data-theme="paper"] h2,
+body[data-theme="paper"] h3,
+body[data-theme="paper"] h4 {
+    font-family: var(--p-serif);
+    color: var(--p-text);
+    font-weight: 600;
+    letter-spacing: -0.005em;
+}
+body[data-theme="paper"] p {
+    margin: 0 0 0.9em 0;
+    color: var(--p-text);
+}
+
+/* ---------- Component wrapper (envelope rendered by paper/wrapper.html) ---------- */
+body[data-theme="paper"] .component {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0 0 2em 0;
+}
+body[data-theme="paper"] .c-container {
+    margin: 0 0 2em 0;
+}
+
+/* ---------- Paper-specific helpers ---------- */
+body[data-theme="paper"] .p-page-title {
+    font-size: 2em;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    margin: 0 0 0.15em 0;
+    padding-bottom: 0.4em;
+    border-bottom: 2px solid var(--p-rule-strong);
+}
+body[data-theme="paper"] .p-page-lead {
+    font-size: 1.05em;
+    color: var(--p-muted);
+    font-style: italic;
+    margin: 0.4em 0 2em 0;
+}
+
+/* Container header (e.g. "Subscription tier" for a Navigation) */
+body[data-theme="paper"] .p-section {
+    margin: 2em 0 1.2em 0;
+}
+body[data-theme="paper"] .p-section-title {
+    font-size: 1.3em;
+    margin: 0 0 0.25em 0;
+    padding-bottom: 0.25em;
+    border-bottom: 1px solid var(--p-rule);
+}
+body[data-theme="paper"] .p-section-instr {
+    color: var(--p-muted);
+    font-style: italic;
+    margin: 0 0 0.8em 0;
+}
+
+/* Data-form header */
+body[data-theme="paper"] .p-form {
+    margin: 0 0 1.4em 0;
+    padding-left: 16px;
+    border-left: 3px solid var(--p-rule);
+    position: relative;
+}
+body[data-theme="paper"] .component.component--complete .p-form {
+    border-left-color: var(--p-complete);
+}
+body[data-theme="paper"] .component.component--editing  .p-form {
+    border-left-color: var(--p-editing);
+    background: var(--p-editing-soft);
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+body[data-theme="paper"] .p-form-title {
+    font-size: 1.05em;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 0.5em;
+}
+body[data-theme="paper"] .p-form-title .p-status {
+    font-family: var(--p-sans);
+    font-size: 0.7em;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--p-subtle);
+}
+body[data-theme="paper"] .component.component--complete .p-status { color: var(--p-complete); }
+body[data-theme="paper"] .component.component--editing  .p-status { color: var(--p-editing); }
+body[data-theme="paper"] .p-form-instr {
+    color: var(--p-muted);
+    font-style: italic;
+    margin: 0.3em 0 0.8em 0;
+}
+
+/* ---------- Completed component in "prose" mode ----------
+   The template renders:
+       <div class="p-completed">
+         <span class="p-completed-label">Label:</span>
+         <span class="p-completed-value">Current value</span>
+         <button class="p-link">change</button>
+       </div>
+   No border, no box, no instruction — one tight line. */
+body[data-theme="paper"] .p-completed {
+    margin: 0.4em 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4em;
+}
+body[data-theme="paper"] .p-completed-label {
+    font-weight: 600;
+}
+body[data-theme="paper"] .p-completed-label::after {
+    content: ":";
+}
+body[data-theme="paper"] .p-completed-value {
+    color: var(--p-text);
+    font-family: var(--p-mono);
+    font-size: 0.95em;
+    background: #f3efe4;
+    padding: 0 0.4em;
+    border-radius: 2px;
+}
+body[data-theme="paper"] .p-completed-value--empty {
+    color: var(--p-subtle);
+    font-style: italic;
+    font-family: var(--p-serif);
+    background: transparent;
+    padding: 0;
+}
+
+/* ---------- Inputs ---------- */
+body[data-theme="paper"] input[type="text"],
+body[data-theme="paper"] input[type="number"],
+body[data-theme="paper"] input[type="date"],
+body[data-theme="paper"] input[type="datetime-local"],
+body[data-theme="paper"] input[type="email"],
+body[data-theme="paper"] input[type="url"],
+body[data-theme="paper"] input[type="password"],
+body[data-theme="paper"] input[type="search"],
+body[data-theme="paper"] textarea,
+body[data-theme="paper"] select {
+    background: var(--p-panel);
+    border: 1px solid var(--p-rule-strong);
+    border-radius: 3px;
+    padding: 6px 10px;
+    font-family: var(--p-serif);
+    font-size: 1em;
+    color: var(--p-text);
+    min-width: 20ch;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+body[data-theme="paper"] input:focus,
+body[data-theme="paper"] textarea:focus,
+body[data-theme="paper"] select:focus {
+    outline: none;
+    border-color: var(--p-accent);
+    box-shadow: 0 0 0 3px rgba(44, 74, 124, 0.15);
+}
+body[data-theme="paper"] textarea {
+    width: 100%;
+    max-width: 60ch;
+    resize: vertical;
+    line-height: 1.55;
+}
+body[data-theme="paper"] input[type="checkbox"],
+body[data-theme="paper"] input[type="radio"] {
+    accent-color: var(--p-accent);
+    width: 1.1em;
+    height: 1.1em;
+    margin-right: 0.5em;
+    vertical-align: middle;
+}
+
+/* ---------- Buttons ----------
+   Real button look, not pseudo-bracket trickery. Primary action is navy
+   filled; secondary action is ghost with navy text; destructive uses red. */
+body[data-theme="paper"] button[data-c-post],
+body[data-theme="paper"] button[data-c-submit],
+body[data-theme="paper"] button[type="submit"],
+body[data-theme="paper"] .c-aff-btn {
+    background: var(--p-accent);
+    color: #ffffff;
+    border: 1px solid var(--p-accent);
+    padding: 7px 16px;
+    font-family: var(--p-sans);
+    font-size: 0.92em;
+    font-weight: 500;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+body[data-theme="paper"] button[data-c-post]:hover,
+body[data-theme="paper"] button[data-c-submit]:hover,
+body[data-theme="paper"] button[type="submit"]:hover,
+body[data-theme="paper"] .c-aff-btn:hover {
+    background: var(--p-accent-hover);
+    border-color: var(--p-accent-hover);
+}
+
+/* "Change" / ghost link-button used in completed-component rows */
+body[data-theme="paper"] button.p-link,
+body[data-theme="paper"] a.p-link {
+    background: transparent;
+    color: var(--p-accent);
+    border: none;
+    padding: 0 0 0 0.4em;
+    font-family: var(--p-sans);
+    font-size: 0.88em;
+    text-decoration: underline;
+    cursor: pointer;
+    box-shadow: none;
+}
+body[data-theme="paper"] button.p-link:hover {
+    color: var(--p-accent-hover);
+    background: transparent;
+}
+
+/* Chrome buttons (edit / undo / discard) in the component header */
+body[data-theme="paper"] .c-chrome-btn {
+    background: transparent;
+    border: 1px solid var(--p-rule-strong);
+    color: var(--p-muted);
+    padding: 2px 8px;
+    font-family: var(--p-sans);
+    font-size: 0.78em;
+    width: auto;
+    height: auto;
+    border-radius: 3px;
+    cursor: pointer;
+    box-shadow: none;
+}
+body[data-theme="paper"] .c-chrome-btn:hover {
+    color: var(--p-text);
+    border-color: var(--p-text);
+    background: #f3efe4;
+}
+
+/* Secondary / clear / cancel */
+body[data-theme="paper"] button.c-btn-clear,
+body[data-theme="paper"] button[data-c-body*='"clear"'] {
+    background: transparent;
+    color: var(--p-muted);
+    border: 1px solid var(--p-rule-strong);
+    box-shadow: none;
+}
+body[data-theme="paper"] button.c-btn-clear:hover {
+    color: var(--p-error);
+    border-color: var(--p-error);
+    background: var(--p-error-soft);
+}
+
+/* Inline confirm/remove/arrow action icons (lists, tables) */
+body[data-theme="paper"] button.c-btn-confirm,
+body[data-theme="paper"] button.c-btn-remove,
+body[data-theme="paper"] button.c-btn-arrow,
+body[data-theme="paper"] button.c-icon-btn {
+    background: transparent;
+    border: 1px solid var(--p-rule-strong);
+    color: var(--p-muted);
+    width: 28px;
+    height: 28px;
+    font-family: var(--p-sans);
+    font-size: 14px;
+    border-radius: 3px;
+    padding: 0;
+    box-shadow: none;
+}
+body[data-theme="paper"] button.c-btn-confirm { color: var(--p-complete); }
+body[data-theme="paper"] button.c-btn-remove:hover,
+body[data-theme="paper"] button.c-icon-btn--danger {
+    color: var(--p-error);
+    border-color: var(--p-error);
+}
+
+/* A proper grouping for the affordance row under a form */
+body[data-theme="paper"] .p-form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-top: 0.6em;
+}
+body[data-theme="paper"] form[data-c-submit] {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin: 0;
+}
+
+/* ---------- Radio / checkbox lists ---------- */
+body[data-theme="paper"] .p-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0.4em 0 0.8em 0;
+}
+body[data-theme="paper"] .p-choice {
+    display: flex;
+    align-items: center;
+    padding: 6px 10px;
+    border: 1px solid var(--p-rule);
+    border-radius: 3px;
+    background: var(--p-panel);
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+body[data-theme="paper"] .p-choice:hover {
+    background: #f3efe4;
+    border-color: var(--p-rule-strong);
+}
+body[data-theme="paper"] .p-choice--selected {
+    border-color: var(--p-accent);
+    background: #eef2f9;
+}
+body[data-theme="paper"] .p-choice--selected::after {
+    content: "✓";
+    margin-left: auto;
+    color: var(--p-accent);
+    font-weight: 700;
+}
+
+/* ---------- Navigation (tabs, sequence) ---------- */
+body[data-theme="paper"] .c-nav-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    margin: 0.4em 0 1.2em 0;
+    padding: 0;
+    background: transparent;
+    border-bottom: 1px solid var(--p-rule-strong);
+    box-shadow: none;
+    border-radius: 0;
+}
+body[data-theme="paper"] .c-nav-tab {
+    background: transparent;
+    border: none;
+    color: var(--p-muted);
+    font-family: var(--p-sans);
+    font-size: 0.95em;
+    padding: 8px 16px;
+    margin-bottom: -1px;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    box-shadow: none;
+    border-radius: 0;
+}
+body[data-theme="paper"] .c-nav-tab:hover {
+    color: var(--p-text);
+    background: transparent;
+}
+body[data-theme="paper"] .c-nav-tab.c-nav-tab--active {
+    color: var(--p-text);
+    font-weight: 600;
+    border-bottom-color: var(--p-accent);
+}
+body[data-theme="paper"] .c-nav-tab.c-nav-tab--complete {
+    color: var(--p-complete);
+}
+body[data-theme="paper"] .c-nav-tab.c-nav-tab--complete::before {
+    content: "✓ ";
+}
+body[data-theme="paper"] .c-nav-tab.c-nav-tab--locked {
+    color: var(--p-subtle);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+body[data-theme="paper"] .c-nav-content {
+    padding: 0.2em 0;
+}
+
+/* ---------- Feedback banners ---------- */
+body[data-theme="paper"] .c-feedback {
+    font-family: var(--p-sans);
+    font-size: 0.92em;
+    padding: 10px 14px;
+    margin: 0.6em 0;
+    border-radius: 3px;
+    border-left: 3px solid;
+    background: transparent;
+}
+body[data-theme="paper"] .c-feedback--error {
+    color: var(--p-error);
+    background: var(--p-error-soft);
+    border-left-color: var(--p-error);
+}
+body[data-theme="paper"] .c-feedback--success {
+    color: var(--p-complete);
+    background: var(--p-complete-soft);
+    border-left-color: var(--p-complete);
+}
+
+/* ---------- Theme picker / page footer ---------- */
+body[data-theme="paper"] .c-page-footer {
+    margin-top: 3em;
+    padding-top: 1em;
+    border-top: 1px solid var(--p-rule);
+}
+body[data-theme="paper"] .c-theme-picker {
+    font-family: var(--p-sans);
+    font-size: 0.85em;
+    color: var(--p-muted);
+}
+body[data-theme="paper"] .c-theme-picker select {
+    min-width: 0;
+    font-family: var(--p-sans);
+}
+
+/* ---------- Depends-on, error boundary ---------- */
+body[data-theme="paper"] .c-depends-on {
+    font-family: var(--p-sans);
+    font-size: 0.82em;
+    color: var(--p-subtle);
+    font-style: italic;
+}
+body[data-theme="paper"] .c-depends-on a {
+    color: var(--p-accent);
+    text-decoration: none;
+}
+body[data-theme="paper"] .c-error-boundary {
+    font-family: var(--p-sans);
+    background: var(--p-error-soft);
+    border: 1px solid var(--p-error);
+    border-radius: 3px;
+    color: #5a1010;
+}
+
+/* ---------- Info display: paper's natural home ---------- */
+body[data-theme="paper"] .p-info {
+    margin: 0 0 1.2em 0;
+    padding: 12px 16px;
+    background: #f3efe4;
+    border-left: 3px solid var(--p-muted);
+    border-radius: 0 3px 3px 0;
+}
+body[data-theme="paper"] .p-info h4 {
+    margin: 0 0 0.4em 0;
+    font-size: 1em;
+    font-weight: 600;
+}
+body[data-theme="paper"] .p-info p {
+    margin: 0 0 0.5em 0;
+}
+body[data-theme="paper"] .p-info p:last-child {
+    margin-bottom: 0;
+}

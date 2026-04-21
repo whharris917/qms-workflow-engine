@@ -1,0 +1,39 @@
+{# Paper NumberForm.
+
+   Complete: "<value> <unit> [change]"
+   Incomplete: input with constraint hint + save.
+#}
+{% if data.edit_mode %}
+  {% include "number.html" %}
+{% else %}
+  {% for aff in data.affordances %}{% set _ = aff.update({"_rendered": true}) %}{% endfor %}
+
+  {% set val = data.value %}
+  {% set unit = data.unit or "" %}
+
+  {% if val is not none %}
+    {% set clear_body = {"action": "clear"}|tojson %}
+    <div class="p-completed">
+      <span class="p-completed-value">{{ val }}{% if unit %} {{ unit }}{% endif %}</span>
+      <button class="p-link" data-c-post="{{ url }}" data-c-body='{{ clear_body }}' title="POST {{ url }} {{ clear_body }}">change</button>
+    </div>
+  {% else %}
+    {# Constraint hint (min/max/step) #}
+    {% set hints = [] %}
+    {% if data.min is not none %}{% set _ = hints.append("min: " ~ data.min|string) %}{% endif %}
+    {% if data.max is not none %}{% set _ = hints.append("max: " ~ data.max|string) %}{% endif %}
+    {% if data.step is not none %}{% set _ = hints.append("step: " ~ data.step|string) %}{% endif %}
+    {% if unit %}{% set _ = hints.append("unit: " ~ unit) %}{% endif %}
+    {% if hints %}
+      <p style="color: var(--p-subtle); font-size: 0.88em; font-style: italic; margin: 0 0 0.4em 0;">{{ hints|join(" · ") }}</p>
+    {% endif %}
+    <form data-c-submit="{{ url }}" class="p-form-actions">
+      <input name="value" type="number"
+        {% if data.min is not none %}min="{{ data.min }}"{% endif %}
+        {% if data.max is not none %}max="{{ data.max }}"{% endif %}
+        {% if data.step is not none %}step="{{ data.step }}"{% endif %}
+        placeholder="{{ label|lower }}">
+      <button type="submit">Save</button>
+    </form>
+  {% endif %}
+{% endif %}

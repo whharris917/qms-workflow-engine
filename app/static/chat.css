@@ -1,0 +1,667 @@
+/* ===================================================================
+   Chat Theme — Conversational Showcase
+
+   The page renders as a dialogue: the app asks questions (left-aligned
+   white bubbles with a gradient avatar), the user answers (right-aligned
+   gradient bubbles). Completed turns dim to 55% opacity; the last
+   incomplete turn stays full-brightness with a soft glow.
+
+   Every component type becomes a dialogue turn. ChoiceForm renders as
+   tappable suggestion chips in the reply area. InfoDisplay becomes a
+   centered "system" message. Containers become topic dividers.
+   =================================================================== */
+
+body[data-theme="chat"] {
+    /* palette */
+    --ch-ask:         rgba(255, 255, 255, 0.92);
+    --ch-ask-border:  rgba(160, 180, 220, 0.35);
+    --ch-reply-grad:  linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --ch-reply-text:  #ffffff;
+    --ch-accent:      #6366f1;       /* indigo */
+    --ch-accent-2:    #a855f7;       /* purple */
+    --ch-pink:        #ec4899;
+    --ch-cyan:        #06b6d4;
+    --ch-green:       #10b981;
+
+    --ch-text:        #1f2144;
+    --ch-muted:       #4a4e6d;
+    --ch-subtle:      #8088a8;
+    --ch-text-on-ask: #1f2144;
+    --ch-text-on-reply: #ffffff;
+
+    --ch-glow:        0 0 0 4px rgba(99, 102, 241, 0.15),
+                      0 12px 32px rgba(99, 102, 241, 0.18);
+    --ch-shadow:      0 6px 20px rgba(59, 41, 102, 0.10),
+                      0 1px 2px rgba(0, 0, 0, 0.04);
+    --ch-shadow-reply: 0 6px 24px rgba(118, 75, 162, 0.30);
+
+    --ch-radius:      22px;
+    --ch-radius-chip: 999px;
+
+    --ch-sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto,
+               "Helvetica Neue", sans-serif;
+
+    background:
+        radial-gradient(at 15% 20%, #ffe3f0 0%, transparent 55%),
+        radial-gradient(at 85% 15%, #c8d8ff 0%, transparent 55%),
+        radial-gradient(at 70% 85%, #d9c8ff 0%, transparent 55%),
+        radial-gradient(at 20% 90%, #c4f0f4 0%, transparent 55%),
+        linear-gradient(160deg, #f7f9ff 0%, #fdf4ff 100%);
+    background-attachment: fixed;
+    font-family: var(--ch-sans);
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--ch-text);
+}
+
+body[data-theme="chat"] #page-content {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 40px 24px 80px 24px;
+}
+
+/* ---------- Components are invisible frames; all visual weight is on
+   the chat primitives the templates emit. ---------- */
+body[data-theme="chat"] .component {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 18px 0;
+}
+body[data-theme="chat"] .c-container {
+    margin: 18px 0;
+}
+
+/* ---------- Intro (page header as first conversational message) ---------- */
+body[data-theme="chat"] .ch-intro {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    margin: 8px 0 28px 0;
+}
+body[data-theme="chat"] .ch-intro-body h1 {
+    font-size: 1.55em;
+    font-weight: 700;
+    margin: 0 0 0.15em 0;
+    letter-spacing: -0.01em;
+    background: linear-gradient(90deg, var(--ch-accent) 0%, var(--ch-pink) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+body[data-theme="chat"] .ch-intro-body p {
+    margin: 0;
+    color: var(--ch-muted);
+    font-size: 0.98em;
+}
+
+/* ---------- Avatars ---------- */
+body[data-theme="chat"] .ch-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: #ffffff;
+    flex-shrink: 0;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    letter-spacing: -0.02em;
+}
+body[data-theme="chat"] .ch-avatar--ask {
+    background: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%);
+}
+body[data-theme="chat"] .ch-avatar--reply {
+    background: linear-gradient(135deg, #ec4899 0%, #f97316 100%);
+}
+body[data-theme="chat"] .ch-avatar--system {
+    background: linear-gradient(135deg, #94a3b8 0%, #64748b 100%);
+    font-size: 13px;
+}
+
+/* ---------- Turn (wrapper for ask+reply pair per component) ---------- */
+body[data-theme="chat"] .ch-turn {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+    transition: opacity 0.25s ease;
+}
+
+/* Completed turns: keep the user's answer bright and legible; only the
+   question softens into history. A small green ✓ badge marks the turn
+   as done. */
+body[data-theme="chat"] .ch-turn--complete .ch-bubble--ask {
+    opacity: 0.70;
+}
+body[data-theme="chat"] .ch-turn--complete:hover .ch-bubble--ask {
+    opacity: 1;
+}
+body[data-theme="chat"] .ch-turn--complete .ch-bubble--reply > .ch-bubble-body {
+    position: relative;
+}
+body[data-theme="chat"] .ch-turn--complete .ch-bubble--reply > .ch-bubble-body::before {
+    content: "✓";
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 22px;
+    height: 22px;
+    background: var(--ch-green);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    border: 2px solid rgba(255, 255, 255, 0.9);
+}
+
+/* Active (incomplete) turn has a glow around the question to draw the eye. */
+body[data-theme="chat"] .ch-turn--active .ch-bubble--ask > .ch-bubble-body {
+    box-shadow: var(--ch-glow), var(--ch-shadow);
+    border-color: rgba(99, 102, 241, 0.35);
+}
+
+/* ---------- Bubble layout ---------- */
+body[data-theme="chat"] .ch-bubble {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    max-width: 100%;
+}
+body[data-theme="chat"] .ch-bubble--ask {
+    justify-content: flex-start;
+}
+body[data-theme="chat"] .ch-bubble--reply {
+    justify-content: flex-end;
+    flex-direction: row-reverse;
+}
+body[data-theme="chat"] .ch-bubble-body {
+    max-width: 82%;
+    padding: 12px 18px;
+    border-radius: var(--ch-radius);
+    box-shadow: var(--ch-shadow);
+}
+body[data-theme="chat"] .ch-bubble--ask > .ch-bubble-body {
+    background: var(--ch-ask);
+    border: 1px solid var(--ch-ask-border);
+    backdrop-filter: saturate(180%) blur(10px);
+    -webkit-backdrop-filter: saturate(180%) blur(10px);
+    color: var(--ch-text-on-ask);
+    border-bottom-left-radius: 6px;
+}
+body[data-theme="chat"] .ch-bubble--reply > .ch-bubble-body {
+    background: var(--ch-reply-grad);
+    color: var(--ch-text-on-reply);
+    border: none;
+    box-shadow: var(--ch-shadow-reply);
+    border-bottom-right-radius: 6px;
+}
+body[data-theme="chat"] .ch-bubble-title {
+    font-weight: 600;
+    margin: 0;
+    font-size: 1em;
+    line-height: 1.4;
+}
+body[data-theme="chat"] .ch-bubble-text {
+    margin: 4px 0 0 0;
+    font-size: 0.92em;
+    color: var(--ch-muted);
+    line-height: 1.5;
+}
+body[data-theme="chat"] .ch-bubble--reply .ch-bubble-text {
+    color: rgba(255, 255, 255, 0.85);
+}
+body[data-theme="chat"] .ch-bubble-value {
+    margin: 0;
+    font-size: 1.08em;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    display: inline;
+}
+/* Keep value + edit-pill on the same visual line when they fit, with
+   graceful wrap for long values. */
+body[data-theme="chat"] .ch-bubble--reply .ch-bubble-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px;
+}
+
+/* Chrome on bubble (edit button in corner of the reply).
+   Stronger contrast so it reads as an affordance, not decoration. */
+body[data-theme="chat"] .ch-bubble-edit {
+    background: rgba(255, 255, 255, 0.35);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    font-family: var(--ch-sans);
+    font-size: 0.82em;
+    font-weight: 500;
+    padding: 3px 12px;
+    border-radius: var(--ch-radius-chip);
+    cursor: pointer;
+    margin-left: 12px;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+body[data-theme="chat"] .ch-bubble-edit:hover {
+    background: rgba(255, 255, 255, 0.55);
+    border-color: rgba(255, 255, 255, 0.8);
+}
+
+/* System messages (InfoDisplay, topic switches) — centered, muted */
+body[data-theme="chat"] .ch-system {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+    margin: 24px auto;
+    max-width: 90%;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(160, 180, 220, 0.25);
+    border-radius: var(--ch-radius);
+    color: var(--ch-muted);
+    font-size: 0.9em;
+    backdrop-filter: saturate(180%) blur(10px);
+    -webkit-backdrop-filter: saturate(180%) blur(10px);
+}
+body[data-theme="chat"] .ch-system h4 {
+    margin: 0 0 4px 0;
+    font-weight: 600;
+    color: var(--ch-text);
+    font-size: 1em;
+}
+body[data-theme="chat"] .ch-system p {
+    margin: 2px 0;
+}
+
+/* Container panel — encloses all content belonging to a non-Page
+   container (Group, Navigation, etc.).  A subtle frosted box with a
+   header row, a separator, and a body.  Nests cleanly: inner
+   containers inherit the same style, and padding conveys depth. */
+body[data-theme="chat"] .ch-container {
+    background: rgba(255, 255, 255, 0.38);
+    backdrop-filter: saturate(140%) blur(14px);
+    -webkit-backdrop-filter: saturate(140%) blur(14px);
+    border: 1px solid rgba(160, 180, 220, 0.32);
+    border-radius: 20px;
+    padding: 20px 24px 24px 24px;
+    margin: 18px 0;
+    box-shadow: 0 6px 22px rgba(99, 102, 241, 0.07),
+                inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+/* A nested container sits slightly brighter so it reads as "inside". */
+body[data-theme="chat"] .ch-container .ch-container {
+    background: rgba(255, 255, 255, 0.55);
+    border-color: rgba(160, 180, 220, 0.25);
+    box-shadow: 0 3px 12px rgba(99, 102, 241, 0.05);
+}
+
+body[data-theme="chat"] .ch-container-header {
+    margin: 0 0 16px 0;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(160, 180, 220, 0.28);
+}
+body[data-theme="chat"] .ch-container-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    font-size: 1.14em;
+    font-weight: 600;
+    color: var(--ch-text);
+    letter-spacing: -0.005em;
+}
+/* Small "form type" badge (tabs / sequence / group / etc.) — so the
+   nature of the container is legible at a glance. */
+body[data-theme="chat"] .ch-container-badge {
+    font-size: 0.68em;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ch-accent);
+    background: rgba(99, 102, 241, 0.10);
+    padding: 2px 10px;
+    border-radius: var(--ch-radius-chip);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+}
+body[data-theme="chat"] .ch-container-instr {
+    margin: 8px 0 0 0;
+    color: var(--ch-muted);
+    font-size: 0.92em;
+    line-height: 1.5;
+}
+/* Last child inside the body should not add margin at the bottom
+   (otherwise panels gain extra vertical space). */
+body[data-theme="chat"] .ch-container-body > .component:last-child,
+body[data-theme="chat"] .ch-container-body > .c-container:last-child {
+    margin-bottom: 0;
+}
+body[data-theme="chat"] .ch-container-body > .component:first-child {
+    margin-top: 0;
+}
+
+/* ---------- Reply area (for incomplete data forms) ---------- */
+body[data-theme="chat"] .ch-reply-area {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-left: 50px;   /* visually align with reply bubbles */
+    align-items: flex-end;
+    max-width: calc(100% - 50px);
+}
+
+body[data-theme="chat"] .ch-reply-area form {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(160, 180, 220, 0.35);
+    border-radius: var(--ch-radius);
+    padding: 6px 8px 6px 18px;
+    box-shadow: var(--ch-shadow);
+    backdrop-filter: saturate(180%) blur(10px);
+    -webkit-backdrop-filter: saturate(180%) blur(10px);
+    min-width: 280px;
+}
+body[data-theme="chat"] .ch-reply-area input[type="text"],
+body[data-theme="chat"] .ch-reply-area input[type="number"],
+body[data-theme="chat"] .ch-reply-area input[type="date"],
+body[data-theme="chat"] .ch-reply-area input[type="datetime-local"],
+body[data-theme="chat"] .ch-reply-area input[type="email"],
+body[data-theme="chat"] .ch-reply-area input[type="url"],
+body[data-theme="chat"] .ch-reply-area input[type="search"],
+body[data-theme="chat"] .ch-reply-area select {
+    border: none;
+    background: transparent;
+    font: inherit;
+    font-size: 1em;
+    padding: 8px 0;
+    color: var(--ch-text);
+    flex: 1;
+    min-width: 160px;
+    outline: none;
+}
+body[data-theme="chat"] .ch-reply-area input::placeholder {
+    color: var(--ch-subtle);
+}
+body[data-theme="chat"] .ch-reply-area textarea {
+    border: none;
+    background: transparent;
+    font: inherit;
+    font-size: 1em;
+    padding: 8px 0;
+    color: var(--ch-text);
+    width: 100%;
+    outline: none;
+    resize: vertical;
+    min-height: 60px;
+    line-height: 1.5;
+}
+
+/* Send button — the only pill in the input row */
+body[data-theme="chat"] .ch-reply-area button[type="submit"],
+body[data-theme="chat"] .ch-reply-area .ch-send {
+    background: var(--ch-reply-grad);
+    color: white;
+    border: none;
+    border-radius: var(--ch-radius-chip);
+    padding: 8px 18px;
+    font: inherit;
+    font-size: 0.92em;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: var(--ch-shadow-reply);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    white-space: nowrap;
+}
+body[data-theme="chat"] .ch-reply-area button[type="submit"]:hover,
+body[data-theme="chat"] .ch-reply-area .ch-send:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(118, 75, 162, 0.4);
+}
+body[data-theme="chat"] .ch-reply-area button[type="submit"]:active {
+    transform: translateY(0);
+}
+
+/* ---------- Chip row (choice / checkbox options) ---------- */
+body[data-theme="chat"] .ch-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+    max-width: 100%;
+}
+body[data-theme="chat"] .ch-chip {
+    background: rgba(255, 255, 255, 0.85);
+    border: 1.5px solid rgba(99, 102, 241, 0.3);
+    color: var(--ch-accent);
+    border-radius: var(--ch-radius-chip);
+    padding: 8px 18px;
+    font: inherit;
+    font-size: 0.95em;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.08);
+    transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease,
+                border-color 0.15s ease, box-shadow 0.15s ease;
+    backdrop-filter: saturate(180%) blur(10px);
+    -webkit-backdrop-filter: saturate(180%) blur(10px);
+}
+body[data-theme="chat"] .ch-chip:hover {
+    background: white;
+    border-color: var(--ch-accent);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(99, 102, 241, 0.18);
+}
+body[data-theme="chat"] .ch-chip--on {
+    background: var(--ch-reply-grad);
+    color: white;
+    border-color: transparent;
+    box-shadow: var(--ch-shadow-reply);
+}
+body[data-theme="chat"] .ch-chip--on:hover {
+    background: var(--ch-reply-grad);
+    color: white;
+    transform: translateY(-1px);
+}
+
+/* Done/submit accompanying a chip row */
+body[data-theme="chat"] .ch-chip-done {
+    background: var(--ch-reply-grad);
+    color: white;
+    border: none;
+    border-radius: var(--ch-radius-chip);
+    padding: 8px 22px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: var(--ch-shadow-reply);
+}
+
+/* ---------- Generic form-submit buttons & action affordances ---------- */
+body[data-theme="chat"] button[data-c-post],
+body[data-theme="chat"] button[data-c-submit],
+body[data-theme="chat"] button[type="submit"],
+body[data-theme="chat"] .c-aff-btn {
+    background: var(--ch-reply-grad);
+    color: white;
+    border: none;
+    border-radius: var(--ch-radius-chip);
+    padding: 8px 18px;
+    font-family: var(--ch-sans);
+    font-size: 0.92em;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: var(--ch-shadow-reply);
+    transition: transform 0.15s ease;
+}
+body[data-theme="chat"] button[data-c-post]:hover,
+body[data-theme="chat"] button[data-c-submit]:hover,
+body[data-theme="chat"] button[type="submit"]:hover,
+body[data-theme="chat"] .c-aff-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(118, 75, 162, 0.4);
+}
+
+/* Ghost / clear variants */
+body[data-theme="chat"] button.c-btn-clear {
+    background: rgba(255, 255, 255, 0.7);
+    color: var(--ch-muted);
+    border: 1px solid rgba(160, 180, 220, 0.4);
+    box-shadow: none;
+}
+body[data-theme="chat"] button.c-btn-clear:hover {
+    color: var(--ch-pink);
+    border-color: var(--ch-pink);
+    background: white;
+}
+body[data-theme="chat"] .c-chrome-btn {
+    background: rgba(255, 255, 255, 0.85);
+    color: var(--ch-muted);
+    border: 1px solid rgba(160, 180, 220, 0.35);
+    border-radius: var(--ch-radius-chip);
+    padding: 3px 12px;
+    font-size: 0.78em;
+    font-family: var(--ch-sans);
+    width: auto;
+    height: auto;
+    cursor: pointer;
+    box-shadow: none;
+}
+body[data-theme="chat"] .c-chrome-btn:hover {
+    color: var(--ch-text);
+    background: white;
+}
+
+/* ---------- Navigation (tabs) ---------- */
+/* Render tabs as a pill-row at the top of the section. */
+body[data-theme="chat"] .c-nav-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    padding: 6px;
+    background: rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(160, 180, 220, 0.25);
+    border-radius: var(--ch-radius-chip);
+    margin: 6px auto 20px auto;
+    max-width: fit-content;
+    backdrop-filter: saturate(180%) blur(10px);
+    -webkit-backdrop-filter: saturate(180%) blur(10px);
+    box-shadow: var(--ch-shadow);
+}
+body[data-theme="chat"] .c-nav-tab {
+    background: transparent;
+    color: var(--ch-muted);
+    border: none;
+    border-radius: var(--ch-radius-chip);
+    padding: 6px 14px;
+    font: inherit;
+    font-size: 0.9em;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: none;
+    transition: all 0.15s ease;
+}
+body[data-theme="chat"] .c-nav-tab:hover {
+    color: var(--ch-accent);
+    transform: none;
+    background: rgba(99, 102, 241, 0.08);
+}
+body[data-theme="chat"] .c-nav-tab.c-nav-tab--active {
+    background: var(--ch-reply-grad);
+    color: white;
+    box-shadow: var(--ch-shadow-reply);
+}
+body[data-theme="chat"] .c-nav-tab.c-nav-tab--complete {
+    color: var(--ch-green);
+}
+body[data-theme="chat"] .c-nav-tab.c-nav-tab--complete::before {
+    content: "✓ ";
+}
+body[data-theme="chat"] .c-nav-tab.c-nav-tab--locked {
+    color: var(--ch-subtle);
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ---------- Feedback banners ---------- */
+body[data-theme="chat"] .c-feedback {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 16px;
+    margin: 14px 0;
+    background: rgba(255, 255, 255, 0.75);
+    border: 1px solid rgba(160, 180, 220, 0.3);
+    border-radius: var(--ch-radius);
+    font-size: 0.92em;
+    box-shadow: var(--ch-shadow);
+    backdrop-filter: saturate(180%) blur(10px);
+    -webkit-backdrop-filter: saturate(180%) blur(10px);
+}
+body[data-theme="chat"] .c-feedback--error {
+    color: #b91c1c;
+    border-color: rgba(239, 68, 68, 0.3);
+}
+body[data-theme="chat"] .c-feedback--error::before {
+    content: "⚠";
+    font-size: 1.2em;
+}
+body[data-theme="chat"] .c-feedback--success {
+    color: var(--ch-green);
+    border-color: rgba(16, 185, 129, 0.3);
+}
+body[data-theme="chat"] .c-feedback--success::before {
+    content: "✓";
+    font-size: 1.2em;
+    font-weight: 700;
+}
+
+/* ---------- Theme picker ---------- */
+body[data-theme="chat"] .c-page-footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(160, 180, 220, 0.25);
+}
+body[data-theme="chat"] .c-theme-picker {
+    color: var(--ch-muted);
+    font-family: var(--ch-sans);
+}
+body[data-theme="chat"] .c-theme-picker select {
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(160, 180, 220, 0.3);
+    border-radius: var(--ch-radius-chip);
+    padding: 4px 12px;
+    font-family: var(--ch-sans);
+    color: var(--ch-text);
+}
+
+/* ---------- Error boundary, depends-on, other utilities ---------- */
+body[data-theme="chat"] .c-error-boundary {
+    background: rgba(254, 226, 226, 0.8);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    border-radius: var(--ch-radius);
+    backdrop-filter: saturate(180%) blur(10px);
+    -webkit-backdrop-filter: saturate(180%) blur(10px);
+    color: #7f1d1d;
+}
+body[data-theme="chat"] .c-depends-on {
+    color: var(--ch-subtle);
+    font-size: 0.82em;
+    font-style: italic;
+}
+body[data-theme="chat"] .c-depends-on a {
+    color: var(--ch-accent);
+    text-decoration: none;
+}

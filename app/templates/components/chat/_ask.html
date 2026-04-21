@@ -1,0 +1,13 @@
+{# Reusable ask-bubble. Context expects:
+     label       — the question title
+     instruction — the subtitle/hint (optional)
+     hint        — an additional small-print line (optional; passed ad-hoc)
+#}
+<div class="ch-bubble ch-bubble--ask">
+  <div class="ch-avatar ch-avatar--ask">✨</div>
+  <div class="ch-bubble-body">
+    <p class="ch-bubble-title">{{ label }}</p>
+    {% if instruction %}<p class="ch-bubble-text">{{ instruction }}</p>{% endif %}
+    {% if hint %}<p class="ch-bubble-text" style="margin-top: 6px; opacity: 0.85;">{{ hint }}</p>{% endif %}
+  </div>
+</div>

@@ -832,7 +832,10 @@ class Component:
                 f"Use render_affordance_html() to render or Component.mark_rendered() to skip."
             )
 
+        is_container = self.form in self._CONTAINER_FORMS
         classes = ['component']
+        if is_container:
+            classes.append('c-container')
         if self.is_complete:
             classes.append('component--complete')
         if self.edit_mode:
@@ -853,7 +856,8 @@ class Component:
             url=self.url,
             inner=inner,
             json_str=json.dumps(self.serialize(), indent=2, ensure_ascii=False),
-            is_container=self.form in self._CONTAINER_FORMS,
+            is_container=is_container,
+            data=data,
         )
 
     def handle(self, body: dict) -> dict:

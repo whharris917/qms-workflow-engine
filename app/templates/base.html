@@ -88,7 +88,7 @@
         }
     </style>
 </head>
-<body>
+<body{% if active_theme %} data-theme="{{ active_theme }}"{% endif %}>
     <aside class="sidebar">
         <div class="sidebar-header">QMS Engine</div>
         <nav>
