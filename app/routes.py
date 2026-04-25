@@ -207,6 +207,13 @@ _WORKSHOPS = [
         "icon": "\u2728",
         "template": "workshop_component_creation.html",
     },
+    {
+        "slug": "nesting",
+        "title": "Nesting Visualizations",
+        "description": "Playground for exploring different visual idioms for representing nested structure. Self-contained, independent of the component system.",
+        "icon": "▣",
+        "template": "workshop_nesting.html",
+    },
 ]
 
 

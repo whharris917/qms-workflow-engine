@@ -1,0 +1,3374 @@
+{% extends "base.html" %}
+{% block title %}Nesting Visualizations &middot; Workshop &middot; Razem{% endblock %}
+{% block content %}
+<div class="nest-ws">
+
+  <nav class="nest-ws__topbar" aria-label="Experiment switcher">
+    <a class="nest-ws__back" href="/workshop">&larr;</a>
+    <div class="nest-ws__tabs" role="tablist">
+      <button class="nest-ws__tab is-active" role="tab" aria-selected="true" data-tab="exp-1">Experiment 1</button>
+      <button class="nest-ws__tab" role="tab" aria-selected="false" data-tab="exp-2">Experiment 2</button>
+      <button class="nest-ws__tab" role="tab" aria-selected="false" data-tab="exp-3">Experiment 3</button>
+      <button class="nest-ws__tab" role="tab" aria-selected="false" data-tab="exp-4">Experiment 4</button>
+      <button class="nest-ws__tab" role="tab" aria-selected="false" data-tab="exp-5">Experiment 5</button>
+      <button class="nest-ws__tab" role="tab" aria-selected="false" data-tab="exp-4-1">Experiment 4.1</button>
+      <button class="nest-ws__tab" role="tab" aria-selected="false" data-tab="exp-4-2">Experiment 4.2</button>
+      <button class="nest-ws__tab" role="tab" aria-selected="false" data-tab="exp-4-3">Experiment 4.3</button>
+      <button class="nest-ws__tab" role="tab" aria-selected="false" data-tab="exp-4-4">Experiment 4.4</button>
+      <button class="nest-ws__tab" role="tab" aria-selected="false" data-tab="exp-4-5">Experiment 4.5</button>
+      <button class="nest-ws__tab" role="tab" aria-selected="false" data-tab="exp-4-1-1">Experiment 4.1.1</button>
+    </div>
+  </nav>
+
+  <section class="nest-ws__canvas is-active" role="tabpanel" data-panel="exp-1">
+    <div class="exp1-root"></div>
+  </section>
+  <section class="nest-ws__canvas" role="tabpanel" data-panel="exp-2" hidden>
+    <div class="exp2-root"></div>
+  </section>
+  <section class="nest-ws__canvas" role="tabpanel" data-panel="exp-3" hidden>
+    <div class="exp3-root"></div>
+  </section>
+  <section class="nest-ws__canvas" role="tabpanel" data-panel="exp-4" hidden>
+    <div class="exp4-root"></div>
+  </section>
+  <section class="nest-ws__canvas" role="tabpanel" data-panel="exp-5" hidden>
+    <div class="exp5-root"></div>
+  </section>
+  <section class="nest-ws__canvas" role="tabpanel" data-panel="exp-4-1" hidden>
+    <div class="exp41-root"></div>
+  </section>
+  <section class="nest-ws__canvas" role="tabpanel" data-panel="exp-4-2" hidden>
+    <div class="exp42-root"></div>
+  </section>
+  <section class="nest-ws__canvas" role="tabpanel" data-panel="exp-4-3" hidden>
+    <div class="exp43-root"></div>
+  </section>
+  <section class="nest-ws__canvas" role="tabpanel" data-panel="exp-4-4" hidden>
+    <div class="exp44-root"></div>
+  </section>
+  <section class="nest-ws__canvas" role="tabpanel" data-panel="exp-4-5" hidden>
+    <div class="exp45-root"></div>
+  </section>
+  <section class="nest-ws__canvas" role="tabpanel" data-panel="exp-4-1-1" hidden>
+    <div class="exp411-root"></div>
+  </section>
+
+</div>
+
+<style>
+/* Scoped to .nest-ws. The whole viewport (minus sidebar) is the canvas; the
+   topbar is the only persistent chrome. Each .nest-ws__canvas is a full-bleed
+   empty surface — experiments render directly onto it without any parent frame. */
+
+.nest-ws {
+    --nw-accent:      #6366f1;
+    --nw-accent-2:    #a855f7;
+    --nw-pink:        #ec4899;
+    --nw-text:        #1f2144;
+    --nw-muted:       #4a4e6d;
+    --nw-subtle:      #8088a8;
+    --nw-chip-bg:     rgba(255, 255, 255, 0.62);
+    --nw-chip-border: rgba(160, 180, 220, 0.38);
+    --nw-font:        -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+
+    position: relative;
+    margin: -2rem;                /* bleed past base.html's .content padding */
+    min-height: calc(100vh);
+    display: flex;
+    flex-direction: column;
+    font-family: var(--nw-font);
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--nw-text);
+
+    background:
+        radial-gradient(at 15% 20%, #ffe3f0 0%, transparent 55%),
+        radial-gradient(at 85% 15%, #c8d8ff 0%, transparent 55%),
+        radial-gradient(at 70% 85%, #d9c8ff 0%, transparent 55%),
+        radial-gradient(at 20% 90%, #c4f0f4 0%, transparent 55%),
+        linear-gradient(160deg, #f7f9ff 0%, #fdf4ff 100%);
+    background-attachment: fixed;
+}
+
+/* ----- Topbar: compact, horizontal, the only chrome ----- */
+.nest-ws__topbar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 20px;
+    border-bottom: 1px solid rgba(160, 180, 220, 0.22);
+    background: rgba(255, 255, 255, 0.35);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+}
+
+.nest-ws__back {
+    color: var(--nw-muted);
+    text-decoration: none;
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: color 0.12s, background 0.12s;
+}
+.nest-ws__back:hover {
+    color: var(--nw-text);
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.nest-ws__tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.nest-ws__tab {
+    font: inherit;
+    font-size: 0.88em;
+    font-weight: 500;
+    color: var(--nw-muted);
+    background: var(--nw-chip-bg);
+    border: 1px solid var(--nw-chip-border);
+    border-radius: 999px;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: transform 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+}
+.nest-ws__tab:hover {
+    color: var(--nw-text);
+    transform: translateY(-1px);
+}
+.nest-ws__tab.is-active {
+    color: #ffffff;
+    background: linear-gradient(135deg, var(--nw-accent) 0%, var(--nw-accent-2) 100%);
+    border-color: transparent;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+}
+
+/* ----- Canvas: full-bleed, no frame. Experiments own the whole surface. ----- */
+.nest-ws__canvas {
+    flex: 1;
+    position: relative;
+    /* deliberately no background / border / padding / max-width — this IS the page */
+}
+.nest-ws__canvas[hidden] {
+    display: none;
+}
+
+/* =====================================================================
+   Experiment 1 — naively nested tabs (3×3×3)
+
+   Every level uses identical styling: same button, same border, same
+   background. No indentation, color shift, or depth cue. The point is
+   to show the failure mode — by level 3 you can't tell at a glance
+   which tab bar belongs to which depth.
+   ===================================================================== */
+.nest-ws__canvas[data-panel="exp-1"] {
+    padding: 28px 32px;
+    overflow: auto;
+}
+
+.exp1-tabs {
+    font-size: 0.92em;
+    color: #1a1a2e;
+}
+.exp1-instruction {
+    margin: 0 0 6px 0;
+    font-size: inherit;
+    color: #444;
+    /* Deliberately undifferentiated: same font, same color, same weight at every level. */
+}
+.exp1-bar {
+    display: flex;
+    gap: 2px;
+    border-bottom: 1px solid #c9c9d1;
+}
+.exp1-btn {
+    font: inherit;
+    font-size: inherit;
+    padding: 8px 16px;
+    border: 1px solid #c9c9d1;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    background: #ececf0;
+    color: #555;
+    cursor: pointer;
+    margin-bottom: -1px;              /* overlap the bar's bottom border when active */
+    transition: background 0.1s, color 0.1s;
+}
+.exp1-btn:hover {
+    background: #f3f3f6;
+    color: #1a1a2e;
+}
+.exp1-btn.is-active {
+    background: #ffffff;
+    color: #1a1a2e;
+    font-weight: 600;
+    border-bottom: 1px solid #ffffff; /* hide the bar's border where the tab meets it */
+}
+.exp1-panelwrap {
+    border: 1px solid #c9c9d1;
+    border-top: none;
+    padding: 14px;
+    background: #ffffff;
+}
+.exp1-panel {
+    display: none;
+}
+.exp1-panel.is-active {
+    display: block;
+}
+.exp1-leaf {
+    margin: 0;
+    padding: 10px 4px;
+    color: #666;
+    font-size: 0.95em;
+}
+
+/* =====================================================================
+   Experiment 2 — minimum viable tether
+
+   The only change from Experiment 1: the instruction is now the FIRST
+   CHILD of the tab bar instead of a paragraph floating above it. That
+   single structural move binds instruction and tabs onto one strip
+   sharing a row, a baseline, and a bottom border. No new borders, no
+   new colors, no depth-specific styling.
+   ===================================================================== */
+.nest-ws__canvas[data-panel="exp-2"] {
+    padding: 28px 32px;
+    overflow: auto;
+}
+
+.exp2-tabs {
+    font-size: 0.92em;
+    color: #1a1a2e;
+}
+.exp2-bar {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    border-bottom: 1px solid #c9c9d1;
+}
+.exp2-instruction {
+    flex: 1 1 auto;
+    min-width: 0;                /* allow shrinking below content size so tabs keep their space */
+    max-width: 72ch;             /* long paragraphs wrap to readable column width */
+    padding: 10px 18px 10px 2px;
+    color: #444;
+    line-height: 1.55;
+}
+.exp2-instruction p {
+    margin: 0;
+}
+.exp2-instruction p + p {
+    margin-top: 0.65em;
+}
+.exp2-btn {
+    font: inherit;
+    font-size: inherit;
+    padding: 8px 16px;
+    border: 1px solid #c9c9d1;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    background: #ececf0;
+    color: #555;
+    cursor: pointer;
+    margin-bottom: -1px;
+    transition: background 0.1s, color 0.1s;
+}
+.exp2-btn:hover {
+    background: #f3f3f6;
+    color: #1a1a2e;
+}
+.exp2-btn.is-active {
+    background: #ffffff;
+    color: #1a1a2e;
+    font-weight: 600;
+    border-bottom: 1px solid #ffffff;
+}
+.exp2-panelwrap {
+    border: 1px solid #c9c9d1;
+    border-top: none;
+    padding: 14px;
+    background: #ffffff;
+}
+.exp2-panel {
+    display: none;
+}
+.exp2-panel.is-active {
+    display: block;
+}
+.exp2-leaf {
+    margin: 0;
+    padding: 10px 4px;
+    color: #666;
+    font-size: 0.95em;
+}
+
+/* =====================================================================
+   Experiment 3 — instructions in a popup
+
+   The bar is back to being a thin strip. A small "?" button at the
+   start of each bar toggles a floating popover anchored to the group.
+   Instructions live outside the layout flow — nesting depth no longer
+   pays a vertical cost for long/multi-paragraph text.
+   ===================================================================== */
+.nest-ws__canvas[data-panel="exp-3"] {
+    padding: 28px 32px;
+    overflow: auto;
+}
+
+.exp3-tabs {
+    position: relative;        /* popover anchor */
+    font-size: 0.92em;
+    color: #1a1a2e;
+}
+.exp3-bar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    border-bottom: 1px solid #c9c9d1;
+    padding-bottom: 0;
+}
+.exp3-help {
+    font: inherit;
+    font-size: 0.8em;
+    font-weight: 600;
+    width: 22px;
+    height: 22px;
+    line-height: 1;
+    padding: 0;
+    margin: 0 10px 6px 2px;
+    border-radius: 50%;
+    border: 1px solid #bdbdc8;
+    background: #ffffff;
+    color: #666;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+.exp3-help:hover {
+    color: #1a1a2e;
+    border-color: #6366f1;
+}
+.exp3-help.is-open {
+    background: #6366f1;
+    color: #ffffff;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+}
+.exp3-btn {
+    font: inherit;
+    font-size: inherit;
+    padding: 8px 16px;
+    border: 1px solid #c9c9d1;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    background: #ececf0;
+    color: #555;
+    cursor: pointer;
+    margin-bottom: -1px;
+    transition: background 0.1s, color 0.1s;
+}
+.exp3-btn:hover {
+    background: #f3f3f6;
+    color: #1a1a2e;
+}
+.exp3-btn.is-active {
+    background: #ffffff;
+    color: #1a1a2e;
+    font-weight: 600;
+    border-bottom: 1px solid #ffffff;
+}
+.exp3-panelwrap {
+    border: 1px solid #c9c9d1;
+    border-top: none;
+    padding: 14px;
+    background: #ffffff;
+}
+.exp3-panel {
+    display: none;
+}
+.exp3-panel.is-active {
+    display: block;
+}
+.exp3-leaf {
+    margin: 0;
+    padding: 10px 4px;
+    color: #666;
+    font-size: 0.95em;
+}
+
+/* Popover */
+.exp3-popup {
+    position: absolute;
+    top: 40px;                          /* just below the bar */
+    left: -2px;                         /* aligned to the help button */
+    z-index: 10;
+    max-width: 380px;
+    padding: 14px 16px;
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid rgba(160, 180, 220, 0.45);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(30, 30, 50, 0.16),
+                0 2px 6px rgba(30, 30, 50, 0.06);
+    backdrop-filter: blur(14px) saturate(180%);
+    -webkit-backdrop-filter: blur(14px) saturate(180%);
+    font-size: 0.95em;
+    line-height: 1.55;
+    color: #1f2144;
+}
+.exp3-popup[hidden] {
+    display: none;
+}
+.exp3-popup::before {
+    content: "";
+    position: absolute;
+    top: -6px;
+    left: 8px;
+    width: 11px;
+    height: 11px;
+    background: rgba(255, 255, 255, 0.96);
+    border-top: 1px solid rgba(160, 180, 220, 0.45);
+    border-left: 1px solid rgba(160, 180, 220, 0.45);
+    transform: rotate(45deg);
+}
+.exp3-popup p {
+    margin: 0;
+}
+.exp3-popup p + p {
+    margin-top: 0.7em;
+}
+
+/* =====================================================================
+   Experiment 4 — VS Code–style file-explorer tree
+
+   The entire hierarchy is visible as an expandable/collapsible tree on
+   the left. Selecting a node shows its content on the right. Nesting
+   is made literal through indentation + indent guides. Instructions
+   attach to the selected folder and live in the content pane — no
+   tethering problem because the selection already resolved ambiguity.
+   ===================================================================== */
+.nest-ws__canvas[data-panel="exp-4"] {
+    padding: 0;
+    overflow: hidden;
+}
+
+.exp4-root {
+    display: flex;
+    height: 100%;
+    color: #1a1a2e;
+    font-size: 13px;
+}
+
+/* ----- Tree (left pane, VS Code dark aesthetic) ----- */
+.exp4-tree {
+    width: 280px;
+    flex-shrink: 0;
+    background: #252526;
+    color: #cccccc;
+    border-right: 1px solid #1e1e1e;
+    display: flex;
+    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+.exp4-tree-header {
+    padding: 10px 14px 8px;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #bbbbbb;
+    border-bottom: 1px solid #1e1e1e;
+    flex-shrink: 0;
+}
+.exp4-tree-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 0;
+}
+
+.exp4-node {
+    /* children visibility toggled by .is-expanded */
+}
+.exp4-children {
+    display: none;
+    padding-left: 10px;
+    margin-left: 10px;
+    border-left: 1px solid #333335;
+}
+.exp4-node.is-expanded > .exp4-children {
+    display: block;
+}
+
+.exp4-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px 3px 6px;
+    cursor: pointer;
+    user-select: none;
+    line-height: 1.5;
+}
+.exp4-row:hover {
+    background: #2a2d2e;
+}
+.exp4-row.is-selected {
+    background: #37373d;
+    color: #ffffff;
+}
+.exp4-tree:focus-within .exp4-row.is-selected {
+    background: #094771;
+    color: #ffffff;
+}
+
+.exp4-chev {
+    display: inline-block;
+    width: 12px;
+    font-size: 9px;
+    color: #8b8b8b;
+    flex-shrink: 0;
+    text-align: center;
+    transition: transform 0.12s;
+}
+.exp4-node.is-expanded > .exp4-row > .exp4-chev {
+    transform: rotate(90deg);
+}
+.exp4-chev--leaf {
+    visibility: hidden;                    /* invisible but keeps alignment */
+}
+
+.exp4-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    display: inline-block;
+}
+.exp4-icon--folder {
+    background: #dcb67a;                    /* VS Code folder yellow */
+    clip-path: polygon(0 20%, 35% 20%, 45% 35%, 100% 35%, 100% 100%, 0 100%);
+}
+.exp4-icon--leaf {
+    background: #75beff;                    /* VS Code file blue */
+    opacity: 0.55;
+    clip-path: polygon(0 0, 70% 0, 100% 30%, 100% 100%, 0 100%);
+}
+
+.exp4-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+}
+
+/* ----- Details pane (right, light) ----- */
+.exp4-details {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+    background: #ffffff;
+    padding: 28px 36px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+}
+.exp4-details-empty {
+    color: #8b8b96;
+    font-style: italic;
+    padding: 40px 0;
+    text-align: center;
+}
+.exp4-details-crumb {
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #8b8b96;
+    margin-bottom: 4px;
+}
+.exp4-details-title {
+    font-size: 1.4em;
+    font-weight: 600;
+    margin: 0 0 18px 0;
+    color: #1a1a2e;
+}
+.exp4-details-instruction {
+    max-width: 72ch;
+    color: #333;
+    padding: 14px 18px;
+    background: #f8f8fa;
+    border-left: 3px solid #6366f1;
+    border-radius: 0 6px 6px 0;
+    margin-bottom: 18px;
+}
+.exp4-details-instruction p { margin: 0; }
+.exp4-details-instruction p + p { margin-top: 0.65em; }
+.exp4-details-childcount {
+    color: #6b6b78;
+    font-size: 0.92em;
+}
+.exp4-details-leaf {
+    padding: 20px 24px;
+    background: #fdfdfe;
+    border: 1px solid #e3e3e8;
+    border-radius: 8px;
+    color: #333;
+}
+
+/* =====================================================================
+   Experiment 5 — instructions as margin comments (Word/Google-Docs style)
+
+   The tab tree from Experiment 2 is kept verbatim, minus the inline
+   instruction inside each bar. Instructions are moved to a left-margin
+   column. Each comment is absolutely positioned at the vertical level
+   of its tab bar, so tether is established by alignment rather than
+   spatial adjacency. When tabs switch, only the comments for the newly
+   visible bars remain visible; the others hide.
+   ===================================================================== */
+.nest-ws__canvas[data-panel="exp-5"] {
+    padding: 0;
+    overflow: auto;
+}
+
+.exp5-root {
+    position: relative;
+    padding: 28px 32px 60px;
+    min-height: 100%;
+}
+
+.exp5-content {
+    margin-left: 252px;          /* reserves the comment gutter */
+    min-width: 0;
+}
+
+/* ----- The tab tree (Experiment 2 styling, inline instruction removed) ----- */
+.exp5-tabs {
+    font-size: 0.92em;
+    color: #1a1a2e;
+}
+.exp5-bar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    border-bottom: 1px solid #c9c9d1;
+    transition: border-color 0.15s;
+}
+.exp5-bar.has-comment {
+    border-left: 3px solid transparent;
+    margin-left: -3px;
+    padding-left: 0;
+    /* The amber accent is applied when a comment is aligned with this bar. */
+}
+.exp5-btn {
+    font: inherit;
+    font-size: inherit;
+    padding: 8px 16px;
+    border: 1px solid #c9c9d1;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    background: #ececf0;
+    color: #555;
+    cursor: pointer;
+    margin-bottom: -1px;
+    transition: background 0.1s, color 0.1s;
+}
+.exp5-btn:hover {
+    background: #f3f3f6;
+    color: #1a1a2e;
+}
+.exp5-btn.is-active {
+    background: #ffffff;
+    color: #1a1a2e;
+    font-weight: 600;
+    border-bottom: 1px solid #ffffff;
+}
+.exp5-panelwrap {
+    border: 1px solid #c9c9d1;
+    border-top: none;
+    padding: 14px;
+    background: #ffffff;
+}
+.exp5-panel { display: none; }
+.exp5-panel.is-active { display: block; }
+.exp5-leaf {
+    margin: 0;
+    padding: 10px 4px;
+    color: #666;
+    font-size: 0.95em;
+}
+
+/* ----- Margin comments ----- */
+.exp5-comment {
+    position: absolute;
+    left: 24px;
+    width: 208px;
+    padding: 10px 12px;
+    background: #ffffff;
+    border: 1px solid #e3e3e8;
+    border-left: 3px solid #f5b73d;             /* Word-comment amber accent */
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: #3a3a4a;
+    transition: top 0.18s ease, opacity 0.18s ease;
+}
+.exp5-comment[hidden] {
+    display: none;
+}
+.exp5-comment p { margin: 0; }
+.exp5-comment p + p { margin-top: 0.6em; }
+.exp5-comment-head {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #b28b20;
+    margin-bottom: 4px;
+}
+
+/* =====================================================================
+   Shared placeholder card (used by any experiment awaiting implementation)
+   ===================================================================== */
+.nest-ws-placeholder {
+    max-width: 520px;
+    margin: 80px auto;
+    padding: 28px 32px;
+    background: rgba(255, 255, 255, 0.68);
+    border: 1px solid rgba(160, 180, 220, 0.42);
+    border-radius: 16px;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow: 0 6px 24px rgba(59, 41, 102, 0.08);
+    color: #1f2144;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+}
+.nest-ws-ph-tag {
+    display: inline-block;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #a855f7;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+.nest-ws-placeholder h3 {
+    margin: 0 0 10px;
+    font-size: 1.15em;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    background: linear-gradient(90deg, #6366f1 0%, #ec4899 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+.nest-ws-placeholder p {
+    margin: 0 0 10px;
+    color: #4a4e6d;
+    line-height: 1.55;
+    font-size: 0.95em;
+}
+.nest-ws-placeholder p:last-of-type {
+    margin-bottom: 0;
+}
+.nest-ws-ph-goal {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed rgba(160, 180, 220, 0.5);
+    font-size: 0.88em;
+    color: #6b6b8a;
+    font-style: italic;
+}
+
+/* =====================================================================
+   Experiment 4.1 — inline progressive disclosure
+
+   Same tree model as Exp 4, but the right pane is dissolved. Content
+   is shown IN-LINE, under the node that owns it. Click a folder →
+   instruction + children appear below, indenting the subtree. Click a
+   leaf → leaf content appears below. Siblings stay visible (collapsed),
+   preserving parallel structure. Nesting is made literal through
+   indentation + chevron rotation, exactly like Exp 4, but without the
+   "code editor" framing or the fixed sidebar cost.
+   ===================================================================== */
+.nest-ws__canvas[data-panel="exp-4-1"] {
+    padding: 0;
+    overflow: auto;
+}
+
+.exp41-root {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 32px 40px 60px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    color: #1a1a2e;
+}
+
+.exp41-node {
+    margin: 1px 0;
+}
+
+.exp41-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.1s;
+    user-select: none;
+}
+.exp41-row:hover {
+    background: #f3f3f6;
+}
+.exp41-row.is-selected {
+    background: #eef0ff;
+}
+
+.exp41-chev {
+    width: 12px;
+    font-size: 10px;
+    color: #8b8b96;
+    text-align: center;
+    transition: transform 0.15s;
+    flex-shrink: 0;
+}
+.exp41-node.is-expanded > .exp41-row > .exp41-chev {
+    transform: rotate(90deg);
+}
+.exp41-chev--leaf {
+    visibility: hidden;
+}
+
+.exp41-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    display: inline-block;
+}
+.exp41-icon--folder {
+    background: #dcb67a;
+    clip-path: polygon(0 20%, 35% 20%, 45% 35%, 100% 35%, 100% 100%, 0 100%);
+}
+.exp41-icon--leaf {
+    background: #75beff;
+    opacity: 0.6;
+    clip-path: polygon(0 0, 70% 0, 100% 30%, 100% 100%, 0 100%);
+}
+
+.exp41-label {
+    flex: 1;
+    font-size: 14px;
+}
+
+.exp41-content {
+    display: none;
+    margin: 4px 0 10px 14px;
+    padding-left: 14px;
+    border-left: 1px solid #e3e3e8;
+}
+.exp41-node.is-expanded > .exp41-content {
+    display: block;
+}
+
+.exp41-instruction {
+    background: #f8f8fa;
+    border-left: 3px solid #6366f1;
+    padding: 10px 14px;
+    border-radius: 0 6px 6px 0;
+    margin-bottom: 8px;
+    color: #333;
+    line-height: 1.55;
+    font-size: 13.5px;
+}
+.exp41-instruction p { margin: 0; }
+.exp41-instruction p + p { margin-top: 0.6em; }
+
+.exp41-leaf-body {
+    padding: 12px 16px;
+    background: #fdfdfe;
+    border: 1px solid #e3e3e8;
+    border-radius: 6px;
+    color: #444;
+    font-size: 13.5px;
+}
+
+/* Root-level instruction sits above the tree, always visible. */
+.exp41-root-instruction {
+    margin: 0 0 14px;
+    padding: 10px 14px;
+    background: #f8f8fa;
+    border-left: 3px solid #6366f1;
+    border-radius: 0 6px 6px 0;
+    color: #333;
+    line-height: 1.55;
+    font-size: 13.5px;
+}
+.exp41-root-instruction p { margin: 0; }
+.exp41-root-instruction p + p { margin-top: 0.6em; }
+
+/* =====================================================================
+   Experiment 4.2 — Miller columns (Finder-style horizontal drill-down)
+   ===================================================================== */
+.nest-ws__canvas[data-panel="exp-4-2"] {
+    padding: 0;
+    overflow: hidden;
+}
+.exp42-root {
+    display: flex;
+    height: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    color: #1a1a2e;
+    background: #ffffff;
+}
+.exp42-column {
+    width: 260px;
+    flex-shrink: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #e3e3e8;
+    background: #fafafb;
+}
+.exp42-column--detail {
+    flex: 1;
+    min-width: 360px;
+    background: #ffffff;
+    border-right: none;
+}
+.exp42-col-header {
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid #e3e3e8;
+    background: #ffffff;
+    flex-shrink: 0;
+}
+.exp42-col-tag {
+    display: block;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #8b8b96;
+    margin-bottom: 4px;
+}
+.exp42-col-instruction {
+    color: #333;
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+.exp42-col-instruction p { margin: 0; }
+.exp42-col-instruction p + p { margin-top: 0.55em; }
+.exp42-col-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 0;
+}
+.exp42-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 16px;
+    cursor: pointer;
+    color: #1a1a2e;
+    border-left: 3px solid transparent;
+    transition: background 0.1s;
+}
+.exp42-item:hover { background: #f0f0f4; }
+.exp42-item.is-active {
+    background: #eef0ff;
+    border-left-color: #6366f1;
+}
+.exp42-item-label { flex: 1; }
+.exp42-item-arrow {
+    color: #bdbdc8;
+    font-size: 1.05em;
+    line-height: 1;
+}
+.exp42-item.is-active .exp42-item-arrow { color: #6366f1; }
+.exp42-detail-body { padding: 28px 32px; overflow-y: auto; }
+.exp42-detail-crumb {
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #8b8b96;
+    margin-bottom: 4px;
+}
+.exp42-detail-title {
+    font-size: 1.4em;
+    font-weight: 600;
+    margin: 0 0 18px;
+    color: #1a1a2e;
+}
+.exp42-detail-leaf {
+    padding: 20px 24px;
+    background: #fdfdfe;
+    border: 1px solid #e3e3e8;
+    border-radius: 8px;
+    color: #333;
+}
+
+/* =====================================================================
+   Experiment 4.3 — chat-aesthetic tree
+   ===================================================================== */
+.nest-ws__canvas[data-panel="exp-4-3"] {
+    padding: 0;
+    overflow: hidden;
+    background:
+        radial-gradient(at 15% 20%, #ffe3f0 0%, transparent 55%),
+        radial-gradient(at 85% 15%, #c8d8ff 0%, transparent 55%),
+        radial-gradient(at 70% 85%, #d9c8ff 0%, transparent 55%),
+        radial-gradient(at 20% 90%, #c4f0f4 0%, transparent 55%),
+        linear-gradient(160deg, #f7f9ff 0%, #fdf4ff 100%);
+}
+.exp43-root {
+    display: flex;
+    gap: 16px;
+    padding: 20px;
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    color: #1f2144;
+    box-sizing: border-box;
+}
+.exp43-tree {
+    width: 300px;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.62);
+    border: 1px solid rgba(160, 180, 220, 0.38);
+    border-radius: 16px;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow: 0 6px 24px rgba(59, 41, 102, 0.08);
+    padding: 14px 10px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+.exp43-tree-header {
+    padding: 6px 12px 10px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #8088a8;
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+.exp43-tree-total {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+    color: #8088a8;
+    font-variant-numeric: tabular-nums;
+}
+.exp43-tree-body { flex: 1; }
+.exp43-children {
+    display: none;
+    padding-left: 8px;
+    margin-left: 12px;
+    border-left: 1px solid rgba(168, 85, 247, 0.22);
+}
+.exp43-node.is-expanded > .exp43-children { display: block; }
+.exp43-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    margin: 1px 0;
+    cursor: pointer;
+    user-select: none;
+    border-radius: 999px;
+    color: #4a4e6d;
+    transition: background 0.12s, color 0.12s;
+}
+.exp43-row:hover {
+    background: rgba(99, 102, 241, 0.08);
+    color: #1f2144;
+}
+.exp43-row.is-selected {
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.32);
+}
+.exp43-chev {
+    width: 12px;
+    font-size: 10px;
+    color: #8088a8;
+    transition: transform 0.15s;
+    flex-shrink: 0;
+    text-align: center;
+}
+.exp43-node.is-expanded > .exp43-row > .exp43-chev { transform: rotate(90deg); }
+.exp43-row.is-selected .exp43-chev { color: rgba(255, 255, 255, 0.85); }
+.exp43-chev--leaf { visibility: hidden; }
+.exp43-icon {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+    border-radius: 3px;
+    background: #a855f7;
+    opacity: 0.75;
+}
+.exp43-row.is-selected .exp43-icon { background: #ffffff; opacity: 1; }
+.exp43-check {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+    border: 1.5px solid rgba(168, 85, 247, 0.45);
+    border-radius: 4px;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: transparent;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.exp43-row:hover .exp43-check {
+    border-color: rgba(168, 85, 247, 0.75);
+}
+.exp43-row.is-done .exp43-check {
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    border-color: transparent;
+    color: #ffffff;
+}
+.exp43-row.is-selected .exp43-check {
+    border-color: rgba(255, 255, 255, 0.75);
+}
+.exp43-row.is-selected.is-done .exp43-check {
+    background: #ffffff;
+    color: #6366f1;
+    border-color: transparent;
+}
+.exp43-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13.5px;
+}
+.exp43-row.is-done .exp43-label {
+    text-decoration: line-through;
+    text-decoration-color: rgba(74, 78, 109, 0.35);
+    color: #8088a8;
+}
+.exp43-row.is-selected.is-done .exp43-label {
+    color: rgba(255, 255, 255, 0.72);
+    text-decoration-color: rgba(255, 255, 255, 0.4);
+}
+.exp43-counter {
+    flex-shrink: 0;
+    font-size: 11.5px;
+    color: #8088a8;
+    font-variant-numeric: tabular-nums;
+    padding: 1px 7px;
+    border-radius: 10px;
+    background: rgba(99, 102, 241, 0.08);
+}
+.exp43-counter.is-complete {
+    color: #ffffff;
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    font-weight: 600;
+}
+.exp43-row.is-selected .exp43-counter {
+    background: rgba(255, 255, 255, 0.22);
+    color: rgba(255, 255, 255, 0.92);
+}
+.exp43-row.is-selected .exp43-counter.is-complete {
+    background: rgba(255, 255, 255, 0.92);
+    color: #6366f1;
+}
+.exp43-details {
+    flex: 1;
+    min-width: 0;
+    background: rgba(255, 255, 255, 0.62);
+    border: 1px solid rgba(160, 180, 220, 0.38);
+    border-radius: 16px;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow: 0 6px 24px rgba(59, 41, 102, 0.08);
+    padding: 28px 32px;
+    overflow-y: auto;
+}
+.exp43-details-empty {
+    color: #8088a8;
+    font-style: italic;
+    text-align: center;
+    padding: 40px 0;
+}
+.exp43-details-crumb {
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #8088a8;
+    margin-bottom: 4px;
+}
+.exp43-details-title {
+    font-size: 1.4em;
+    font-weight: 600;
+    margin: 0 0 18px;
+    background: linear-gradient(90deg, #6366f1 0%, #ec4899 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+.exp43-details-instruction {
+    padding: 14px 18px;
+    background: rgba(99, 102, 241, 0.08);
+    border-left: 3px solid #6366f1;
+    border-radius: 0 10px 10px 0;
+    color: #1f2144;
+    margin-bottom: 18px;
+    line-height: 1.55;
+}
+.exp43-details-instruction p { margin: 0; }
+.exp43-details-instruction p + p { margin-top: 0.65em; }
+.exp43-details-leaf {
+    padding: 20px 24px;
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(160, 180, 220, 0.32);
+    border-radius: 10px;
+    color: #1f2144;
+    margin-bottom: 16px;
+}
+.exp43-progress-bar {
+    height: 8px;
+    background: rgba(99, 102, 241, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+.exp43-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #6366f1 0%, #a855f7 100%);
+    transition: width 0.25s ease;
+}
+.exp43-progress-label {
+    font-size: 12px;
+    color: #6b6b8a;
+    margin-bottom: 16px;
+    font-variant-numeric: tabular-nums;
+}
+.exp43-toggle-btn {
+    font: inherit;
+    font-size: 0.92em;
+    padding: 10px 20px;
+    border: 1px solid rgba(99, 102, 241, 0.45);
+    background: rgba(255, 255, 255, 0.6);
+    color: #6366f1;
+    border-radius: 999px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.exp43-toggle-btn:hover {
+    background: rgba(99, 102, 241, 0.08);
+    border-color: #6366f1;
+}
+.exp43-toggle-btn.is-done {
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    color: #ffffff;
+    border-color: transparent;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.32);
+}
+.exp43-toggle-btn.is-done:hover {
+    filter: brightness(1.05);
+}
+
+/* =====================================================================
+   Experiment 4.4 — collapsed Miller (breadcrumb-navigated)
+
+   The current scope gets the whole canvas. Ancestors collapse into a
+   breadcrumb at the top; the "Up" button pops one level. This is the
+   scalable variant of Miller columns — no matter how deep the tree,
+   the UI stays flat. Trade-off: you see only siblings at the current
+   depth, not siblings at every depth simultaneously.
+   ===================================================================== */
+.nest-ws__canvas[data-panel="exp-4-4"] {
+    padding: 0;
+    overflow: hidden;
+}
+.exp44-root {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    color: #1a1a2e;
+}
+.exp44-topbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 20px;
+    border-bottom: 1px solid #e3e3e8;
+    background: #fafafb;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+.exp44-up {
+    font: inherit;
+    font-size: 0.9em;
+    padding: 6px 12px;
+    border: 1px solid #c9c9d1;
+    background: #ffffff;
+    color: #444;
+    border-radius: 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: border-color 0.12s, color 0.12s, background 0.12s;
+    flex-shrink: 0;
+}
+.exp44-up:hover:not(:disabled) {
+    border-color: #6366f1;
+    color: #1a1a2e;
+    background: #f3f3f6;
+}
+.exp44-up:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+.exp44-crumbs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.92em;
+    flex-wrap: wrap;
+}
+.exp44-crumb {
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: #6b6b78;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+}
+.exp44-crumb:hover {
+    background: #eef0ff;
+    color: #1a1a2e;
+}
+.exp44-crumb.is-current {
+    color: #1a1a2e;
+    font-weight: 600;
+    cursor: default;
+    background: transparent;
+}
+.exp44-crumb.is-current:hover {
+    background: transparent;
+}
+.exp44-sep {
+    color: #bdbdc8;
+    font-size: 1.05em;
+    user-select: none;
+}
+.exp44-column {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+.exp44-col-header {
+    padding: 26px 32px 20px;
+    border-bottom: 1px solid #ececf0;
+    flex-shrink: 0;
+}
+.exp44-col-tag {
+    display: block;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #8b8b96;
+    margin-bottom: 6px;
+}
+.exp44-col-title {
+    font-size: 1.35em;
+    font-weight: 600;
+    margin: 0 0 10px;
+    color: #1a1a2e;
+}
+.exp44-col-instruction {
+    color: #333;
+    line-height: 1.55;
+    max-width: 72ch;
+}
+.exp44-col-instruction p { margin: 0; }
+.exp44-col-instruction p + p { margin-top: 0.65em; }
+.exp44-col-body {
+    padding: 16px 20px 32px;
+    max-width: 720px;
+    margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
+    flex: 1;
+}
+.exp44-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border: 1px solid #e3e3e8;
+    border-radius: 8px;
+    background: #ffffff;
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s, transform 0.12s;
+}
+.exp44-item + .exp44-item {
+    margin-top: 8px;
+}
+.exp44-item:hover {
+    background: #f3f5ff;
+    border-color: #c7cbff;
+}
+.exp44-item-label {
+    font-size: 0.98em;
+    color: #1a1a2e;
+}
+.exp44-item-arrow {
+    color: #bdbdc8;
+    font-size: 1.15em;
+    line-height: 1;
+    transition: color 0.12s, transform 0.12s;
+}
+.exp44-item:hover .exp44-item-arrow {
+    color: #6366f1;
+    transform: translateX(2px);
+}
+.exp44-leaf-body {
+    padding: 22px 26px;
+    background: #fdfdfe;
+    border: 1px solid #e3e3e8;
+    border-radius: 10px;
+    color: #333;
+    font-size: 0.98em;
+    line-height: 1.6;
+}
+
+/* =====================================================================
+   Experiment 4.5 — completion-aware tree
+   ===================================================================== */
+.nest-ws__canvas[data-panel="exp-4-5"] {
+    padding: 0;
+    overflow: hidden;
+}
+.exp45-root {
+    display: flex;
+    height: 100%;
+    color: #1a1a2e;
+    font-size: 13px;
+}
+.exp45-tree {
+    width: 300px;
+    flex-shrink: 0;
+    background: #252526;
+    color: #cccccc;
+    border-right: 1px solid #1e1e1e;
+    display: flex;
+    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+.exp45-tree-header {
+    padding: 10px 14px 8px;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #bbbbbb;
+    border-bottom: 1px solid #1e1e1e;
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+.exp45-tree-total {
+    font-size: 11px;
+    font-weight: 500;
+    color: #8b8b8b;
+    letter-spacing: 0;
+    text-transform: none;
+}
+.exp45-tree-body { flex: 1; overflow-y: auto; padding: 4px 0; }
+.exp45-children {
+    display: none;
+    padding-left: 10px;
+    margin-left: 10px;
+    border-left: 1px solid #333335;
+}
+.exp45-node.is-expanded > .exp45-children { display: block; }
+.exp45-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px 3px 6px;
+    cursor: pointer;
+    user-select: none;
+    line-height: 1.5;
+}
+.exp45-row:hover { background: #2a2d2e; }
+.exp45-row.is-selected { background: #094771; color: #ffffff; }
+.exp45-chev {
+    display: inline-block;
+    width: 12px;
+    font-size: 9px;
+    color: #8b8b8b;
+    flex-shrink: 0;
+    text-align: center;
+    transition: transform 0.12s;
+}
+.exp45-node.is-expanded > .exp45-row > .exp45-chev { transform: rotate(90deg); }
+.exp45-chev--leaf { visibility: hidden; }
+.exp45-check {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+    border: 1.5px solid #7a7a85;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: transparent;
+    transition: background 0.1s, border-color 0.1s, color 0.1s;
+}
+.exp45-row.is-done .exp45-check {
+    background: #16a34a;
+    border-color: #16a34a;
+    color: #ffffff;
+}
+.exp45-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    background: #dcb67a;
+    clip-path: polygon(0 20%, 35% 20%, 45% 35%, 100% 35%, 100% 100%, 0 100%);
+}
+.exp45-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+}
+.exp45-row.is-done .exp45-label {
+    color: #7a7a85;
+    text-decoration: line-through;
+    text-decoration-color: rgba(122, 122, 133, 0.4);
+}
+.exp45-counter {
+    flex-shrink: 0;
+    font-size: 11.5px;
+    color: #8b8b8b;
+    font-variant-numeric: tabular-nums;
+    padding: 0 4px;
+}
+.exp45-counter.is-complete {
+    color: #4ade80;
+    font-weight: 600;
+}
+.exp45-details {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+    background: #ffffff;
+    padding: 28px 36px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+}
+.exp45-details-empty {
+    color: #8b8b96;
+    font-style: italic;
+    padding: 60px 0;
+    text-align: center;
+}
+.exp45-details-crumb {
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #8b8b96;
+    margin-bottom: 4px;
+}
+.exp45-details-title {
+    font-size: 1.4em;
+    font-weight: 600;
+    margin: 0 0 12px;
+    color: #1a1a2e;
+}
+.exp45-progress-bar {
+    height: 8px;
+    background: #ececf0;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+.exp45-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #16a34a 0%, #4ade80 100%);
+    transition: width 0.2s ease;
+}
+.exp45-progress-label {
+    font-size: 12px;
+    color: #6b6b78;
+    margin-bottom: 16px;
+}
+.exp45-details-instruction {
+    padding: 14px 18px;
+    background: #f8f8fa;
+    border-left: 3px solid #6366f1;
+    border-radius: 0 6px 6px 0;
+    color: #333;
+    line-height: 1.55;
+    margin-bottom: 16px;
+}
+.exp45-details-instruction p { margin: 0; }
+.exp45-details-instruction p + p { margin-top: 0.6em; }
+.exp45-details-leaf {
+    padding: 18px 22px;
+    background: #fdfdfe;
+    border: 1px solid #e3e3e8;
+    border-radius: 8px;
+    color: #333;
+    margin-bottom: 16px;
+}
+.exp45-toggle-btn {
+    font: inherit;
+    padding: 9px 18px;
+    border: 1px solid #16a34a;
+    background: #ffffff;
+    color: #16a34a;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.1s, color 0.1s;
+}
+.exp45-toggle-btn:hover { background: #f0fdf4; }
+.exp45-toggle-btn.is-done {
+    background: #16a34a;
+    color: #ffffff;
+}
+.exp45-toggle-btn.is-done:hover { background: #15803d; }
+
+/* =====================================================================
+   Experiment 4.1.1 — inline disclosure + vertical group brackets
+
+   Same inline-disclosure model as Exp 4.1, but each group (one
+   instruction + its siblings) is bracketed by a solid vertical line
+   on the left. The line runs the full height of the group from just
+   below the instruction's top to just above the last sibling's bottom.
+   Nested groups each carry their own line, so depth reads as stacked
+   brackets. The old per-instruction left border is removed — the
+   group line now carries the accent.
+   ===================================================================== */
+.nest-ws__canvas[data-panel="exp-4-1-1"] {
+    padding: 0;
+    overflow: auto;
+}
+.exp411-root {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 32px 40px 60px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    color: #1a1a2e;
+}
+
+/* Group container — the key new piece. Wraps (instruction + children list)
+   and draws a vertical indigo line in its left gutter. */
+.exp411-group {
+    position: relative;
+    padding-left: 18px;
+}
+.exp411-group::before {
+    content: "";
+    position: absolute;
+    left: 5px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: #6366f1;
+    border-radius: 1px;
+    opacity: 0.45;
+}
+/* Slightly softer line at deeper nesting so stacked brackets don't pile up. */
+.exp411-group .exp411-group::before {
+    opacity: 0.32;
+}
+.exp411-group .exp411-group .exp411-group::before {
+    opacity: 0.22;
+}
+
+.exp411-inst {
+    background: rgba(99, 102, 241, 0.08);
+    padding: 10px 14px;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    color: #333;
+    line-height: 1.55;
+    font-size: 13.5px;
+}
+.exp411-inst p { margin: 0; }
+.exp411-inst p + p { margin-top: 0.6em; }
+
+.exp411-children {
+    display: flex;
+    flex-direction: column;
+}
+
+.exp411-node { margin: 1px 0; }
+
+.exp411-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.1s;
+    user-select: none;
+}
+.exp411-row:hover { background: #f3f3f6; }
+.exp411-row.is-selected { background: #eef0ff; }
+
+.exp411-chev {
+    width: 12px;
+    font-size: 10px;
+    color: #8b8b96;
+    text-align: center;
+    transition: transform 0.15s;
+    flex-shrink: 0;
+}
+.exp411-node.is-expanded > .exp411-row > .exp411-chev {
+    transform: rotate(90deg);
+}
+.exp411-chev--leaf { visibility: hidden; }
+
+.exp411-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    display: inline-block;
+}
+.exp411-icon--folder {
+    background: #dcb67a;
+    clip-path: polygon(0 20%, 35% 20%, 45% 35%, 100% 35%, 100% 100%, 0 100%);
+}
+.exp411-icon--leaf {
+    background: #75beff;
+    opacity: 0.6;
+    clip-path: polygon(0 0, 70% 0, 100% 30%, 100% 100%, 0 100%);
+}
+
+.exp411-label { flex: 1; font-size: 14px; }
+
+/* A folder's expandable content is itself a group — same rendering.
+   Toggled via display on the group when inside an .exp411-node. */
+.exp411-node > .exp411-group {
+    display: none;
+    margin: 6px 0 10px 14px;
+}
+.exp411-node.is-expanded > .exp411-group {
+    display: block;
+}
+
+.exp411-leaf-body {
+    padding: 12px 16px;
+    background: #fdfdfe;
+    border: 1px solid #e3e3e8;
+    border-radius: 6px;
+    color: #444;
+    font-size: 13.5px;
+    margin: 6px 0 10px 14px;
+}
+.exp411-node > .exp411-leaf-body {
+    display: none;
+}
+.exp411-node.is-expanded > .exp411-leaf-body {
+    display: block;
+}
+</style>
+
+<script>
+// ----- Outer experiment switcher -----
+(function () {
+    const root = document.querySelector('.nest-ws');
+    if (!root) return;
+    const tabs = root.querySelectorAll('.nest-ws__tab');
+    const panels = root.querySelectorAll('.nest-ws__canvas');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const target = tab.dataset.tab;
+            tabs.forEach(t => {
+                const active = t === tab;
+                t.classList.toggle('is-active', active);
+                t.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+            panels.forEach(p => {
+                const active = p.dataset.panel === target;
+                p.classList.toggle('is-active', active);
+                if (active) p.removeAttribute('hidden');
+                else p.setAttribute('hidden', '');
+            });
+        });
+    });
+})();
+
+// ----- Experiment 1: naively nested tabs (3 × 3 × 3) -----
+(function () {
+    const root = document.querySelector('.exp1-root');
+    if (!root) return;
+
+    // Per-level instructions. Naively rendered as plain paragraphs above each tab bar.
+    const INSTRUCTIONS = [
+        'Pick a chapter to read.',
+        'Pick a section within this chapter.',
+        'Pick an article within this section.',
+    ];
+
+    function build(parent, prefix, depth, maxDepth) {
+        const group = document.createElement('div');
+        group.className = 'exp1-tabs';
+
+        const instruction = document.createElement('p');
+        instruction.className = 'exp1-instruction';
+        instruction.textContent = INSTRUCTIONS[depth];
+        group.appendChild(instruction);
+
+        const bar = document.createElement('div');
+        bar.className = 'exp1-bar';
+        const panelwrap = document.createElement('div');
+        panelwrap.className = 'exp1-panelwrap';
+
+        for (let i = 1; i <= 3; i++) {
+            const id = prefix ? prefix + '.' + i : String(i);
+            const btn = document.createElement('button');
+            btn.className = 'exp1-btn' + (i === 1 ? ' is-active' : '');
+            btn.dataset.target = id;
+            btn.textContent = 'Tab ' + id;
+            bar.appendChild(btn);
+
+            const panel = document.createElement('div');
+            panel.className = 'exp1-panel' + (i === 1 ? ' is-active' : '');
+            panel.dataset.panel = id;
+            if (depth + 1 < maxDepth) {
+                build(panel, id, depth + 1, maxDepth);
+            } else {
+                const leaf = document.createElement('p');
+                leaf.className = 'exp1-leaf';
+                leaf.textContent = 'Leaf ' + id;
+                panel.appendChild(leaf);
+            }
+            panelwrap.appendChild(panel);
+        }
+
+        group.appendChild(bar);
+        group.appendChild(panelwrap);
+        parent.appendChild(group);
+    }
+
+    build(root, '', 0, 3);
+
+    // Event delegation — scope to the clicked button's own .exp1-tabs group only.
+    root.addEventListener('click', e => {
+        const btn = e.target.closest('.exp1-btn');
+        if (!btn) return;
+        const group = btn.closest('.exp1-tabs');
+        const target = btn.dataset.target;
+
+        group.querySelector(':scope > .exp1-bar')
+             .querySelectorAll(':scope > .exp1-btn')
+             .forEach(b => b.classList.toggle('is-active', b === btn));
+
+        group.querySelector(':scope > .exp1-panelwrap')
+             .querySelectorAll(':scope > .exp1-panel')
+             .forEach(p => p.classList.toggle('is-active', p.dataset.panel === target));
+    });
+})();
+
+// ----- Experiment 2: instruction tethered as the first child of the tab bar -----
+(function () {
+    const root = document.querySelector('.exp2-root');
+    if (!root) return;
+
+    // Progressively longer instructions — one-liner, medium, multi-paragraph — to stress-test
+    // the layout. Paragraphs are separated by "\n\n".
+    const INSTRUCTIONS = [
+        'Pick a chapter to read.',
+        'Pick a section within this chapter. Sections group articles that share a theme, so you can skim in any order.',
+        'Pick an article to read.\n\nArticles are the leaves of this navigation tree. Once you pick one, you’re done navigating and can just read; each takes 5–10 minutes and is self-contained.\n\nIf nothing jumps out, pick the first — articles are ordered roughly by importance within their section.',
+    ];
+
+    function build(parent, prefix, depth, maxDepth) {
+        const group = document.createElement('div');
+        group.className = 'exp2-tabs';
+
+        const bar = document.createElement('div');
+        bar.className = 'exp2-bar';
+
+        // Instruction stays inside the bar (tether preserved) but is now a block with one
+        // <p> per paragraph. The bar is flex with align-items: flex-end, so as the instruction
+        // grows taller the tab buttons stay pinned to the bottom-right corner.
+        const instruction = document.createElement('div');
+        instruction.className = 'exp2-instruction';
+        INSTRUCTIONS[depth].split('\n\n').forEach(text => {
+            const p = document.createElement('p');
+            p.textContent = text;
+            instruction.appendChild(p);
+        });
+        bar.appendChild(instruction);
+
+        const panelwrap = document.createElement('div');
+        panelwrap.className = 'exp2-panelwrap';
+
+        for (let i = 1; i <= 3; i++) {
+            const id = prefix ? prefix + '.' + i : String(i);
+            const btn = document.createElement('button');
+            btn.className = 'exp2-btn' + (i === 1 ? ' is-active' : '');
+            btn.dataset.target = id;
+            btn.textContent = 'Tab ' + id;
+            bar.appendChild(btn);
+
+            const panel = document.createElement('div');
+            panel.className = 'exp2-panel' + (i === 1 ? ' is-active' : '');
+            panel.dataset.panel = id;
+            if (depth + 1 < maxDepth) {
+                build(panel, id, depth + 1, maxDepth);
+            } else {
+                const leaf = document.createElement('p');
+                leaf.className = 'exp2-leaf';
+                leaf.textContent = 'Leaf ' + id;
+                panel.appendChild(leaf);
+            }
+            panelwrap.appendChild(panel);
+        }
+
+        group.appendChild(bar);
+        group.appendChild(panelwrap);
+        parent.appendChild(group);
+    }
+
+    build(root, '', 0, 3);
+
+    root.addEventListener('click', e => {
+        const btn = e.target.closest('.exp2-btn');
+        if (!btn) return;
+        const group = btn.closest('.exp2-tabs');
+        const target = btn.dataset.target;
+
+        group.querySelector(':scope > .exp2-bar')
+             .querySelectorAll(':scope > .exp2-btn')
+             .forEach(b => b.classList.toggle('is-active', b === btn));
+
+        group.querySelector(':scope > .exp2-panelwrap')
+             .querySelectorAll(':scope > .exp2-panel')
+             .forEach(p => p.classList.toggle('is-active', p.dataset.panel === target));
+    });
+})();
+
+// ----- Experiment 3: instructions in a click-triggered popover -----
+(function () {
+    const root = document.querySelector('.exp3-root');
+    if (!root) return;
+
+    const INSTRUCTIONS = [
+        'Pick a chapter to read.',
+        'Pick a section within this chapter. Sections group articles that share a theme, so you can skim in any order.',
+        'Pick an article to read.\n\nArticles are the leaves of this navigation tree. Once you pick one, you’re done navigating and can just read; each takes 5–10 minutes and is self-contained.\n\nIf nothing jumps out, pick the first — articles are ordered roughly by importance within their section.',
+    ];
+
+    function build(parent, prefix, depth, maxDepth) {
+        const group = document.createElement('div');
+        group.className = 'exp3-tabs';
+
+        const bar = document.createElement('div');
+        bar.className = 'exp3-bar';
+
+        const help = document.createElement('button');
+        help.type = 'button';
+        help.className = 'exp3-help';
+        help.textContent = '?';
+        help.setAttribute('aria-label', 'Show instructions for this tab group');
+        help.setAttribute('aria-expanded', 'false');
+        bar.appendChild(help);
+
+        for (let i = 1; i <= 3; i++) {
+            const id = prefix ? prefix + '.' + i : String(i);
+            const btn = document.createElement('button');
+            btn.className = 'exp3-btn' + (i === 1 ? ' is-active' : '');
+            btn.dataset.target = id;
+            btn.textContent = 'Tab ' + id;
+            bar.appendChild(btn);
+        }
+
+        // The popover lives inside the group; position: absolute anchors it to the
+        // nearest positioned ancestor (.exp3-tabs), so nested groups each carry their
+        // own popover that appears adjacent to their own help button.
+        const popup = document.createElement('div');
+        popup.className = 'exp3-popup';
+        popup.hidden = true;
+        INSTRUCTIONS[depth].split('\n\n').forEach(text => {
+            const p = document.createElement('p');
+            p.textContent = text;
+            popup.appendChild(p);
+        });
+
+        const panelwrap = document.createElement('div');
+        panelwrap.className = 'exp3-panelwrap';
+
+        for (let i = 1; i <= 3; i++) {
+            const id = prefix ? prefix + '.' + i : String(i);
+            const panel = document.createElement('div');
+            panel.className = 'exp3-panel' + (i === 1 ? ' is-active' : '');
+            panel.dataset.panel = id;
+            if (depth + 1 < maxDepth) {
+                build(panel, id, depth + 1, maxDepth);
+            } else {
+                const leaf = document.createElement('p');
+                leaf.className = 'exp3-leaf';
+                leaf.textContent = 'Leaf ' + id;
+                panel.appendChild(leaf);
+            }
+            panelwrap.appendChild(panel);
+        }
+
+        group.appendChild(bar);
+        group.appendChild(popup);
+        group.appendChild(panelwrap);
+        parent.appendChild(group);
+    }
+
+    build(root, '', 0, 3);
+
+    function closeAllPopups() {
+        root.querySelectorAll('.exp3-popup').forEach(p => p.hidden = true);
+        root.querySelectorAll('.exp3-help').forEach(b => {
+            b.classList.remove('is-open');
+            b.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    root.addEventListener('click', e => {
+        // Help button → toggle popover for its group; at most one open at a time.
+        const helpBtn = e.target.closest('.exp3-help');
+        if (helpBtn) {
+            const group = helpBtn.closest('.exp3-tabs');
+            const popup = group.querySelector(':scope > .exp3-popup');
+            const wasOpen = !popup.hidden;
+            closeAllPopups();
+            if (!wasOpen) {
+                popup.hidden = false;
+                helpBtn.classList.add('is-open');
+                helpBtn.setAttribute('aria-expanded', 'true');
+            }
+            e.stopPropagation();
+            return;
+        }
+
+        // Tab button → switch tab within its group.
+        const tabBtn = e.target.closest('.exp3-btn');
+        if (tabBtn) {
+            const group = tabBtn.closest('.exp3-tabs');
+            const target = tabBtn.dataset.target;
+            group.querySelector(':scope > .exp3-bar')
+                 .querySelectorAll(':scope > .exp3-btn')
+                 .forEach(b => b.classList.toggle('is-active', b === tabBtn));
+            group.querySelector(':scope > .exp3-panelwrap')
+                 .querySelectorAll(':scope > .exp3-panel')
+                 .forEach(p => p.classList.toggle('is-active', p.dataset.panel === target));
+        }
+    });
+
+    // Click anywhere outside a help button or popover → close.
+    document.addEventListener('click', e => {
+        if (!e.target.closest('.exp3-help') && !e.target.closest('.exp3-popup')) {
+            closeAllPopups();
+        }
+    });
+
+    // Escape → close.
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') closeAllPopups();
+    });
+})();
+
+// ----- Experiment 4: VS Code–style tree explorer -----
+(function () {
+    const root = document.querySelector('.exp4-root');
+    if (!root) return;
+
+    const MAX_DEPTH = 3;
+    const INSTRUCTIONS = [
+        'Pick a chapter to read.',
+        'Pick a section within this chapter. Sections group articles that share a theme, so you can skim in any order.',
+        'Pick an article to read.\n\nArticles are the leaves of this navigation tree. Once you pick one, you’re done navigating and can just read; each takes 5–10 minutes and is self-contained.\n\nIf nothing jumps out, pick the first — articles are ordered roughly by importance within their section.',
+    ];
+
+    // ----- Split-pane structure -----
+    const tree = document.createElement('div');
+    tree.className = 'exp4-tree';
+    tree.tabIndex = 0;
+
+    const treeHeader = document.createElement('div');
+    treeHeader.className = 'exp4-tree-header';
+    treeHeader.textContent = 'Explorer';
+    tree.appendChild(treeHeader);
+
+    const treeBody = document.createElement('div');
+    treeBody.className = 'exp4-tree-body';
+    tree.appendChild(treeBody);
+
+    const details = document.createElement('div');
+    details.className = 'exp4-details';
+
+    root.appendChild(tree);
+    root.appendChild(details);
+
+    // ----- Tree build (pre-render all nodes; toggle via classes) -----
+    function buildTree(parent, prefix, depth) {
+        for (let i = 1; i <= 3; i++) {
+            const id = prefix ? prefix + '.' + i : String(i);
+            const isLeaf = depth === MAX_DEPTH - 1;
+
+            const node = document.createElement('div');
+            node.className = 'exp4-node';
+            node.dataset.path = id;
+
+            const row = document.createElement('div');
+            row.className = 'exp4-row';
+            row.dataset.path = id;
+            row.dataset.kind = isLeaf ? 'leaf' : 'folder';
+
+            const chev = document.createElement('span');
+            chev.className = 'exp4-chev' + (isLeaf ? ' exp4-chev--leaf' : '');
+            chev.textContent = '▸';
+            row.appendChild(chev);
+
+            const icon = document.createElement('span');
+            icon.className = 'exp4-icon ' + (isLeaf ? 'exp4-icon--leaf' : 'exp4-icon--folder');
+            row.appendChild(icon);
+
+            const label = document.createElement('span');
+            label.className = 'exp4-label';
+            label.textContent = isLeaf ? 'Leaf ' + id : 'Tab ' + id;
+            row.appendChild(label);
+
+            node.appendChild(row);
+
+            if (!isLeaf) {
+                const children = document.createElement('div');
+                children.className = 'exp4-children';
+                buildTree(children, id, depth + 1);
+                node.appendChild(children);
+            }
+
+            parent.appendChild(node);
+        }
+    }
+
+    buildTree(treeBody, '', 0);
+
+    // ----- Details rendering -----
+    function renderDetails(path, kind) {
+        details.innerHTML = '';
+        if (!path) {
+            const empty = document.createElement('div');
+            empty.className = 'exp4-details-empty';
+            empty.textContent = 'Select an item in the explorer to view it.';
+            details.appendChild(empty);
+            return;
+        }
+
+        const crumb = document.createElement('div');
+        crumb.className = 'exp4-details-crumb';
+        crumb.textContent = kind === 'leaf' ? 'Leaf' : 'Folder · Depth ' + path.split('.').length;
+        details.appendChild(crumb);
+
+        const title = document.createElement('h2');
+        title.className = 'exp4-details-title';
+        title.textContent = (kind === 'leaf' ? 'Leaf ' : 'Tab ') + path;
+        details.appendChild(title);
+
+        if (kind === 'leaf') {
+            const leafBody = document.createElement('div');
+            leafBody.className = 'exp4-details-leaf';
+            leafBody.textContent = '[Leaf content for ' + path + ']';
+            details.appendChild(leafBody);
+        } else {
+            // Folder: show the instruction that governs picking among its children.
+            const depth = path.split('.').length;    // 1 for "1", 2 for "1.2", 3 for "1.2.3"
+            const inst = document.createElement('div');
+            inst.className = 'exp4-details-instruction';
+            INSTRUCTIONS[depth].split('\n\n').forEach(text => {
+                const p = document.createElement('p');
+                p.textContent = text;
+                inst.appendChild(p);
+            });
+            details.appendChild(inst);
+
+            const count = document.createElement('div');
+            count.className = 'exp4-details-childcount';
+            count.textContent = 'Contains 3 items.';
+            details.appendChild(count);
+        }
+    }
+
+    // ----- Interaction -----
+    let selectedPath = null;
+
+    function select(path, kind) {
+        treeBody.querySelectorAll('.exp4-row.is-selected')
+                .forEach(r => r.classList.remove('is-selected'));
+        const row = treeBody.querySelector('.exp4-row[data-path="' + path + '"]');
+        if (row) row.classList.add('is-selected');
+        selectedPath = path;
+        renderDetails(path, kind);
+    }
+
+    treeBody.addEventListener('click', e => {
+        const row = e.target.closest('.exp4-row');
+        if (!row) return;
+        const node = row.parentElement;
+        const kind = row.dataset.kind;
+        const path = row.dataset.path;
+
+        // Folders: clicking anywhere on the row toggles expand AND selects.
+        if (kind === 'folder') {
+            node.classList.toggle('is-expanded');
+        }
+        select(path, kind);
+    });
+
+    // Default view matches Experiments 1–3: expand the first-child chain and select Leaf 1.1.1.
+    // This frames the tree's "no-default" tendency as a design choice, not a constraint —
+    // we can mirror the tabs paradigm if we want to, it's just not automatic.
+    treeBody.querySelector('.exp4-node[data-path="1"]').classList.add('is-expanded');
+    treeBody.querySelector('.exp4-node[data-path="1.1"]').classList.add('is-expanded');
+    select('1.1.1', 'leaf');
+})();
+
+// ----- Experiment 5: instructions as margin comments -----
+(function () {
+    const root = document.querySelector('.exp5-root');
+    if (!root) return;
+
+    const INSTRUCTIONS = [
+        'Pick a chapter to read.',
+        'Pick a section within this chapter. Sections group articles that share a theme, so you can skim in any order.',
+        'Pick an article to read.\n\nArticles are the leaves of this navigation tree. Once you pick one, you’re done navigating and can just read; each takes 5–10 minutes and is self-contained.\n\nIf nothing jumps out, pick the first — articles are ordered roughly by importance within their section.',
+    ];
+
+    // Content column holds the tab tree; comments are siblings in root, absolutely positioned.
+    const content = document.createElement('div');
+    content.className = 'exp5-content';
+    root.appendChild(content);
+
+    function build(contentParent, prefix, depth, maxDepth) {
+        const groupId = prefix || 'root';
+
+        const group = document.createElement('div');
+        group.className = 'exp5-tabs';
+        group.dataset.groupId = groupId;
+
+        const bar = document.createElement('div');
+        bar.className = 'exp5-bar';
+        bar.dataset.groupId = groupId;
+
+        for (let i = 1; i <= 3; i++) {
+            const id = prefix ? prefix + '.' + i : String(i);
+            const btn = document.createElement('button');
+            btn.className = 'exp5-btn' + (i === 1 ? ' is-active' : '');
+            btn.dataset.target = id;
+            btn.textContent = 'Tab ' + id;
+            bar.appendChild(btn);
+        }
+
+        const panelwrap = document.createElement('div');
+        panelwrap.className = 'exp5-panelwrap';
+
+        for (let i = 1; i <= 3; i++) {
+            const id = prefix ? prefix + '.' + i : String(i);
+            const panel = document.createElement('div');
+            panel.className = 'exp5-panel' + (i === 1 ? ' is-active' : '');
+            panel.dataset.panel = id;
+            if (depth + 1 < maxDepth) {
+                build(panel, id, depth + 1, maxDepth);
+            } else {
+                const leaf = document.createElement('p');
+                leaf.className = 'exp5-leaf';
+                leaf.textContent = 'Leaf ' + id;
+                panel.appendChild(leaf);
+            }
+            panelwrap.appendChild(panel);
+        }
+
+        group.appendChild(bar);
+        group.appendChild(panelwrap);
+        contentParent.appendChild(group);
+
+        // Comment for this group lives in root (NOT nested in the tree), absolutely positioned.
+        // Putting it at the top-level keeps it out of the hidden-ancestor trap.
+        const comment = document.createElement('div');
+        comment.className = 'exp5-comment';
+        comment.dataset.groupId = groupId;
+        comment.hidden = true;                              // revealed by positionComments()
+
+        const head = document.createElement('div');
+        head.className = 'exp5-comment-head';
+        head.textContent = 'Instruction · Depth ' + depth;
+        comment.appendChild(head);
+
+        INSTRUCTIONS[depth].split('\n\n').forEach(text => {
+            const p = document.createElement('p');
+            p.textContent = text;
+            comment.appendChild(p);
+        });
+        root.appendChild(comment);
+    }
+
+    build(content, '', 0, 3);
+
+    function positionComments() {
+        const rootRect = root.getBoundingClientRect();
+        root.querySelectorAll('.exp5-comment').forEach(comment => {
+            const groupId = comment.dataset.groupId;
+            const bar = content.querySelector('.exp5-bar[data-group-id="' + groupId + '"]');
+            // offsetParent is null when an ancestor has display:none (hidden tab panel),
+            // which we treat as "bar isn't currently visible on the active path."
+            if (!bar || bar.offsetParent === null) {
+                comment.hidden = true;
+                return;
+            }
+            comment.hidden = false;
+            const barRect = bar.getBoundingClientRect();
+            comment.style.top = (barRect.top - rootRect.top) + 'px';
+        });
+    }
+
+    // Re-position on tab clicks, panel switches, and window resize.
+    root.addEventListener('click', e => {
+        const btn = e.target.closest('.exp5-btn');
+        if (!btn) return;
+        const group = btn.closest('.exp5-tabs');
+        const target = btn.dataset.target;
+
+        group.querySelector(':scope > .exp5-bar')
+             .querySelectorAll(':scope > .exp5-btn')
+             .forEach(b => b.classList.toggle('is-active', b === btn));
+
+        group.querySelector(':scope > .exp5-panelwrap')
+             .querySelectorAll(':scope > .exp5-panel')
+             .forEach(p => p.classList.toggle('is-active', p.dataset.panel === target));
+
+        positionComments();
+    });
+
+    window.addEventListener('resize', positionComments);
+
+    // When Experiment 5's canvas becomes visible, position comments — getBoundingClientRect
+    // returns zeros while the canvas is hidden, so initial positioning must wait.
+    const canvas = root.closest('.nest-ws__canvas');
+    const observer = new MutationObserver(() => {
+        if (!canvas.hidden) positionComments();
+    });
+    observer.observe(canvas, { attributes: true, attributeFilter: ['hidden'] });
+
+    // Initial pass (works if the canvas is already visible on load).
+    requestAnimationFrame(positionComments);
+})();
+
+// ----- Shared helper: render a placeholder card for experiments not yet implemented -----
+function nestWsRenderPlaceholder(rootEl, tag, title, description, goal) {
+    const card = document.createElement('div');
+    card.className = 'nest-ws-placeholder';
+
+    const tagEl = document.createElement('div');
+    tagEl.className = 'nest-ws-ph-tag';
+    tagEl.textContent = tag + ' · Placeholder';
+    card.appendChild(tagEl);
+
+    const titleEl = document.createElement('h3');
+    titleEl.textContent = title;
+    card.appendChild(titleEl);
+
+    description.split('\n\n').forEach(text => {
+        const p = document.createElement('p');
+        p.textContent = text;
+        card.appendChild(p);
+    });
+
+    const goalEl = document.createElement('p');
+    goalEl.className = 'nest-ws-ph-goal';
+    goalEl.textContent = 'Goal — ' + goal;
+    card.appendChild(goalEl);
+
+    rootEl.appendChild(card);
+}
+
+// ----- Experiment 4.1: inline progressive disclosure -----
+(function () {
+    const root = document.querySelector('.exp41-root');
+    if (!root) return;
+
+    const MAX_DEPTH = 3;
+    const INSTRUCTIONS = [
+        'Pick a chapter to read.',
+        'Pick a section within this chapter. Sections group articles that share a theme, so you can skim in any order.',
+        'Pick an article to read.\n\nArticles are the leaves of this navigation tree. Once you pick one, you’re done navigating and can just read; each takes 5–10 minutes and is self-contained.\n\nIf nothing jumps out, pick the first — articles are ordered roughly by importance within their section.',
+    ];
+
+    // Root instruction sits above the tree (always visible — it describes the always-visible top level).
+    const rootInst = document.createElement('div');
+    rootInst.className = 'exp41-root-instruction';
+    INSTRUCTIONS[0].split('\n\n').forEach(text => {
+        const p = document.createElement('p');
+        p.textContent = text;
+        rootInst.appendChild(p);
+    });
+    root.appendChild(rootInst);
+
+    const treeBody = document.createElement('div');
+    treeBody.className = 'exp41-tree';
+    root.appendChild(treeBody);
+
+    function buildChildren(containerEl, parentPrefix, parentDepth) {
+        const childDepth = parentDepth + 1;
+        const isLeafLevel = childDepth === MAX_DEPTH;
+
+        for (let i = 1; i <= 3; i++) {
+            const id = parentPrefix ? parentPrefix + '.' + i : String(i);
+
+            const node = document.createElement('div');
+            node.className = 'exp41-node';
+            node.dataset.path = id;
+
+            const row = document.createElement('div');
+            row.className = 'exp41-row';
+            row.dataset.path = id;
+            row.dataset.kind = isLeafLevel ? 'leaf' : 'folder';
+
+            const chev = document.createElement('span');
+            chev.className = 'exp41-chev' + (isLeafLevel ? ' exp41-chev--leaf' : '');
+            chev.textContent = '▸';
+            row.appendChild(chev);
+
+            const icon = document.createElement('span');
+            icon.className = 'exp41-icon ' + (isLeafLevel ? 'exp41-icon--leaf' : 'exp41-icon--folder');
+            row.appendChild(icon);
+
+            const label = document.createElement('span');
+            label.className = 'exp41-label';
+            label.textContent = (isLeafLevel ? 'Leaf ' : 'Tab ') + id;
+            row.appendChild(label);
+
+            node.appendChild(row);
+
+            const content = document.createElement('div');
+            content.className = 'exp41-content';
+
+            if (isLeafLevel) {
+                const leafBody = document.createElement('div');
+                leafBody.className = 'exp41-leaf-body';
+                leafBody.textContent = '[Leaf content for ' + id + ']';
+                content.appendChild(leafBody);
+            } else {
+                // Instruction describing this folder's children
+                const inst = document.createElement('div');
+                inst.className = 'exp41-instruction';
+                INSTRUCTIONS[childDepth].split('\n\n').forEach(text => {
+                    const p = document.createElement('p');
+                    p.textContent = text;
+                    inst.appendChild(p);
+                });
+                content.appendChild(inst);
+
+                const children = document.createElement('div');
+                children.className = 'exp41-children';
+                buildChildren(children, id, childDepth);
+                content.appendChild(children);
+            }
+
+            node.appendChild(content);
+            containerEl.appendChild(node);
+        }
+    }
+
+    buildChildren(treeBody, '', 0);
+
+    // Click any row → toggle its expand AND mark selected.
+    treeBody.addEventListener('click', e => {
+        const row = e.target.closest('.exp41-row');
+        if (!row) return;
+        const node = row.parentElement;
+        node.classList.toggle('is-expanded');
+
+        treeBody.querySelectorAll('.exp41-row.is-selected').forEach(r => r.classList.remove('is-selected'));
+        row.classList.add('is-selected');
+    });
+
+    // Default view: mirror Experiments 1–3 by auto-expanding the first-child chain to Leaf 1.1.1.
+    treeBody.querySelector('.exp41-node[data-path="1"]').classList.add('is-expanded');
+    treeBody.querySelector('.exp41-node[data-path="1.1"]').classList.add('is-expanded');
+    treeBody.querySelector('.exp41-node[data-path="1.1.1"]').classList.add('is-expanded');
+    treeBody.querySelector('.exp41-row[data-path="1.1.1"]').classList.add('is-selected');
+})();
+
+// ----- Experiment 4.2: Miller columns -----
+(function () {
+    const root = document.querySelector('.exp42-root');
+    if (!root) return;
+
+    const MAX_DEPTH = 3;
+    const INSTRUCTIONS = [
+        'Pick a chapter to read.',
+        'Pick a section within this chapter. Sections group articles that share a theme, so you can skim in any order.',
+        'Pick an article to read.\n\nArticles are the leaves of this navigation tree. Once you pick one, you’re done navigating and can just read; each takes 5–10 minutes and is self-contained.\n\nIf nothing jumps out, pick the first — articles are ordered roughly by importance within their section.',
+    ];
+    const COLUMN_TAGS = ['Chapters', 'Sections', 'Articles'];
+
+    // path[d] = selected child index at depth d (1-based), undefined if none selected.
+    // path.length is how many levels deep the user has drilled. Default matches Exp 1–3.
+    let path = [1, 1, 1];
+
+    function buildColumn(depth, parentPrefix, selectedIdx) {
+        const col = document.createElement('div');
+        col.className = 'exp42-column';
+
+        const header = document.createElement('div');
+        header.className = 'exp42-col-header';
+
+        const tag = document.createElement('span');
+        tag.className = 'exp42-col-tag';
+        tag.textContent = COLUMN_TAGS[depth] + ' · Depth ' + (depth + 1);
+        header.appendChild(tag);
+
+        const inst = document.createElement('div');
+        inst.className = 'exp42-col-instruction';
+        INSTRUCTIONS[depth].split('\n\n').forEach(text => {
+            const p = document.createElement('p');
+            p.textContent = text;
+            inst.appendChild(p);
+        });
+        header.appendChild(inst);
+        col.appendChild(header);
+
+        const body = document.createElement('div');
+        body.className = 'exp42-col-body';
+
+        const isLeafLevel = depth === MAX_DEPTH - 1;
+        for (let i = 1; i <= 3; i++) {
+            const id = parentPrefix ? parentPrefix + '.' + i : String(i);
+            const item = document.createElement('div');
+            item.className = 'exp42-item' + (i === selectedIdx ? ' is-active' : '');
+            item.dataset.depth = String(depth);
+            item.dataset.index = String(i);
+
+            const label = document.createElement('span');
+            label.className = 'exp42-item-label';
+            label.textContent = (isLeafLevel ? 'Leaf ' : 'Tab ') + id;
+            item.appendChild(label);
+
+            if (!isLeafLevel) {
+                const arrow = document.createElement('span');
+                arrow.className = 'exp42-item-arrow';
+                arrow.textContent = '›';
+                item.appendChild(arrow);
+            }
+            body.appendChild(item);
+        }
+        col.appendChild(body);
+        return col;
+    }
+
+    function buildDetailColumn() {
+        const col = document.createElement('div');
+        col.className = 'exp42-column exp42-column--detail';
+
+        const body = document.createElement('div');
+        body.className = 'exp42-detail-body';
+
+        const crumb = document.createElement('div');
+        crumb.className = 'exp42-detail-crumb';
+        crumb.textContent = 'Leaf · ' + path.join('.');
+        body.appendChild(crumb);
+
+        const title = document.createElement('h2');
+        title.className = 'exp42-detail-title';
+        title.textContent = 'Leaf ' + path.join('.');
+        body.appendChild(title);
+
+        const leaf = document.createElement('div');
+        leaf.className = 'exp42-detail-leaf';
+        leaf.textContent = '[Leaf content for ' + path.join('.') + ']';
+        body.appendChild(leaf);
+
+        col.appendChild(body);
+        return col;
+    }
+
+    function render() {
+        root.innerHTML = '';
+        // One navigation column per depth up to first unvisited level (or MAX_DEPTH).
+        const columnCount = Math.min(path.length + 1, MAX_DEPTH);
+        for (let d = 0; d < columnCount; d++) {
+            const parentPrefix = path.slice(0, d).join('.');
+            const selectedIdx = path[d];   // undefined if column d has no selection yet
+            root.appendChild(buildColumn(d, parentPrefix, selectedIdx));
+        }
+        if (path.length === MAX_DEPTH) {
+            root.appendChild(buildDetailColumn());
+        }
+        // Scroll rightmost column into view so deep selections stay visible.
+        root.scrollLeft = root.scrollWidth;
+    }
+
+    render();
+
+    root.addEventListener('click', e => {
+        const item = e.target.closest('.exp42-item');
+        if (!item) return;
+        const d = parseInt(item.dataset.depth, 10);
+        const i = parseInt(item.dataset.index, 10);
+        // Replace selection at depth d; discard any deeper selections.
+        path = [...path.slice(0, d), i];
+        render();
+    });
+})();
+
+// ----- Experiment 4.3: chat-aesthetic tree + completion/progress (merged from 4.5) -----
+(function () {
+    const root = document.querySelector('.exp43-root');
+    if (!root) return;
+
+    const MAX_DEPTH = 3;
+    const INSTRUCTIONS = [
+        'Pick a chapter to read.',
+        'Pick a section within this chapter. Sections group articles that share a theme, so you can skim in any order.',
+        'Pick an article to read.\n\nArticles are the leaves of this navigation tree. Once you pick one, you’re done navigating and can just read; each takes 5–10 minutes and is self-contained.\n\nIf nothing jumps out, pick the first — articles are ordered roughly by importance within their section.',
+    ];
+
+    // ----- Completion state and progress helpers -----
+    const done = new Set();
+
+    function leafPathsUnder(prefix) {
+        const startDepth = prefix ? prefix.split('.').length : 0;
+        if (startDepth === MAX_DEPTH) return [prefix];
+        const result = [];
+        (function enumerate(p, depth) {
+            if (depth === MAX_DEPTH) { result.push(p); return; }
+            for (let i = 1; i <= 3; i++) {
+                enumerate(p ? p + '.' + i : String(i), depth + 1);
+            }
+        })(prefix, startDepth);
+        return result;
+    }
+    function progressFor(prefix) {
+        const leaves = leafPathsUnder(prefix);
+        return {
+            total: leaves.length,
+            completed: leaves.filter(p => done.has(p)).length,
+        };
+    }
+
+    // ----- Structure -----
+    const tree = document.createElement('div');
+    tree.className = 'exp43-tree';
+
+    const treeHeader = document.createElement('div');
+    treeHeader.className = 'exp43-tree-header';
+    const headerLabel = document.createElement('span');
+    headerLabel.textContent = 'Explorer';
+    const headerTotal = document.createElement('span');
+    headerTotal.className = 'exp43-tree-total';
+    treeHeader.appendChild(headerLabel);
+    treeHeader.appendChild(headerTotal);
+    tree.appendChild(treeHeader);
+
+    const treeBody = document.createElement('div');
+    treeBody.className = 'exp43-tree-body';
+    tree.appendChild(treeBody);
+
+    const details = document.createElement('div');
+    details.className = 'exp43-details';
+
+    root.appendChild(tree);
+    root.appendChild(details);
+
+    function buildTree(parent, prefix, depth) {
+        for (let i = 1; i <= 3; i++) {
+            const id = prefix ? prefix + '.' + i : String(i);
+            const isLeaf = depth === MAX_DEPTH - 1;
+
+            const node = document.createElement('div');
+            node.className = 'exp43-node';
+            node.dataset.path = id;
+
+            const row = document.createElement('div');
+            row.className = 'exp43-row';
+            row.dataset.path = id;
+            row.dataset.kind = isLeaf ? 'leaf' : 'folder';
+
+            const chev = document.createElement('span');
+            chev.className = 'exp43-chev' + (isLeaf ? ' exp43-chev--leaf' : '');
+            chev.textContent = '▸';
+            row.appendChild(chev);
+
+            if (isLeaf) {
+                const check = document.createElement('span');
+                check.className = 'exp43-check';
+                check.textContent = '✓';
+                check.dataset.role = 'checkbox';
+                row.appendChild(check);
+            } else {
+                const icon = document.createElement('span');
+                icon.className = 'exp43-icon';
+                row.appendChild(icon);
+            }
+
+            const label = document.createElement('span');
+            label.className = 'exp43-label';
+            label.textContent = (isLeaf ? 'Leaf ' : 'Tab ') + id;
+            row.appendChild(label);
+
+            if (!isLeaf) {
+                const counter = document.createElement('span');
+                counter.className = 'exp43-counter';
+                row.appendChild(counter);
+            }
+
+            node.appendChild(row);
+
+            if (!isLeaf) {
+                const children = document.createElement('div');
+                children.className = 'exp43-children';
+                buildTree(children, id, depth + 1);
+                node.appendChild(children);
+            }
+            parent.appendChild(node);
+        }
+    }
+    buildTree(treeBody, '', 0);
+
+    let selectedPath = null;
+    let selectedKind = null;
+
+    function updateAllProgress() {
+        treeBody.querySelectorAll('.exp43-row[data-kind="folder"]').forEach(row => {
+            const path = row.dataset.path;
+            const { completed, total } = progressFor(path);
+            const counter = row.querySelector('.exp43-counter');
+            counter.textContent = completed + '/' + total;
+            counter.classList.toggle('is-complete', completed === total);
+        });
+        treeBody.querySelectorAll('.exp43-row[data-kind="leaf"]').forEach(row => {
+            row.classList.toggle('is-done', done.has(row.dataset.path));
+        });
+        const total = progressFor('');
+        headerTotal.textContent = total.completed + '/' + total.total + ' done';
+    }
+
+    function renderDetails() {
+        details.innerHTML = '';
+        if (!selectedPath) {
+            const empty = document.createElement('div');
+            empty.className = 'exp43-details-empty';
+            empty.textContent = 'Select an item to view it. Click ✓ on a leaf to mark done.';
+            details.appendChild(empty);
+            return;
+        }
+
+        const crumb = document.createElement('div');
+        crumb.className = 'exp43-details-crumb';
+        crumb.textContent = selectedKind === 'leaf' ? 'Leaf' : 'Folder · Depth ' + selectedPath.split('.').length;
+        details.appendChild(crumb);
+
+        const title = document.createElement('h2');
+        title.className = 'exp43-details-title';
+        title.textContent = (selectedKind === 'leaf' ? 'Leaf ' : 'Tab ') + selectedPath;
+        details.appendChild(title);
+
+        if (selectedKind === 'folder') {
+            const { completed, total } = progressFor(selectedPath);
+            const pct = total === 0 ? 0 : (completed / total) * 100;
+
+            const bar = document.createElement('div');
+            bar.className = 'exp43-progress-bar';
+            const fill = document.createElement('div');
+            fill.className = 'exp43-progress-fill';
+            fill.style.width = pct + '%';
+            bar.appendChild(fill);
+            details.appendChild(bar);
+
+            const label = document.createElement('div');
+            label.className = 'exp43-progress-label';
+            label.textContent = completed + ' of ' + total + ' leaves complete';
+            details.appendChild(label);
+
+            const depth = selectedPath.split('.').length;
+            const inst = document.createElement('div');
+            inst.className = 'exp43-details-instruction';
+            INSTRUCTIONS[depth].split('\n\n').forEach(text => {
+                const p = document.createElement('p');
+                p.textContent = text;
+                inst.appendChild(p);
+            });
+            details.appendChild(inst);
+        } else {
+            const body = document.createElement('div');
+            body.className = 'exp43-details-leaf';
+            body.textContent = '[Leaf content for ' + selectedPath + ']';
+            details.appendChild(body);
+
+            const toggle = document.createElement('button');
+            toggle.type = 'button';
+            const isDone = done.has(selectedPath);
+            toggle.className = 'exp43-toggle-btn' + (isDone ? ' is-done' : '');
+            toggle.textContent = isDone ? '✓ Completed' : 'Mark as done';
+            toggle.addEventListener('click', () => {
+                if (done.has(selectedPath)) done.delete(selectedPath);
+                else done.add(selectedPath);
+                updateAllProgress();
+                renderDetails();
+            });
+            details.appendChild(toggle);
+        }
+    }
+
+    function select(path, kind) {
+        treeBody.querySelectorAll('.exp43-row.is-selected').forEach(r => r.classList.remove('is-selected'));
+        const row = treeBody.querySelector('.exp43-row[data-path="' + path + '"]');
+        if (row) row.classList.add('is-selected');
+        selectedPath = path;
+        selectedKind = kind;
+        renderDetails();
+    }
+
+    treeBody.addEventListener('click', e => {
+        // Checkbox click → toggle done without changing selection.
+        const check = e.target.closest('.exp43-check');
+        if (check) {
+            const row = check.closest('.exp43-row');
+            const path = row.dataset.path;
+            if (done.has(path)) done.delete(path);
+            else done.add(path);
+            updateAllProgress();
+            if (selectedPath === path) renderDetails();
+            e.stopPropagation();
+            return;
+        }
+        const row = e.target.closest('.exp43-row');
+        if (!row) return;
+        const node = row.parentElement;
+        const kind = row.dataset.kind;
+        const path = row.dataset.path;
+        if (kind === 'folder') node.classList.toggle('is-expanded');
+        select(path, kind);
+    });
+
+    // Default matches Exp 4 + 4.5: expand chain to Leaf 1.1.1 and pre-mark a couple as done.
+    treeBody.querySelector('.exp43-node[data-path="1"]').classList.add('is-expanded');
+    treeBody.querySelector('.exp43-node[data-path="1.1"]').classList.add('is-expanded');
+    done.add('1.1.1');
+    done.add('1.2.3');
+    updateAllProgress();
+    select('1.1.1', 'leaf');
+})();
+
+// ----- Experiment 4.4: collapsed Miller (breadcrumb-navigated) -----
+(function () {
+    const root = document.querySelector('.exp44-root');
+    if (!root) return;
+
+    const MAX_DEPTH = 3;
+    const INSTRUCTIONS = [
+        'Pick a chapter to read.',
+        'Pick a section within this chapter. Sections group articles that share a theme, so you can skim in any order.',
+        'Pick an article to read.\n\nArticles are the leaves of this navigation tree. Once you pick one, you’re done navigating and can just read; each takes 5–10 minutes and is self-contained.\n\nIf nothing jumps out, pick the first — articles are ordered roughly by importance within their section.',
+    ];
+    const COLUMN_TAGS = ['Chapters', 'Sections', 'Articles'];
+
+    let path = [1, 1, 1];   // default: at Leaf 1.1.1 detail, matching Exp 1–3
+
+    function render() {
+        root.innerHTML = '';
+
+        // ----- Topbar: Up button + breadcrumb -----
+        const topbar = document.createElement('div');
+        topbar.className = 'exp44-topbar';
+
+        const up = document.createElement('button');
+        up.className = 'exp44-up';
+        up.type = 'button';
+        up.innerHTML = '<span>↑</span> Up';
+        up.disabled = path.length === 0;
+        up.addEventListener('click', () => {
+            if (path.length === 0) return;
+            path = path.slice(0, -1);
+            render();
+        });
+        topbar.appendChild(up);
+
+        const crumbs = document.createElement('nav');
+        crumbs.className = 'exp44-crumbs';
+        crumbs.setAttribute('aria-label', 'Breadcrumb');
+
+        const topCrumb = document.createElement('span');
+        topCrumb.className = 'exp44-crumb' + (path.length === 0 ? ' is-current' : '');
+        topCrumb.textContent = 'Top';
+        if (path.length > 0) {
+            topCrumb.addEventListener('click', () => { path = []; render(); });
+        }
+        crumbs.appendChild(topCrumb);
+
+        for (let i = 0; i < path.length; i++) {
+            const sep = document.createElement('span');
+            sep.className = 'exp44-sep';
+            sep.textContent = '›';
+            crumbs.appendChild(sep);
+
+            const crumbPath = path.slice(0, i + 1).join('.');
+            const isLeafCrumb = i === MAX_DEPTH - 1;
+            const isCurrent = i === path.length - 1;
+
+            const crumb = document.createElement('span');
+            crumb.className = 'exp44-crumb' + (isCurrent ? ' is-current' : '');
+            crumb.textContent = (isLeafCrumb ? 'Leaf ' : 'Tab ') + crumbPath;
+            if (!isCurrent) {
+                const targetDepth = i + 1;
+                crumb.addEventListener('click', () => {
+                    path = path.slice(0, targetDepth);
+                    render();
+                });
+            }
+            crumbs.appendChild(crumb);
+        }
+        topbar.appendChild(crumbs);
+        root.appendChild(topbar);
+
+        // ----- Column: current scope content -----
+        const column = document.createElement('div');
+        column.className = 'exp44-column';
+
+        const atLeaf = path.length === MAX_DEPTH;
+
+        const header = document.createElement('div');
+        header.className = 'exp44-col-header';
+
+        const tag = document.createElement('span');
+        tag.className = 'exp44-col-tag';
+        tag.textContent = atLeaf
+            ? 'Leaf · ' + path.join('.')
+            : COLUMN_TAGS[path.length] + ' · Depth ' + (path.length + 1);
+        header.appendChild(tag);
+
+        if (atLeaf) {
+            const title = document.createElement('h2');
+            title.className = 'exp44-col-title';
+            title.textContent = 'Leaf ' + path.join('.');
+            header.appendChild(title);
+        } else {
+            const inst = document.createElement('div');
+            inst.className = 'exp44-col-instruction';
+            INSTRUCTIONS[path.length].split('\n\n').forEach(text => {
+                const p = document.createElement('p');
+                p.textContent = text;
+                inst.appendChild(p);
+            });
+            header.appendChild(inst);
+        }
+        column.appendChild(header);
+
+        const body = document.createElement('div');
+        body.className = 'exp44-col-body';
+
+        if (atLeaf) {
+            const leaf = document.createElement('div');
+            leaf.className = 'exp44-leaf-body';
+            leaf.textContent = '[Leaf content for ' + path.join('.') + ']';
+            body.appendChild(leaf);
+        } else {
+            const childrenAreLeaves = path.length === MAX_DEPTH - 1;
+            for (let i = 1; i <= 3; i++) {
+                const id = [...path, i].join('.');
+
+                const item = document.createElement('div');
+                item.className = 'exp44-item';
+                item.setAttribute('role', 'button');
+                item.setAttribute('tabindex', '0');
+
+                const label = document.createElement('span');
+                label.className = 'exp44-item-label';
+                label.textContent = (childrenAreLeaves ? 'Leaf ' : 'Tab ') + id;
+                item.appendChild(label);
+
+                const arrow = document.createElement('span');
+                arrow.className = 'exp44-item-arrow';
+                arrow.textContent = '›';
+                item.appendChild(arrow);
+
+                item.addEventListener('click', () => {
+                    path = [...path, i];
+                    render();
+                });
+                body.appendChild(item);
+            }
+        }
+        column.appendChild(body);
+        root.appendChild(column);
+    }
+
+    render();
+})();
+
+// ----- Experiment 4.1.1: inline disclosure + vertical group brackets -----
+(function () {
+    const root = document.querySelector('.exp411-root');
+    if (!root) return;
+
+    const MAX_DEPTH = 3;
+    const INSTRUCTIONS = [
+        'Pick a chapter to read.',
+        'Pick a section within this chapter. Sections group articles that share a theme, so you can skim in any order.',
+        'Pick an article to read.\n\nArticles are the leaves of this navigation tree. Once you pick one, you’re done navigating and can just read; each takes 5–10 minutes and is self-contained.\n\nIf nothing jumps out, pick the first — articles are ordered roughly by importance within their section.',
+    ];
+
+    // Build a "group" = instruction block + siblings list, wrapped so the vertical
+    // line can bracket both. Used at root and inside every expanded folder.
+    function buildGroup(parentPrefix, depth) {
+        const group = document.createElement('div');
+        group.className = 'exp411-group';
+
+        const inst = document.createElement('div');
+        inst.className = 'exp411-inst';
+        INSTRUCTIONS[depth].split('\n\n').forEach(text => {
+            const p = document.createElement('p');
+            p.textContent = text;
+            inst.appendChild(p);
+        });
+        group.appendChild(inst);
+
+        const children = document.createElement('div');
+        children.className = 'exp411-children';
+
+        const childDepth = depth + 1;
+        const childrenAreLeaves = childDepth === MAX_DEPTH;
+
+        for (let i = 1; i <= 3; i++) {
+            const id = parentPrefix ? parentPrefix + '.' + i : String(i);
+            children.appendChild(buildNode(id, childDepth, childrenAreLeaves));
+        }
+        group.appendChild(children);
+        return group;
+    }
+
+    function buildNode(id, depth, isLeaf) {
+        const node = document.createElement('div');
+        node.className = 'exp411-node';
+        node.dataset.path = id;
+
+        const row = document.createElement('div');
+        row.className = 'exp411-row';
+        row.dataset.path = id;
+        row.dataset.kind = isLeaf ? 'leaf' : 'folder';
+
+        const chev = document.createElement('span');
+        chev.className = 'exp411-chev' + (isLeaf ? ' exp411-chev--leaf' : '');
+        chev.textContent = '▸';
+        row.appendChild(chev);
+
+        const icon = document.createElement('span');
+        icon.className = 'exp411-icon ' + (isLeaf ? 'exp411-icon--leaf' : 'exp411-icon--folder');
+        row.appendChild(icon);
+
+        const label = document.createElement('span');
+        label.className = 'exp411-label';
+        label.textContent = (isLeaf ? 'Leaf ' : 'Tab ') + id;
+        row.appendChild(label);
+
+        node.appendChild(row);
+
+        if (isLeaf) {
+            const leafBody = document.createElement('div');
+            leafBody.className = 'exp411-leaf-body';
+            leafBody.textContent = '[Leaf content for ' + id + ']';
+            node.appendChild(leafBody);
+        } else {
+            // Nested group lives inside the node; toggled by .is-expanded.
+            node.appendChild(buildGroup(id, depth));
+        }
+        return node;
+    }
+
+    // Root is itself a group — wrapped so it gets the same bracket treatment as any nested level.
+    root.appendChild(buildGroup('', 0));
+
+    // Click handlers: toggle expand + mark selected.
+    root.addEventListener('click', e => {
+        const row = e.target.closest('.exp411-row');
+        if (!row) return;
+        const node = row.parentElement;
+        node.classList.toggle('is-expanded');
+        root.querySelectorAll('.exp411-row.is-selected').forEach(r => r.classList.remove('is-selected'));
+        row.classList.add('is-selected');
+    });
+
+    // Default matches Exp 1–3 / 4.1: auto-expand first-child chain down to Leaf 1.1.1.
+    root.querySelector('.exp411-node[data-path="1"]').classList.add('is-expanded');
+    root.querySelector('.exp411-node[data-path="1.1"]').classList.add('is-expanded');
+    root.querySelector('.exp411-node[data-path="1.1.1"]').classList.add('is-expanded');
+    root.querySelector('.exp411-row[data-path="1.1.1"]').classList.add('is-selected');
+})();
+
+// ----- Experiment 4.5: completion-aware tree -----
+(function () {
+    const root = document.querySelector('.exp45-root');
+    if (!root) return;
+
+    const MAX_DEPTH = 3;
+    const INSTRUCTIONS = [
+        'Pick a chapter to read.',
+        'Pick a section within this chapter. Sections group articles that share a theme, so you can skim in any order.',
+        'Pick an article to read.\n\nArticles are the leaves of this navigation tree. Once you pick one, you’re done navigating and can just read; each takes 5–10 minutes and is self-contained.\n\nIf nothing jumps out, pick the first — articles are ordered roughly by importance within their section.',
+    ];
+
+    // Enumerate leaf paths under a given prefix (empty string = all leaves in the tree).
+    function leafPathsUnder(prefix) {
+        const startDepth = prefix ? prefix.split('.').length : 0;
+        if (startDepth === MAX_DEPTH) return [prefix];
+        const result = [];
+        (function enumerate(p, depth) {
+            if (depth === MAX_DEPTH) { result.push(p); return; }
+            for (let i = 1; i <= 3; i++) {
+                enumerate(p ? p + '.' + i : String(i), depth + 1);
+            }
+        })(prefix, startDepth);
+        return result;
+    }
+    function progressFor(prefix, doneSet) {
+        const leaves = leafPathsUnder(prefix);
+        const total = leaves.length;
+        const completed = leaves.filter(p => doneSet.has(p)).length;
+        return { total, completed };
+    }
+
+    const done = new Set();
+
+    // ----- Structure -----
+    const tree = document.createElement('div');
+    tree.className = 'exp45-tree';
+
+    const header = document.createElement('div');
+    header.className = 'exp45-tree-header';
+    const headerLabel = document.createElement('span');
+    headerLabel.textContent = 'Explorer';
+    const headerTotal = document.createElement('span');
+    headerTotal.className = 'exp45-tree-total';
+    header.appendChild(headerLabel);
+    header.appendChild(headerTotal);
+    tree.appendChild(header);
+
+    const treeBody = document.createElement('div');
+    treeBody.className = 'exp45-tree-body';
+    tree.appendChild(treeBody);
+
+    const details = document.createElement('div');
+    details.className = 'exp45-details';
+
+    root.appendChild(tree);
+    root.appendChild(details);
+
+    function buildTree(parent, prefix, depth) {
+        for (let i = 1; i <= 3; i++) {
+            const id = prefix ? prefix + '.' + i : String(i);
+            const isLeaf = depth === MAX_DEPTH - 1;
+
+            const node = document.createElement('div');
+            node.className = 'exp45-node';
+            node.dataset.path = id;
+
+            const row = document.createElement('div');
+            row.className = 'exp45-row';
+            row.dataset.path = id;
+            row.dataset.kind = isLeaf ? 'leaf' : 'folder';
+
+            const chev = document.createElement('span');
+            chev.className = 'exp45-chev' + (isLeaf ? ' exp45-chev--leaf' : '');
+            chev.textContent = '▸';
+            row.appendChild(chev);
+
+            if (isLeaf) {
+                const check = document.createElement('span');
+                check.className = 'exp45-check';
+                check.textContent = '✓';
+                check.dataset.role = 'checkbox';
+                row.appendChild(check);
+            } else {
+                const icon = document.createElement('span');
+                icon.className = 'exp45-icon';
+                row.appendChild(icon);
+            }
+
+            const label = document.createElement('span');
+            label.className = 'exp45-label';
+            label.textContent = (isLeaf ? 'Leaf ' : 'Tab ') + id;
+            row.appendChild(label);
+
+            if (!isLeaf) {
+                const counter = document.createElement('span');
+                counter.className = 'exp45-counter';
+                row.appendChild(counter);
+            }
+
+            node.appendChild(row);
+
+            if (!isLeaf) {
+                const children = document.createElement('div');
+                children.className = 'exp45-children';
+                buildTree(children, id, depth + 1);
+                node.appendChild(children);
+            }
+            parent.appendChild(node);
+        }
+    }
+    buildTree(treeBody, '', 0);
+
+    let selectedPath = null;
+    let selectedKind = null;
+
+    function updateAllProgress() {
+        // Folder counters.
+        treeBody.querySelectorAll('.exp45-row[data-kind="folder"]').forEach(row => {
+            const path = row.dataset.path;
+            const { completed, total } = progressFor(path, done);
+            const counter = row.querySelector('.exp45-counter');
+            counter.textContent = completed + '/' + total;
+            counter.classList.toggle('is-complete', completed === total);
+        });
+        // Leaf done-state.
+        treeBody.querySelectorAll('.exp45-row[data-kind="leaf"]').forEach(row => {
+            row.classList.toggle('is-done', done.has(row.dataset.path));
+        });
+        // Global total in header.
+        const total = progressFor('', done);
+        headerTotal.textContent = total.completed + '/' + total.total + ' done';
+    }
+
+    function renderDetails() {
+        details.innerHTML = '';
+        if (!selectedPath) {
+            const empty = document.createElement('div');
+            empty.className = 'exp45-details-empty';
+            empty.textContent = 'Select an item to view it. Click ✓ on a leaf to mark done.';
+            details.appendChild(empty);
+            return;
+        }
+        const crumb = document.createElement('div');
+        crumb.className = 'exp45-details-crumb';
+        crumb.textContent = selectedKind === 'leaf' ? 'Leaf' : 'Folder · Depth ' + selectedPath.split('.').length;
+        details.appendChild(crumb);
+
+        const title = document.createElement('h2');
+        title.className = 'exp45-details-title';
+        title.textContent = (selectedKind === 'leaf' ? 'Leaf ' : 'Tab ') + selectedPath;
+        details.appendChild(title);
+
+        if (selectedKind === 'folder') {
+            const { completed, total } = progressFor(selectedPath, done);
+            const pct = total === 0 ? 0 : (completed / total) * 100;
+
+            const bar = document.createElement('div');
+            bar.className = 'exp45-progress-bar';
+            const fill = document.createElement('div');
+            fill.className = 'exp45-progress-fill';
+            fill.style.width = pct + '%';
+            bar.appendChild(fill);
+            details.appendChild(bar);
+
+            const label = document.createElement('div');
+            label.className = 'exp45-progress-label';
+            label.textContent = completed + ' of ' + total + ' leaves complete';
+            details.appendChild(label);
+
+            const depth = selectedPath.split('.').length;
+            const inst = document.createElement('div');
+            inst.className = 'exp45-details-instruction';
+            INSTRUCTIONS[depth].split('\n\n').forEach(text => {
+                const p = document.createElement('p');
+                p.textContent = text;
+                inst.appendChild(p);
+            });
+            details.appendChild(inst);
+        } else {
+            const body = document.createElement('div');
+            body.className = 'exp45-details-leaf';
+            body.textContent = '[Leaf content for ' + selectedPath + ']';
+            details.appendChild(body);
+
+            const toggle = document.createElement('button');
+            toggle.type = 'button';
+            const isDone = done.has(selectedPath);
+            toggle.className = 'exp45-toggle-btn' + (isDone ? ' is-done' : '');
+            toggle.textContent = isDone ? '✓ Completed' : 'Mark as done';
+            toggle.addEventListener('click', () => {
+                if (done.has(selectedPath)) done.delete(selectedPath);
+                else done.add(selectedPath);
+                updateAllProgress();
+                renderDetails();
+            });
+            details.appendChild(toggle);
+        }
+    }
+
+    function select(path, kind) {
+        treeBody.querySelectorAll('.exp45-row.is-selected').forEach(r => r.classList.remove('is-selected'));
+        const row = treeBody.querySelector('.exp45-row[data-path="' + path + '"]');
+        if (row) row.classList.add('is-selected');
+        selectedPath = path;
+        selectedKind = kind;
+        renderDetails();
+    }
+
+    treeBody.addEventListener('click', e => {
+        // Checkbox click on leaf row: toggle done without changing selection.
+        const check = e.target.closest('.exp45-check');
+        if (check) {
+            const row = check.closest('.exp45-row');
+            const path = row.dataset.path;
+            if (done.has(path)) done.delete(path);
+            else done.add(path);
+            updateAllProgress();
+            if (selectedPath === path) renderDetails();
+            e.stopPropagation();
+            return;
+        }
+        // Row click: select + toggle expand.
+        const row = e.target.closest('.exp45-row');
+        if (!row) return;
+        const node = row.parentElement;
+        const kind = row.dataset.kind;
+        const path = row.dataset.path;
+        if (kind === 'folder') node.classList.toggle('is-expanded');
+        select(path, kind);
+    });
+
+    // Default matches Exp 4, plus a couple of leaves pre-marked done to showcase state.
+    treeBody.querySelector('.exp45-node[data-path="1"]').classList.add('is-expanded');
+    treeBody.querySelector('.exp45-node[data-path="1.1"]').classList.add('is-expanded');
+    done.add('1.1.1');
+    done.add('1.2.3');
+    updateAllProgress();
+    select('1.1.1', 'leaf');
+})();
+</script>
+{% endblock %}
