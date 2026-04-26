@@ -9,11 +9,26 @@
       <div class="nest-ws__row">
         <button class="nest-ws__tab is-active" role="tab" aria-selected="true" data-tab="exp-a">Experiment A</button>
       </div>
+      <div class="nest-ws__row nest-ws__row--child">
+        <span class="nest-ws__lineage">↳ from Experiment A · component-integrated leaves</span>
+        <button class="nest-ws__tab" role="tab" aria-selected="false" data-tab="exp-a1">A.1 · Text response</button>
+        <button class="nest-ws__tab" role="tab" aria-selected="false" data-tab="exp-a2">A.2 · Quiz question</button>
+        <button class="nest-ws__tab" role="tab" aria-selected="false" data-tab="exp-a3">A.3 · Composite log</button>
+      </div>
     </div>
   </nav>
 
   <section class="nest-ws__canvas is-active" role="tabpanel" data-panel="exp-a">
     <div class="expA-root"></div>
+  </section>
+  <section class="nest-ws__canvas" role="tabpanel" data-panel="exp-a1" hidden>
+    <div class="expA1-root"></div>
+  </section>
+  <section class="nest-ws__canvas" role="tabpanel" data-panel="exp-a2" hidden>
+    <div class="expA2-root"></div>
+  </section>
+  <section class="nest-ws__canvas" role="tabpanel" data-panel="exp-a3" hidden>
+    <div class="expA3-root"></div>
   </section>
 
 </div>
@@ -91,6 +106,13 @@
     gap: 6px;
     flex-wrap: wrap;
     align-items: center;
+}
+.nest-ws__row--child { padding-left: 28px; }
+.nest-ws__lineage {
+    font-size: 11px;
+    color: var(--nw-subtle);
+    font-style: italic;
+    margin-right: 4px;
 }
 .nest-ws__tab {
     font: inherit;
@@ -351,7 +373,10 @@
      - Auto-select first incomplete reachable leaf when scope drills
        to leaf level (handled in exp43121xCore.makeNavigator).
    ===================================================================== */
-.nest-ws__canvas[data-panel="exp-a"] {
+.nest-ws__canvas[data-panel="exp-a"],
+.nest-ws__canvas[data-panel="exp-a1"],
+.nest-ws__canvas[data-panel="exp-a2"],
+.nest-ws__canvas[data-panel="exp-a3"] {
     padding: 0;
     overflow: auto;
     background:
@@ -361,7 +386,7 @@
         radial-gradient(at 20% 90%, #c4f0f4 0%, transparent 55%),
         linear-gradient(160deg, #f7f9ff 0%, #fdf4ff 100%);
 }
-.expA-root {
+.expA-root, .expA1-root, .expA2-root, .expA3-root {
     max-width: 760px;
     margin: 0 auto;
     padding: 28px 28px 56px;
@@ -626,6 +651,88 @@
     font-weight: 600;
     color: #166534;
 }
+
+/* =====================================================================
+   Showcase variants A.1–A.3 — A's nesting structure with realistic
+   Razem-style component HTML in the leaf body. The layout (thread,
+   ancestor rows, current step, proceed/complete) is identical to A —
+   variants reuse .expA-nav, .expA-ancestor, .expA-step, etc. classes.
+   The only difference is the leaf panel's body content, which embeds
+   Razem-styled components (.component[data-form="text"], etc.).
+   The rules below style those embedded components for reasonable
+   visual fidelity to Razem's default-theme rendering.
+   ===================================================================== */
+.exp431x-leaf-body .component {
+    margin: 12px 0;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(160, 180, 220, 0.32);
+    border-radius: 10px;
+}
+.exp431x-leaf-body .component:first-child { margin-top: 0; }
+.exp431x-leaf-body .component:last-child  { margin-bottom: 0; }
+.exp431x-leaf-body .component h3 {
+    font-size: 1em;
+    font-weight: 600;
+    margin: 0 0 4px;
+    color: #1f2144;
+}
+.exp431x-leaf-body .component p {
+    margin: 0 0 6px;
+    color: #4a4e6d;
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+.exp431x-leaf-body .component p strong { color: #1f2144; }
+.exp431x-leaf-body .component input[type="text"],
+.exp431x-leaf-body .component input[type="date"] {
+    padding: 6px 10px;
+    border: 1px solid rgba(160, 180, 220, 0.45);
+    border-radius: 6px;
+    font: inherit;
+    font-size: 0.9em;
+    background: #ffffff;
+    box-sizing: border-box;
+    width: 100%;
+}
+.exp431x-leaf-body .component input[type="text"]:focus,
+.exp431x-leaf-body .component input[type="date"]:focus {
+    outline: none;
+    border-color: rgba(99, 102, 241, 0.55);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+.exp431x-leaf-body .component button[type="submit"] {
+    margin-top: 6px;
+    padding: 5px 14px;
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 0.85em;
+    font-weight: 500;
+    cursor: pointer;
+    transition: filter 0.12s, transform 0.12s;
+}
+.exp431x-leaf-body .component button[type="submit"]:hover {
+    filter: brightness(1.05);
+    transform: translateY(-1px);
+}
+.exp431x-leaf-body .component label {
+    display: block;
+    cursor: pointer;
+    padding: 4px 0;
+    font-size: 0.92em;
+    color: #1f2144;
+}
+.exp431x-leaf-body .component label:hover { color: #6366f1; }
+.exp431x-leaf-body .component input[type="radio"],
+.exp431x-leaf-body .component input[type="checkbox"] {
+    margin-right: 8px;
+    cursor: pointer;
+    accent-color: #6366f1;
+}
+
 </style>
 
 <script>
@@ -648,8 +755,15 @@
             panels.forEach(p => {
                 const active = p.dataset.panel === target;
                 p.classList.toggle('is-active', active);
-                if (active) p.removeAttribute('hidden');
-                else p.setAttribute('hidden', '');
+                if (active) {
+                    p.removeAttribute('hidden');
+                    // Variants that depend on layout measurements (A.3 SVG
+                    // path; A.1 wire heights) listen for this event and
+                    // recompute when their panel becomes visible.
+                    p.dispatchEvent(new CustomEvent('panelshown'));
+                } else {
+                    p.setAttribute('hidden', '');
+                }
             });
         });
     });
@@ -941,6 +1055,384 @@ const expRing = (function () {
     }
     return { makeRing };
 })();
+
+// ----- expABase — shared builders for the standard A-style pieces
+// (ancestor row, info note, current step with ring + gating, leaf
+// panel, proceed/complete). The .expA- inner classes are reused across
+// every variant; each variant supplies its own outer namespace and
+// arranges/decorates these pieces differently. Kept separate from A's
+// IIFE so A keeps working untouched. -----
+const expABase = (function () {
+    const { MAX_DEPTH } = exp431xShared;
+
+    const INTERLEVEL_NOTES = [
+        {
+            meta: 'About this chapter',
+            text: 'Sections within a chapter group articles by theme. You can read sections in any order — pick whichever interests you most.',
+        },
+        {
+            meta: 'About this section',
+            text: 'Each article is self-contained and takes 5–10 minutes. Numbering suggests a reading order, but is not strictly required.',
+        },
+    ];
+
+    function checkCurrentComplete(scope, done, progressFor) {
+        const isLeafLevel = scope.length === MAX_DEPTH - 1;
+        for (let i = 1; i <= 3; i++) {
+            const tabPath = scope.length === 0 ? String(i) : (scope.join('.') + '.' + i);
+            if (isLeafLevel) {
+                if (!done.has(tabPath)) return false;
+            } else {
+                const tp = progressFor(tabPath);
+                if (tp.completed < tp.total) return false;
+            }
+        }
+        return true;
+    }
+
+    function findNextTarget(scope, progressFor) {
+        for (let d = scope.length - 1; d >= 0; d--) {
+            const parentScope = scope.slice(0, d);
+            const currentChoice = scope[d];
+            for (let i = currentChoice + 1; i <= 3; i++) {
+                const siblingPath = parentScope.length === 0 ? String(i) : (parentScope.join('.') + '.' + i);
+                const sp = progressFor(siblingPath);
+                if (sp.completed < sp.total) {
+                    return { scope: [...parentScope, i], label: 'Tab ' + siblingPath };
+                }
+            }
+        }
+        return null;
+    }
+
+    function applyGating(stepEl, scope, done, progressFor) {
+        const isLeafLevel = scope.length === MAX_DEPTH - 1;
+        const tabs = Array.from(stepEl.querySelectorAll('.exp431x-tab'));
+        let prevComplete = true;
+        const blockedDeps = [];
+        function isComplete(tabPath) {
+            if (isLeafLevel) return done.has(tabPath);
+            const tp = progressFor(tabPath);
+            return tp.completed === tp.total;
+        }
+        tabs.forEach((tabEl, idx) => {
+            if (idx === 0) {
+                prevComplete = isComplete(tabEl.dataset.path);
+                return;
+            }
+            if (!prevComplete) {
+                const clone = tabEl.cloneNode(true);
+                clone.classList.add('is-locked');
+                clone.title = 'Locked — complete the previous selection first';
+                tabEl.replaceWith(clone);
+                blockedDeps.push((isLeafLevel ? 'Leaf ' : 'Tab ') + tabs[idx - 1].dataset.path);
+                prevComplete = false;
+            } else {
+                prevComplete = isComplete(tabEl.dataset.path);
+            }
+        });
+        return blockedDeps;
+    }
+
+    function buildAncestorRow(opts) {
+        const { depth, scope, progressFor, defsState, gradientId, onChangeBack } = opts;
+        const isLeafLevel = depth === MAX_DEPTH - 1;
+        const labelPrefix = isLeafLevel ? 'Leaf ' : 'Tab ';
+        const parentPrefix = scope.slice(0, depth).join('.');
+        const choicePath = scope.slice(0, depth + 1).join('.');
+
+        const ancestor = document.createElement('div');
+        ancestor.className = 'expA-ancestor';
+        ancestor.dataset.depth = depth;
+        ancestor.dataset.choice = scope[depth];
+
+        const node = document.createElement('div');
+        node.className = 'expA-ancestor-node';
+        const ap = progressFor(choicePath);
+        node.appendChild(expRing.makeRing({
+            size: 18, strokeWidth: 3,
+            completed: ap.completed, total: ap.total,
+            gradientId, includeDefs: !defsState.emitted,
+        }));
+        defsState.emitted = true;
+        ancestor.appendChild(node);
+
+        const tabs = document.createElement('div');
+        tabs.className = 'expA-ancestor-tabs';
+        for (let i = 1; i <= 3; i++) {
+            const tabPath = parentPrefix ? parentPrefix + '.' + i : String(i);
+            const tab = document.createElement('span');
+            tab.className = 'expA-ancestor-tab';
+            tab.dataset.choice = i;
+            if (scope[depth] === i) tab.classList.add('is-active');
+            tab.textContent = labelPrefix + tabPath;
+            if (!isLeafLevel) {
+                const tp = progressFor(tabPath);
+                const pip = document.createElement('span');
+                pip.className = 'expA-tab-pip';
+                if (tp.completed === tp.total) pip.classList.add('is-complete');
+                pip.textContent = tp.completed + '/' + tp.total;
+                tab.appendChild(pip);
+            }
+            tabs.appendChild(tab);
+        }
+        ancestor.appendChild(tabs);
+
+        const change = document.createElement('button');
+        change.type = 'button';
+        change.className = 'expA-ancestor-change';
+        change.textContent = 'Change selection';
+        change.title = 'Re-read the instruction and pick again';
+        change.addEventListener('click', onChangeBack);
+        ancestor.appendChild(change);
+
+        return ancestor;
+    }
+
+    function buildInfoNote(opts) {
+        const note = INTERLEVEL_NOTES[opts.depth];
+        if (!note) return null;
+        const info = document.createElement('div');
+        info.className = 'expA-info';
+        info.dataset.afterDepth = opts.depth;
+        const infoNode = document.createElement('div');
+        infoNode.className = 'expA-info-node';
+        infoNode.textContent = 'i';
+        info.appendChild(infoNode);
+        const card = document.createElement('div');
+        card.className = 'expA-info-card';
+        const meta = document.createElement('div');
+        meta.className = 'expA-info-card-meta';
+        meta.textContent = note.meta;
+        card.appendChild(meta);
+        const text = document.createElement('div');
+        text.textContent = note.text;
+        card.appendChild(text);
+        info.appendChild(card);
+        return info;
+    }
+
+    function buildCurrentStep(opts) {
+        const { scope, stepPath, done, progressFor, defsState, gradientId, onSelectAt } = opts;
+        const stepClass = opts.stepClass || 'expA-step';
+        const builtStep = exp431xShared.buildStep({
+            depth: scope.length, path: stepPath, done, onSelectAt, stepClass,
+        });
+        const stepAvatar = builtStep.querySelector('.exp431x-avatar');
+        if (stepAvatar) {
+            const ringWrap = document.createElement('div');
+            ringWrap.className = 'expA-step-ring';
+            const sp = progressFor(scope.join('.'));
+            ringWrap.appendChild(expRing.makeRing({
+                size: 36, strokeWidth: 4,
+                completed: sp.completed, total: sp.total,
+                gradientId, includeDefs: !defsState.emitted,
+            }));
+            defsState.emitted = true;
+            stepAvatar.replaceWith(ringWrap);
+        }
+        const blockedDeps = applyGating(builtStep, scope, done, progressFor);
+        if (blockedDeps.length > 0) {
+            const hint = document.createElement('div');
+            hint.className = 'expA-gate-hint';
+            hint.innerHTML = '<strong>Note:</strong> ' +
+                'The remaining tab' + (blockedDeps.length > 1 ? 's are' : ' is') +
+                ' locked until ' + blockedDeps[0] + '’s subtree is fully complete.';
+            const bubbleBody = builtStep.querySelector('.exp431x-bubble-body');
+            if (bubbleBody) bubbleBody.appendChild(hint);
+        }
+        return builtStep;
+    }
+
+    function buildProceedOrComplete(opts) {
+        const { scope, done, progressFor, onProceed } = opts;
+        if (!checkCurrentComplete(scope, done, progressFor)) return null;
+        const next = findNextTarget(scope, progressFor);
+        if (next) {
+            const proceed = document.createElement('div');
+            proceed.className = 'expA-proceed';
+            const pNode = document.createElement('div');
+            pNode.className = 'expA-proceed-node';
+            pNode.textContent = '→';
+            proceed.appendChild(pNode);
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'expA-proceed-btn';
+            btn.textContent = 'Proceed to ' + next.label + ' →';
+            btn.addEventListener('click', () => onProceed(next.scope));
+            proceed.appendChild(btn);
+            return proceed;
+        }
+        const cmp = document.createElement('div');
+        cmp.className = 'expA-complete';
+        const cNode = document.createElement('div');
+        cNode.className = 'expA-complete-node';
+        cNode.textContent = '✓';
+        cmp.appendChild(cNode);
+        const text = document.createElement('div');
+        text.className = 'expA-complete-text';
+        text.textContent = 'Workshop complete — every leaf is done.';
+        cmp.appendChild(text);
+        return cmp;
+    }
+
+    return {
+        INTERLEVEL_NOTES, checkCurrentComplete, findNextTarget, applyGating,
+        buildAncestorRow, buildInfoNote, buildCurrentStep, buildProceedOrComplete,
+    };
+})();
+
+// ----- Showcase variants — shared rendering helper. Each variant uses
+// A's exact nesting structure (via expABase) but supplies a custom leaf
+// body builder that emits Razem-style component HTML. The form elements
+// are interactive in the browser (you can type / click) but their state
+// is not persisted across re-renders — these are visual showcases, not
+// functional demos. -----
+function renderShowcase(rootSelector, opts) {
+    // opts.gradId — unique SVG gradient id for this variant
+    // opts.crumb  — leaf-panel "Now reading"-style label
+    // opts.body   — function(leafPath) -> HTML string for the leaf body
+    const root = document.querySelector(rootSelector);
+    if (!root) return;
+    const { progressForFn } = exp431xShared;
+
+    function buildShowcasePanel(nav) {
+        const panel = exp431xShared.buildLeafPanel({
+            path: nav.selectedLeaf.split('.').map(Number),
+            done: nav.done,
+            onToggleDone: () => nav.toggleDone(),
+        });
+        const crumbEl = panel.querySelector('.exp431x-leaf-crumb');
+        if (crumbEl) crumbEl.textContent = opts.crumb;
+        const bodyEl = panel.querySelector('.exp431x-leaf-body');
+        if (bodyEl) bodyEl.innerHTML = opts.body(nav.selectedLeaf);
+        return panel;
+    }
+
+    exp43121xCore.makeNavigator({
+        onRender(nav) {
+            root.innerHTML = '';
+            const scope = nav.scope;
+            const progressFor = progressForFn(nav.done);
+            const defsState = { emitted: false };
+
+            const navWrap = document.createElement('div');
+            navWrap.className = 'expA-nav';
+
+            for (let d = 0; d < scope.length; d++) {
+                navWrap.appendChild(expABase.buildAncestorRow({
+                    depth: d, scope, progressFor,
+                    defsState, gradientId: opts.gradId,
+                    onChangeBack: () => nav.navigateTo(scope.slice(0, d)),
+                }));
+                const info = expABase.buildInfoNote({ depth: d });
+                if (info) navWrap.appendChild(info);
+            }
+
+            navWrap.appendChild(expABase.buildCurrentStep({
+                scope, stepPath: nav.getStepPath(),
+                done: nav.done, progressFor,
+                defsState, gradientId: opts.gradId,
+                onSelectAt: nav.selectAt,
+            }));
+
+            if (nav.selectedLeaf) navWrap.appendChild(buildShowcasePanel(nav));
+
+            const tail = expABase.buildProceedOrComplete({
+                scope, done: nav.done, progressFor,
+                onProceed: (newScope) => nav.navigateTo(newScope),
+            });
+            if (tail) navWrap.appendChild(tail);
+
+            root.appendChild(navWrap);
+        },
+    });
+}
+
+// ----- A.1 · Text response — TextForm-style leaf. Each leaf prompts
+// for a 1-2 sentence reflection on the article. Tests: does focus on
+// a deep leaf input feel disorienting? Does the form coexist cleanly
+// with the leaf's "Mark as done" affordance? -----
+renderShowcase('.expA1-root', {
+    gradId: 'expA1-sg',
+    crumb: 'Now reflecting',
+    body: function (leafPath) {
+        return ''
+            + '<div class="component" data-form="text" data-key="leaf-' + leafPath + '">'
+            +   '<h3>Reflection on Leaf ' + leafPath + '</h3>'
+            +   '<p>Write a 1–2 sentence reflection on what you read.</p>'
+            +   '<p><strong>Value:</strong> None</p>'
+            +   '<form onsubmit="event.preventDefault();">'
+            +     '<input name="value" type="text" placeholder="Your reflection">'
+            +     '<div style="margin-top: 4px;">'
+            +       '<button type="submit">Set Reflection</button>'
+            +     '</div>'
+            +   '</form>'
+            + '</div>';
+    },
+});
+
+// ----- A.2 · Quiz question — ChoiceForm-style leaf with 3 radio
+// options. Closest to a real QMS-style workflow. Tests: does the
+// leaf-level "pick one" feel redundant alongside the tab-strip's
+// "pick one" two levels up? -----
+renderShowcase('.expA2-root', {
+    gradId: 'expA2-sg',
+    crumb: 'Now answering',
+    body: function (leafPath) {
+        const radioName = 'leaf-' + leafPath;
+        return ''
+            + '<div class="component" data-form="choice" data-key="leaf-' + leafPath + '">'
+            +   '<h3>Comprehension check on Leaf ' + leafPath + '</h3>'
+            +   '<p>Pick the option that best matches what you read.</p>'
+            +   '<p><strong>Selected:</strong> None</p>'
+            +   '<div style="margin: 4px 0;">'
+            +     '<label><input type="radio" name="' + radioName + '"> Option A — the literal interpretation</label>'
+            +     '<label><input type="radio" name="' + radioName + '"> Option B — the systemic interpretation</label>'
+            +     '<label><input type="radio" name="' + radioName + '"> Option C — neither / both / it depends</label>'
+            +   '</div>'
+            + '</div>';
+    },
+});
+
+// ----- A.3 · Composite log — Group containing TextForm + DateForm +
+// CheckboxForm in a single leaf. Tests: does the leaf panel grow
+// gracefully? Does scrolling within a deeply-nested leaf feel
+// disorienting? -----
+renderShowcase('.expA3-root', {
+    gradId: 'expA3-sg',
+    crumb: 'Now logging',
+    body: function (leafPath) {
+        return ''
+            + '<div class="component" data-form="text" data-key="notes-' + leafPath + '">'
+            +   '<h3>Notes</h3>'
+            +   '<p>Brief notes from this article.</p>'
+            +   '<form onsubmit="event.preventDefault();">'
+            +     '<input name="value" type="text" placeholder="Notes">'
+            +     '<div style="margin-top: 4px;">'
+            +       '<button type="submit">Set Notes</button>'
+            +     '</div>'
+            +   '</form>'
+            + '</div>'
+            + '<div class="component" data-form="date" data-key="date-' + leafPath + '">'
+            +   '<h3>Date read</h3>'
+            +   '<p>When did you read this?</p>'
+            +   '<form onsubmit="event.preventDefault();">'
+            +     '<input name="value" type="date">'
+            +     '<div style="margin-top: 4px;">'
+            +       '<button type="submit">Set Date</button>'
+            +     '</div>'
+            +   '</form>'
+            + '</div>'
+            + '<div class="component" data-form="checkbox" data-key="topics-' + leafPath + '">'
+            +   '<h3>Topics covered</h3>'
+            +   '<p>Select all topics this article addressed.</p>'
+            +   '<label><input type="checkbox"> Recursion</label>'
+            +   '<label><input type="checkbox"> Iteration</label>'
+            +   '<label><input type="checkbox"> Induction</label>'
+            + '</div>';
+    },
+});
 
 // ----- Experiment A — the consolidated winner. See the long CSS comment
 // block above for the feature inventory. -----
