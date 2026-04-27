@@ -9,26 +9,11 @@
       <div class="nest-ws__row">
         <button class="nest-ws__tab is-active" role="tab" aria-selected="true" data-tab="exp-a">Experiment A</button>
       </div>
-      <div class="nest-ws__row nest-ws__row--child">
-        <span class="nest-ws__lineage">↳ from Experiment A · component-integrated leaves</span>
-        <button class="nest-ws__tab" role="tab" aria-selected="false" data-tab="exp-a1">A.1 · Text response</button>
-        <button class="nest-ws__tab" role="tab" aria-selected="false" data-tab="exp-a2">A.2 · Quiz question</button>
-        <button class="nest-ws__tab" role="tab" aria-selected="false" data-tab="exp-a3">A.3 · Composite log</button>
-      </div>
     </div>
   </nav>
 
   <section class="nest-ws__canvas is-active" role="tabpanel" data-panel="exp-a">
     <div class="expA-root"></div>
-  </section>
-  <section class="nest-ws__canvas" role="tabpanel" data-panel="exp-a1" hidden>
-    <div class="expA1-root"></div>
-  </section>
-  <section class="nest-ws__canvas" role="tabpanel" data-panel="exp-a2" hidden>
-    <div class="expA2-root"></div>
-  </section>
-  <section class="nest-ws__canvas" role="tabpanel" data-panel="exp-a3" hidden>
-    <div class="expA3-root"></div>
   </section>
 
 </div>
@@ -373,10 +358,7 @@
      - Auto-select first incomplete reachable leaf when scope drills
        to leaf level (handled in exp43121xCore.makeNavigator).
    ===================================================================== */
-.nest-ws__canvas[data-panel="exp-a"],
-.nest-ws__canvas[data-panel="exp-a1"],
-.nest-ws__canvas[data-panel="exp-a2"],
-.nest-ws__canvas[data-panel="exp-a3"] {
+.nest-ws__canvas[data-panel="exp-a"] {
     padding: 0;
     overflow: auto;
     background:
@@ -386,7 +368,7 @@
         radial-gradient(at 20% 90%, #c4f0f4 0%, transparent 55%),
         linear-gradient(160deg, #f7f9ff 0%, #fdf4ff 100%);
 }
-.expA-root, .expA1-root, .expA2-root, .expA3-root {
+.expA-root {
     max-width: 760px;
     margin: 0 auto;
     padding: 28px 28px 56px;
@@ -653,14 +635,11 @@
 }
 
 /* =====================================================================
-   Showcase variants A.1–A.3 — A's nesting structure with realistic
-   Razem-style component HTML in the leaf body. The layout (thread,
-   ancestor rows, current step, proceed/complete) is identical to A —
-   variants reuse .expA-nav, .expA-ancestor, .expA-step, etc. classes.
-   The only difference is the leaf panel's body content, which embeds
-   Razem-styled components (.component[data-form="text"], etc.).
-   The rules below style those embedded components for reasonable
-   visual fidelity to Razem's default-theme rendering.
+   Embedded Razem-component styling for A's leaf body. Each leaf renders
+   real component HTML (.component[data-form="text"|"choice"|"date"|
+   "checkbox"], etc.) so this experiment exercises A's structure with
+   realistic content rather than placeholder text. The rules below
+   approximate Razem's default-theme rendering.
    ===================================================================== */
 .exp431x-leaf-body .component {
     margin: 12px 0;
@@ -1056,309 +1035,34 @@ const expRing = (function () {
     return { makeRing };
 })();
 
-// ----- expABase — shared builders for the standard A-style pieces
-// (ancestor row, info note, current step with ring + gating, leaf
-// panel, proceed/complete). The .expA- inner classes are reused across
-// every variant; each variant supplies its own outer namespace and
-// arranges/decorates these pieces differently. Kept separate from A's
-// IIFE so A keeps working untouched. -----
-const expABase = (function () {
-    const { MAX_DEPTH } = exp431xShared;
+// ----- Experiment A — the consolidated winner. See the long CSS comment
+// block above for the feature inventory. -----
+(function () {
+    const root = document.querySelector('.expA-root');
+    if (!root) return;
+    const { MAX_DEPTH, buildStep, buildLeafPanel, progressForFn } = exp431xShared;
 
     const INTERLEVEL_NOTES = [
+        // Shown after a chapter is picked — describes the section level.
         {
             meta: 'About this chapter',
             text: 'Sections within a chapter group articles by theme. You can read sections in any order — pick whichever interests you most.',
         },
+        // Shown after a section is picked — describes the article level.
         {
             meta: 'About this section',
             text: 'Each article is self-contained and takes 5–10 minutes. Numbering suggests a reading order, but is not strictly required.',
         },
     ];
 
-    function checkCurrentComplete(scope, done, progressFor) {
-        const isLeafLevel = scope.length === MAX_DEPTH - 1;
-        for (let i = 1; i <= 3; i++) {
-            const tabPath = scope.length === 0 ? String(i) : (scope.join('.') + '.' + i);
-            if (isLeafLevel) {
-                if (!done.has(tabPath)) return false;
-            } else {
-                const tp = progressFor(tabPath);
-                if (tp.completed < tp.total) return false;
-            }
-        }
-        return true;
-    }
-
-    function findNextTarget(scope, progressFor) {
-        for (let d = scope.length - 1; d >= 0; d--) {
-            const parentScope = scope.slice(0, d);
-            const currentChoice = scope[d];
-            for (let i = currentChoice + 1; i <= 3; i++) {
-                const siblingPath = parentScope.length === 0 ? String(i) : (parentScope.join('.') + '.' + i);
-                const sp = progressFor(siblingPath);
-                if (sp.completed < sp.total) {
-                    return { scope: [...parentScope, i], label: 'Tab ' + siblingPath };
-                }
-            }
-        }
-        return null;
-    }
-
-    function applyGating(stepEl, scope, done, progressFor) {
-        const isLeafLevel = scope.length === MAX_DEPTH - 1;
-        const tabs = Array.from(stepEl.querySelectorAll('.exp431x-tab'));
-        let prevComplete = true;
-        const blockedDeps = [];
-        function isComplete(tabPath) {
-            if (isLeafLevel) return done.has(tabPath);
-            const tp = progressFor(tabPath);
-            return tp.completed === tp.total;
-        }
-        tabs.forEach((tabEl, idx) => {
-            if (idx === 0) {
-                prevComplete = isComplete(tabEl.dataset.path);
-                return;
-            }
-            if (!prevComplete) {
-                const clone = tabEl.cloneNode(true);
-                clone.classList.add('is-locked');
-                clone.title = 'Locked — complete the previous selection first';
-                tabEl.replaceWith(clone);
-                blockedDeps.push((isLeafLevel ? 'Leaf ' : 'Tab ') + tabs[idx - 1].dataset.path);
-                prevComplete = false;
-            } else {
-                prevComplete = isComplete(tabEl.dataset.path);
-            }
-        });
-        return blockedDeps;
-    }
-
-    function buildAncestorRow(opts) {
-        const { depth, scope, progressFor, defsState, gradientId, onChangeBack } = opts;
-        const isLeafLevel = depth === MAX_DEPTH - 1;
-        const labelPrefix = isLeafLevel ? 'Leaf ' : 'Tab ';
-        const parentPrefix = scope.slice(0, depth).join('.');
-        const choicePath = scope.slice(0, depth + 1).join('.');
-
-        const ancestor = document.createElement('div');
-        ancestor.className = 'expA-ancestor';
-        ancestor.dataset.depth = depth;
-        ancestor.dataset.choice = scope[depth];
-
-        const node = document.createElement('div');
-        node.className = 'expA-ancestor-node';
-        const ap = progressFor(choicePath);
-        node.appendChild(expRing.makeRing({
-            size: 18, strokeWidth: 3,
-            completed: ap.completed, total: ap.total,
-            gradientId, includeDefs: !defsState.emitted,
-        }));
-        defsState.emitted = true;
-        ancestor.appendChild(node);
-
-        const tabs = document.createElement('div');
-        tabs.className = 'expA-ancestor-tabs';
-        for (let i = 1; i <= 3; i++) {
-            const tabPath = parentPrefix ? parentPrefix + '.' + i : String(i);
-            const tab = document.createElement('span');
-            tab.className = 'expA-ancestor-tab';
-            tab.dataset.choice = i;
-            if (scope[depth] === i) tab.classList.add('is-active');
-            tab.textContent = labelPrefix + tabPath;
-            if (!isLeafLevel) {
-                const tp = progressFor(tabPath);
-                const pip = document.createElement('span');
-                pip.className = 'expA-tab-pip';
-                if (tp.completed === tp.total) pip.classList.add('is-complete');
-                pip.textContent = tp.completed + '/' + tp.total;
-                tab.appendChild(pip);
-            }
-            tabs.appendChild(tab);
-        }
-        ancestor.appendChild(tabs);
-
-        const change = document.createElement('button');
-        change.type = 'button';
-        change.className = 'expA-ancestor-change';
-        change.textContent = 'Change selection';
-        change.title = 'Re-read the instruction and pick again';
-        change.addEventListener('click', onChangeBack);
-        ancestor.appendChild(change);
-
-        return ancestor;
-    }
-
-    function buildInfoNote(opts) {
-        const note = INTERLEVEL_NOTES[opts.depth];
-        if (!note) return null;
-        const info = document.createElement('div');
-        info.className = 'expA-info';
-        info.dataset.afterDepth = opts.depth;
-        const infoNode = document.createElement('div');
-        infoNode.className = 'expA-info-node';
-        infoNode.textContent = 'i';
-        info.appendChild(infoNode);
-        const card = document.createElement('div');
-        card.className = 'expA-info-card';
-        const meta = document.createElement('div');
-        meta.className = 'expA-info-card-meta';
-        meta.textContent = note.meta;
-        card.appendChild(meta);
-        const text = document.createElement('div');
-        text.textContent = note.text;
-        card.appendChild(text);
-        info.appendChild(card);
-        return info;
-    }
-
-    function buildCurrentStep(opts) {
-        const { scope, stepPath, done, progressFor, defsState, gradientId, onSelectAt } = opts;
-        const stepClass = opts.stepClass || 'expA-step';
-        const builtStep = exp431xShared.buildStep({
-            depth: scope.length, path: stepPath, done, onSelectAt, stepClass,
-        });
-        const stepAvatar = builtStep.querySelector('.exp431x-avatar');
-        if (stepAvatar) {
-            const ringWrap = document.createElement('div');
-            ringWrap.className = 'expA-step-ring';
-            const sp = progressFor(scope.join('.'));
-            ringWrap.appendChild(expRing.makeRing({
-                size: 36, strokeWidth: 4,
-                completed: sp.completed, total: sp.total,
-                gradientId, includeDefs: !defsState.emitted,
-            }));
-            defsState.emitted = true;
-            stepAvatar.replaceWith(ringWrap);
-        }
-        const blockedDeps = applyGating(builtStep, scope, done, progressFor);
-        if (blockedDeps.length > 0) {
-            const hint = document.createElement('div');
-            hint.className = 'expA-gate-hint';
-            hint.innerHTML = '<strong>Note:</strong> ' +
-                'The remaining tab' + (blockedDeps.length > 1 ? 's are' : ' is') +
-                ' locked until ' + blockedDeps[0] + '’s subtree is fully complete.';
-            const bubbleBody = builtStep.querySelector('.exp431x-bubble-body');
-            if (bubbleBody) bubbleBody.appendChild(hint);
-        }
-        return builtStep;
-    }
-
-    function buildProceedOrComplete(opts) {
-        const { scope, done, progressFor, onProceed } = opts;
-        if (!checkCurrentComplete(scope, done, progressFor)) return null;
-        const next = findNextTarget(scope, progressFor);
-        if (next) {
-            const proceed = document.createElement('div');
-            proceed.className = 'expA-proceed';
-            const pNode = document.createElement('div');
-            pNode.className = 'expA-proceed-node';
-            pNode.textContent = '→';
-            proceed.appendChild(pNode);
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'expA-proceed-btn';
-            btn.textContent = 'Proceed to ' + next.label + ' →';
-            btn.addEventListener('click', () => onProceed(next.scope));
-            proceed.appendChild(btn);
-            return proceed;
-        }
-        const cmp = document.createElement('div');
-        cmp.className = 'expA-complete';
-        const cNode = document.createElement('div');
-        cNode.className = 'expA-complete-node';
-        cNode.textContent = '✓';
-        cmp.appendChild(cNode);
-        const text = document.createElement('div');
-        text.className = 'expA-complete-text';
-        text.textContent = 'Workshop complete — every leaf is done.';
-        cmp.appendChild(text);
-        return cmp;
-    }
-
-    return {
-        INTERLEVEL_NOTES, checkCurrentComplete, findNextTarget, applyGating,
-        buildAncestorRow, buildInfoNote, buildCurrentStep, buildProceedOrComplete,
-    };
-})();
-
-// ----- Showcase variants — shared rendering helper. Each variant uses
-// A's exact nesting structure (via expABase) but supplies a custom leaf
-// body builder that emits Razem-style component HTML. The form elements
-// are interactive in the browser (you can type / click) but their state
-// is not persisted across re-renders — these are visual showcases, not
-// functional demos. -----
-function renderShowcase(rootSelector, opts) {
-    // opts.gradId — unique SVG gradient id for this variant
-    // opts.crumb  — leaf-panel "Now reading"-style label
-    // opts.body   — function(leafPath) -> HTML string for the leaf body
-    const root = document.querySelector(rootSelector);
-    if (!root) return;
-    const { progressForFn } = exp431xShared;
-
-    function buildShowcasePanel(nav) {
-        const panel = exp431xShared.buildLeafPanel({
-            path: nav.selectedLeaf.split('.').map(Number),
-            done: nav.done,
-            onToggleDone: () => nav.toggleDone(),
-        });
-        const crumbEl = panel.querySelector('.exp431x-leaf-crumb');
-        if (crumbEl) crumbEl.textContent = opts.crumb;
-        const bodyEl = panel.querySelector('.exp431x-leaf-body');
-        if (bodyEl) bodyEl.innerHTML = opts.body(nav.selectedLeaf);
-        return panel;
-    }
-
-    exp43121xCore.makeNavigator({
-        onRender(nav) {
-            root.innerHTML = '';
-            const scope = nav.scope;
-            const progressFor = progressForFn(nav.done);
-            const defsState = { emitted: false };
-
-            const navWrap = document.createElement('div');
-            navWrap.className = 'expA-nav';
-
-            for (let d = 0; d < scope.length; d++) {
-                navWrap.appendChild(expABase.buildAncestorRow({
-                    depth: d, scope, progressFor,
-                    defsState, gradientId: opts.gradId,
-                    onChangeBack: () => nav.navigateTo(scope.slice(0, d)),
-                }));
-                const info = expABase.buildInfoNote({ depth: d });
-                if (info) navWrap.appendChild(info);
-            }
-
-            navWrap.appendChild(expABase.buildCurrentStep({
-                scope, stepPath: nav.getStepPath(),
-                done: nav.done, progressFor,
-                defsState, gradientId: opts.gradId,
-                onSelectAt: nav.selectAt,
-            }));
-
-            if (nav.selectedLeaf) navWrap.appendChild(buildShowcasePanel(nav));
-
-            const tail = expABase.buildProceedOrComplete({
-                scope, done: nav.done, progressFor,
-                onProceed: (newScope) => nav.navigateTo(newScope),
-            });
-            if (tail) navWrap.appendChild(tail);
-
-            root.appendChild(navWrap);
-        },
-    });
-}
-
-// ----- A.1 · Text response — TextForm-style leaf. Each leaf prompts
-// for a 1-2 sentence reflection on the article. Tests: does focus on
-// a deep leaf input feel disorienting? Does the form coexist cleanly
-// with the leaf's "Mark as done" affordance? -----
-renderShowcase('.expA1-root', {
-    gradId: 'expA1-sg',
-    crumb: 'Now reflecting',
-    body: function (leafPath) {
+    function buildLeafBody(leafPath) {
+        // Combined leaf body: Reflection (TextForm) + Comprehension
+        // check (ChoiceForm) + Notes (TextForm) + Date read (DateForm)
+        // + Topics covered (CheckboxForm). Five components per leaf,
+        // all rendered with Razem default-theme component HTML.
+        const radioName = 'choice-' + leafPath;
         return ''
-            + '<div class="component" data-form="text" data-key="leaf-' + leafPath + '">'
+            + '<div class="component" data-form="text" data-key="reflection-' + leafPath + '">'
             +   '<h3>Reflection on Leaf ' + leafPath + '</h3>'
             +   '<p>Write a 1–2 sentence reflection on what you read.</p>'
             +   '<p><strong>Value:</strong> None</p>'
@@ -1368,21 +1072,8 @@ renderShowcase('.expA1-root', {
             +       '<button type="submit">Set Reflection</button>'
             +     '</div>'
             +   '</form>'
-            + '</div>';
-    },
-});
-
-// ----- A.2 · Quiz question — ChoiceForm-style leaf with 3 radio
-// options. Closest to a real QMS-style workflow. Tests: does the
-// leaf-level "pick one" feel redundant alongside the tab-strip's
-// "pick one" two levels up? -----
-renderShowcase('.expA2-root', {
-    gradId: 'expA2-sg',
-    crumb: 'Now answering',
-    body: function (leafPath) {
-        const radioName = 'leaf-' + leafPath;
-        return ''
-            + '<div class="component" data-form="choice" data-key="leaf-' + leafPath + '">'
+            + '</div>'
+            + '<div class="component" data-form="choice" data-key="check-' + leafPath + '">'
             +   '<h3>Comprehension check on Leaf ' + leafPath + '</h3>'
             +   '<p>Pick the option that best matches what you read.</p>'
             +   '<p><strong>Selected:</strong> None</p>'
@@ -1391,19 +1082,7 @@ renderShowcase('.expA2-root', {
             +     '<label><input type="radio" name="' + radioName + '"> Option B — the systemic interpretation</label>'
             +     '<label><input type="radio" name="' + radioName + '"> Option C — neither / both / it depends</label>'
             +   '</div>'
-            + '</div>';
-    },
-});
-
-// ----- A.3 · Composite log — Group containing TextForm + DateForm +
-// CheckboxForm in a single leaf. Tests: does the leaf panel grow
-// gracefully? Does scrolling within a deeply-nested leaf feel
-// disorienting? -----
-renderShowcase('.expA3-root', {
-    gradId: 'expA3-sg',
-    crumb: 'Now logging',
-    body: function (leafPath) {
-        return ''
+            + '</div>'
             + '<div class="component" data-form="text" data-key="notes-' + leafPath + '">'
             +   '<h3>Notes</h3>'
             +   '<p>Brief notes from this article.</p>'
@@ -1431,28 +1110,7 @@ renderShowcase('.expA3-root', {
             +   '<label><input type="checkbox"> Iteration</label>'
             +   '<label><input type="checkbox"> Induction</label>'
             + '</div>';
-    },
-});
-
-// ----- Experiment A — the consolidated winner. See the long CSS comment
-// block above for the feature inventory. -----
-(function () {
-    const root = document.querySelector('.expA-root');
-    if (!root) return;
-    const { MAX_DEPTH, buildStep, buildLeafPanel, progressForFn } = exp431xShared;
-
-    const INTERLEVEL_NOTES = [
-        // Shown after a chapter is picked — describes the section level.
-        {
-            meta: 'About this chapter',
-            text: 'Sections within a chapter group articles by theme. You can read sections in any order — pick whichever interests you most.',
-        },
-        // Shown after a section is picked — describes the article level.
-        {
-            meta: 'About this section',
-            text: 'Each article is self-contained and takes 5–10 minutes. Numbering suggests a reading order, but is not strictly required.',
-        },
-    ];
+    }
 
     function checkCurrentComplete(scope, done, progressFor) {
         // True iff every tab at the current scope is fully complete.
@@ -1634,13 +1292,19 @@ renderShowcase('.expA3-root', {
             }
             navWrap.appendChild(builtStep);
 
-            // --- Leaf content panel
+            // --- Leaf content panel — body holds real Razem-style
+            // components (TextForm + ChoiceForm + composite log:
+            // TextForm + DateForm + CheckboxForm). Forms preventDefault
+            // on submit; state isn't persisted across re-renders. -----
             if (nav.selectedLeaf) {
-                navWrap.appendChild(buildLeafPanel({
+                const panel = buildLeafPanel({
                     path: nav.selectedLeaf.split('.').map(Number),
                     done: nav.done,
                     onToggleDone: () => nav.toggleDone(),
-                }));
+                });
+                const bodyEl = panel.querySelector('.exp431x-leaf-body');
+                if (bodyEl) bodyEl.innerHTML = buildLeafBody(nav.selectedLeaf);
+                navWrap.appendChild(panel);
             }
 
             // --- Proceed-to-next or workshop-complete element.

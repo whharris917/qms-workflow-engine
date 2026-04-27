@@ -214,6 +214,13 @@ _WORKSHOPS = [
         "icon": "▣",
         "template": "workshop_nesting.html",
     },
+    {
+        "slug": "graph-builder",
+        "title": "Graph Builder",
+        "description": "Aerial railroad-yard canvas for sketching DAGs interactively. Hover a node to add before / after / branch; click the dashed + ghost to grow.",
+        "icon": "⊡",
+        "template": "workshop_graph_builder.html",
+    },
 ]
 
 

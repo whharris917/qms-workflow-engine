@@ -1,0 +1,964 @@
+{% extends "base.html" %}
+{% block title %}Graph Builder &middot; Workshop &middot; Razem{% endblock %}
+{% block content %}
+<div class="gb">
+  <nav class="gb__topbar">
+    <a class="gb__back" href="/workshop">&larr;</a>
+    <div class="gb__heading">
+      <h1 class="gb__title">Graph Builder</h1>
+      <span class="gb__hint">+ below a node adds a sequence step · + on a vertical edge splices · Click a container tag's + to add a branch · Click any type label to cycle</span>
+    </div>
+    <button type="button" class="gb__reset" data-action="reset">Reset</button>
+  </nav>
+  <div class="gb__canvas">
+    <svg class="gb__svg" aria-hidden="true"></svg>
+    <div class="gb__layer" data-layer="ghosts"></div>
+    <div class="gb__layer" data-layer="nodes"></div>
+  </div>
+</div>
+
+<style>
+/* Scoped to .gb. The graph is a tree: each parent-child edge is either a
+   "branch" (horizontal — container members like tabs/group/switch siblings)
+   or a "next" (vertical — sequence successor). The horizontal axis at any
+   row shows what the user can see / select at that moment; the vertical
+   axis shows sequential progression. */
+
+.gb {
+    --gb-accent:    #6366f1;
+    --gb-accent-2:  #a855f7;
+    --gb-pink:      #ec4899;
+    --gb-amber:     #f59e0b;
+    --gb-text:      #1f2144;
+    --gb-muted:     #4a4e6d;
+    --gb-subtle:    #8088a8;
+    --gb-font:      -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+
+    position: relative;
+    margin: -2rem;
+    min-height: calc(100vh);
+    display: flex;
+    flex-direction: column;
+    font-family: var(--gb-font);
+    font-size: 14px;
+    color: var(--gb-text);
+    background:
+        radial-gradient(at 15% 20%, #ffe3f0 0%, transparent 55%),
+        radial-gradient(at 85% 15%, #c8d8ff 0%, transparent 55%),
+        radial-gradient(at 70% 85%, #d9c8ff 0%, transparent 55%),
+        radial-gradient(at 20% 90%, #c4f0f4 0%, transparent 55%),
+        linear-gradient(160deg, #f7f9ff 0%, #fdf4ff 100%);
+    background-attachment: fixed;
+    overflow: hidden;
+}
+
+/* ----- Topbar ----- */
+.gb__topbar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 20px;
+    border-bottom: 1px solid rgba(160, 180, 220, 0.22);
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+}
+.gb__back {
+    color: var(--gb-muted);
+    text-decoration: none;
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: color 0.12s, background 0.12s;
+}
+.gb__back:hover { color: var(--gb-text); background: rgba(255, 255, 255, 0.55); }
+.gb__heading { display: flex; align-items: baseline; gap: 14px; flex: 1; }
+.gb__title { font-size: 1.05rem; font-weight: 600; margin: 0; color: var(--gb-text); }
+.gb__hint { font-size: 0.78rem; color: var(--gb-subtle); font-style: italic; }
+.gb__reset {
+    font: inherit; font-size: 12px; padding: 6px 14px;
+    border: 1px solid rgba(99, 102, 241, 0.42);
+    background: rgba(255, 255, 255, 0.6);
+    color: var(--gb-accent);
+    border-radius: 999px; cursor: pointer; font-weight: 500;
+    transition: background 0.12s, color 0.12s;
+}
+.gb__reset:hover { background: rgba(99, 102, 241, 0.08); color: #4338ca; }
+
+/* ----- Canvas ----- */
+.gb__canvas {
+    position: relative;
+    flex: 1;
+    overflow: auto;
+}
+.gb__svg, .gb__layer {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+}
+.gb__layer .gb-node, .gb__layer .gb-ghost { pointer-events: auto; }
+
+/* ----- Node wrapper (no visible style; positions and hovers) ----- */
+.gb-node {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    width: 44px; height: 44px;
+    z-index: 2;
+}
+
+/* ----- Node visible shape (the colored, type-shaped element) ----- */
+.gb-node-shape {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    color: #ffffff;
+    box-shadow: 0 0 0 4px rgba(247, 249, 255, 0.95), 0 4px 14px rgba(99, 102, 241, 0.32);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 12.5px;
+    user-select: none;
+    cursor: default;
+    transition: box-shadow 0.18s, transform 0.18s;
+}
+.gb-node:hover .gb-node-shape {
+    box-shadow: 0 0 0 4px rgba(247, 249, 255, 0.95), 0 0 0 8px rgba(168, 85, 247, 0.18), 0 6px 18px rgba(168, 85, 247, 0.45);
+    transform: scale(1.04);
+}
+/* form — rounded square, indigo→violet (data-input leaf) */
+.gb-node[data-type="form"]   .gb-node-shape { border-radius: 12px; }
+/* action — chevron, pink→amber (imperative leaf) */
+.gb-node[data-type="action"] .gb-node-shape {
+    clip-path: polygon(0% 0%, 100% 0%, 100% 65%, 50% 100%, 0% 65%);
+    background: linear-gradient(135deg, #ec4899 0%, #f59e0b 100%);
+    box-shadow: 0 4px 14px rgba(236, 72, 153, 0.32);
+}
+/* Containers (group / tabs / switch) have NO visible node shape — they're a
+   pure grouping concept rendered as a labelled bounding box around their
+   branches. The .gb-node wrapper still exists for affordance positioning. */
+.gb-node[data-type="group"]  .gb-node-shape,
+.gb-node[data-type="tabs"]   .gb-node-shape,
+.gb-node[data-type="switch"] .gb-node-shape { display: none; }
+.gb-node[data-type="group"], .gb-node[data-type="tabs"], .gb-node[data-type="switch"] {
+    width: 0; height: 0;   /* shrink wrapper; the bbox + tag carry the visuals */
+}
+
+.gb-node-glyph { pointer-events: none; line-height: 1; }
+
+/* Right-side label stack: name and type pill (leaf nodes only) */
+.gb-node-stack {
+    position: absolute;
+    left: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    align-items: flex-start;
+    pointer-events: none;
+    white-space: nowrap;
+}
+.gb-node-label {
+    font-size: 11.5px;
+    color: var(--gb-muted);
+    background: rgba(255, 255, 255, 0.7);
+    padding: 2px 8px;
+    border-radius: 6px;
+}
+.gb-node-type {
+    font-size: 10px;
+    color: var(--gb-subtle);
+    font-style: italic;
+    cursor: pointer;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(160, 180, 220, 0.32);
+    pointer-events: auto;
+    transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.gb-node-type:hover { color: var(--gb-accent); border-color: var(--gb-accent); background: rgba(255, 255, 255, 0.9); }
+.gb-node-badge {
+    font-size: 9.5px;
+    color: var(--gb-subtle);
+    background: rgba(99, 102, 241, 0.08);
+    border: 1px dashed rgba(99, 102, 241, 0.32);
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-style: italic;
+}
+
+/* ----- Ghost: dashed circle below a node that has no sequence successor ----- */
+.gb-ghost {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    border: 1.5px dashed rgba(99, 102, 241, 0.55);
+    background: rgba(255, 255, 255, 0.55);
+    color: var(--gb-accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 1;
+    transition: background 0.18s, border-color 0.18s, color 0.18s, transform 0.18s, box-shadow 0.18s;
+}
+.gb-ghost:hover {
+    background: rgba(99, 102, 241, 0.1);
+    border-color: var(--gb-accent);
+    color: #4338ca;
+    transform: translate(-50%, -50%) scale(1.1);
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12);
+}
+.gb-ghost-tip {
+    position: absolute;
+    left: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    color: var(--gb-muted);
+    white-space: nowrap;
+    background: rgba(255, 255, 255, 0.94);
+    padding: 3px 9px;
+    border-radius: 999px;
+    border: 1px solid rgba(160, 180, 220, 0.32);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.18s;
+}
+.gb-ghost:hover .gb-ghost-tip { opacity: 1; }
+
+/* ----- Edges ----- */
+.gb-edge {
+    fill: none;
+    stroke: #6366f1;
+    stroke-width: 3;
+    stroke-linecap: round;
+}
+.gb-edge-hit {
+    stroke: transparent;
+    stroke-width: 18;
+    fill: none;
+    pointer-events: stroke;
+    cursor: pointer;
+}
+/* Splice button only on next (vertical) edges. Branch edges are excluded
+   in the renderer because splicing on a branch is semantically ambiguous. */
+.gb-edge-btn {
+    opacity: 0;
+    cursor: pointer;
+    pointer-events: auto;
+    transition: opacity 0.18s;
+}
+.gb-edge-group:hover .gb-edge-btn,
+.gb-edge-btn:hover { opacity: 1; }
+.gb-edge-btn circle {
+    fill: rgba(255, 255, 255, 0.96);
+    stroke: var(--gb-accent);
+    stroke-width: 1.5;
+    stroke-dasharray: 3 3;
+    transition: fill 0.12s, stroke-dasharray 0.12s;
+}
+.gb-edge-btn text {
+    text-anchor: middle;
+    fill: var(--gb-accent);
+    font-weight: 700;
+    font-size: 16px;
+    font-family: var(--gb-font);
+    user-select: none;
+    transition: fill 0.12s;
+}
+.gb-edge-btn:hover circle { fill: var(--gb-accent); stroke-dasharray: none; }
+.gb-edge-btn:hover text   { fill: #ffffff; }
+
+.gb-stub {
+    fill: none;
+    stroke: rgba(99, 102, 241, 0.55);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-dasharray: 2 4;
+}
+.gb-container-frame {
+    fill: rgba(168, 85, 247, 0.06);
+    stroke: rgba(168, 85, 247, 0.5);
+    stroke-width: 1.5;
+    stroke-dasharray: 6 4;
+    rx: 14;
+    ry: 14;
+}
+.gb-container-frame[data-kind="tabs"]   { stroke: rgba(99, 102, 241, 0.6); fill: rgba(99, 102, 241, 0.06); }
+.gb-container-frame[data-kind="switch"] { stroke: rgba(245, 158, 11, 0.6);  fill: rgba(245, 158, 11, 0.06); }
+
+/* Container tag: small labelled handle anchored to the bbox top-left.
+   Hosts the kind label (clickable to cycle), collapse caret, and Create
+   Branch button. Replaces the node "shape" for container types. */
+.gb-container-tag {
+    position: absolute;
+    transform: translateY(-100%);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid rgba(168, 85, 247, 0.5);
+    border-radius: 8px 8px 0 8px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: rgba(168, 85, 247, 0.95);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    pointer-events: auto;
+    z-index: 2;
+    white-space: nowrap;
+    box-shadow: 0 -2px 6px rgba(168, 85, 247, 0.12);
+    cursor: pointer;
+}
+.gb-container-tag[data-kind="tabs"]   { color: rgba(99, 102, 241, 0.95); border-color: rgba(99, 102, 241, 0.5); box-shadow: 0 -2px 6px rgba(99, 102, 241, 0.12); }
+.gb-container-tag[data-kind="switch"] { color: rgba(245, 158, 11, 0.95);  border-color: rgba(245, 158, 11, 0.5);  box-shadow: 0 -2px 6px rgba(245, 158, 11, 0.12); }
+.gb-container-tag:hover { filter: brightness(1.05); }
+
+.gb-container-tag__label   { user-select: none; }
+.gb-container-tag__caret   {
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 1;
+    padding: 0 3px;
+    border-radius: 4px;
+}
+.gb-container-tag__caret:hover { background: rgba(0, 0, 0, 0.06); }
+.gb-container-tag__addbranch {
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    padding: 0 4px;
+    border-radius: 4px;
+    color: inherit;
+}
+.gb-container-tag__addbranch:hover { background: rgba(0, 0, 0, 0.08); }
+
+.gb-container-frame-label {
+    font-family: var(--gb-font);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    fill: rgba(168, 85, 247, 0.85);
+    display: none;   /* superseded by HTML .gb-container-tag */
+}
+</style>
+
+<script>
+(function () {
+    const root = document.querySelector('.gb');
+    if (!root) return;
+
+    const ROW_H   = 130;
+    const COL_W   = 160;
+    const NODE_R  = 22;
+    const GHOST_R = 16;
+    const STUB_GAP_TOP = NODE_R + 6;
+    const STUB_GAP_BOT = GHOST_R + 4;
+
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+
+    // ----- Type taxonomy -----
+    // form / action are leaves. group / tabs / switch are containers; only
+    // they accept "branch" children. Cycling order: leaves first, then
+    // parallel container, then alternative containers.
+    const TYPES = ['form', 'action', 'group', 'tabs', 'switch'];
+    const TYPE_LABELS = {
+        form:   'Form',
+        action: 'Action',
+        group:  'Group',
+        tabs:   'Tabs',
+        switch: 'Switch',
+    };
+    const CONTAINER_TYPES = new Set(['group', 'tabs', 'switch']);
+    const isContainer = t => CONTAINER_TYPES.has(t);
+
+    const svg     = root.querySelector('.gb__svg');
+    const ghostL  = root.querySelector('[data-layer="ghosts"]');
+    const nodeL   = root.querySelector('[data-layer="nodes"]');
+    const canvas  = root.querySelector('.gb__canvas');
+
+    // ----- State -----
+    // Tree-shaped: each node has at most one parent. The parent-child edge
+    // has a `kind` carried on the child as `parentRel`:
+    //   'branch' — horizontal (container member; tab/group sibling/switch alt)
+    //   'next'   — vertical   (sequence successor)
+    // The root has parentRel = null. Each node has at most one 'next' child;
+    // it can have any number of 'branch' children.
+    let state = freshState();
+
+    function freshState() { return { nodes: {}, nextId: 1 }; }
+
+    function makeNode(opts) {
+        opts = opts || {};
+        const id = 'n' + state.nextId++;
+        const num = state.nextId - 1;
+        state.nodes[id] = {
+            id,
+            label: opts.label || ('Node ' + num),
+            x: 0, y: 0,
+            type: opts.type || 'form',
+            collapsed: false,
+            parents: [],
+            children: [],
+            parentRel: opts.parentRel || null,
+        };
+        return id;
+    }
+
+    function init() {
+        state = freshState();
+        makeNode({ label: 'Node 1' });
+        layout();
+        render();
+    }
+
+    // ----- Type cycling + collapse -----
+    function cycleType(nodeId) {
+        const n = state.nodes[nodeId];
+        if (!n) return;
+        const idx = TYPES.indexOf(n.type);
+        n.type = TYPES[(idx + 1) % TYPES.length];
+        if (!isContainer(n.type)) n.collapsed = false;
+        layout();
+        render();
+    }
+
+    function toggleCollapse(nodeId) {
+        const n = state.nodes[nodeId];
+        if (!n || !isContainer(n.type)) return;
+        n.collapsed = !n.collapsed;
+        layout();
+        render();
+    }
+
+    // ----- Edge accessors (read parentRel from the child) -----
+    function branchesOf(node) {
+        return node.children
+            .map(cid => state.nodes[cid])
+            .filter(c => c && c.parentRel === 'branch');
+    }
+    function nextOf(node) {
+        return node.children
+            .map(cid => state.nodes[cid])
+            .find(c => c && c.parentRel === 'next') || null;
+    }
+
+    // ----- Mutations (topology only; layout() recomputes positions) -----
+
+    // Add a sequence successor below `target`. If `target` already has a
+    // 'next' child, the new node splices between them.
+    function addNext(targetId) {
+        const t = state.nodes[targetId];
+        if (!t) return;
+        const newId = makeNode({ parentRel: 'next' });
+        const n = state.nodes[newId];
+        const existingNext = nextOf(t);
+        if (existingNext) {
+            // splice: t -> newNode -> existingNext
+            t.children = t.children.map(cid => cid === existingNext.id ? newId : cid);
+            existingNext.parents = [newId];
+            n.parents = [t.id];
+            n.children = [existingNext.id];
+        } else {
+            t.children.push(newId);
+            n.parents = [t.id];
+        }
+        layout();
+        render();
+    }
+
+    // Add a horizontal branch under `target`. Only meaningful for container
+    // types — the affordance is hidden on form/action via CSS, but the
+    // function is permissive (callers should gate).
+    function addBranch(targetId) {
+        const t = state.nodes[targetId];
+        if (!t) return;
+        const newId = makeNode({ parentRel: 'branch' });
+        const n = state.nodes[newId];
+        n.parents = [t.id];
+        t.children.push(newId);
+        layout();
+        render();
+    }
+
+    // Splice a fresh node onto a 'next' (vertical) edge between parent and
+    // child. The new node inherits the child's parentRel; the child becomes
+    // the new node's 'next'. Branch edges aren't spliceable in v1.
+    function spliceEdge(parentId, childId) {
+        const p = state.nodes[parentId];
+        const c = state.nodes[childId];
+        if (!p || !c) return;
+        if (!p.children.includes(childId)) return;
+        if (c.parentRel !== 'next') return;  // only splice on next edges
+        const newId = makeNode({ parentRel: 'next' });
+        const m = state.nodes[newId];
+        p.children = p.children.map(id => id === childId ? newId : id);
+        c.parents  = [newId];
+        c.parentRel = 'next';
+        m.parents  = [parentId];
+        m.children = [childId];
+        layout();
+        render();
+    }
+
+    // ----- Visibility (collapsed-container hiding) -----
+    function isHidden(nodeId) {
+        const seen = new Set();
+        const stack = (state.nodes[nodeId] && state.nodes[nodeId].parents || []).slice();
+        while (stack.length) {
+            const id = stack.pop();
+            if (seen.has(id)) continue;
+            seen.add(id);
+            const n = state.nodes[id];
+            if (!n) continue;
+            if (isContainer(n.type) && n.collapsed) return true;
+            n.parents.forEach(pid => stack.push(pid));
+        }
+        return false;
+    }
+    function visibleNodes() { return Object.values(state.nodes).filter(n => !isHidden(n.id)); }
+    function descendantCount(rootId) {
+        const seen = new Set();
+        const stack = [rootId];
+        let count = 0;
+        while (stack.length) {
+            const id = stack.pop();
+            if (seen.has(id)) continue;
+            seen.add(id);
+            if (id !== rootId) count++;
+            const n = state.nodes[id];
+            if (n) n.children.forEach(cid => stack.push(cid));
+        }
+        return count;
+    }
+
+    // ----- Layout -----
+    // Branches go right; next goes down. subtreeWidth tells us how many cols
+    // a subtree occupies (so adjacent branches don't collide). subtreeWidth
+    // takes the max of "this row's width via branches" and "next subtree's
+    // width" so vertically-stacked branches with their own branches are
+    // accounted for.
+    function subtreeWidth(rootId, memo) {
+        if (memo[rootId] !== undefined) return memo[rootId];
+        memo[rootId] = 1;   // cycle guard (impossible in tree, but cheap)
+        const n = state.nodes[rootId];
+        if (!n || isHidden(rootId)) { memo[rootId] = 1; return 1; }
+        const branches = branchesOf(n).filter(c => !isHidden(c.id));
+        const branchesSum = branches.reduce((s, c) => s + subtreeWidth(c.id, memo), 0);
+        const myRowWidth = 1 + branchesSum;
+        const nx = nextOf(n);
+        const nextWidth = (nx && !isHidden(nx.id)) ? subtreeWidth(nx.id, memo) : 0;
+        memo[rootId] = Math.max(myRowWidth, nextWidth);
+        return memo[rootId];
+    }
+
+    function layout() {
+        if (Object.keys(state.nodes).length === 0) return;
+        const rect = canvas.getBoundingClientRect();
+        const anchorX = Math.round(rect.width  / 2)  || 480;
+        const anchorY = Math.round(rect.height / 3)  || 120;
+        const positions = Object.create(null);
+        const widthMemo = Object.create(null);
+
+        const roots = Object.values(state.nodes).filter(n => n.parents.length === 0);
+        let baseCol = 0;
+        for (const r of roots) {
+            placeRecursive(r.id, baseCol, 0, positions, widthMemo);
+            baseCol += subtreeWidth(r.id, widthMemo);
+        }
+        // Centre the union of all roots' subtrees around anchorX.
+        const totalWidth = baseCol;
+        const offsetCol = -(totalWidth - 1) / 2;
+
+        Object.values(state.nodes).forEach(n => {
+            const p = positions[n.id];
+            if (!p) return;
+            n.x = anchorX + (p.col + offsetCol) * COL_W;
+            n.y = anchorY + p.row * ROW_H;
+        });
+    }
+
+    function placeRecursive(nodeId, col, row, positions, widthMemo) {
+        if (positions[nodeId]) return;
+        positions[nodeId] = { col, row };
+        const n = state.nodes[nodeId];
+        if (!n || isHidden(nodeId)) return;
+        // Branches at this row, starting from col+1, shifting right by each
+        // sibling's full subtree width.
+        const branches = branchesOf(n).filter(c => !isHidden(c.id));
+        let branchCol = col + 1;
+        const branchCols = [];
+        for (const b of branches) {
+            placeRecursive(b.id, branchCol, row, positions, widthMemo);
+            branchCols.push(branchCol);
+            branchCol += subtreeWidth(b.id, widthMemo);
+        }
+        // Container nodes are visually invisible (rendered as just a frame
+        // around their branches). Re-anchor the container's col to the
+        // centre of its branches so its next-edge drops from the bbox
+        // centre rather than the leftmost column.
+        let nextCol = col;
+        if (isContainer(n.type) && branchCols.length > 0) {
+            const centerCol = (branchCols[0] + branchCols[branchCols.length - 1]) / 2;
+            positions[nodeId].col = centerCol;
+            nextCol = centerCol;
+        }
+        // Next at this col, row+1.
+        const nx = nextOf(n);
+        if (nx && !isHidden(nx.id)) placeRecursive(nx.id, nextCol, row + 1, positions, widthMemo);
+    }
+
+    // ----- Render -----
+    // Container nodes are invisible. Their visual representation is a labelled
+    // bounding box around their branches plus an HTML "tag" handle at the
+    // bbox top-left. Bboxes are computed once per render pass and cached on
+    // each container node so edge/ghost/node renderers can read them.
+    function render() {
+        computeContainerBBoxes();
+        renderEdges();
+        renderNodes();
+        renderGhosts();
+    }
+
+    function computeContainerBBoxes() {
+        Object.values(state.nodes).forEach(n => { n._bbox = null; });
+        const PAD_X = 22, PAD_Y = 24;
+        const visible = new Set(visibleNodes().map(n => n.id));
+        const visited = new Set();
+        function visit(id) {
+            if (visited.has(id)) return;
+            visited.add(id);
+            const n = state.nodes[id];
+            if (!n) return;
+            // Children first so nested container bboxes are known when their
+            // parent's bbox is computed.
+            n.children.forEach(visit);
+            if (!isContainer(n.type) || !visible.has(id) || n.collapsed) return;
+            const branches = branchesOf(n).filter(c => visible.has(c.id));
+            if (branches.length === 0) {
+                n._bbox = { x: n.x - 50, y: n.y - 24, w: 100, h: 48 };
+                return;
+            }
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            for (const b of branches) {
+                const bb = visualBBox(b);
+                minX = Math.min(minX, bb.x);
+                maxX = Math.max(maxX, bb.x + bb.w);
+                minY = Math.min(minY, bb.y);
+                maxY = Math.max(maxY, bb.y + bb.h);
+            }
+            n._bbox = {
+                x: minX - PAD_X,
+                y: minY - PAD_Y,
+                w: (maxX - minX) + 2 * PAD_X,
+                h: (maxY - minY) + 2 * PAD_Y,
+            };
+        }
+        Object.values(state.nodes).forEach(n => visit(n.id));
+    }
+
+    // Visual extent of a node — the container's bbox if it has one, otherwise
+    // the leaf's shape footprint. Used so nested containers' frames enclose
+    // their inner containers' frames, not just their (zero-width) anchors.
+    function visualBBox(n) {
+        if (isContainer(n.type) && n._bbox) return n._bbox;
+        const halfW = nodeHalfW(n);
+        const halfH = 22;
+        return { x: n.x - halfW, y: n.y - halfH, w: 2 * halfW, h: 2 * halfH };
+    }
+
+    function renderEdges() {
+        while (svg.firstChild) svg.removeChild(svg.firstChild);
+        const visible = new Set(visibleNodes().map(n => n.id));
+
+        // Container frames: dashed bounding box around each container's
+        // branches. Drawn first so edges + nodes paint over them.
+        Object.values(state.nodes).forEach(n => {
+            if (!n._bbox) return;
+            const rect = document.createElementNS(SVG_NS, 'rect');
+            rect.setAttribute('class', 'gb-container-frame');
+            rect.setAttribute('data-kind', n.type);
+            rect.setAttribute('x', n._bbox.x);
+            rect.setAttribute('y', n._bbox.y);
+            rect.setAttribute('width',  n._bbox.w);
+            rect.setAttribute('height', n._bbox.h);
+            svg.appendChild(rect);
+        });
+
+        // Edges. We draw:
+        //   - chain segments between consecutive branches of a container or
+        //     leaf parent (so the horizontal strip reads as a single track);
+        //   - the parent → first-branch segment ONLY if the parent is NOT a
+        //     container (containers express membership via the bbox);
+        //   - vertical next edges from a parent's bottom (or bbox bottom for
+        //     containers) down to the next child.
+        Object.values(state.nodes).forEach(n => {
+            if (!visible.has(n.id)) return;
+            const branches = branchesOf(n).filter(c => visible.has(c.id));
+            for (let i = 1; i < branches.length; i++) {
+                drawBranchEdge(branches[i - 1], branches[i]);
+            }
+            if (branches.length > 0 && !isContainer(n.type)) {
+                drawBranchEdge(n, branches[0]);
+            }
+            const nx = nextOf(n);
+            if (nx && visible.has(nx.id)) drawNextEdge(n, nx);
+        });
+
+        // Ghost stubs: dotted line between a node and its (would-be) next
+        // child, where the leaf ghost lives. For containers the stub
+        // originates at bbox bottom-centre.
+        Object.values(state.nodes).forEach(n => {
+            if (!visible.has(n.id)) return;
+            const nx = nextOf(n);
+            if (nx && visible.has(nx.id)) return;
+            const start = nextEdgeStart(n);
+            const x1 = start.x, y1 = start.y + 6;
+            const x2 = start.x, y2 = start.y + ROW_H - NODE_R - STUB_GAP_BOT;
+            const path = document.createElementNS(SVG_NS, 'path');
+            path.setAttribute('d', `M ${x1} ${y1} L ${x2} ${y2}`);
+            path.setAttribute('class', 'gb-stub');
+            svg.appendChild(path);
+        });
+    }
+
+    // The point on a node (or container bbox) where its next-edge / next-stub
+    // should originate.
+    function nextEdgeStart(n) {
+        if (isContainer(n.type) && n._bbox) {
+            return { x: n._bbox.x + n._bbox.w / 2, y: n._bbox.y + n._bbox.h };
+        }
+        return { x: n.x, y: n.y + NODE_R };
+    }
+
+    function drawBranchEdge(fromN, toN) {
+        // Horizontal connection: from-right → to-left. Straight line if
+        // same Y; gentle bezier otherwise.
+        const x1 = fromN.x + nodeHalfW(fromN), y1 = fromN.y;
+        const x2 = toN.x   - nodeHalfW(toN),   y2 = toN.y;
+        const midX = (x1 + x2) / 2;
+        const d = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
+        const g = document.createElementNS(SVG_NS, 'g');
+        g.setAttribute('class', 'gb-edge-group');
+        g.setAttribute('data-from', fromN.id);
+        g.setAttribute('data-to',   toN.id);
+        const hit = document.createElementNS(SVG_NS, 'path');
+        hit.setAttribute('d', d);
+        hit.setAttribute('class', 'gb-edge-hit');
+        g.appendChild(hit);
+        const visiblePath = document.createElementNS(SVG_NS, 'path');
+        visiblePath.setAttribute('d', d);
+        visiblePath.setAttribute('class', 'gb-edge');
+        g.appendChild(visiblePath);
+        // No splice + on branch edges.
+        svg.appendChild(g);
+    }
+
+    function drawNextEdge(parentN, childN) {
+        const start = nextEdgeStart(parentN);
+        const x1 = start.x, y1 = start.y;
+        const x2 = childN.x,  y2 = childN.y - NODE_R;
+        const midY = (y1 + y2) / 2;
+        const d = `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
+        const mx = (x1 + x2) / 2;
+        const my = (y1 + y2) / 2;
+        const g = document.createElementNS(SVG_NS, 'g');
+        g.setAttribute('class', 'gb-edge-group');
+        g.setAttribute('data-from', parentN.id);
+        g.setAttribute('data-to',   childN.id);
+        const hit = document.createElementNS(SVG_NS, 'path');
+        hit.setAttribute('d', d);
+        hit.setAttribute('class', 'gb-edge-hit');
+        g.appendChild(hit);
+        const visiblePath = document.createElementNS(SVG_NS, 'path');
+        visiblePath.setAttribute('d', d);
+        visiblePath.setAttribute('class', 'gb-edge');
+        g.appendChild(visiblePath);
+        const btn = document.createElementNS(SVG_NS, 'g');
+        btn.setAttribute('class', 'gb-edge-btn');
+        btn.setAttribute('transform', `translate(${mx}, ${my})`);
+        btn.addEventListener('click', () => spliceEdge(parentN.id, childN.id));
+        const circle = document.createElementNS(SVG_NS, 'circle');
+        circle.setAttribute('r', '13');
+        btn.appendChild(circle);
+        const txt = document.createElementNS(SVG_NS, 'text');
+        txt.setAttribute('dy', '0.32em');
+        txt.textContent = '+';
+        btn.appendChild(txt);
+        g.appendChild(btn);
+        svg.appendChild(g);
+    }
+
+    function nodeHalfW(n) {
+        // Half-widths reflect the data-type widths set in CSS.
+        if (n.type === 'group') return 40;
+        if (n.type === 'tabs')  return 35;
+        return 22;
+    }
+
+    function subtreeIds(rootId) {
+        const seen = new Set();
+        const stack = [rootId];
+        const out = [];
+        while (stack.length) {
+            const id = stack.pop();
+            if (seen.has(id)) continue;
+            seen.add(id);
+            out.push(id);
+            const n = state.nodes[id];
+            if (n) n.children.forEach(cid => stack.push(cid));
+        }
+        return out;
+    }
+
+    function subtreeBBox(ids) {
+        const PAD = 26;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        ids.forEach(id => {
+            const n = state.nodes[id];
+            if (!n) return;
+            const halfW = nodeHalfW(n);
+            const halfH = 22;
+            minX = Math.min(minX, n.x - halfW);
+            maxX = Math.max(maxX, n.x + halfW);
+            minY = Math.min(minY, n.y - halfH);
+            maxY = Math.max(maxY, n.y + halfH);
+        });
+        return { x: minX - PAD, y: minY - PAD, w: (maxX - minX) + 2 * PAD, h: (maxY - minY) + 2 * PAD };
+    }
+
+    function renderNodes() {
+        nodeL.innerHTML = '';
+        visibleNodes().forEach(n => {
+            if (isContainer(n.type)) renderContainer(n);
+            else                     renderLeafNode(n);
+        });
+    }
+
+    // Leaf nodes (form / action) render as a coloured shape centred on (x,y),
+    // with the type pill / label stack on the right and the Create-Branch
+    // affordance hidden via CSS.
+    function renderLeafNode(n) {
+        const el = document.createElement('div');
+        el.className = 'gb-node';
+        el.dataset.id = n.id;
+        el.dataset.type = n.type;
+        el.style.left = n.x + 'px';
+        el.style.top  = n.y + 'px';
+
+        const shape = document.createElement('div');
+        shape.className = 'gb-node-shape';
+        const glyph = document.createElement('span');
+        glyph.className = 'gb-node-glyph';
+        glyph.textContent = n.id.slice(1);
+        shape.appendChild(glyph);
+        el.appendChild(shape);
+
+        const stack = document.createElement('div');
+        stack.className = 'gb-node-stack';
+        const lab = document.createElement('span');
+        lab.className = 'gb-node-label';
+        lab.textContent = n.label;
+        stack.appendChild(lab);
+        const typePill = document.createElement('span');
+        typePill.className = 'gb-node-type';
+        typePill.textContent = TYPE_LABELS[n.type];
+        typePill.title = 'Click to cycle type';
+        typePill.addEventListener('click', e => { e.stopPropagation(); cycleType(n.id); });
+        stack.appendChild(typePill);
+        el.appendChild(stack);
+        nodeL.appendChild(el);
+    }
+
+    // Container nodes (group / tabs / switch) are invisible — only the bbox
+    // (drawn in renderEdges) and a small HTML tag handle anchored to the
+    // bbox top-left. The tag is the interactive locus: click it to cycle
+    // kind, click + to add another branch, click ▾ to collapse.
+    function renderContainer(n) {
+        if (!n._bbox) return;
+        const tag = document.createElement('div');
+        tag.className = 'gb-container-tag';
+        tag.dataset.id = n.id;
+        tag.dataset.kind = n.type;
+        tag.style.left = n._bbox.x + 'px';
+        tag.style.top  = n._bbox.y + 'px';   // CSS translateY(-100%) lifts it above the bbox
+        tag.title = 'Click to cycle container kind';
+        tag.addEventListener('click', e => {
+            // Plain click anywhere on the tag (except the inner buttons)
+            // cycles kind. Inner button handlers stop propagation.
+            cycleType(n.id);
+        });
+
+        const label = document.createElement('span');
+        label.className = 'gb-container-tag__label';
+        label.textContent = TYPE_LABELS[n.type];
+        tag.appendChild(label);
+
+        const addBranchBtn = document.createElement('span');
+        addBranchBtn.className = 'gb-container-tag__addbranch';
+        addBranchBtn.textContent = '+';
+        addBranchBtn.title = 'Add a branch';
+        addBranchBtn.addEventListener('click', e => { e.stopPropagation(); addBranch(n.id); });
+        tag.appendChild(addBranchBtn);
+
+        const caret = document.createElement('span');
+        caret.className = 'gb-container-tag__caret';
+        caret.textContent = n.collapsed ? '▸' : '▾';
+        caret.title = n.collapsed ? 'Expand' : 'Collapse';
+        caret.addEventListener('click', e => { e.stopPropagation(); toggleCollapse(n.id); });
+        tag.appendChild(caret);
+
+        if (n.collapsed) {
+            const badge = document.createElement('span');
+            badge.className = 'gb-node-badge';
+            badge.style.marginLeft = '4px';
+            const c = descendantCount(n.id);
+            badge.textContent = c + ' hidden';
+            tag.appendChild(badge);
+        }
+
+        nodeL.appendChild(tag);
+    }
+
+    function renderGhosts() {
+        ghostL.innerHTML = '';
+        const visible = new Set(visibleNodes().map(n => n.id));
+        Object.values(state.nodes).forEach(n => {
+            if (!visible.has(n.id)) return;
+            const nx = nextOf(n);
+            if (nx && visible.has(nx.id)) return;   // already has a next
+            const start = nextEdgeStart(n);
+            const el = document.createElement('div');
+            el.className = 'gb-ghost';
+            el.dataset.parentId = n.id;
+            el.style.left = start.x + 'px';
+            el.style.top  = (start.y + ROW_H - NODE_R) + 'px';
+            el.textContent = '+';
+            el.title = 'Add sequence step';
+            el.addEventListener('click', () => addNext(n.id));
+            const tip = document.createElement('span');
+            tip.className = 'gb-ghost-tip';
+            tip.textContent = 'Add sequence step';
+            el.appendChild(tip);
+            ghostL.appendChild(el);
+        });
+    }
+
+    // ----- Wire up reset and initial render -----
+    root.querySelector('[data-action="reset"]').addEventListener('click', init);
+    requestAnimationFrame(init);
+})();
+</script>
+{% endblock %}
