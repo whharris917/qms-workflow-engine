@@ -118,11 +118,13 @@
   {% if data.instruction %}<p>{{ data.instruction }}</p>{% endif %}
 
   {% if mode == "tabs" %}
-    {# Tab bar: all accessible, no progress #}
-    <div class="c-nav-bar" style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;">
+    {# Tab bar: all accessible, no progress.
+       Layout (flex/gap/margin) and active-tab default styling live in
+       static/style.css so themes can override cleanly without !important. #}
+    <div class="c-nav-bar">
     {% for step in step_items %}
       {% if step.is_active %}
-        <span class="c-nav-tab c-nav-tab--active" style="font-weight: bold; padding: 2px 8px; border-bottom: 2px solid #333;">{{ step.label }}</span>
+        <span class="c-nav-tab c-nav-tab--active">{{ step.label }}</span>
       {% else %}
         {{ render_btn(url, {"step": step.key}, step.label,
             "c-nav-tab") }}
@@ -154,22 +156,24 @@
     </div>
 
   {% elif mode == "sequence" %}
-    {# Progress bar with accessibility states, back/next #}
+    {# Progress bar with accessibility states, back/next.
+       Visual styling lives in static/style.css (default theme) so that
+       themes can override .c-nav-step / .c-nav-arrow without !important. #}
     {% set progress = data.progress|default([]) %}
     {% set active_key = data.active_step %}
-    <div class="c-nav-bar c-nav-bar--sequence" style="display: flex; align-items: center; gap: 2px; margin-bottom: 12px; flex-wrap: wrap;">
+    <div class="c-nav-bar c-nav-bar--sequence">
     {% for step in progress %}
       {% if step.key == active_key %}
-        <span class="c-nav-step c-nav-step--active" style="font-weight: bold; padding: 4px 10px; border-bottom: 3px solid #333; background: #f0f0f0; border-radius: 3px 3px 0 0;">{{ step.label }}</span>
+        <span class="c-nav-step c-nav-step--active">{{ step.label }}</span>
       {% elif step.complete %}
-        <button class="c-nav-step c-nav-step--complete" data-c-post="{{ url }}" data-c-body="{{ {"step": step.key}|tojson }}" style="cursor: pointer; font-size: 12px; padding: 4px 10px; color: #2a2; background: #efffef; border: 1px solid #cdc; border-radius: 3px;">{{ step.label }}</button>
+        <button class="c-nav-step c-nav-step--complete" data-c-post="{{ url }}" data-c-body="{{ {"step": step.key}|tojson }}">{{ step.label }}</button>
       {% elif step.accessible|default(false) %}
-        <span class="c-nav-step c-nav-step--accessible" style="padding: 4px 10px; color: #555; background: #f8f8f8; border-radius: 3px;">{{ step.label }}</span>
+        <span class="c-nav-step c-nav-step--accessible">{{ step.label }}</span>
       {% else %}
-        <span class="c-nav-step c-nav-step--locked" style="padding: 4px 10px; color: #bbb; background: #f5f5f5; border-radius: 3px;">&#128274; {{ step.label }}</span>
+        <span class="c-nav-step c-nav-step--locked">&#128274; {{ step.label }}</span>
       {% endif %}
       {% if not loop.last %}
-        <span class="c-nav-arrow" style="color: #ccc; margin: 0 2px;">&#8594;</span>
+        <span class="c-nav-arrow">&#8594;</span>
       {% endif %}
     {% endfor %}
     </div>
@@ -182,7 +186,7 @@
       {% endif %}
     {% endfor %}
     {% if nav_affs %}
-      <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+      <div class="c-nav-buttons">
       {% for aff in nav_affs %}{{ render_aff(aff) }}{% endfor %}
       </div>
     {% endif %}

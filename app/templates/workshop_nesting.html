@@ -8,12 +8,27 @@
     <div class="nest-ws__tabs" role="tablist">
       <div class="nest-ws__row">
         <button class="nest-ws__tab is-active" role="tab" aria-selected="true" data-tab="exp-a">Experiment A</button>
+        <button class="nest-ws__tab" role="tab" aria-selected="false" data-tab="exp-b">Experiment B</button>
+        <button class="nest-ws__tab" role="tab" aria-selected="false" data-tab="exp-c">Experiment C</button>
+        <button class="nest-ws__tab" role="tab" aria-selected="false" data-tab="exp-d">Experiment D</button>
       </div>
     </div>
   </nav>
 
   <section class="nest-ws__canvas is-active" role="tabpanel" data-panel="exp-a">
     <div class="expA-root"></div>
+  </section>
+
+  <section class="nest-ws__canvas" role="tabpanel" data-panel="exp-b" hidden>
+    <div class="expB-root"></div>
+  </section>
+
+  <section class="nest-ws__canvas" role="tabpanel" data-panel="exp-c" hidden>
+    <div class="expC-root"></div>
+  </section>
+
+  <section class="nest-ws__canvas" role="tabpanel" data-panel="exp-d" hidden>
+    <div class="expD-root"></div>
   </section>
 
 </div>
@@ -712,6 +727,362 @@
     accent-color: #6366f1;
 }
 
+/* =====================================================================
+   Experiment B — two consecutive, non-nested tab sets. Demonstrates
+   the Razem shape: SequenceForm{TabForm, TabForm}. Each step renders a
+   bubble + tab strip; the active step (= the step containing the
+   currently-selected tab) shows a leaf panel below it. Step 2 is
+   locked until step 1 is fully complete; within each step, sequential
+   gating (Tab N+1 locked until Tab N is done) matches A's pattern.
+   ===================================================================== */
+.nest-ws__canvas[data-panel="exp-b"] {
+    padding: 0;
+    overflow: auto;
+    background:
+        radial-gradient(at 15% 20%, #ffe3f0 0%, transparent 55%),
+        radial-gradient(at 85% 15%, #c8d8ff 0%, transparent 55%),
+        radial-gradient(at 70% 85%, #d9c8ff 0%, transparent 55%),
+        radial-gradient(at 20% 90%, #c4f0f4 0%, transparent 55%),
+        linear-gradient(160deg, #f7f9ff 0%, #fdf4ff 100%);
+}
+.expB-root {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 28px 28px 56px;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    color: #1f2144;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+.expB-nav {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    /* Larger gap than A's 16px so the two consecutive tab sets read
+       as distinct sequential steps rather than nested levels. */
+    gap: 32px;
+}
+.expB-nav::before {
+    content: '';
+    position: absolute;
+    top: 14px; bottom: 14px; left: 14px;
+    width: 2px;
+    background: linear-gradient(to bottom, rgba(99, 102, 241, 0.40) 0%, rgba(99, 102, 241, 0.65) 30%, #a855f7 100%);
+    border-radius: 1px;
+    pointer-events: none;
+}
+
+/* --- Per-step bubble + tabs. Reuses the .exp431x- visual primitives. --- */
+.expB-step { z-index: 1; position: relative; }
+.expB-step .exp431x-tab.is-active {
+    color: #ffffff;
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    border-color: transparent;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.32);
+}
+.expB-step .exp431x-tab.is-locked {
+    opacity: 0.55;
+    color: #8088a8;
+    background: rgba(160, 180, 220, 0.18);
+    border-color: rgba(160, 180, 220, 0.35);
+    cursor: not-allowed;
+}
+.expB-step .exp431x-tab.is-locked::before {
+    content: '\01F512';   /* 🔒 */
+    margin-right: 6px;
+    font-size: 11px;
+    opacity: 0.8;
+}
+.expB-step .exp431x-tab.is-locked .exp431x-tab-pip {
+    background: rgba(160, 180, 220, 0.25);
+    color: #8088a8;
+}
+.expB-step .exp431x-tab.is-locked .exp431x-tab-check {
+    border-color: rgba(160, 180, 220, 0.55);
+}
+
+/* --- Avatar treatment for a fully-completed step. --- */
+.expB-avatar-done {
+    background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.32);
+}
+
+/* --- Inline gating note inside a step bubble. --- */
+.expB-gate-hint {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: rgba(168, 85, 247, 0.08);
+    border-radius: 8px;
+    font-size: 12px;
+    color: #6b6b8a;
+    line-height: 1.5;
+}
+.expB-gate-hint strong { color: #1f2144; font-weight: 600; }
+
+/* =====================================================================
+   Experiment C — same structural shape as B (two consecutive,
+   non-nested tab sets) but the active leaf renders as flat content:
+   no panel card, no inner body, no per-component sub-cards. The
+   chat bubble + tab strip survive (those are the navigation, not
+   the leaf); everything below the tab strip is just typography +
+   form fields directly on the pastel canvas.
+   ===================================================================== */
+.nest-ws__canvas[data-panel="exp-c"],
+.nest-ws__canvas[data-panel="exp-d"] {
+    padding: 0;
+    overflow: auto;
+    background:
+        radial-gradient(at 15% 20%, #ffe3f0 0%, transparent 55%),
+        radial-gradient(at 85% 15%, #c8d8ff 0%, transparent 55%),
+        radial-gradient(at 70% 85%, #d9c8ff 0%, transparent 55%),
+        radial-gradient(at 20% 90%, #c4f0f4 0%, transparent 55%),
+        linear-gradient(160deg, #f7f9ff 0%, #fdf4ff 100%);
+}
+.expC-root,
+.expD-root {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 28px 28px 56px;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    color: #1f2144;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+.expC-nav {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+}
+.expC-nav::before {
+    content: '';
+    position: absolute;
+    top: 14px; bottom: 14px; left: 14px;
+    width: 2px;
+    background: linear-gradient(to bottom, rgba(99, 102, 241, 0.40) 0%, rgba(99, 102, 241, 0.65) 30%, #a855f7 100%);
+    border-radius: 1px;
+    pointer-events: none;
+}
+
+/* Step bubble + tab strip — reuse B's per-step state styling. */
+.expC-step { z-index: 1; position: relative; }
+
+/* Tab strip stays single-row so the JS shift math (which centers the
+   active tab over the thread at x=14) is correct. The strip itself
+   keeps its natural left padding from .exp431x-tabs; JS applies a
+   transform that overrides the visual position. */
+.expC-step .exp431x-tabs {
+    flex-wrap: nowrap;
+}
+
+.expC-step .exp431x-tab.is-active {
+    color: #ffffff;
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    border-color: transparent;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.32);
+}
+.expC-step .exp431x-tab.is-locked {
+    opacity: 0.55;
+    color: #8088a8;
+    background: rgba(160, 180, 220, 0.18);
+    border-color: rgba(160, 180, 220, 0.35);
+    cursor: not-allowed;
+}
+.expC-step .exp431x-tab.is-locked::before {
+    content: '\01F512';   /* 🔒 */
+    margin-right: 6px;
+    font-size: 11px;
+    opacity: 0.8;
+}
+.expC-step .exp431x-tab.is-locked .exp431x-tab-pip {
+    background: rgba(160, 180, 220, 0.25);
+    color: #8088a8;
+}
+.expC-step .exp431x-tab.is-locked .exp431x-tab-check {
+    border-color: rgba(160, 180, 220, 0.55);
+}
+.expC-avatar-done {
+    background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.32);
+}
+.expC-gate-hint {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: rgba(168, 85, 247, 0.08);
+    border-radius: 8px;
+    font-size: 12px;
+    color: #6b6b8a;
+    line-height: 1.5;
+}
+.expC-gate-hint strong { color: #1f2144; font-weight: 600; }
+
+/* --- Components ON the main thread ---
+   Each component within the active tab is rendered as its own chat-
+   bubble row on the same vertical thread that runs through the step
+   bubbles. No indentation, no leaf panel, no horizontal offset to
+   represent nesting — every node sits at x=14 of .expC-nav, on the
+   thread. The .expC-leaf-group is a tighter-spacing wrapper so
+   consecutive components within the same tab feel related, while the
+   step-to-components-to-step transitions get .expC-nav's larger
+   32px gap. */
+.expC-leaf-group {
+    z-index: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.expC-comp-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+}
+.expC-comp-avatar {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    margin-left: 3px;     /* center 22px element at x=14 of nav (= thread) */
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    box-shadow: 0 0 0 4px rgba(247, 249, 255, 0.95);
+    box-sizing: border-box;
+}
+.expC-toggle-avatar {
+    background: rgba(255, 255, 255, 0.95);
+    color: rgba(99, 102, 241, 0.7);
+    border: 1.5px dashed rgba(99, 102, 241, 0.55);
+}
+.expC-toggle-avatar.is-done {
+    background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+    color: #ffffff;
+    border: none;
+    box-shadow: 0 0 0 4px rgba(247, 249, 255, 0.95), 0 2px 8px rgba(34, 197, 94, 0.4);
+}
+/* QA's nested-Sequence sub-step avatars — same 22px size, with
+   completion (green) and locked (dim) state variants. */
+.expD-sub-done {
+    background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+    box-shadow: 0 0 0 4px rgba(247, 249, 255, 0.95), 0 2px 8px rgba(34, 197, 94, 0.4);
+}
+.expD-sub-locked {
+    background: rgba(160, 180, 220, 0.35);
+    color: #8088a8;
+    opacity: 0.7;
+}
+.expC-comp-body {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Component internals — flat, no surrounding chrome. Form inputs keep
+   their native borders for usability; everything else is typography. */
+.expC-comp-body .component {
+    margin: 0;
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: 0;
+}
+.expC-comp-body .component h3 {
+    font-size: 1em;
+    font-weight: 600;
+    margin: 0 0 4px;
+    color: #1f2144;
+}
+.expC-comp-body .component p {
+    margin: 0 0 8px;
+    color: #4a4e6d;
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+.expC-comp-body .component p strong { color: #1f2144; }
+.expC-comp-body .component input[type="text"],
+.expC-comp-body .component input[type="date"] {
+    padding: 6px 10px;
+    border: 1px solid rgba(160, 180, 220, 0.45);
+    border-radius: 6px;
+    font: inherit;
+    font-size: 0.9em;
+    background: #ffffff;
+    box-sizing: border-box;
+    width: 100%;
+}
+.expC-comp-body .component input[type="text"]:focus,
+.expC-comp-body .component input[type="date"]:focus {
+    outline: none;
+    border-color: rgba(99, 102, 241, 0.55);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+.expC-comp-body .component button[type="submit"] {
+    margin-top: 6px;
+    padding: 5px 14px;
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 0.85em;
+    font-weight: 500;
+    cursor: pointer;
+    transition: filter 0.12s, transform 0.12s;
+}
+.expC-comp-body .component button[type="submit"]:hover {
+    filter: brightness(1.05);
+    transform: translateY(-1px);
+}
+.expC-comp-body .component label {
+    display: block;
+    cursor: pointer;
+    padding: 2px 0;
+    font-size: 0.92em;
+    color: #1f2144;
+}
+.expC-comp-body .component label:hover { color: #6366f1; }
+.expC-comp-body .component input[type="radio"],
+.expC-comp-body .component input[type="checkbox"] {
+    margin-right: 8px;
+    cursor: pointer;
+    accent-color: #6366f1;
+}
+
+/* Mark-as-done toggle — same pill as A/B, just no surrounding panel. */
+.expC-toggle-btn {
+    align-self: flex-start;
+    margin-top: 6px;
+    font: inherit;
+    font-size: 0.92em;
+    padding: 9px 18px;
+    border: 1px solid rgba(99, 102, 241, 0.45);
+    background: rgba(255, 255, 255, 0.6);
+    color: #6366f1;
+    border-radius: 999px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.12s, color 0.12s, border-color 0.12s, filter 0.12s;
+}
+.expC-toggle-btn:hover {
+    background: rgba(99, 102, 241, 0.08);
+    border-color: #6366f1;
+}
+.expC-toggle-btn.is-done {
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    color: #ffffff;
+    border-color: transparent;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.32);
+}
+.expC-toggle-btn.is-done:hover { filter: brightness(1.05); }
+
 </style>
 
 <script>
@@ -1342,6 +1713,1195 @@ const expRing = (function () {
             root.appendChild(navWrap);
         },
     });
+})();
+
+// ----- Experiment B — two consecutive, non-nested tab sets. The Razem
+// shape this models is SequenceForm{TabForm, TabForm}: two parallel-
+// branch containers chained by a sequence. Each step's tabs share a row
+// (parallel within a step); the steps stack vertically (sequential
+// across steps). Step 2 is fully locked until step 1's three tabs are
+// all done. Within each step, sequential gating mirrors A: Tab N+1
+// locks until Tab N is done. -----
+(function () {
+    const root = document.querySelector('.expB-root');
+    if (!root) return;
+
+    const STEPS = [
+        {
+            label: 'Step 1 of 2 · Pick a topic',
+            instruction: 'Pick a tab to read its summary, then mark it done. Tabs unlock left-to-right — the next tab opens once the current one is complete.',
+            tabs: ['Tab 1', 'Tab 2', 'Tab 3'],
+        },
+        {
+            label: 'Step 2 of 2 · Pick a follow-up',
+            instruction: 'Pick a tab to read its summary, then mark it done. Same gating as Step 1; this entire step was locked until Step 1’s tabs were all complete.',
+            tabs: ['Tab 1', 'Tab 2', 'Tab 3'],
+        },
+    ];
+
+    const done = new Set();        // keys: "1.1", "2.3", etc.
+    let selectedTab = null;        // string key, or null
+
+    function key(stepIdx, tabIdx) { return (stepIdx + 1) + '.' + (tabIdx + 1); }
+    function parseKey(k) { const [s, t] = k.split('.').map(Number); return [s - 1, t - 1]; }
+
+    function tabDone(stepIdx, tabIdx) { return done.has(key(stepIdx, tabIdx)); }
+    function stepDone(stepIdx) {
+        return STEPS[stepIdx].tabs.every((_, t) => tabDone(stepIdx, t));
+    }
+    function stepReachable(stepIdx) {
+        for (let s = 0; s < stepIdx; s++) if (!stepDone(s)) return false;
+        return true;
+    }
+    function tabLocked(stepIdx, tabIdx) {
+        if (!stepReachable(stepIdx)) return true;
+        for (let t = 0; t < tabIdx; t++) if (!tabDone(stepIdx, t)) return true;
+        return false;
+    }
+    function activeStepIdx() {
+        if (!selectedTab) return 0;
+        return parseKey(selectedTab)[0];
+    }
+
+    function buildLeafBody(stepIdx, tabIdx) {
+        // A pared-down version of A's leaf body: a TextForm for a
+        // reflection plus a ChoiceForm with three radio options. Enough
+        // to show that real Razem-component HTML lives inside each
+        // tab's leaf, without overloading the visual.
+        const k = key(stepIdx, tabIdx);
+        const radioName = 'choice-B-' + k;
+        return ''
+            + '<div class="component" data-form="text" data-key="reflection-B-' + k + '">'
+            +   '<h3>Reflection on ' + STEPS[stepIdx].tabs[tabIdx] + '</h3>'
+            +   '<p>Write a 1–2 sentence reflection on what you just read.</p>'
+            +   '<form onsubmit="event.preventDefault();">'
+            +     '<input name="value" type="text" placeholder="Your reflection">'
+            +     '<div style="margin-top: 4px;">'
+            +       '<button type="submit">Set Reflection</button>'
+            +     '</div>'
+            +   '</form>'
+            + '</div>'
+            + '<div class="component" data-form="choice" data-key="check-B-' + k + '">'
+            +   '<h3>Comprehension check</h3>'
+            +   '<p>Pick the option that best matches what you read.</p>'
+            +   '<div style="margin: 4px 0;">'
+            +     '<label><input type="radio" name="' + radioName + '"> Option A — the literal interpretation</label>'
+            +     '<label><input type="radio" name="' + radioName + '"> Option B — the systemic interpretation</label>'
+            +     '<label><input type="radio" name="' + radioName + '"> Option C — neither / both / it depends</label>'
+            +   '</div>'
+            + '</div>';
+    }
+
+    function autoSelect() {
+        // First reachable, incomplete tab in step order. Used on initial
+        // render so the user lands on Tab 1.1 ready to read.
+        if (selectedTab) return;
+        for (let s = 0; s < STEPS.length; s++) {
+            if (!stepReachable(s)) return;
+            for (let t = 0; t < STEPS[s].tabs.length; t++) {
+                if (tabLocked(s, t)) return;
+                if (!tabDone(s, t)) { selectedTab = key(s, t); return; }
+            }
+        }
+    }
+
+    function buildStep(stepIdx) {
+        const cfg = STEPS[stepIdx];
+        const reachable = stepReachable(stepIdx);
+        const allDoneInStep = stepDone(stepIdx);
+        const stepDoneCount = cfg.tabs.filter((_, t) => tabDone(stepIdx, t)).length;
+        const isFocus = activeStepIdx() === stepIdx && stepReachable(stepIdx);
+
+        const stepEl = document.createElement('div');
+        stepEl.className = 'exp431x-step expB-step';
+        stepEl.dataset.step = stepIdx;
+
+        const bubble = document.createElement('div');
+        bubble.className = 'exp431x-bubble';
+        const avatar = document.createElement('span');
+        avatar.className = 'exp431x-avatar';
+        if (allDoneInStep) {
+            avatar.classList.add('expB-avatar-done');
+            avatar.textContent = '✓';
+        } else {
+            avatar.textContent = '✨';
+        }
+        bubble.appendChild(avatar);
+
+        const body = document.createElement('div');
+        body.className = 'exp431x-bubble-body';
+        const meta = document.createElement('div');
+        meta.className = 'exp431x-bubble-meta';
+        const metaLabel = document.createElement('span');
+        metaLabel.textContent = cfg.label;
+        meta.appendChild(metaLabel);
+        const metaProg = document.createElement('span');
+        metaProg.className = 'exp431x-bubble-progress';
+        metaProg.textContent = stepDoneCount + ' of ' + cfg.tabs.length + ' done';
+        meta.appendChild(metaProg);
+        body.appendChild(meta);
+
+        const p = document.createElement('p');
+        p.className = 'exp431x-bubble-text';
+        p.textContent = !reachable
+            ? 'This step is locked until Step 1 is fully complete.'
+            : cfg.instruction;
+        body.appendChild(p);
+
+        // Locked-tab hint inside the bubble (parallel to A's gate hint).
+        if (reachable && !allDoneInStep) {
+            const blockedAfter = cfg.tabs.findIndex((_, t) => !tabDone(stepIdx, t));
+            const hasLockedTabs = blockedAfter >= 0 && blockedAfter < cfg.tabs.length - 1;
+            if (hasLockedTabs && blockedAfter > 0) {
+                const hint = document.createElement('div');
+                hint.className = 'expB-gate-hint';
+                hint.innerHTML = '<strong>Note:</strong> Subsequent tabs unlock once the current tab is marked done.';
+                body.appendChild(hint);
+            }
+        }
+
+        bubble.appendChild(body);
+        stepEl.appendChild(bubble);
+
+        const tabs = document.createElement('div');
+        tabs.className = 'exp431x-tabs';
+        cfg.tabs.forEach((label, t) => {
+            const k = key(stepIdx, t);
+            const tab = document.createElement('button');
+            tab.type = 'button';
+            tab.className = 'exp431x-tab';
+            tab.dataset.path = k;
+
+            const isLocked = tabLocked(stepIdx, t);
+            const isDoneTab = tabDone(stepIdx, t);
+            const isActive = selectedTab === k;
+            if (isActive) tab.classList.add('is-active');
+            if (isDoneTab) tab.classList.add('is-done');
+            if (isLocked) tab.classList.add('is-locked');
+
+            const check = document.createElement('span');
+            check.className = 'exp431x-tab-check';
+            check.textContent = '✓';
+            tab.appendChild(check);
+
+            const lbl = document.createElement('span');
+            lbl.className = 'exp431x-tab-label';
+            lbl.textContent = label;
+            tab.appendChild(lbl);
+
+            if (isLocked) {
+                tab.title = 'Locked — complete the previous tab first';
+            } else {
+                tab.addEventListener('click', () => {
+                    selectedTab = k;
+                    render();
+                });
+            }
+            tabs.appendChild(tab);
+        });
+        stepEl.appendChild(tabs);
+
+        return { stepEl, isFocus };
+    }
+
+    function buildLeafPanel(stepIdx, tabIdx) {
+        const k = key(stepIdx, tabIdx);
+        const isDoneLeaf = tabDone(stepIdx, tabIdx);
+
+        const panel = document.createElement('div');
+        panel.className = 'exp431x-leaf-panel';
+
+        const crumb = document.createElement('div');
+        crumb.className = 'exp431x-leaf-crumb';
+        crumb.textContent = 'Step ' + (stepIdx + 1) + ' · Now reading';
+        panel.appendChild(crumb);
+
+        const title = document.createElement('h2');
+        title.className = 'exp431x-leaf-title';
+        title.textContent = STEPS[stepIdx].tabs[tabIdx];
+        panel.appendChild(title);
+
+        const bodyEl = document.createElement('div');
+        bodyEl.className = 'exp431x-leaf-body';
+        bodyEl.innerHTML = buildLeafBody(stepIdx, tabIdx);
+        panel.appendChild(bodyEl);
+
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'exp431x-toggle-btn' + (isDoneLeaf ? ' is-done' : '');
+        toggle.textContent = isDoneLeaf ? '✓ Completed' : 'Mark as done';
+        toggle.addEventListener('click', () => {
+            if (done.has(k)) done.delete(k);
+            else done.add(k);
+            render();
+        });
+        panel.appendChild(toggle);
+
+        return panel;
+    }
+
+    function findNextStep() {
+        for (let s = 0; s < STEPS.length; s++) if (!stepDone(s)) return s;
+        return -1;
+    }
+
+    function render() {
+        autoSelect();
+        root.innerHTML = '';
+
+        const navWrap = document.createElement('div');
+        navWrap.className = 'expB-nav';
+
+        const focusStep = activeStepIdx();
+        STEPS.forEach((_, stepIdx) => {
+            const { stepEl, isFocus } = buildStep(stepIdx);
+            navWrap.appendChild(stepEl);
+
+            // Leaf panel for the active step's selected tab. Lives inline
+            // inside the same flex column so it sits on the thread between
+            // its step and the next.
+            if (isFocus && selectedTab && parseKey(selectedTab)[0] === stepIdx) {
+                const tabIdx = parseKey(selectedTab)[1];
+                navWrap.appendChild(buildLeafPanel(stepIdx, tabIdx));
+            }
+        });
+
+        // Proceed-to-next or workshop-complete on the thread. Mirrors A's
+        // pattern but at the step level instead of the chapter level.
+        const allStepsDone = STEPS.every((_, s) => stepDone(s));
+        if (allStepsDone) {
+            const cmp = document.createElement('div');
+            cmp.className = 'expA-complete';
+            const cNode = document.createElement('div');
+            cNode.className = 'expA-complete-node';
+            cNode.textContent = '✓';
+            cmp.appendChild(cNode);
+            const text = document.createElement('div');
+            text.className = 'expA-complete-text';
+            text.textContent = 'Workshop complete — both steps done.';
+            cmp.appendChild(text);
+            navWrap.appendChild(cmp);
+        } else if (stepDone(focusStep)) {
+            const next = findNextStep();
+            if (next > focusStep) {
+                const proceed = document.createElement('div');
+                proceed.className = 'expA-proceed';
+                const pNode = document.createElement('div');
+                pNode.className = 'expA-proceed-node';
+                pNode.textContent = '→';
+                proceed.appendChild(pNode);
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'expA-proceed-btn';
+                btn.textContent = 'Proceed to Step ' + (next + 1) + ' →';
+                btn.addEventListener('click', () => {
+                    selectedTab = key(next, 0);
+                    render();
+                });
+                proceed.appendChild(btn);
+                navWrap.appendChild(proceed);
+            }
+        }
+
+        root.appendChild(navWrap);
+    }
+
+    render();
+})();
+
+// ----- Experiment C — same two-step structural shape as B, but the
+// active leaf renders as flat content. No leaf panel, no inner body,
+// no per-component sub-cards. Same chat bubble + tab strip + sequential
+// gating; only the leaf rendering differs. -----
+(function () {
+    const root = document.querySelector('.expC-root');
+    if (!root) return;
+
+    const STEPS = [
+        {
+            label: 'Step 1 of 2 · Pick a topic',
+            instruction: 'Pick a tab to read its summary, then mark it done. Tabs unlock left-to-right.',
+            tabs: ['Tab 1', 'Tab 2', 'Tab 3'],
+        },
+        {
+            label: 'Step 2 of 2 · Pick a follow-up',
+            instruction: 'Same gating as Step 1; this entire step was locked until Step 1’s tabs were all complete.',
+            tabs: ['Tab 1', 'Tab 2', 'Tab 3'],
+        },
+    ];
+
+    const done = new Set();
+    let selectedTab = null;
+
+    function key(stepIdx, tabIdx) { return (stepIdx + 1) + '.' + (tabIdx + 1); }
+    function parseKey(k) { const [s, t] = k.split('.').map(Number); return [s - 1, t - 1]; }
+    function tabDone(stepIdx, tabIdx) { return done.has(key(stepIdx, tabIdx)); }
+    function stepDone(stepIdx) {
+        return STEPS[stepIdx].tabs.every((_, t) => tabDone(stepIdx, t));
+    }
+    function stepReachable(stepIdx) {
+        for (let s = 0; s < stepIdx; s++) if (!stepDone(s)) return false;
+        return true;
+    }
+    function tabLocked(stepIdx, tabIdx) {
+        if (!stepReachable(stepIdx)) return true;
+        for (let t = 0; t < tabIdx; t++) if (!tabDone(stepIdx, t)) return true;
+        return false;
+    }
+    function activeStepIdx() {
+        if (!selectedTab) return 0;
+        return parseKey(selectedTab)[0];
+    }
+
+    function buildComponents(stepIdx, tabIdx) {
+        // Returns one entry per component in the active tab. Each entry
+        // is { glyph, html } and becomes its own chat-bubble row on the
+        // main thread (see buildCompRow). The glyph is the per-type
+        // marker shown in the row's avatar.
+        const k = key(stepIdx, tabIdx);
+        const radioName = 'choice-C-' + k;
+        return [
+            {
+                glyph: 'T',
+                html: ''
+                    + '<div class="component" data-form="text" data-key="reflection-C-' + k + '">'
+                    +   '<h3>Reflection on ' + STEPS[stepIdx].tabs[tabIdx] + '</h3>'
+                    +   '<p>Write a 1–2 sentence reflection on what you just read.</p>'
+                    +   '<form onsubmit="event.preventDefault();">'
+                    +     '<input name="value" type="text" placeholder="Your reflection">'
+                    +     '<div style="margin-top: 4px;">'
+                    +       '<button type="submit">Set Reflection</button>'
+                    +     '</div>'
+                    +   '</form>'
+                    + '</div>',
+            },
+            {
+                glyph: '?',
+                html: ''
+                    + '<div class="component" data-form="choice" data-key="check-C-' + k + '">'
+                    +   '<h3>Comprehension check</h3>'
+                    +   '<p>Pick the option that best matches what you read.</p>'
+                    +   '<div style="margin: 4px 0;">'
+                    +     '<label><input type="radio" name="' + radioName + '"> Option A — the literal interpretation</label>'
+                    +     '<label><input type="radio" name="' + radioName + '"> Option B — the systemic interpretation</label>'
+                    +     '<label><input type="radio" name="' + radioName + '"> Option C — neither / both / it depends</label>'
+                    +   '</div>'
+                    + '</div>',
+            },
+        ];
+    }
+
+    function autoSelect() {
+        if (selectedTab) return;
+        for (let s = 0; s < STEPS.length; s++) {
+            if (!stepReachable(s)) return;
+            for (let t = 0; t < STEPS[s].tabs.length; t++) {
+                if (tabLocked(s, t)) return;
+                if (!tabDone(s, t)) { selectedTab = key(s, t); return; }
+            }
+        }
+    }
+
+    function buildStep(stepIdx) {
+        const cfg = STEPS[stepIdx];
+        const reachable = stepReachable(stepIdx);
+        const allDoneInStep = stepDone(stepIdx);
+        const stepDoneCount = cfg.tabs.filter((_, t) => tabDone(stepIdx, t)).length;
+        const isFocus = activeStepIdx() === stepIdx && stepReachable(stepIdx);
+
+        const stepEl = document.createElement('div');
+        stepEl.className = 'exp431x-step expC-step';
+        stepEl.dataset.step = stepIdx;
+
+        const bubble = document.createElement('div');
+        bubble.className = 'exp431x-bubble';
+        const avatar = document.createElement('span');
+        avatar.className = 'exp431x-avatar';
+        if (allDoneInStep) {
+            avatar.classList.add('expC-avatar-done');
+            avatar.textContent = '✓';
+        } else {
+            avatar.textContent = '✨';
+        }
+        bubble.appendChild(avatar);
+
+        const body = document.createElement('div');
+        body.className = 'exp431x-bubble-body';
+        const meta = document.createElement('div');
+        meta.className = 'exp431x-bubble-meta';
+        const metaLabel = document.createElement('span');
+        metaLabel.textContent = cfg.label;
+        meta.appendChild(metaLabel);
+        const metaProg = document.createElement('span');
+        metaProg.className = 'exp431x-bubble-progress';
+        metaProg.textContent = stepDoneCount + ' of ' + cfg.tabs.length + ' done';
+        meta.appendChild(metaProg);
+        body.appendChild(meta);
+
+        const p = document.createElement('p');
+        p.className = 'exp431x-bubble-text';
+        p.textContent = !reachable
+            ? 'This step is locked until Step 1 is fully complete.'
+            : cfg.instruction;
+        body.appendChild(p);
+
+        if (reachable && !allDoneInStep) {
+            const blockedAfter = cfg.tabs.findIndex((_, t) => !tabDone(stepIdx, t));
+            const hasLockedTabs = blockedAfter >= 0 && blockedAfter < cfg.tabs.length - 1;
+            if (hasLockedTabs && blockedAfter > 0) {
+                const hint = document.createElement('div');
+                hint.className = 'expC-gate-hint';
+                hint.innerHTML = '<strong>Note:</strong> Subsequent tabs unlock once the current tab is marked done.';
+                body.appendChild(hint);
+            }
+        }
+
+        bubble.appendChild(body);
+        stepEl.appendChild(bubble);
+
+        const tabs = document.createElement('div');
+        tabs.className = 'exp431x-tabs';
+        cfg.tabs.forEach((label, t) => {
+            const k = key(stepIdx, t);
+            const tab = document.createElement('button');
+            tab.type = 'button';
+            tab.className = 'exp431x-tab';
+            tab.dataset.path = k;
+
+            const isLocked = tabLocked(stepIdx, t);
+            const isDoneTab = tabDone(stepIdx, t);
+            const isActive = selectedTab === k;
+            if (isActive) tab.classList.add('is-active');
+            if (isDoneTab) tab.classList.add('is-done');
+            if (isLocked) tab.classList.add('is-locked');
+
+            const check = document.createElement('span');
+            check.className = 'exp431x-tab-check';
+            check.textContent = '✓';
+            tab.appendChild(check);
+
+            const lbl = document.createElement('span');
+            lbl.className = 'exp431x-tab-label';
+            lbl.textContent = label;
+            tab.appendChild(lbl);
+
+            if (isLocked) {
+                tab.title = 'Locked — complete the previous tab first';
+            } else {
+                tab.addEventListener('click', () => {
+                    selectedTab = k;
+                    render();
+                });
+            }
+            tabs.appendChild(tab);
+        });
+        stepEl.appendChild(tabs);
+
+        return { stepEl, isFocus };
+    }
+
+    function buildCompRow(comp) {
+        const row = document.createElement('div');
+        row.className = 'expC-comp-row';
+
+        const avatar = document.createElement('span');
+        avatar.className = 'expC-comp-avatar';
+        avatar.textContent = comp.glyph;
+        row.appendChild(avatar);
+
+        const body = document.createElement('div');
+        body.className = 'expC-comp-body';
+        body.innerHTML = comp.html;
+        row.appendChild(body);
+
+        return row;
+    }
+
+    function buildToggleRow(stepIdx, tabIdx) {
+        // The mark-as-done toggle is itself a node on the thread —
+        // an empty dashed circle when undone, a green check when done.
+        const k = key(stepIdx, tabIdx);
+        const isDoneLeaf = tabDone(stepIdx, tabIdx);
+
+        const row = document.createElement('div');
+        row.className = 'expC-comp-row';
+
+        const avatar = document.createElement('span');
+        avatar.className = 'expC-comp-avatar expC-toggle-avatar' + (isDoneLeaf ? ' is-done' : '');
+        avatar.textContent = isDoneLeaf ? '✓' : '○';
+        row.appendChild(avatar);
+
+        const body = document.createElement('div');
+        body.className = 'expC-comp-body';
+
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'expC-toggle-btn' + (isDoneLeaf ? ' is-done' : '');
+        toggle.textContent = isDoneLeaf ? '✓ Completed' : 'Mark as done';
+        toggle.addEventListener('click', () => {
+            if (done.has(k)) done.delete(k);
+            else done.add(k);
+            render();
+        });
+        body.appendChild(toggle);
+
+        row.appendChild(body);
+        return row;
+    }
+
+    function buildLeafFlat(stepIdx, tabIdx) {
+        // Each component (and the mark-as-done toggle) is its own node on
+        // the same vertical thread that runs through the step bubbles —
+        // no indentation, no leaf-panel container. The .expC-leaf-group
+        // is just a tighter-spacing wrapper for the rows belonging to
+        // the same active tab.
+        const group = document.createElement('div');
+        group.className = 'expC-leaf-group';
+
+        buildComponents(stepIdx, tabIdx).forEach(c => {
+            group.appendChild(buildCompRow(c));
+        });
+        group.appendChild(buildToggleRow(stepIdx, tabIdx));
+
+        return group;
+    }
+
+    function findNextStep() {
+        for (let s = 0; s < STEPS.length; s++) if (!stepDone(s)) return s;
+        return -1;
+    }
+
+    function alignActiveTabsToThread() {
+        // Each step's tab strip shifts horizontally so the active tab's
+        // center lines up with the vertical thread at x=14 of .expC-step.
+        // The thread visually enters the active tab from above and exits
+        // out the bottom, continuing the flow into the (flat) leaf below.
+        // Steps without an active tab (typically not-yet-reached steps)
+        // stay at their natural padding-aligned position.
+        //
+        // Note: offsetLeft/offsetWidth return 0 for elements inside a
+        // display:none ancestor (the C panel starts `hidden`), which
+        // would yield a bogus translateX(14). Skip in that case; the
+        // panelshown listener below re-runs alignment once the panel
+        // actually becomes visible.
+        const strips = root.querySelectorAll('.expC-step .exp431x-tabs');
+        strips.forEach(strip => {
+            const active = strip.querySelector('.exp431x-tab.is-active');
+            if (!active) {
+                strip.style.transform = '';
+                return;
+            }
+            if (active.offsetWidth === 0) return;
+            const center = active.offsetLeft + active.offsetWidth / 2;
+            strip.style.transform = 'translateX(' + (14 - center) + 'px)';
+        });
+    }
+
+    function render() {
+        autoSelect();
+        root.innerHTML = '';
+
+        const navWrap = document.createElement('div');
+        navWrap.className = 'expC-nav';
+
+        const focusStep = activeStepIdx();
+        STEPS.forEach((_, stepIdx) => {
+            const { stepEl, isFocus } = buildStep(stepIdx);
+            navWrap.appendChild(stepEl);
+
+            if (isFocus && selectedTab && parseKey(selectedTab)[0] === stepIdx) {
+                const tabIdx = parseKey(selectedTab)[1];
+                navWrap.appendChild(buildLeafFlat(stepIdx, tabIdx));
+            }
+        });
+
+        // Reuse A's .expA-proceed / .expA-complete styling for the
+        // "Proceed to Step 2" / "Workshop complete" thread elements.
+        const allStepsDone = STEPS.every((_, s) => stepDone(s));
+        if (allStepsDone) {
+            const cmp = document.createElement('div');
+            cmp.className = 'expA-complete';
+            const cNode = document.createElement('div');
+            cNode.className = 'expA-complete-node';
+            cNode.textContent = '✓';
+            cmp.appendChild(cNode);
+            const text = document.createElement('div');
+            text.className = 'expA-complete-text';
+            text.textContent = 'Workshop complete — both steps done.';
+            cmp.appendChild(text);
+            navWrap.appendChild(cmp);
+        } else if (stepDone(focusStep)) {
+            const next = findNextStep();
+            if (next > focusStep) {
+                const proceed = document.createElement('div');
+                proceed.className = 'expA-proceed';
+                const pNode = document.createElement('div');
+                pNode.className = 'expA-proceed-node';
+                pNode.textContent = '→';
+                proceed.appendChild(pNode);
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'expA-proceed-btn';
+                btn.textContent = 'Proceed to Step ' + (next + 1) + ' →';
+                btn.addEventListener('click', () => {
+                    selectedTab = key(next, 0);
+                    render();
+                });
+                proceed.appendChild(btn);
+                navWrap.appendChild(proceed);
+            }
+        }
+
+        root.appendChild(navWrap);
+
+        // After DOM is in place, align each step's active tab onto the
+        // thread. Reading offsetLeft here forces layout, so the
+        // measurement is correct (when the panel is visible).
+        alignActiveTabsToThread();
+    }
+
+    // Re-align when the C panel first becomes visible. The initial
+    // render runs while the panel is still `hidden`, so its measurements
+    // are 0 and alignActiveTabsToThread skips. The experiment switcher
+    // dispatches `panelshown` synchronously after un-hiding the panel,
+    // so this listener applies the transform before the browser paints
+    // — no flash of the unaligned position.
+    const panel = document.querySelector('.nest-ws__canvas[data-panel="exp-c"]');
+    if (panel) {
+        panel.addEventListener('panelshown', alignActiveTabsToThread);
+    }
+
+    render();
+})();
+
+// ----- Experiment D — same structural shape as C (two consecutive
+// non-nested tab sets, components as nodes on the main thread), but
+// populated with a real-world Change Control workflow:
+//
+//   Phase 1 of 2 · Pre-approval review
+//     Tab: Technical review   (TU sign-off on design/feasibility)
+//     Tab: Business review    (BU sign-off on user/product impact)
+//     Tab: Quality assurance  (QA sign-off on procedural compliance)
+//
+//   Phase 2 of 2 · Post-execution verification
+//     Tab: Technical verification  (TU verifies implementation matches plan)
+//     Tab: Business verification   (BU verifies UX outcome)
+//     Tab: QA closure              (QA confirms evidence and closes the CR)
+//
+// Each tab carries the reviewer's review form: comments + a binary
+// decision (recommend / request changes for Phase 1; confirm / reject
+// for Phase 2). The mark-as-done toggle becomes "Submit review" /
+// "Submit verification" — semantically the act of finalizing that
+// reviewer's input. Phase 2 is gated until all three Phase-1 reviewers
+// have submitted, which models the real CR rule that execution can't
+// merge until pre-approval is fully signed off.
+//
+// Visual styling reuses C's classes (.expC-step, .expC-comp-row, etc.)
+// since the spatial language is the same — only the content differs.
+(function () {
+    const root = document.querySelector('.expD-root');
+    if (!root) return;
+
+    const STEPS = [
+        {
+            label: 'Phase 1 of 2 · Pre-approval review',
+            instruction: 'Each reviewer signs off on the proposed change before execution begins. Reviewers unlock left-to-right; all three sign-offs are required before the CR can be pre-approved and execution can start.',
+            tabs: ['Technical review', 'Business review', 'Quality assurance'],
+        },
+        {
+            label: 'Phase 2 of 2 · Post-execution verification',
+            instruction: 'After execution, the same reviewers verify that the change was implemented as approved and that evidence is in order. This phase was locked until Phase 1 was fully signed off.',
+            tabs: ['Technical verification', 'Business verification', 'QA closure'],
+        },
+    ];
+
+    const done = new Set();
+    let selectedTab = null;
+
+    function key(stepIdx, tabIdx) { return (stepIdx + 1) + '.' + (tabIdx + 1); }
+    function parseKey(k) { const [s, t] = k.split('.').map(Number); return [s - 1, t - 1]; }
+
+    // QA review (Phase 1, Tab 3) is a nested 2-step sequence; the tab
+    // counts complete only when both sub-steps are submitted. Their
+    // done keys are "1.3.1" and "1.3.2" — the regular tab keys are
+    // never directly added for QA, so the override below routes the
+    // tab-completion check through the sub-step keys instead.
+    function isQATab(stepIdx, tabIdx) { return stepIdx === 0 && tabIdx === 2; }
+    function tabDone(stepIdx, tabIdx) {
+        if (isQATab(stepIdx, tabIdx)) {
+            const tk = key(stepIdx, tabIdx);
+            return done.has(tk + '.1') && done.has(tk + '.2');
+        }
+        return done.has(key(stepIdx, tabIdx));
+    }
+    function stepDone(stepIdx) {
+        return STEPS[stepIdx].tabs.every((_, t) => tabDone(stepIdx, t));
+    }
+    function stepReachable(stepIdx) {
+        for (let s = 0; s < stepIdx; s++) if (!stepDone(s)) return false;
+        return true;
+    }
+    function tabLocked(stepIdx, tabIdx) {
+        if (!stepReachable(stepIdx)) return true;
+        for (let t = 0; t < tabIdx; t++) if (!tabDone(stepIdx, t)) return true;
+        return false;
+    }
+    function activeStepIdx() {
+        if (!selectedTab) return 0;
+        return parseKey(selectedTab)[0];
+    }
+
+    function buildComponents(stepIdx, tabIdx) {
+        // Two components per reviewer: a comments TextForm + a decision
+        // ChoiceForm. Phase 1 uses recommend/request-changes; Phase 2
+        // uses confirm/reject closure.
+        const k = key(stepIdx, tabIdx);
+        const radioName = 'decision-D-' + k;
+        const reviewerName = STEPS[stepIdx].tabs[tabIdx];
+        const isPost = stepIdx === 1;
+
+        const commentsLabel = isPost ? 'verification notes' : 'review comments';
+        const commentsHelp  = isPost
+            ? 'Confirm whether the change was implemented as approved. Note any deviations, follow-ups, or evidence gaps.'
+            : 'Document concerns, suggested revisions, or rationale for recommending approval. Review-independence applies — reach your own conclusion.';
+        const decisionHelp  = isPost
+            ? 'Does this change clear post-execution verification?'
+            : 'Recommend the change for approval, or request changes before approval?';
+        const optYes = isPost
+            ? 'Confirm closure — change implemented correctly'
+            : 'Recommend approval';
+        const optNo  = isPost
+            ? 'Reject closure — discrepancies or gaps found'
+            : 'Request changes — revisions needed before approval';
+
+        return [
+            {
+                glyph: '✎',
+                html: ''
+                    + '<div class="component" data-form="text" data-key="comments-D-' + k + '">'
+                    +   '<h3>' + reviewerName + ' — ' + commentsLabel + '</h3>'
+                    +   '<p>' + commentsHelp + '</p>'
+                    +   '<form onsubmit="event.preventDefault();">'
+                    +     '<input name="value" type="text" placeholder="Your ' + commentsLabel + '">'
+                    +     '<div style="margin-top: 4px;">'
+                    +       '<button type="submit">Save draft</button>'
+                    +     '</div>'
+                    +   '</form>'
+                    + '</div>',
+            },
+            {
+                glyph: '⚖',
+                html: ''
+                    + '<div class="component" data-form="choice" data-key="decision-D-' + k + '">'
+                    +   '<h3>Decision</h3>'
+                    +   '<p>' + decisionHelp + '</p>'
+                    +   '<div style="margin: 4px 0;">'
+                    +     '<label><input type="radio" name="' + radioName + '"> ' + optYes + '</label>'
+                    +     '<label><input type="radio" name="' + radioName + '"> ' + optNo + '</label>'
+                    +   '</div>'
+                    + '</div>',
+            },
+        ];
+    }
+
+    function autoSelect() {
+        if (selectedTab) return;
+        for (let s = 0; s < STEPS.length; s++) {
+            if (!stepReachable(s)) return;
+            for (let t = 0; t < STEPS[s].tabs.length; t++) {
+                if (tabLocked(s, t)) return;
+                if (!tabDone(s, t)) { selectedTab = key(s, t); return; }
+            }
+        }
+    }
+
+    function buildStep(stepIdx) {
+        const cfg = STEPS[stepIdx];
+        const reachable = stepReachable(stepIdx);
+        const allDoneInStep = stepDone(stepIdx);
+        const stepDoneCount = cfg.tabs.filter((_, t) => tabDone(stepIdx, t)).length;
+        const isFocus = activeStepIdx() === stepIdx && stepReachable(stepIdx);
+
+        const stepEl = document.createElement('div');
+        stepEl.className = 'exp431x-step expC-step';
+        stepEl.dataset.step = stepIdx;
+
+        const bubble = document.createElement('div');
+        bubble.className = 'exp431x-bubble';
+        const avatar = document.createElement('span');
+        avatar.className = 'exp431x-avatar';
+        if (allDoneInStep) {
+            avatar.classList.add('expC-avatar-done');
+            avatar.textContent = '✓';
+        } else {
+            avatar.textContent = '✨';
+        }
+        bubble.appendChild(avatar);
+
+        const body = document.createElement('div');
+        body.className = 'exp431x-bubble-body';
+        const meta = document.createElement('div');
+        meta.className = 'exp431x-bubble-meta';
+        const metaLabel = document.createElement('span');
+        metaLabel.textContent = cfg.label;
+        meta.appendChild(metaLabel);
+        const metaProg = document.createElement('span');
+        metaProg.className = 'exp431x-bubble-progress';
+        metaProg.textContent = stepDoneCount + ' of ' + cfg.tabs.length + ' submitted';
+        meta.appendChild(metaProg);
+        body.appendChild(meta);
+
+        const p = document.createElement('p');
+        p.className = 'exp431x-bubble-text';
+        p.textContent = !reachable
+            ? 'This phase is locked until Phase 1 is fully signed off.'
+            : cfg.instruction;
+        body.appendChild(p);
+
+        if (reachable && !allDoneInStep) {
+            const blockedAfter = cfg.tabs.findIndex((_, t) => !tabDone(stepIdx, t));
+            const hasLockedTabs = blockedAfter >= 0 && blockedAfter < cfg.tabs.length - 1;
+            if (hasLockedTabs && blockedAfter > 0) {
+                const hint = document.createElement('div');
+                hint.className = 'expC-gate-hint';
+                hint.innerHTML = '<strong>Note:</strong> Subsequent reviewers unlock once the current reviewer has submitted.';
+                body.appendChild(hint);
+            }
+        }
+
+        bubble.appendChild(body);
+        stepEl.appendChild(bubble);
+
+        const tabs = document.createElement('div');
+        tabs.className = 'exp431x-tabs';
+        cfg.tabs.forEach((label, t) => {
+            const k = key(stepIdx, t);
+            const tab = document.createElement('button');
+            tab.type = 'button';
+            tab.className = 'exp431x-tab';
+            tab.dataset.path = k;
+
+            const isLocked = tabLocked(stepIdx, t);
+            const isDoneTab = tabDone(stepIdx, t);
+            const isActive = selectedTab === k;
+            if (isActive) tab.classList.add('is-active');
+            if (isDoneTab) tab.classList.add('is-done');
+            if (isLocked) tab.classList.add('is-locked');
+
+            const check = document.createElement('span');
+            check.className = 'exp431x-tab-check';
+            check.textContent = '✓';
+            tab.appendChild(check);
+
+            const lbl = document.createElement('span');
+            lbl.className = 'exp431x-tab-label';
+            lbl.textContent = label;
+            tab.appendChild(lbl);
+
+            if (isLocked) {
+                tab.title = 'Locked — previous reviewer must submit first';
+            } else {
+                tab.addEventListener('click', () => {
+                    selectedTab = k;
+                    render();
+                });
+            }
+            tabs.appendChild(tab);
+        });
+        stepEl.appendChild(tabs);
+
+        return { stepEl, isFocus };
+    }
+
+    function buildCompRow(comp) {
+        const row = document.createElement('div');
+        row.className = 'expC-comp-row';
+
+        const avatar = document.createElement('span');
+        avatar.className = 'expC-comp-avatar';
+        avatar.textContent = comp.glyph;
+        row.appendChild(avatar);
+
+        const body = document.createElement('div');
+        body.className = 'expC-comp-body';
+        body.innerHTML = comp.html;
+        row.appendChild(body);
+
+        return row;
+    }
+
+    function buildToggleRow(stepIdx, tabIdx) {
+        const k = key(stepIdx, tabIdx);
+        const isDoneLeaf = tabDone(stepIdx, tabIdx);
+        const isPost = stepIdx === 1;
+        const submitVerb   = isPost ? 'Submit verification' : 'Submit review';
+        const submittedTxt = isPost ? '✓ Verification submitted' : '✓ Review submitted';
+
+        const row = document.createElement('div');
+        row.className = 'expC-comp-row';
+
+        const avatar = document.createElement('span');
+        avatar.className = 'expC-comp-avatar expC-toggle-avatar' + (isDoneLeaf ? ' is-done' : '');
+        avatar.textContent = isDoneLeaf ? '✓' : '○';
+        row.appendChild(avatar);
+
+        const body = document.createElement('div');
+        body.className = 'expC-comp-body';
+
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'expC-toggle-btn' + (isDoneLeaf ? ' is-done' : '');
+        toggle.textContent = isDoneLeaf ? submittedTxt : submitVerb;
+        toggle.addEventListener('click', () => {
+            if (done.has(k)) done.delete(k);
+            else done.add(k);
+            render();
+        });
+        body.appendChild(toggle);
+
+        row.appendChild(body);
+        return row;
+    }
+
+    function buildLeafFlat(stepIdx, tabIdx) {
+        // QA review (Phase 1, Tab 3) breaks into two consecutive
+        // sub-steps; everything else uses the flat single-leaf layout.
+        if (isQATab(stepIdx, tabIdx)) {
+            return buildQASubFlow(stepIdx, tabIdx);
+        }
+        const group = document.createElement('div');
+        group.className = 'expC-leaf-group';
+
+        buildComponents(stepIdx, tabIdx).forEach(c => {
+            group.appendChild(buildCompRow(c));
+        });
+        group.appendChild(buildToggleRow(stepIdx, tabIdx));
+
+        return group;
+    }
+
+    function buildQASubFlow(stepIdx, tabIdx) {
+        // QA's review is a 2-step Sequence that lives inside the QA tab.
+        // The two sub-steps are gated: Step 2 unlocks once Step 1 is
+        // submitted. Each sub-step gets its own components (comments +
+        // decision) and its own submit toggle. Both bubbles render even
+        // when locked, so the user can see the upcoming structure;
+        // components and the submit toggle for a locked sub-step are
+        // suppressed until the previous one is submitted.
+        const QA_SUB_STEPS = [
+            {
+                metaLabel: 'QA · Step 1 of 2 · Procedural compliance',
+                instruction: 'Verify the CR follows SOP-002, has a complete execution-item table, and includes the required scope and justification sections.',
+                commentsTitle: 'Procedural compliance notes',
+                commentsHelp: 'Note any procedural gaps, missing sections, or SOP deviations.',
+                decisionHelp: 'Does this CR meet procedural compliance requirements?',
+                optYes: 'Pass — procedural requirements met',
+                optNo:  'Flag — procedural concerns to address',
+                submitVerb:   'Submit procedural compliance check',
+                submittedTxt: '✓ Procedural compliance submitted',
+            },
+            {
+                metaLabel: 'QA · Step 2 of 2 · Risk and impact',
+                instruction: 'Verify the risk assessment is appropriate for the change scope, and that potentially affected systems and stakeholders are identified.',
+                commentsTitle: 'Risk and impact notes',
+                commentsHelp: 'Note any unaddressed risks, impact gaps, or stakeholder omissions.',
+                decisionHelp: 'Is the risk and impact analysis adequate?',
+                optYes: 'Pass — risk and impact properly documented',
+                optNo:  'Flag — risk or impact concerns to address',
+                submitVerb:   'Submit risk and impact assessment',
+                submittedTxt: '✓ Risk and impact submitted',
+            },
+        ];
+
+        const tabKey = key(stepIdx, tabIdx);
+        const group = document.createElement('div');
+        group.className = 'expC-leaf-group';
+
+        let prevSubDone = true;
+        QA_SUB_STEPS.forEach((sub, i) => {
+            const subKey = tabKey + '.' + (i + 1);
+            const isSubDone = done.has(subKey);
+            const isSubReachable = prevSubDone;
+
+            // Sub-step bubble: small avatar + meta label + instruction,
+            // styled in the same chat-bubble vocabulary as everything
+            // else on the thread.
+            const subRow = document.createElement('div');
+            subRow.className = 'expC-comp-row';
+            const subAvatar = document.createElement('span');
+            subAvatar.className = 'expC-comp-avatar';
+            if (isSubDone) {
+                subAvatar.classList.add('expD-sub-done');
+                subAvatar.textContent = '✓';
+            } else if (!isSubReachable) {
+                subAvatar.classList.add('expD-sub-locked');
+                subAvatar.textContent = String(i + 1);
+            } else {
+                subAvatar.textContent = String(i + 1);
+            }
+            subRow.appendChild(subAvatar);
+            const subBody = document.createElement('div');
+            subBody.className = 'expC-comp-body';
+            const meta = document.createElement('div');
+            meta.className = 'exp431x-bubble-meta';
+            const metaSpan = document.createElement('span');
+            metaSpan.textContent = sub.metaLabel;
+            meta.appendChild(metaSpan);
+            subBody.appendChild(meta);
+            const text = document.createElement('p');
+            text.className = 'exp431x-bubble-text';
+            text.textContent = !isSubReachable
+                ? 'This sub-step unlocks once the previous QA sub-step is submitted.'
+                : sub.instruction;
+            subBody.appendChild(text);
+            subRow.appendChild(subBody);
+            group.appendChild(subRow);
+
+            // Components and submit toggle — only when this sub-step is
+            // reachable. Locked sub-steps render only the bubble above.
+            if (isSubReachable) {
+                const radioName = 'decision-D-' + subKey;
+                [
+                    {
+                        glyph: '✎',
+                        html: ''
+                            + '<div class="component" data-form="text" data-key="comments-' + subKey + '">'
+                            +   '<h3>' + sub.commentsTitle + '</h3>'
+                            +   '<p>' + sub.commentsHelp + '</p>'
+                            +   '<form onsubmit="event.preventDefault();">'
+                            +     '<input name="value" type="text" placeholder="Your notes">'
+                            +     '<div style="margin-top: 4px;">'
+                            +       '<button type="submit">Save draft</button>'
+                            +     '</div>'
+                            +   '</form>'
+                            + '</div>',
+                    },
+                    {
+                        glyph: '⚖',
+                        html: ''
+                            + '<div class="component" data-form="choice" data-key="decision-' + subKey + '">'
+                            +   '<h3>Decision</h3>'
+                            +   '<p>' + sub.decisionHelp + '</p>'
+                            +   '<div style="margin: 4px 0;">'
+                            +     '<label><input type="radio" name="' + radioName + '"> ' + sub.optYes + '</label>'
+                            +     '<label><input type="radio" name="' + radioName + '"> ' + sub.optNo + '</label>'
+                            +   '</div>'
+                            + '</div>',
+                    },
+                ].forEach(c => group.appendChild(buildCompRow(c)));
+
+                // Sub-step submit toggle — adds/removes the sub-key
+                // from the global done set; tabDone(QA) checks both keys.
+                const tRow = document.createElement('div');
+                tRow.className = 'expC-comp-row';
+                const tAvatar = document.createElement('span');
+                tAvatar.className = 'expC-comp-avatar expC-toggle-avatar' + (isSubDone ? ' is-done' : '');
+                tAvatar.textContent = isSubDone ? '✓' : '○';
+                tRow.appendChild(tAvatar);
+                const tBody = document.createElement('div');
+                tBody.className = 'expC-comp-body';
+                const tBtn = document.createElement('button');
+                tBtn.type = 'button';
+                tBtn.className = 'expC-toggle-btn' + (isSubDone ? ' is-done' : '');
+                tBtn.textContent = isSubDone ? sub.submittedTxt : sub.submitVerb;
+                tBtn.addEventListener('click', () => {
+                    if (done.has(subKey)) done.delete(subKey);
+                    else done.add(subKey);
+                    render();
+                });
+                tBody.appendChild(tBtn);
+                tRow.appendChild(tBody);
+                group.appendChild(tRow);
+            }
+
+            prevSubDone = isSubDone;
+        });
+
+        return group;
+    }
+
+    function findNextStep() {
+        for (let s = 0; s < STEPS.length; s++) if (!stepDone(s)) return s;
+        return -1;
+    }
+
+    function alignActiveTabsToThread() {
+        const strips = root.querySelectorAll('.expC-step .exp431x-tabs');
+        strips.forEach(strip => {
+            const active = strip.querySelector('.exp431x-tab.is-active');
+            if (!active) {
+                strip.style.transform = '';
+                return;
+            }
+            if (active.offsetWidth === 0) return;
+            const center = active.offsetLeft + active.offsetWidth / 2;
+            strip.style.transform = 'translateX(' + (14 - center) + 'px)';
+        });
+    }
+
+    function render() {
+        autoSelect();
+        root.innerHTML = '';
+
+        const navWrap = document.createElement('div');
+        navWrap.className = 'expC-nav';
+
+        const focusStep = activeStepIdx();
+        STEPS.forEach((_, stepIdx) => {
+            const { stepEl, isFocus } = buildStep(stepIdx);
+            navWrap.appendChild(stepEl);
+
+            if (isFocus && selectedTab && parseKey(selectedTab)[0] === stepIdx) {
+                const tabIdx = parseKey(selectedTab)[1];
+                navWrap.appendChild(buildLeafFlat(stepIdx, tabIdx));
+            }
+        });
+
+        const allStepsDone = STEPS.every((_, s) => stepDone(s));
+        if (allStepsDone) {
+            const cmp = document.createElement('div');
+            cmp.className = 'expA-complete';
+            const cNode = document.createElement('div');
+            cNode.className = 'expA-complete-node';
+            cNode.textContent = '✓';
+            cmp.appendChild(cNode);
+            const text = document.createElement('div');
+            text.className = 'expA-complete-text';
+            text.textContent = 'CR closed — pre-approval and post-execution verification complete.';
+            cmp.appendChild(text);
+            navWrap.appendChild(cmp);
+        } else if (stepDone(focusStep)) {
+            const next = findNextStep();
+            if (next > focusStep) {
+                const proceed = document.createElement('div');
+                proceed.className = 'expA-proceed';
+                const pNode = document.createElement('div');
+                pNode.className = 'expA-proceed-node';
+                pNode.textContent = '→';
+                proceed.appendChild(pNode);
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'expA-proceed-btn';
+                btn.textContent = 'Proceed to ' + STEPS[next].label.split(' · ')[1] + ' →';
+                btn.addEventListener('click', () => {
+                    selectedTab = key(next, 0);
+                    render();
+                });
+                proceed.appendChild(btn);
+                navWrap.appendChild(proceed);
+            }
+        }
+
+        root.appendChild(navWrap);
+        alignActiveTabsToThread();
+    }
+
+    const panel = document.querySelector('.nest-ws__canvas[data-panel="exp-d"]');
+    if (panel) {
+        panel.addEventListener('panelshown', alignActiveTabsToThread);
+    }
+
+    render();
 })();
 </script>
 {% endblock %}

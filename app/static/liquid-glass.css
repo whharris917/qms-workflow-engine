@@ -1,55 +1,82 @@
 /* ===================================================================
-   Bright Liquid Glass Theme
+   Liquid Glass — Workshop Edition
 
-   Pastel-gradient background with frosted-glass component cards.
-   Apple-inspired: translucent white surfaces, backdrop blur, soft
-   blue-tinted shadows, rounded everything. High-legibility dark text
-   on bright surfaces — "bright" over "frosted dark".
+   Palette and surface treatment aligned with the Nesting Visualizations
+   workshop UI (templates/workshop_nesting.html). The original theme
+   used Apple-style blue (#007aff) on a pink/blue/purple gradient; this
+   revision adopts the workshop's indigo→violet→pink gradient system
+   over a 4-radial pastel background, with chat-bubble glass surfaces
+   and purple-tinted shadows.
 
-   Everything layers on top of the bare-bones base in style.css.
-   No template overrides — structure is unchanged; only presentation.
+   Workshop palette mirrored here as --lg-* custom properties:
+       --nw-accent    #6366f1   (indigo, primary)
+       --nw-accent-2  #a855f7   (violet, gradient pair)
+       --nw-pink      #ec4899   (pink, title-gradient endpoint)
+       --nw-text      #1f2144   (deep navy text)
+       --nw-muted     #4a4e6d
+       --nw-subtle    #8088a8
+
+   Layers on top of the bare-bones base in style.css. No template
+   overrides — structure is unchanged; only presentation.
    =================================================================== */
 
-/* ---------- Palette (local custom properties for legibility) ---------- */
+/* ---------- Palette ---------- */
 body[data-theme="liquid-glass"] {
-    --lg-surface: rgba(255, 255, 255, 0.55);
-    --lg-surface-hover: rgba(255, 255, 255, 0.75);
-    --lg-surface-solid: rgba(255, 255, 255, 0.9);
-    --lg-border: rgba(255, 255, 255, 0.8);
-    --lg-border-soft: rgba(140, 160, 200, 0.25);
-    --lg-sheen: inset 0 1px 0 rgba(255, 255, 255, 0.95);
-    --lg-shadow: 0 8px 32px rgba(31, 38, 135, 0.12);
-    --lg-shadow-raised: 0 12px 40px rgba(31, 38, 135, 0.18);
-    --lg-blur: saturate(180%) blur(20px);
+    --lg-accent:        #6366f1;
+    --lg-accent-2:      #a855f7;
+    --lg-pink:          #ec4899;
+    --lg-accent-soft:   rgba(99, 102, 241, 0.12);
+    --lg-accent-soft-2: rgba(168, 85, 247, 0.18);
 
-    --lg-text: #1a1a2e;
-    --lg-text-muted: #4a5168;
-    --lg-text-subtle: #7682a0;
+    --lg-text:        #1f2144;
+    --lg-text-muted:  #4a4e6d;
+    --lg-text-subtle: #8088a8;
 
-    --lg-accent: #007aff;
-    --lg-accent-soft: rgba(0, 122, 255, 0.12);
-    --lg-complete: #34c759;
-    --lg-complete-soft: rgba(52, 199, 89, 0.18);
-    --lg-editing: #af52de;
-    --lg-danger: #ff3b30;
-    --lg-danger-soft: rgba(255, 59, 48, 0.12);
+    --lg-surface:        rgba(255, 255, 255, 0.62);
+    --lg-surface-hover:  rgba(255, 255, 255, 0.82);
+    --lg-surface-card:   rgba(255, 255, 255, 0.78);
+    --lg-surface-solid:  rgba(255, 255, 255, 0.95);
+    --lg-surface-inner:  rgba(255, 255, 255, 0.55);
 
-    --lg-radius-card: 16px;
-    --lg-radius-control: 10px;
-    --lg-radius-pill: 999px;
+    --lg-border:       rgba(160, 180, 220, 0.42);
+    --lg-border-soft:  rgba(160, 180, 220, 0.32);
+    --lg-border-chip:  rgba(160, 180, 220, 0.38);
+
+    --lg-shadow:        0 6px 24px rgba(59, 41, 102, 0.08);
+    --lg-shadow-raised: 0 12px 32px rgba(59, 41, 102, 0.14);
+    --lg-shadow-button: 0 4px 14px rgba(99, 102, 241, 0.32);
+    --lg-shadow-tab:    0 2px 8px rgba(99, 102, 241, 0.28);
+    --lg-blur:          blur(20px) saturate(180%);
+
+    --lg-gradient:      linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    --lg-gradient-text: linear-gradient(90deg, #6366f1 0%, #ec4899 100%);
+
+    --lg-complete:      #22c55e;
+    --lg-complete-soft: rgba(34, 197, 94, 0.18);
+    --lg-editing:       var(--lg-accent-2);
+    --lg-danger:        #ef4444;
+    --lg-danger-soft:   rgba(239, 68, 68, 0.12);
+
+    --lg-radius-card:    16px;
+    --lg-radius-control: 12px;
+    --lg-radius-pill:    999px;
 }
 
-/* ---------- Body / page canvas ---------- */
+/* ---------- Body / page canvas ----------
+   Same 4-radial pastel pattern (pink / blue / purple / mint) over a
+   soft off-white linear-gradient that the workshop canvas uses. */
 body[data-theme="liquid-glass"] {
     background:
-        radial-gradient(at 20% 10%, #ffd6ec 0%, transparent 50%),
-        radial-gradient(at 80% 0%, #c8e0ff 0%, transparent 50%),
-        radial-gradient(at 50% 100%, #e8d5ff 0%, transparent 50%),
-        linear-gradient(135deg, #e8f1ff 0%, #f0e6ff 50%, #ffe6f2 100%);
+        radial-gradient(at 15% 20%, #ffe3f0 0%, transparent 55%),
+        radial-gradient(at 85% 15%, #c8d8ff 0%, transparent 55%),
+        radial-gradient(at 70% 85%, #d9c8ff 0%, transparent 55%),
+        radial-gradient(at 20% 90%, #c4f0f4 0%, transparent 55%),
+        linear-gradient(160deg, #f7f9ff 0%, #fdf4ff 100%);
     background-attachment: fixed;
     color: var(--lg-text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "SF Pro Display", sans-serif;
-    font-size: 13px;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
 }
 
 body[data-theme="liquid-glass"] #page-content {
@@ -58,22 +85,23 @@ body[data-theme="liquid-glass"] #page-content {
     padding-top: 16px;
 }
 
-/* ---------- Component card (glass surface) ---------- */
+/* ---------- Component card (glass surface) ----------
+   Matches the workshop's .exp431x-leaf-panel: 78% white surface,
+   18px radius, soft purple-tinted shadow. */
 body[data-theme="liquid-glass"] .component {
-    background: var(--lg-surface);
+    background: var(--lg-surface-card);
     backdrop-filter: var(--lg-blur);
     -webkit-backdrop-filter: var(--lg-blur);
     border: 1px solid var(--lg-border);
     border-radius: var(--lg-radius-card);
-    box-shadow: var(--lg-shadow), var(--lg-sheen);
-    padding: 16px 20px;
+    box-shadow: var(--lg-shadow);
+    padding: 22px 24px;
     margin: 14px 0;
-    transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+    transition: box-shadow 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
 }
 
-/* Containers: transparent — don't double-glass the nesting. Let the
-   top-level glass card be the only visible pane unless a container
-   specifically needs its own surface. */
+/* Containers stay transparent so the outer glass card is the only
+   visible pane; nested glass would create a "double frame" effect. */
 body[data-theme="liquid-glass"] .c-container {
     background: none;
     backdrop-filter: none;
@@ -84,23 +112,28 @@ body[data-theme="liquid-glass"] .c-container {
     margin: 14px 0;
 }
 
-/* Page: transparent outermost wrapper with bottom margin */
+/* Page wrapper — transparent root */
 body[data-theme="liquid-glass"] .component[data-form="page"] {
     padding: 0;
     margin: 0;
 }
 
+/* Page title — gradient-clipped indigo→pink text. Matches the
+   workshop's .exp431x-leaf-title treatment. */
 body[data-theme="liquid-glass"] .component[data-form="page"] > h2 {
-    font-size: 22px;
+    font-size: 28px;
     font-weight: 600;
-    color: var(--lg-text);
-    margin: 0 0 4px 0;
+    margin: 0 0 6px 0;
     letter-spacing: -0.01em;
+    background: var(--lg-gradient-text);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
 }
 body[data-theme="liquid-glass"] .component[data-form="page"] > h2 + p {
     color: var(--lg-text-muted);
-    margin: 0 0 20px 0;
-    padding-bottom: 16px;
+    margin: 0 0 22px 0;
+    padding-bottom: 18px;
     border-bottom: 1px solid var(--lg-border-soft);
 }
 
@@ -109,7 +142,6 @@ body[data-theme="liquid-glass"] .component.component--complete {
     border-color: var(--lg-complete);
     box-shadow:
         var(--lg-shadow),
-        var(--lg-sheen),
         0 0 0 3px var(--lg-complete-soft);
 }
 body[data-theme="liquid-glass"] .c-container.component--complete {
@@ -117,18 +149,17 @@ body[data-theme="liquid-glass"] .c-container.component--complete {
     box-shadow: none;
 }
 
-/* Editing outline (subtle violet instead of harsh dashed) */
+/* Editing outline (violet halo) */
 body[data-theme="liquid-glass"] .component.component--editing {
     border-color: var(--lg-editing);
     box-shadow:
         var(--lg-shadow),
-        var(--lg-sheen),
-        0 0 0 3px rgba(175, 82, 222, 0.18);
+        0 0 0 3px var(--lg-accent-soft-2);
 }
 
 /* ---------- Typography ---------- */
 body[data-theme="liquid-glass"] h3 {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
     color: var(--lg-text);
     margin: 0 0 6px 0;
@@ -141,7 +172,7 @@ body[data-theme="liquid-glass"] p {
 }
 body[data-theme="liquid-glass"] label {
     color: var(--lg-text-muted);
-    font-size: 12px;
+    font-size: 13px;
 }
 
 /* ---------- Titlebar ---------- */
@@ -149,8 +180,8 @@ body[data-theme="liquid-glass"] .c-titlebar {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin: -4px -4px 10px -4px;
-    padding-bottom: 6px;
+    margin: -4px -4px 12px -4px;
+    padding-bottom: 8px;
     border-bottom: 1px solid var(--lg-border-soft);
 }
 body[data-theme="liquid-glass"] .c-titlebar__label {
@@ -158,26 +189,30 @@ body[data-theme="liquid-glass"] .c-titlebar__label {
     font-weight: 600;
     color: var(--lg-text);
     font-size: 13px;
+    letter-spacing: 0.01em;
 }
 body[data-theme="liquid-glass"] .c-titlebar__spacer {
     display: inline;
     flex: 1;
 }
 
-/* ---------- Chrome buttons ---------- */
-body[data-theme="liquid-glass"] .c-chrome-btn {
-    background: var(--lg-surface-solid);
-    border: 1px solid var(--lg-border-soft);
+/* ---------- Chrome buttons (small ghost pills in the titlebar) ---------- */
+body[data-theme="liquid-glass"] .c-chrome-btn,
+body[data-theme="liquid-glass"] button.c-chrome-btn {
+    background: var(--lg-surface);
+    border: 1px solid var(--lg-border-chip);
     border-radius: var(--lg-radius-pill);
     color: var(--lg-text-muted);
-    transition: all 0.2s ease;
-    box-shadow: 0 1px 3px rgba(31, 38, 135, 0.08);
+    padding: 0;
+    box-shadow: none;
+    transition: background 0.18s, color 0.18s, border-color 0.18s, transform 0.18s;
 }
-body[data-theme="liquid-glass"] .c-chrome-btn:hover {
-    background: white;
-    color: var(--lg-text);
+body[data-theme="liquid-glass"] .c-chrome-btn:hover,
+body[data-theme="liquid-glass"] button.c-chrome-btn:hover {
+    background: var(--lg-surface-hover);
+    color: var(--lg-accent);
+    border-color: var(--lg-accent);
     transform: translateY(-1px);
-    box-shadow: 0 3px 8px rgba(31, 38, 135, 0.12);
 }
 
 /* ---------- Inputs / textareas / selects ---------- */
@@ -195,99 +230,79 @@ body[data-theme="liquid-glass"] select {
     border: 1px solid var(--lg-border-soft);
     border-radius: var(--lg-radius-control);
     color: var(--lg-text);
-    padding: 6px 10px;
+    padding: 8px 12px;
     font: inherit;
-    font-size: 13px;
-    box-shadow: inset 0 1px 2px rgba(31, 38, 135, 0.04);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    font-size: 14px;
+    transition: border-color 0.18s, box-shadow 0.18s;
 }
 body[data-theme="liquid-glass"] input:focus,
 body[data-theme="liquid-glass"] textarea:focus,
 body[data-theme="liquid-glass"] select:focus {
     outline: none;
     border-color: var(--lg-accent);
-    box-shadow:
-        inset 0 1px 2px rgba(31, 38, 135, 0.04),
-        0 0 0 3px var(--lg-accent-soft);
+    box-shadow: 0 0 0 3px var(--lg-accent-soft);
 }
 body[data-theme="liquid-glass"] textarea {
     line-height: 1.5;
     resize: vertical;
 }
-
-/* Checkbox / radio — keep native look but recolor */
 body[data-theme="liquid-glass"] input[type="checkbox"],
 body[data-theme="liquid-glass"] input[type="radio"] {
     accent-color: var(--lg-accent);
-    transform: scale(1.05);
     cursor: pointer;
 }
-
-/* Range slider */
 body[data-theme="liquid-glass"] input[type="range"] {
     accent-color: var(--lg-accent);
 }
 
-/* ---------- Buttons (generic POST buttons and affordances) ---------- */
+/* ---------- Primary action buttons (POST / submit / generic affordance) ----------
+   Indigo→violet gradient pill with the workshop's halo shadow. */
 body[data-theme="liquid-glass"] button[data-c-post],
 body[data-theme="liquid-glass"] button[data-c-submit],
 body[data-theme="liquid-glass"] .c-aff-btn {
-    background: var(--lg-accent);
+    background: var(--lg-gradient);
     color: white;
     border: none;
     border-radius: var(--lg-radius-pill);
-    padding: 6px 14px;
+    padding: 8px 18px;
     font: inherit;
-    font-size: 12px;
-    font-weight: 500;
+    font-size: 13px;
+    font-weight: 600;
     cursor: pointer;
-    box-shadow:
-        0 1px 2px rgba(0, 122, 255, 0.3),
-        inset 0 1px 0 rgba(255, 255, 255, 0.25);
-    transition: all 0.18s ease;
+    box-shadow: var(--lg-shadow-button);
+    transition: filter 0.18s, transform 0.18s, box-shadow 0.18s;
 }
 body[data-theme="liquid-glass"] button[data-c-post]:hover,
 body[data-theme="liquid-glass"] button[data-c-submit]:hover,
 body[data-theme="liquid-glass"] .c-aff-btn:hover {
-    background: #0069e5;
+    filter: brightness(1.08);
     transform: translateY(-1px);
-    box-shadow:
-        0 3px 8px rgba(0, 122, 255, 0.35),
-        inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+body[data-theme="liquid-glass"] .c-aff-btn--disabled {
+    background: rgba(160, 180, 220, 0.35);
+    color: var(--lg-text-subtle);
+    box-shadow: none;
+    cursor: not-allowed;
+}
+body[data-theme="liquid-glass"] .c-aff-btn--disabled:hover {
+    filter: none;
+    transform: none;
 }
 
-/* Chrome, icon, confirm, remove, arrow, clear buttons need their own
-   treatments — the generic blue pill would be wrong. We re-override
-   with higher specificity below. */
-
-/* Chrome buttons keep the ghost treatment (already defined above) */
-body[data-theme="liquid-glass"] button.c-chrome-btn {
-    background: var(--lg-surface-solid);
-    color: var(--lg-text-muted);
-    border: 1px solid var(--lg-border-soft);
-    box-shadow: 0 1px 3px rgba(31, 38, 135, 0.08);
-    padding: 0;
-}
-body[data-theme="liquid-glass"] button.c-chrome-btn:hover {
-    background: white;
-    color: var(--lg-text);
-    transform: translateY(-1px);
-    box-shadow: 0 3px 8px rgba(31, 38, 135, 0.12);
-}
-
-/* Icon buttons (small 24x24 pencil/lock/delete) */
+/* ---------- Icon buttons (24x24 pencil / lock / move / delete) ---------- */
 body[data-theme="liquid-glass"] button.c-icon-btn {
-    background: var(--lg-surface-solid);
+    background: var(--lg-surface);
     color: var(--lg-text-muted);
-    border: 1px solid var(--lg-border-soft);
+    border: 1px solid var(--lg-border-chip);
     border-radius: var(--lg-radius-control);
-    box-shadow: 0 1px 2px rgba(31, 38, 135, 0.06);
+    box-shadow: none;
     padding: 0;
-    transition: all 0.18s ease;
+    transition: background 0.18s, color 0.18s, border-color 0.18s;
 }
 body[data-theme="liquid-glass"] button.c-icon-btn:hover {
-    background: white;
-    color: var(--lg-text);
+    background: var(--lg-surface-hover);
+    color: var(--lg-accent);
+    border-color: var(--lg-accent);
 }
 body[data-theme="liquid-glass"] button.c-icon-btn--active {
     background: var(--lg-accent-soft);
@@ -297,7 +312,7 @@ body[data-theme="liquid-glass"] button.c-icon-btn--active {
 body[data-theme="liquid-glass"] button.c-icon-btn--danger {
     background: var(--lg-danger-soft);
     color: var(--lg-danger);
-    border-color: rgba(255, 59, 48, 0.3);
+    border-color: rgba(239, 68, 68, 0.3);
 }
 body[data-theme="liquid-glass"] button.c-icon-btn--danger:hover {
     background: var(--lg-danger);
@@ -305,11 +320,11 @@ body[data-theme="liquid-glass"] button.c-icon-btn--danger:hover {
     border-color: var(--lg-danger);
 }
 
-/* Confirm (green), remove (red), arrow (blue) inline action buttons */
+/* ---------- Inline confirm / remove / arrow buttons ---------- */
 body[data-theme="liquid-glass"] button.c-btn-confirm {
     background: var(--lg-complete-soft);
     color: var(--lg-complete);
-    border: 1px solid rgba(52, 199, 89, 0.4);
+    border: 1px solid rgba(34, 197, 94, 0.4);
     border-radius: var(--lg-radius-control);
 }
 body[data-theme="liquid-glass"] button.c-btn-confirm:hover {
@@ -317,9 +332,9 @@ body[data-theme="liquid-glass"] button.c-btn-confirm:hover {
     color: white;
 }
 body[data-theme="liquid-glass"] button.c-btn-remove {
-    background: var(--lg-surface-solid);
+    background: var(--lg-surface);
     color: var(--lg-text-muted);
-    border: 1px solid var(--lg-border-soft);
+    border: 1px solid var(--lg-border-chip);
     border-radius: var(--lg-radius-control);
 }
 body[data-theme="liquid-glass"] button.c-btn-remove:hover {
@@ -328,9 +343,9 @@ body[data-theme="liquid-glass"] button.c-btn-remove:hover {
     border-color: var(--lg-danger);
 }
 body[data-theme="liquid-glass"] button.c-btn-arrow {
-    background: var(--lg-surface-solid);
+    background: var(--lg-surface);
     color: var(--lg-text-muted);
-    border: 1px solid var(--lg-border-soft);
+    border: 1px solid var(--lg-border-chip);
     border-radius: var(--lg-radius-control);
 }
 body[data-theme="liquid-glass"] button.c-btn-arrow:hover {
@@ -339,91 +354,162 @@ body[data-theme="liquid-glass"] button.c-btn-arrow:hover {
     border-color: var(--lg-accent);
 }
 
-/* Clear (ghost) button */
+/* ---------- Clear (ghost) button ---------- */
 body[data-theme="liquid-glass"] button.c-btn-clear {
     background: transparent;
     color: var(--lg-text-subtle);
-    border: 1px solid var(--lg-border-soft);
+    border: 1px solid var(--lg-border-chip);
     border-radius: var(--lg-radius-pill);
     box-shadow: none;
 }
 body[data-theme="liquid-glass"] button.c-btn-clear:hover {
     background: var(--lg-danger-soft);
     color: var(--lg-danger);
-    border-color: rgba(255, 59, 48, 0.3);
+    border-color: rgba(239, 68, 68, 0.3);
     transform: none;
 }
 
-/* ---------- Navigation (tabs) ---------- */
-/* The .c-nav-bar is the tab strip; .c-nav-tab is each tab button. */
+/* ---------- Navigation / tabs ----------
+   Mirrors the workshop's .exp431x-tabs strip: chip pills with hover
+   lift and an indigo→violet gradient for the active tab. The bar
+   itself is transparent — the chips carry the visual weight. */
 body[data-theme="liquid-glass"] .c-nav-bar {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
-    background: var(--lg-surface);
-    backdrop-filter: var(--lg-blur);
-    -webkit-backdrop-filter: var(--lg-blur);
-    border: 1px solid var(--lg-border);
-    border-radius: var(--lg-radius-pill);
-    padding: 4px;
-    box-shadow: var(--lg-shadow), var(--lg-sheen);
-    margin-bottom: 12px;
-}
-
-body[data-theme="liquid-glass"] .c-nav-tab {
     background: transparent;
     border: none;
+    box-shadow: none;
+    padding: 0;
+    margin-bottom: 14px;
+}
+/* Tab chips need .c-nav-bar prefix so their specificity beats the
+   primary-action `button[data-c-post]` rule above (which would
+   otherwise paint inactive tabs with the indigo→violet gradient). */
+body[data-theme="liquid-glass"] .c-nav-bar .c-nav-tab {
+    background: var(--lg-surface);
+    border: 1px solid var(--lg-border-chip);
     color: var(--lg-text-muted);
     border-radius: var(--lg-radius-pill);
-    padding: 6px 14px;
-    font-size: 12px;
+    padding: 7px 16px;
+    font: inherit;
+    font-size: 13px;
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.18s ease;
     box-shadow: none;
+    transition: transform 0.18s, color 0.18s, background 0.18s, box-shadow 0.18s, border-color 0.18s, filter 0.18s;
 }
-body[data-theme="liquid-glass"] .c-nav-tab:hover {
-    background: var(--lg-surface-hover);
+body[data-theme="liquid-glass"] .c-nav-bar .c-nav-tab:hover {
     color: var(--lg-text);
-    transform: none;
+    background: var(--lg-surface-hover);
+    transform: translateY(-1px);
+    filter: none;
 }
-body[data-theme="liquid-glass"] .c-nav-tab.c-nav-tab--active {
-    background: white;
-    color: var(--lg-accent);
-    box-shadow: 0 1px 3px rgba(31, 38, 135, 0.12);
+body[data-theme="liquid-glass"] .c-nav-bar .c-nav-tab.c-nav-tab--active {
+    color: white;
+    background: var(--lg-gradient);
+    border-color: transparent;
+    box-shadow: var(--lg-shadow-tab);
 }
-body[data-theme="liquid-glass"] .c-nav-tab.c-nav-tab--complete {
+body[data-theme="liquid-glass"] .c-nav-bar .c-nav-tab.c-nav-tab--complete {
     color: var(--lg-complete);
+    border-color: rgba(34, 197, 94, 0.4);
 }
-body[data-theme="liquid-glass"] .c-nav-tab.c-nav-tab--locked {
+body[data-theme="liquid-glass"] .c-nav-bar .c-nav-tab.c-nav-tab--active.c-nav-tab--complete {
+    color: white;
+    background: var(--lg-gradient);
+    border-color: transparent;
+}
+body[data-theme="liquid-glass"] .c-nav-bar .c-nav-tab.c-nav-tab--locked {
     color: var(--lg-text-subtle);
-    opacity: 0.55;
+    background: rgba(160, 180, 220, 0.18);
+    border-color: rgba(160, 180, 220, 0.35);
+    opacity: 0.6;
     cursor: not-allowed;
 }
 
+/* Sequence-mode steps — same chip-pill chat aesthetic as tabs.
+   The .c-nav-bar--sequence prefix beats button[data-c-post] for the
+   `--complete` variant which is rendered as a button. */
+body[data-theme="liquid-glass"] .c-nav-bar--sequence {
+    gap: 6px;
+    margin-bottom: 14px;
+}
+body[data-theme="liquid-glass"] .c-nav-bar--sequence .c-nav-step {
+    background: var(--lg-surface);
+    border: 1px solid var(--lg-border-chip);
+    color: var(--lg-text-muted);
+    border-radius: var(--lg-radius-pill);
+    padding: 7px 16px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: none;
+    transition: transform 0.18s, color 0.18s, background 0.18s, box-shadow 0.18s, border-color 0.18s, filter 0.18s;
+}
+body[data-theme="liquid-glass"] .c-nav-bar--sequence .c-nav-step:hover {
+    color: var(--lg-text);
+    background: var(--lg-surface-hover);
+    transform: translateY(-1px);
+    filter: none;
+}
+body[data-theme="liquid-glass"] .c-nav-bar--sequence .c-nav-step.c-nav-step--active {
+    color: white;
+    background: var(--lg-gradient);
+    border-color: transparent;
+    border-bottom: 1px solid transparent;     /* override default-theme black border */
+    border-radius: var(--lg-radius-pill);     /* override default-theme 3px 3px 0 0 */
+    box-shadow: var(--lg-shadow-tab);
+    cursor: default;
+}
+body[data-theme="liquid-glass"] .c-nav-bar--sequence .c-nav-step.c-nav-step--complete {
+    color: var(--lg-complete);
+    background: var(--lg-complete-soft);
+    border-color: rgba(34, 197, 94, 0.4);
+}
+body[data-theme="liquid-glass"] .c-nav-bar--sequence .c-nav-step.c-nav-step--complete:hover {
+    color: white;
+    background: var(--lg-complete);
+    border-color: var(--lg-complete);
+}
+body[data-theme="liquid-glass"] .c-nav-bar--sequence .c-nav-step.c-nav-step--accessible {
+    color: var(--lg-text-muted);
+    background: var(--lg-surface);
+    border-color: var(--lg-border-chip);
+}
+body[data-theme="liquid-glass"] .c-nav-bar--sequence .c-nav-step.c-nav-step--locked {
+    color: var(--lg-text-subtle);
+    background: rgba(160, 180, 220, 0.18);
+    border-color: rgba(160, 180, 220, 0.35);
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+body[data-theme="liquid-glass"] .c-nav-bar--sequence .c-nav-arrow {
+    color: var(--lg-text-subtle);
+    margin: 0 2px;
+    font-size: 14px;
+}
 body[data-theme="liquid-glass"] .c-nav-content {
     padding: 4px 0;
 }
-
-/* Navigation instruction sits under the titlebar, above the tab bar */
-body[data-theme="liquid-glass"] .c-nav-instruction {
+body[data-theme="liquid-glass"] .c-nav-instruction,
+body[data-theme="liquid-glass"] .c-group-instruction {
     color: var(--lg-text-muted);
-    font-size: 12px;
-    margin: 0 0 10px 0;
+    font-size: 13px;
+    margin: 0 0 12px 0;
+    line-height: 1.55;
 }
 
-/* Page > Navigation stays horizontal here — we skip the sleek
-   vertical-sidebar treatment because the glass language already
-   provides enough visual separation via card edges. */
-
-/* ---------- Group ---------- */
+/* ---------- Group container ---------- */
 body[data-theme="liquid-glass"] .component[data-form="group"] {
-    background: var(--lg-surface);
+    background: var(--lg-surface-card);
     backdrop-filter: var(--lg-blur);
     -webkit-backdrop-filter: var(--lg-blur);
     border: 1px solid var(--lg-border);
     border-radius: var(--lg-radius-card);
-    box-shadow: var(--lg-shadow), var(--lg-sheen);
-    padding: 14px 18px;
+    box-shadow: var(--lg-shadow);
+    padding: 18px 22px;
     margin: 14px 0;
 }
 
@@ -431,14 +517,14 @@ body[data-theme="liquid-glass"] .component[data-form="group"] {
 body[data-theme="liquid-glass"] .c-remaining-affs {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 12px;
+    gap: 8px;
+    margin-top: 14px;
 }
 
 /* ---------- Feedback banner ---------- */
 body[data-theme="liquid-glass"] .c-feedback,
 body[data-theme="liquid-glass"] .ef-feedback {
-    background: var(--lg-surface-solid);
+    background: var(--lg-surface-card);
     backdrop-filter: var(--lg-blur);
     -webkit-backdrop-filter: var(--lg-blur);
     border: 1px solid var(--lg-border);
@@ -448,19 +534,19 @@ body[data-theme="liquid-glass"] .ef-feedback {
     box-shadow: var(--lg-shadow);
 }
 
-/* ---------- Edit mode header ---------- */
+/* ---------- Edit-mode header inputs ---------- */
 body[data-theme="liquid-glass"] .c-edit-label-form input,
 body[data-theme="liquid-glass"] .c-edit-instr-form input,
 body[data-theme="liquid-glass"] .c-edit-instr-form textarea {
-    background: rgba(255, 255, 255, 0.75);
+    background: var(--lg-surface-solid);
     border: 1px dashed var(--lg-editing);
     border-radius: var(--lg-radius-control);
 }
 
-/* Depends-on line (sibling dependency visibility) */
+/* ---------- Sibling-dependency line (`.c-depends-on`) ---------- */
 body[data-theme="liquid-glass"] .c-depends-on {
     color: var(--lg-text-subtle);
-    font-size: 11px;
+    font-size: 12px;
     font-style: italic;
 }
 body[data-theme="liquid-glass"] .c-depends-on a {
@@ -482,17 +568,202 @@ body[data-theme="liquid-glass"] .c-theme-picker select {
     background: var(--lg-surface-solid);
     border: 1px solid var(--lg-border-soft);
     border-radius: var(--lg-radius-pill);
-    padding: 4px 10px;
+    padding: 4px 12px;
     color: var(--lg-text);
 }
 
 /* ---------- Error boundary ---------- */
 body[data-theme="liquid-glass"] .c-error-boundary {
-    background: rgba(255, 220, 220, 0.7);
+    background: rgba(254, 226, 226, 0.78);
     backdrop-filter: var(--lg-blur);
     -webkit-backdrop-filter: var(--lg-blur);
-    border: 1px solid rgba(255, 59, 48, 0.4);
+    border: 1px solid rgba(239, 68, 68, 0.4);
     border-radius: var(--lg-radius-card);
     box-shadow: var(--lg-shadow);
     color: #5a1010;
+}
+
+/* =====================================================================
+   Workshop layout — chat bubbles on a vertical thread.
+
+   The page wrapper becomes a centered narrow column with a left-side
+   thread (mirrors expA-nav::before from workshop_nesting.html). Each
+   navigation container (Tabs / Sequence / Accordion) becomes a chat
+   bubble: an avatar circle on the thread, an uppercase-tracked meta
+   label (h3), a body paragraph (p), and the tab strip below. The
+   active step's content (.c-nav-content) becomes the glass leaf
+   panel; non-container components inside it become sub-panels.
+   ===================================================================== */
+
+/* Page wrapper: narrow centered column. The vertical thread is owned
+   by each navigation container individually (via ::after below) so it
+   starts at the first avatar's vertical center rather than at a
+   hardcoded offset from the page top. */
+body[data-theme="liquid-glass"] .component[data-form="page"] {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 28px 0 56px;
+    position: relative;
+}
+body[data-theme="liquid-glass"] #page-content {
+    padding-left: 24px;
+    padding-right: 24px;
+}
+
+/* Tabs / Sequence / Accordion: chat-bubble layout.
+   Override the default glass-card treatment from the .component rule. */
+body[data-theme="liquid-glass"] .component[data-form="tabs"],
+body[data-theme="liquid-glass"] .component[data-form="sequence"],
+body[data-theme="liquid-glass"] .component[data-form="accordion"] {
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: none;
+    box-shadow: none;
+    padding: 0 0 0 40px;
+    margin: 24px 0;
+    position: relative;
+}
+
+/* Vertical thread on each navigation container — starts at the avatar's
+   vertical center and runs to the bottom of the leaf panel. Anchored
+   per-container so it begins exactly at its own first node rather than
+   at a hardcoded offset from the page top. */
+body[data-theme="liquid-glass"] .component[data-form="tabs"]::after,
+body[data-theme="liquid-glass"] .component[data-form="sequence"]::after,
+body[data-theme="liquid-glass"] .component[data-form="accordion"]::after {
+    content: '';
+    position: absolute;
+    top: 14px;          /* center of the 28px avatar at top:0 */
+    bottom: 14px;
+    left: 14px;
+    width: 2px;
+    background: linear-gradient(to bottom,
+        rgba(99, 102, 241, 0.40) 0%,
+        rgba(99, 102, 241, 0.65) 30%,
+        #a855f7 100%);
+    border-radius: 1px;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Avatar circle, centered on the thread (left:14px → 28px wide → left:0). */
+body[data-theme="liquid-glass"] .component[data-form="tabs"]::before,
+body[data-theme="liquid-glass"] .component[data-form="sequence"]::before,
+body[data-theme="liquid-glass"] .component[data-form="accordion"]::before {
+    content: '\2728';                /* ✨ */
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--lg-gradient);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    line-height: 1;
+    box-shadow:
+        0 0 0 4px rgba(247, 249, 255, 0.95),
+        0 2px 8px rgba(99, 102, 241, 0.32);
+    z-index: 1;
+}
+
+/* h3 = bubble meta label (uppercase tracked, like exp431x-bubble-meta). */
+body[data-theme="liquid-glass"] .component[data-form="tabs"] > h3,
+body[data-theme="liquid-glass"] .component[data-form="sequence"] > h3,
+body[data-theme="liquid-glass"] .component[data-form="accordion"] > h3 {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--lg-text-subtle);
+    margin: 6px 0 4px 0;
+}
+
+/* p = bubble text. */
+body[data-theme="liquid-glass"] .component[data-form="tabs"] > p,
+body[data-theme="liquid-glass"] .component[data-form="sequence"] > p,
+body[data-theme="liquid-glass"] .component[data-form="accordion"] > p {
+    font-size: 14px;
+    color: var(--lg-text);
+    margin: 0 0 14px 0;
+    line-height: 1.55;
+}
+
+/* Active tab pill — override the default theme's bold + black border-bottom
+   (which would draw a black line under the gradient pill) by re-asserting
+   the gradient treatment with the dark border-bottom replaced. */
+body[data-theme="liquid-glass"] .c-nav-tab--active {
+    border-bottom: 1px solid transparent;
+}
+
+/* Nav-content: the leaf panel (glass card). Sits directly below the
+   tab strip; visually it's the "active step" panel from the workshop. */
+body[data-theme="liquid-glass"] .c-nav-content {
+    background: var(--lg-surface-card);
+    backdrop-filter: var(--lg-blur);
+    -webkit-backdrop-filter: var(--lg-blur);
+    border: 1px solid var(--lg-border);
+    border-radius: var(--lg-radius-card);
+    box-shadow: var(--lg-shadow);
+    padding: 22px 24px;
+    margin: 4px 0 0 0;
+    position: relative;
+    z-index: 1;
+}
+
+/* Containers inside the leaf panel are transparent — they're structural,
+   not visually distinct surfaces. Forms inside flow as sub-panels. */
+body[data-theme="liquid-glass"] .c-nav-content .c-container,
+body[data-theme="liquid-glass"] .c-nav-content .component[data-form="group"] {
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 14px 0;
+}
+body[data-theme="liquid-glass"] .c-nav-content > .c-container:first-child,
+body[data-theme="liquid-glass"] .c-nav-content > .component[data-form="group"]:first-child {
+    margin-top: 0;
+}
+
+/* Group's h3 inside the leaf panel = gradient-clipped section title. */
+body[data-theme="liquid-glass"] .c-nav-content .component[data-form="group"] > h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 6px 0;
+    letter-spacing: -0.005em;
+    background: var(--lg-gradient-text);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-transform: none;
+}
+body[data-theme="liquid-glass"] .c-nav-content .component[data-form="group"] > p {
+    color: var(--lg-text-muted);
+    margin: 0 0 14px 0;
+    font-size: 13.5px;
+}
+
+/* Non-container components inside the leaf panel = sub-panels. */
+body[data-theme="liquid-glass"] .c-nav-content .component:not(.c-container) {
+    background: var(--lg-surface-inner);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: 1px solid var(--lg-border-soft);
+    border-radius: 10px;
+    box-shadow: none;
+    padding: 14px 16px;
+    margin: 12px 0;
+}
+body[data-theme="liquid-glass"] .c-nav-content .component:not(.c-container):first-child {
+    margin-top: 8px;
+}
+body[data-theme="liquid-glass"] .c-nav-content .component:not(.c-container):last-child {
+    margin-bottom: 0;
 }

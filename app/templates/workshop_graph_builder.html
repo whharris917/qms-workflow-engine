@@ -2,46 +2,44 @@
 {% block title %}Graph Builder &middot; Workshop &middot; Razem{% endblock %}
 {% block content %}
 <div class="gb">
+
   <nav class="gb__topbar">
-    <a class="gb__back" href="/workshop">&larr;</a>
-    <div class="gb__heading">
-      <h1 class="gb__title">Graph Builder</h1>
-      <span class="gb__hint">+ below a node adds a sequence step · + on a vertical edge splices · Click a container tag's + to add a branch · Click any type label to cycle</span>
-    </div>
-    <button type="button" class="gb__reset" data-action="reset">Reset</button>
+    <a class="gb__back" href="/workshop" aria-label="Back to workshop">&larr;</a>
+    <h1 class="gb__title">Graph Builder</h1>
   </nav>
+
   <div class="gb__canvas">
-    <svg class="gb__svg" aria-hidden="true"></svg>
-    <div class="gb__layer" data-layer="ghosts"></div>
-    <div class="gb__layer" data-layer="nodes"></div>
+    <div class="gb__stem"></div>
   </div>
+
 </div>
 
 <style>
-/* Scoped to .gb. The graph is a tree: each parent-child edge is either a
-   "branch" (horizontal — container members like tabs/group/switch siblings)
-   or a "next" (vertical — sequence successor). The horizontal axis at any
-   row shows what the user can see / select at that moment; the vertical
-   axis shows sequential progression. */
+/* Scoped to .gb. The stem is a vertical thread with components stacked
+   along it as chat-bubble rows (avatar on the thread + body to the right).
+   Mirrors the visual language of the Nesting Visualizations workshop:
+   gradient indigo→violet thread, 28px gradient avatars, uppercase
+   tracked meta labels, glass sub-panels for form-style components,
+   chip-pill tab strips and stepped sequence lists for containers. */
 
 .gb {
     --gb-accent:    #6366f1;
     --gb-accent-2:  #a855f7;
     --gb-pink:      #ec4899;
-    --gb-amber:     #f59e0b;
     --gb-text:      #1f2144;
     --gb-muted:     #4a4e6d;
     --gb-subtle:    #8088a8;
     --gb-font:      -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
 
     position: relative;
-    margin: -2rem;
-    min-height: calc(100vh);
+    margin: -2rem;                 /* bleed past base.html's .content padding */
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
     font-family: var(--gb-font);
     font-size: 14px;
     color: var(--gb-text);
+
     background:
         radial-gradient(at 15% 20%, #ffe3f0 0%, transparent 55%),
         radial-gradient(at 85% 15%, #c8d8ff 0%, transparent 55%),
@@ -49,7 +47,6 @@
         radial-gradient(at 20% 90%, #c4f0f4 0%, transparent 55%),
         linear-gradient(160deg, #f7f9ff 0%, #fdf4ff 100%);
     background-attachment: fixed;
-    overflow: hidden;
 }
 
 /* ----- Topbar ----- */
@@ -57,10 +54,10 @@
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 14px;
     padding: 12px 20px;
     border-bottom: 1px solid rgba(160, 180, 220, 0.22);
-    background: rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.35);
     backdrop-filter: blur(14px) saturate(160%);
     -webkit-backdrop-filter: blur(14px) saturate(160%);
 }
@@ -73,892 +70,1029 @@
     border-radius: 6px;
     transition: color 0.12s, background 0.12s;
 }
-.gb__back:hover { color: var(--gb-text); background: rgba(255, 255, 255, 0.55); }
-.gb__heading { display: flex; align-items: baseline; gap: 14px; flex: 1; }
-.gb__title { font-size: 1.05rem; font-weight: 600; margin: 0; color: var(--gb-text); }
-.gb__hint { font-size: 0.78rem; color: var(--gb-subtle); font-style: italic; }
-.gb__reset {
-    font: inherit; font-size: 12px; padding: 6px 14px;
-    border: 1px solid rgba(99, 102, 241, 0.42);
-    background: rgba(255, 255, 255, 0.6);
-    color: var(--gb-accent);
-    border-radius: 999px; cursor: pointer; font-weight: 500;
-    transition: background 0.12s, color 0.12s;
+.gb__back:hover {
+    color: var(--gb-text);
+    background: rgba(255, 255, 255, 0.5);
 }
-.gb__reset:hover { background: rgba(99, 102, 241, 0.08); color: #4338ca; }
+.gb__title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--gb-text);
+    letter-spacing: -0.005em;
+}
 
 /* ----- Canvas ----- */
 .gb__canvas {
-    position: relative;
     flex: 1;
+    position: relative;
     overflow: auto;
-}
-.gb__svg, .gb__layer {
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    pointer-events: none;
-}
-.gb__layer .gb-node, .gb__layer .gb-ghost { pointer-events: auto; }
-
-/* ----- Node wrapper (no visible style; positions and hovers) ----- */
-.gb-node {
-    position: absolute;
-    transform: translate(-50%, -50%);
-    width: 44px; height: 44px;
-    z-index: 2;
-}
-
-/* ----- Node visible shape (the colored, type-shaped element) ----- */
-.gb-node-shape {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
-    color: #ffffff;
-    box-shadow: 0 0 0 4px rgba(247, 249, 255, 0.95), 0 4px 14px rgba(99, 102, 241, 0.32);
     display: flex;
-    align-items: center;
     justify-content: center;
-    font-weight: 600;
-    font-size: 12.5px;
-    user-select: none;
-    cursor: default;
-    transition: box-shadow 0.18s, transform 0.18s;
-}
-.gb-node:hover .gb-node-shape {
-    box-shadow: 0 0 0 4px rgba(247, 249, 255, 0.95), 0 0 0 8px rgba(168, 85, 247, 0.18), 0 6px 18px rgba(168, 85, 247, 0.45);
-    transform: scale(1.04);
-}
-/* form — rounded square, indigo→violet (data-input leaf) */
-.gb-node[data-type="form"]   .gb-node-shape { border-radius: 12px; }
-/* action — chevron, pink→amber (imperative leaf) */
-.gb-node[data-type="action"] .gb-node-shape {
-    clip-path: polygon(0% 0%, 100% 0%, 100% 65%, 50% 100%, 0% 65%);
-    background: linear-gradient(135deg, #ec4899 0%, #f59e0b 100%);
-    box-shadow: 0 4px 14px rgba(236, 72, 153, 0.32);
-}
-/* Containers (group / tabs / switch) have NO visible node shape — they're a
-   pure grouping concept rendered as a labelled bounding box around their
-   branches. The .gb-node wrapper still exists for affordance positioning. */
-.gb-node[data-type="group"]  .gb-node-shape,
-.gb-node[data-type="tabs"]   .gb-node-shape,
-.gb-node[data-type="switch"] .gb-node-shape { display: none; }
-.gb-node[data-type="group"], .gb-node[data-type="tabs"], .gb-node[data-type="switch"] {
-    width: 0; height: 0;   /* shrink wrapper; the bbox + tag carry the visuals */
+    padding: 80px 24px;
 }
 
-.gb-node-glyph { pointer-events: none; line-height: 1; }
-
-/* Right-side label stack: name and type pill (leaf nodes only) */
-.gb-node-stack {
-    position: absolute;
-    left: calc(100% + 10px);
-    top: 50%;
-    transform: translateY(-50%);
+/* ----- Stem -----
+   Each child row has its avatar at left:0 (28px wide), so its center
+   sits at x=14 — exactly where the ::before thread runs. The 14px
+   top/bottom insets on the thread match the avatar's vertical center
+   in its row, so the thread aligns with the first and last avatars. */
+.gb__stem {
+    position: relative;
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    align-items: flex-start;
+    gap: 24px;
+    width: 100%;
+    max-width: 720px;
+    min-height: 240px;            /* growth area visible in the empty state */
+}
+.gb__stem::before {
+    content: '';
+    position: absolute;
+    left: 14px;
+    top: 14px; bottom: 14px;
+    width: 2px;
+    background: linear-gradient(to bottom,
+        rgba(99, 102, 241, 0.40) 0%,
+        rgba(99, 102, 241, 0.65) 30%,
+        var(--gb-accent-2) 100%);
+    border-radius: 1px;
     pointer-events: none;
-    white-space: nowrap;
-}
-.gb-node-label {
-    font-size: 11.5px;
-    color: var(--gb-muted);
-    background: rgba(255, 255, 255, 0.7);
-    padding: 2px 8px;
-    border-radius: 6px;
-}
-.gb-node-type {
-    font-size: 10px;
-    color: var(--gb-subtle);
-    font-style: italic;
-    cursor: pointer;
-    padding: 1px 7px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.55);
-    border: 1px solid rgba(160, 180, 220, 0.32);
-    pointer-events: auto;
-    transition: color 0.12s, border-color 0.12s, background 0.12s;
-}
-.gb-node-type:hover { color: var(--gb-accent); border-color: var(--gb-accent); background: rgba(255, 255, 255, 0.9); }
-.gb-node-badge {
-    font-size: 9.5px;
-    color: var(--gb-subtle);
-    background: rgba(99, 102, 241, 0.08);
-    border: 1px dashed rgba(99, 102, 241, 0.32);
-    padding: 1px 7px;
-    border-radius: 999px;
-    font-style: italic;
+    z-index: 0;
 }
 
-/* ----- Ghost: dashed circle below a node that has no sequence successor ----- */
-.gb-ghost {
-    position: absolute;
-    transform: translate(-50%, -50%);
-    width: 32px; height: 32px;
+/* Each row sits on the thread: avatar (28px) on the left, body to the
+   right. Body has a 12px gap from the avatar. */
+.gb__row {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+/* ----- Avatars ----- */
+.gb__avatar {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
     border-radius: 50%;
-    border: 1.5px dashed rgba(99, 102, 241, 0.55);
-    background: rgba(255, 255, 255, 0.55);
-    color: var(--gb-accent);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 14px;
-    font-weight: 700;
     line-height: 1;
-    cursor: pointer;
-    z-index: 1;
-    transition: background 0.18s, border-color 0.18s, color 0.18s, transform 0.18s, box-shadow 0.18s;
+    font-weight: 600;
+    padding: 0;
+    box-sizing: border-box;
+    box-shadow: 0 0 0 4px rgba(247, 249, 255, 0.95);
 }
-.gb-ghost:hover {
-    background: rgba(99, 102, 241, 0.1);
+.gb__avatar--gradient {
+    background: linear-gradient(135deg, var(--gb-accent), var(--gb-accent-2));
+    color: white;
+    box-shadow: 0 0 0 4px rgba(247, 249, 255, 0.95), 0 2px 8px rgba(99, 102, 241, 0.32);
+}
+.gb__avatar--dashed {
+    background: rgba(255, 255, 255, 0.95);
+    color: var(--gb-accent);
+    border: 1.5px dashed rgba(99, 102, 241, 0.55);
+    font-size: 18px;
+}
+button.gb__avatar--dashed {
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+button.gb__avatar--dashed:hover {
+    background: rgba(99, 102, 241, 0.10);
     border-color: var(--gb-accent);
-    color: #4338ca;
-    transform: translate(-50%, -50%) scale(1.1);
-    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12);
+    transform: scale(1.06);
+    box-shadow: 0 0 0 4px rgba(247, 249, 255, 0.95), 0 4px 14px rgba(99, 102, 241, 0.18);
 }
-.gb-ghost-tip {
-    position: absolute;
-    left: calc(100% + 10px);
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 11px;
-    color: var(--gb-muted);
-    white-space: nowrap;
-    background: rgba(255, 255, 255, 0.94);
-    padding: 3px 9px;
-    border-radius: 999px;
-    border: 1px solid rgba(160, 180, 220, 0.32);
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.18s;
-}
-.gb-ghost:hover .gb-ghost-tip { opacity: 1; }
 
-/* ----- Edges ----- */
-.gb-edge {
-    fill: none;
-    stroke: #6366f1;
-    stroke-width: 3;
-    stroke-linecap: round;
+/* ----- Body (right of avatar) ----- */
+.gb__body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
-.gb-edge-hit {
-    stroke: transparent;
-    stroke-width: 18;
-    fill: none;
-    pointer-events: stroke;
-    cursor: pointer;
-}
-/* Splice button only on next (vertical) edges. Branch edges are excluded
-   in the renderer because splicing on a branch is semantically ambiguous. */
-.gb-edge-btn {
-    opacity: 0;
-    cursor: pointer;
-    pointer-events: auto;
-    transition: opacity 0.18s;
-}
-.gb-edge-group:hover .gb-edge-btn,
-.gb-edge-btn:hover { opacity: 1; }
-.gb-edge-btn circle {
-    fill: rgba(255, 255, 255, 0.96);
-    stroke: var(--gb-accent);
-    stroke-width: 1.5;
-    stroke-dasharray: 3 3;
-    transition: fill 0.12s, stroke-dasharray 0.12s;
-}
-.gb-edge-btn text {
-    text-anchor: middle;
-    fill: var(--gb-accent);
+.gb__meta {
+    font-size: 10.5px;
     font-weight: 700;
-    font-size: 16px;
-    font-family: var(--gb-font);
-    user-select: none;
-    transition: fill 0.12s;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--gb-subtle);
+    margin: 6px 0 0 0;            /* aligns visually with the 28px avatar's center */
+    line-height: 1;
 }
-.gb-edge-btn:hover circle { fill: var(--gb-accent); stroke-dasharray: none; }
-.gb-edge-btn:hover text   { fill: #ffffff; }
+.gb__text {
+    font-size: 14px;
+    color: var(--gb-text);
+    margin: 0;
+    line-height: 1.55;
+}
 
-.gb-stub {
-    fill: none;
-    stroke: rgba(99, 102, 241, 0.55);
-    stroke-width: 1.5;
-    stroke-linecap: round;
-    stroke-dasharray: 2 4;
+/* ----- Sub-panel (Text / Choice form rendering) ----- */
+.gb__sub-panel {
+    background: rgba(255, 255, 255, 0.78);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(160, 180, 220, 0.42);
+    border-radius: 12px;
+    box-shadow: 0 6px 24px rgba(59, 41, 102, 0.08);
+    padding: 14px 16px;
 }
-.gb-container-frame {
-    fill: rgba(168, 85, 247, 0.06);
-    stroke: rgba(168, 85, 247, 0.5);
-    stroke-width: 1.5;
-    stroke-dasharray: 6 4;
-    rx: 14;
-    ry: 14;
+.gb__sub-panel h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 4px;
+    color: var(--gb-text);
 }
-.gb-container-frame[data-kind="tabs"]   { stroke: rgba(99, 102, 241, 0.6); fill: rgba(99, 102, 241, 0.06); }
-.gb-container-frame[data-kind="switch"] { stroke: rgba(245, 158, 11, 0.6);  fill: rgba(245, 158, 11, 0.06); }
+.gb__sub-panel p {
+    font-size: 13px;
+    color: var(--gb-muted);
+    margin: 0 0 8px;
+    line-height: 1.5;
+}
+.gb__sub-panel input[type="text"] {
+    padding: 6px 10px;
+    border: 1px solid rgba(160, 180, 220, 0.45);
+    border-radius: 6px;
+    font: inherit;
+    font-size: 13px;
+    background: white;
+    width: 100%;
+    box-sizing: border-box;
+}
+.gb__sub-panel input[type="text"]:focus {
+    outline: none;
+    border-color: rgba(99, 102, 241, 0.55);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+.gb__sub-panel button.gb__form-submit {
+    margin-top: 6px;
+    padding: 5px 14px;
+    background: linear-gradient(135deg, var(--gb-accent), var(--gb-accent-2));
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.24);
+}
+.gb__sub-panel label {
+    display: block;
+    cursor: pointer;
+    padding: 2px 0;
+    font-size: 13px;
+    color: var(--gb-text);
+}
+.gb__sub-panel input[type="radio"] {
+    margin-right: 8px;
+    accent-color: var(--gb-accent);
+}
 
-/* Container tag: small labelled handle anchored to the bbox top-left.
-   Hosts the kind label (clickable to cycle), collapse caret, and Create
-   Branch button. Replaces the node "shape" for container types. */
-.gb-container-tag {
+/* ----- Container row (Tabs / Sequence) -----
+   Vertical layout: chat-bubble header on top, sub-flow region below.
+   The main page thread continues straight at x=14 of the stem; the
+   sub-flow region branches off horizontally to a sub-line at x=44,
+   runs through the rows, and merges back. */
+.gb__row--container {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+}
+.gb__container-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+.gb__container-flow {
+    position: relative;
+    margin-top: 8px;
+    /* Height is now natural — driven by .gb__sub-flow-list which holds
+       the steps/tabs in flex flow. Each row can be variable-height to
+       accommodate its own nested components. */
+}
+.gb__sub-flow-list {
+    display: flex;
+    flex-direction: column;
+    padding: 30px 0;     /* clearance for the 30px branch and merge curves */
+    gap: 8px;
+}
+
+/* ----- Wiring (branch / sub-line / merge / stems) -----
+   All accent-colored 2px lines positioned absolutely within the
+   sub-flow region. Branch and merge connect main thread (x=14) to
+   sub-line (x=44); sub-line runs the full height inside the 12px
+   top/bottom insets; stems extend from sub-line at each tab row's
+   center to where the tab node begins (x=66). */
+.gb__flow-line {
     position: absolute;
-    transform: translateY(-100%);
+    background: var(--gb-accent-2);
+    border-radius: 1px;
+    pointer-events: none;
+}
+/* Sub-line spans the vertical gap between the branch curve (at top:30)
+   and the merge curve (at bottom:30). Solid violet matches the curve
+   stroke so the join is seamless. */
+.gb__flow-line--sub {
+    left: 44px;
+    top: 30px;
+    bottom: 30px;
+    width: 2px;
+    background: var(--gb-accent-2);
+}
+
+/* Branch and merge curves — cubic-Bezier S-curves drawn as SVG so the
+   right turns at the corners (where main thread meets the branch and
+   where the sub-line meets the merge) blend smoothly, like a railroad
+   track easing from one column to another. */
+.gb__flow-curve {
+    position: absolute;
+    pointer-events: none;
+    width: 60px;
+    height: 30px;
+    overflow: visible;
+}
+.gb__flow-curve--branch   { left: 0; top: 0; }
+.gb__flow-curve--merge    { left: 0; bottom: 0; }
+.gb__flow-curve--branch-h { left: 0; top: 0; }
+.gb__flow-curve--merge-h  { left: 0; bottom: 0; }
+.gb__flow-curve path {
+    stroke: var(--gb-accent-2);
+    stroke-width: 2;
+    fill: none;
+}
+
+/* ----- Horizontal Tabs layout -----
+   Tabs container in horizontal mode: parallel branches arranged as
+   columns. Each column owns a vertical thread that connects the top
+   bus to the bottom bus, with the tab node and any nested control
+   flow sitting along it. */
+.gb__container-flow--horiz {
+    overflow-x: auto;        /* allow horizontal scroll if many tabs */
+}
+.gb__tabs-columns {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;    /* all columns share the tallest column's height */
+    gap: 24px;
+    padding: 30px 30px 30px 30px;
+    /* padding-left:30 puts the first column's content at x=30, so its
+       thread (left:14 within the column) lands at x=44 — which matches
+       the branch curve's endpoint. */
+}
+.gb__tab-column {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    min-width: 140px;
+}
+.gb__tab-column::before {
+    content: '';
+    position: absolute;
+    left: 14px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--gb-accent-2);
+    pointer-events: none;
+    z-index: 0;
+}
+.gb__tab-column-header {
+    position: relative;
+    z-index: 2;              /* above the column thread */
+    height: 22px;
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 3px 10px;
-    background: rgba(255, 255, 255, 0.95);
-    border: 1px solid rgba(168, 85, 247, 0.5);
-    border-radius: 8px 8px 0 8px;
-    font-size: 10.5px;
-    font-weight: 600;
-    color: rgba(168, 85, 247, 0.95);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    pointer-events: auto;
+    gap: 10px;
+}
+/* Column owns the thread; the nested-stem's own thread is redundant
+   (would render at the same x, same color) so hide it inside columns. */
+.gb__tab-column .gb__nested-stem::before {
+    display: none;
+}
+.gb__tab-column .gb__nested-stem {
+    margin-top: 12px;
     z-index: 2;
-    white-space: nowrap;
-    box-shadow: 0 -2px 6px rgba(168, 85, 247, 0.12);
-    cursor: pointer;
+    position: relative;
 }
-.gb-container-tag[data-kind="tabs"]   { color: rgba(99, 102, 241, 0.95); border-color: rgba(99, 102, 241, 0.5); box-shadow: 0 -2px 6px rgba(99, 102, 241, 0.12); }
-.gb-container-tag[data-kind="switch"] { color: rgba(245, 158, 11, 0.95);  border-color: rgba(245, 158, 11, 0.5);  box-shadow: 0 -2px 6px rgba(245, 158, 11, 0.12); }
-.gb-container-tag:hover { filter: brightness(1.05); }
 
-.gb-container-tag__label   { user-select: none; }
-.gb-container-tag__caret   {
-    cursor: pointer;
+/* Top and bottom buses: horizontal lines at the top and bottom of the
+   columns area, connecting all column threads. Their left/width are
+   set inline by JS based on measured column positions. */
+.gb__flow-line--top-bus,
+.gb__flow-line--bottom-bus {
+    position: absolute;
+    height: 2px;
+    background: var(--gb-accent-2);
+    border-radius: 1px;
+    pointer-events: none;
+}
+.gb__flow-line--top-bus    { top: 30px; }
+.gb__flow-line--bottom-bus { bottom: 30px; }
+/* Tab stems are now drawn as ::before of each tab sub-row's header
+   (see below), so .gb__flow-line--stem is no longer used by JS but
+   the rule is kept for any future explicit-stem needs. */
+.gb__flow-line--stem {
+    left: 44px;
+    width: 22px;
+    height: 2px;
+}
+
+/* Synchronizing join node at the bottom of the Tabs bus, where the
+   sub-line meets the merge connector. Reads as "wait here for all
+   parallel tabs to complete" — borrowed from BPMN's parallel-join
+   gateway (a 12x12 square rotated 45° = a diamond). */
+.gb__flow-join {
+    position: absolute;
+    left: 44px;
+    bottom: 30px;            /* sits where the sub-line meets the merge curve */
+    width: 12px;
+    height: 12px;
+    transform: translate(-50%, 50%) rotate(45deg);
+    background: linear-gradient(135deg, var(--gb-accent), var(--gb-accent-2));
+    box-shadow: 0 1px 4px rgba(99, 102, 241, 0.32);
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* ----- Sub-rows (steps / tabs) -----
+   Each row has a fixed-height header (the node + label part on the
+   bus) and an optional nested-content area below for the slot's own
+   components. The header is positioned via flex flow inside
+   .gb__sub-flow-list — its vertical position is determined by the
+   layout, so the bus stem (Tabs) is drawn as ::before of the header
+   itself rather than absolutely on the flow region. */
+.gb__sub-row {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    z-index: 2;
+}
+.gb__sub-row-header {
+    position: relative;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.gb__sub-row--seq .gb__sub-row-header {
+    padding-left: 33px;     /* node center at x=44 (= 33 + 22/2) */
+}
+.gb__sub-row--tab .gb__sub-row-header {
+    padding-left: 66px;     /* node starts where the stem ends */
+}
+/* Tab stem: horizontal connector from the bus (x=44) to the tab node
+   (x=66) at the header's vertical center. */
+.gb__sub-row--tab .gb__sub-row-header::before {
+    content: '';
+    position: absolute;
+    left: 44px;
+    top: 10px;
+    width: 22px;
+    height: 2px;
+    background: var(--gb-accent-2);
+    border-radius: 1px;
+}
+
+/* Nested content for non-add slots: indented so the nested-stem's
+   thread (at left:14 of the nested-stem) lands directly under its
+   parent node's center.
+     Tabs:     tab node at x=77 of flow region → nested-stem at x=63
+               (63 + 14 = 77).
+     Sequence: step node at x=44 of flow region → nested-stem at x=30
+               (30 + 14 = 44). The Seq nested thread coincides with the
+               parent's wire (also at x=44), so the wire visually
+               continues straight through the step's content. */
+.gb__sub-row-content {
+    padding-top: 8px;
+    padding-bottom: 12px;
+}
+.gb__sub-row--tab .gb__sub-row-content {
+    padding-left: 63px;
+}
+.gb__sub-row--seq .gb__sub-row-content {
+    padding-left: 30px;
+}
+.gb__nested-stem {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+/* Each tab/step's nested-stem has its own vertical thread, matching the
+   root .gb__stem. The thread extends 8px above the nested-stem's box
+   into the sub-row-content's padding-top area, so it visually reaches
+   the parent node's bottom (= row.top + 22 = node.bottom for the 22px
+   header). Components inside sit on the thread; the line therefore
+   descends from the parent node down through every nested component. */
+.gb__nested-stem::before {
+    content: '';
+    position: absolute;
+    left: 14px;
+    top: -8px;
+    bottom: 14px;
+    width: 2px;
+    background: linear-gradient(to bottom,
+        rgba(99, 102, 241, 0.40) 0%,
+        rgba(99, 102, 241, 0.65) 30%,
+        var(--gb-accent-2) 100%);
+    border-radius: 1px;
+    pointer-events: none;
+    z-index: 0;
+}
+.gb__sub-node {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    padding: 0;
+}
+.gb__sub-node--seq,
+.gb__sub-node--tab:not(.gb__sub-node--add) {
+    background: linear-gradient(135deg, var(--gb-accent), var(--gb-accent-2));
+    color: white;
     font-size: 11px;
-    line-height: 1;
-    padding: 0 3px;
-    border-radius: 4px;
-}
-.gb-container-tag__caret:hover { background: rgba(0, 0, 0, 0.06); }
-.gb-container-tag__addbranch {
-    cursor: pointer;
-    font-size: 13px;
-    line-height: 1;
-    padding: 0 4px;
-    border-radius: 4px;
-    color: inherit;
-}
-.gb-container-tag__addbranch:hover { background: rgba(0, 0, 0, 0.08); }
-
-.gb-container-frame-label {
-    font-family: var(--gb-font);
-    font-size: 10px;
     font-weight: 600;
+    line-height: 1;
+}
+/* Sequence nodes sit on the sub-line — the 22px gradient circle covers
+   the line locally (opaque background) while the line stays visible
+   in the (ROW_HEIGHT − node-height) gap between adjacent nodes. No
+   canvas halo: that would extend coverage past the node and erase the
+   visible "wire between gates" segments. */
+.gb__sub-node--seq:not(.gb__sub-node--add) {
+    box-shadow: 0 1px 4px rgba(99, 102, 241, 0.32);
+}
+.gb__sub-node--tab:not(.gb__sub-node--add) {
+    box-shadow: 0 1px 4px rgba(99, 102, 241, 0.32);
+}
+.gb__sub-node--add {
+    background: rgba(255, 255, 255, 0.95);
+    border: 1.5px dashed rgba(99, 102, 241, 0.55);
+    color: var(--gb-accent);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+button.gb__sub-node--add:hover {
+    background: rgba(99, 102, 241, 0.10);
+    border-color: var(--gb-accent);
+    transform: scale(1.06);
+}
+.gb__sub-label {
+    font-size: 13px;
+    color: var(--gb-text);
+    line-height: 1;
+}
+.gb__sub-label--add {
+    color: var(--gb-subtle);
+}
+
+/* ----- Picker (replaces the trailing ghost when in picking mode) ----- */
+.gb__picker {
+    background: rgba(255, 255, 255, 0.78);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(160, 180, 220, 0.42);
+    border-radius: 14px;
+    box-shadow: 0 6px 24px rgba(59, 41, 102, 0.08);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-width: 320px;
+    width: 100%;
+}
+.gb__picker-title {
+    font-size: 10.5px;
+    font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    fill: rgba(168, 85, 247, 0.85);
-    display: none;   /* superseded by HTML .gb-container-tag */
+    color: var(--gb-subtle);
+    margin: 0 0 6px 0;
 }
+.gb__picker-option {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(160, 180, 220, 0.32);
+    border-radius: 10px;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+    transition: background 0.12s, border-color 0.12s, transform 0.12s;
+}
+.gb__picker-option:hover {
+    background: rgba(99, 102, 241, 0.08);
+    border-color: var(--gb-accent);
+    transform: translateY(-1px);
+}
+.gb__picker-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gb-text);
+}
+.gb__picker-desc {
+    font-size: 11.5px;
+    color: var(--gb-muted);
+}
+.gb__picker-cancel {
+    margin-top: 4px;
+    align-self: flex-start;
+    padding: 4px 12px;
+    border: 1px solid rgba(160, 180, 220, 0.42);
+    background: transparent;
+    color: var(--gb-subtle);
+    border-radius: 999px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 11.5px;
+    transition: color 0.12s, border-color 0.12s;
+}
+.gb__picker-cancel:hover {
+    color: var(--gb-text);
+    border-color: var(--gb-accent);
+}
+
 </style>
-
 <script>
+// ----- Graph Builder — control-flow map -----
+//
+// This is a birds-eye view of a page's CONTROL FLOW. The picker offers
+// only the three control-flow container types — Tabs, Sequence, Group —
+// and the graph is built from those. Data-entry/info components live
+// "inside" each scope but aren't shown here; the eventual Page Editor
+// view will reveal them and allow editing the compiled-page preview.
+//
+// Visual model: a vertical thread with a chat-bubble row per node. For
+// each container, the row has a header (avatar + meta) plus a sub-flow
+// region whose wiring matches the container's control-flow semantics:
+//   Tabs     — bus with side-stems → tab nodes + sync-join diamond
+//   Sequence — wire with inline gates (step nodes ON the wire)
+//   Group    — same bus + side-stems as Tabs but NO sync diamond
+//              (children render together, no gating to merge through)
+//
+// State: `state.components` is the root list. Tabs/Sequence/Group each
+// carry an array of slots ({ label, components: [] }). pickingArray is
+// a direct reference to the array currently being added to — same UX
+// at every nesting level.
 (function () {
-    const root = document.querySelector('.gb');
-    if (!root) return;
+    const stem = document.querySelector('.gb__stem');
+    if (!stem) return;
 
-    const ROW_H   = 130;
-    const COL_W   = 160;
-    const NODE_R  = 22;
-    const GHOST_R = 16;
-    const STUB_GAP_TOP = NODE_R + 6;
-    const STUB_GAP_BOT = GHOST_R + 4;
+    const TYPES = [
+        { id: 'tabs',     glyph: '⫼', label: 'Tabs',     desc: 'Parallel branches; one shown at a time' },
+        { id: 'sequence', glyph: '↓', label: 'Sequence', desc: 'Steps completed in order' },
+        { id: 'group',    glyph: '∥', label: 'Group',    desc: 'A generic scope; components can be added later' },
+    ];
+    const TYPE_BY_ID = Object.fromEntries(TYPES.map(t => [t.id, t]));
 
-    const SVG_NS = 'http://www.w3.org/2000/svg';
-
-    // ----- Type taxonomy -----
-    // form / action are leaves. group / tabs / switch are containers; only
-    // they accept "branch" children. Cycling order: leaves first, then
-    // parallel container, then alternative containers.
-    const TYPES = ['form', 'action', 'group', 'tabs', 'switch'];
-    const TYPE_LABELS = {
-        form:   'Form',
-        action: 'Action',
-        group:  'Group',
-        tabs:   'Tabs',
-        switch: 'Switch',
+    const state = {
+        components: [],
+        pickingArray: null,
     };
-    const CONTAINER_TYPES = new Set(['group', 'tabs', 'switch']);
-    const isContainer = t => CONTAINER_TYPES.has(t);
+    let nextId = 1;
 
-    const svg     = root.querySelector('.gb__svg');
-    const ghostL  = root.querySelector('[data-layer="ghosts"]');
-    const nodeL   = root.querySelector('[data-layer="nodes"]');
-    const canvas  = root.querySelector('.gb__canvas');
-
-    // ----- State -----
-    // Tree-shaped: each node has at most one parent. The parent-child edge
-    // has a `kind` carried on the child as `parentRel`:
-    //   'branch' — horizontal (container member; tab/group sibling/switch alt)
-    //   'next'   — vertical   (sequence successor)
-    // The root has parentRel = null. Each node has at most one 'next' child;
-    // it can have any number of 'branch' children.
-    let state = freshState();
-
-    function freshState() { return { nodes: {}, nextId: 1 }; }
-
-    function makeNode(opts) {
-        opts = opts || {};
-        const id = 'n' + state.nextId++;
-        const num = state.nextId - 1;
-        state.nodes[id] = {
-            id,
-            label: opts.label || ('Node ' + num),
-            x: 0, y: 0,
-            type: opts.type || 'form',
-            collapsed: false,
-            parents: [],
-            children: [],
-            parentRel: opts.parentRel || null,
-        };
-        return id;
+    function newComponent(type) {
+        const c = { id: nextId++, type };
+        // Each container type carries its own slot array. They're
+        // structurally identical — { label, components: [] }[] — so the
+        // sub-row builder and recursive render pipeline are shared.
+        if (type === 'tabs')     c.tabs    = [];
+        if (type === 'sequence') c.steps   = [];
+        // Group is a generic node — its components array holds whatever
+        // gets added later (via drill-down or a Page-Editor mode). For
+        // now the graph view shows the Group as a labeled node only,
+        // with no inline rendering of what it contains.
+        if (type === 'group')    c.components = [];
+        return c;
+    }
+    function newSlot(prefix, n) {
+        return { label: prefix + ' ' + n, components: [] };
     }
 
-    function init() {
-        state = freshState();
-        makeNode({ label: 'Node 1' });
-        layout();
-        render();
+    // ----- Avatar primitives -----
+    function gradientAvatar(glyph) {
+        const av = document.createElement('span');
+        av.className = 'gb__avatar gb__avatar--gradient';
+        av.textContent = glyph;
+        return av;
+    }
+    function dashedAvatar(glyph, options) {
+        const tag = (options && options.button) ? 'button' : 'span';
+        const av = document.createElement(tag);
+        av.className = 'gb__avatar gb__avatar--dashed';
+        av.textContent = glyph;
+        if (options && options.button) av.type = 'button';
+        return av;
     }
 
-    // ----- Type cycling + collapse -----
-    function cycleType(nodeId) {
-        const n = state.nodes[nodeId];
-        if (!n) return;
-        const idx = TYPES.indexOf(n.type);
-        n.type = TYPES[(idx + 1) % TYPES.length];
-        if (!isContainer(n.type)) n.collapsed = false;
-        layout();
-        render();
-    }
-
-    function toggleCollapse(nodeId) {
-        const n = state.nodes[nodeId];
-        if (!n || !isContainer(n.type)) return;
-        n.collapsed = !n.collapsed;
-        layout();
-        render();
-    }
-
-    // ----- Edge accessors (read parentRel from the child) -----
-    function branchesOf(node) {
-        return node.children
-            .map(cid => state.nodes[cid])
-            .filter(c => c && c.parentRel === 'branch');
-    }
-    function nextOf(node) {
-        return node.children
-            .map(cid => state.nodes[cid])
-            .find(c => c && c.parentRel === 'next') || null;
-    }
-
-    // ----- Mutations (topology only; layout() recomputes positions) -----
-
-    // Add a sequence successor below `target`. If `target` already has a
-    // 'next' child, the new node splices between them.
-    function addNext(targetId) {
-        const t = state.nodes[targetId];
-        if (!t) return;
-        const newId = makeNode({ parentRel: 'next' });
-        const n = state.nodes[newId];
-        const existingNext = nextOf(t);
-        if (existingNext) {
-            // splice: t -> newNode -> existingNext
-            t.children = t.children.map(cid => cid === existingNext.id ? newId : cid);
-            existingNext.parents = [newId];
-            n.parents = [t.id];
-            n.children = [existingNext.id];
-        } else {
-            t.children.push(newId);
-            n.parents = [t.id];
+    // ----- Container sub-flow geometry -----
+    // The sub-flow is a region BELOW the container's chat-bubble header
+    // that renders the steps/tabs as a "siding" off the main page thread.
+    // A horizontal branch connector at the top runs from the main thread
+    // (x=14) right to the sub-line (x=44); the sub-line runs vertically
+    // through the sub-rows; a horizontal merge connector at the bottom
+    // returns to the main thread. For Tabs, each row gets a horizontal
+    // stem off the sub-line ending in a tab node — the bus stays
+    // continuous (parallel taps). For Sequence, each step's gradient
+    // node sits ON the sub-line, covering it locally — the wire is
+    // gated at every step.
+    function addFlowWire(flow, kind) {
+        if (kind === 'branch' || kind === 'merge'
+            || kind === 'branch-h' || kind === 'merge-h') {
+            addFlowCurve(flow, kind);
+            return;
         }
-        layout();
-        render();
+        const w = document.createElement('span');
+        w.className = 'gb__flow-line gb__flow-line--' + kind;
+        flow.appendChild(w);
     }
 
-    // Add a horizontal branch under `target`. Only meaningful for container
-    // types — the affordance is hidden on form/action via CSS, but the
-    // function is permissive (callers should gate).
-    function addBranch(targetId) {
-        const t = state.nodes[targetId];
-        if (!t) return;
-        const newId = makeNode({ parentRel: 'branch' });
-        const n = state.nodes[newId];
-        n.parents = [t.id];
-        t.children.push(newId);
-        layout();
-        render();
+    function addFlowCurve(flow, kind) {
+        // Cubic Bezier curves that smooth the right turns at the corners.
+        //   branch / merge  — vertical → vertical S-curve (Sequence and
+        //                     anything that branches "down to a column").
+        //   branch-h        — vertical → horizontal quarter-arc (entering
+        //                     the top bus of horizontally-laid Tabs).
+        //   merge-h         — horizontal → vertical quarter-arc (leaving
+        //                     the bottom bus back to the main thread).
+        const SVG_NS = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(SVG_NS, 'svg');
+        svg.setAttribute('class', 'gb__flow-curve gb__flow-curve--' + kind);
+        svg.setAttribute('width', '60');
+        svg.setAttribute('height', '30');
+        svg.setAttribute('viewBox', '0 0 60 30');
+        const path = document.createElementNS(SVG_NS, 'path');
+        let d;
+        if      (kind === 'branch')   d = 'M 14,0 C 14,15 44,15 44,30';
+        else if (kind === 'merge')    d = 'M 44,0 C 44,15 14,15 14,30';
+        else if (kind === 'branch-h') d = 'M 14,0 C 14,15 29,30 44,30';
+        else                          d = 'M 44,0 C 29,0 14,15 14,30';
+        path.setAttribute('d', d);
+        svg.appendChild(path);
+        flow.appendChild(svg);
     }
 
-    // Splice a fresh node onto a 'next' (vertical) edge between parent and
-    // child. The new node inherits the child's parentRel; the child becomes
-    // the new node's 'next'. Branch edges aren't spliceable in v1.
-    function spliceEdge(parentId, childId) {
-        const p = state.nodes[parentId];
-        const c = state.nodes[childId];
-        if (!p || !c) return;
-        if (!p.children.includes(childId)) return;
-        if (c.parentRel !== 'next') return;  // only splice on next edges
-        const newId = makeNode({ parentRel: 'next' });
-        const m = state.nodes[newId];
-        p.children = p.children.map(id => id === childId ? newId : id);
-        c.parents  = [newId];
-        c.parentRel = 'next';
-        m.parents  = [parentId];
-        m.children = [childId];
-        layout();
-        render();
-    }
+    function buildSubRow(opts) {
+        // opts: { variant ('seq'|'tab'), glyph, slot, isAdd, onAdd, addLabel }
+        // For non-add rows, the slot is { label, components } and the row
+        // recursively renders its components below the header.
+        const row = document.createElement('div');
+        row.className = 'gb__sub-row gb__sub-row--' + opts.variant
+                      + (opts.isAdd ? ' gb__sub-row--add' : '');
 
-    // ----- Visibility (collapsed-container hiding) -----
-    function isHidden(nodeId) {
-        const seen = new Set();
-        const stack = (state.nodes[nodeId] && state.nodes[nodeId].parents || []).slice();
-        while (stack.length) {
-            const id = stack.pop();
-            if (seen.has(id)) continue;
-            seen.add(id);
-            const n = state.nodes[id];
-            if (!n) continue;
-            if (isContainer(n.type) && n.collapsed) return true;
-            n.parents.forEach(pid => stack.push(pid));
+        const header = document.createElement('div');
+        header.className = 'gb__sub-row-header';
+
+        const node = document.createElement(opts.isAdd ? 'button' : 'span');
+        node.className = 'gb__sub-node gb__sub-node--' + opts.variant
+                       + (opts.isAdd ? ' gb__sub-node--add' : '');
+        if (opts.isAdd) {
+            node.type = 'button';
+            node.textContent = '+';
+            const aria = opts.variant === 'seq' ? 'Add a step' : 'Add a tab';
+            node.title = aria;
+            node.setAttribute('aria-label', aria);
+            node.addEventListener('click', opts.onAdd);
+        } else if (opts.glyph) {
+            node.textContent = opts.glyph;
         }
-        return false;
-    }
-    function visibleNodes() { return Object.values(state.nodes).filter(n => !isHidden(n.id)); }
-    function descendantCount(rootId) {
-        const seen = new Set();
-        const stack = [rootId];
-        let count = 0;
-        while (stack.length) {
-            const id = stack.pop();
-            if (seen.has(id)) continue;
-            seen.add(id);
-            if (id !== rootId) count++;
-            const n = state.nodes[id];
-            if (n) n.children.forEach(cid => stack.push(cid));
+        header.appendChild(node);
+
+        const lbl = document.createElement('span');
+        lbl.className = 'gb__sub-label' + (opts.isAdd ? ' gb__sub-label--add' : '');
+        lbl.textContent = opts.isAdd ? opts.addLabel : opts.slot.label;
+        header.appendChild(lbl);
+
+        row.appendChild(header);
+
+        // Nested content area — every non-add slot recursively renders
+        // its own components list with the same picker UX as the root.
+        if (!opts.isAdd) {
+            const content = document.createElement('div');
+            content.className = 'gb__sub-row-content';
+            const nestedStem = document.createElement('div');
+            nestedStem.className = 'gb__nested-stem';
+            renderStem(opts.slot.components, nestedStem);
+            content.appendChild(nestedStem);
+            row.appendChild(content);
         }
-        return count;
+
+        return row;
     }
 
-    // ----- Layout -----
-    // Branches go right; next goes down. subtreeWidth tells us how many cols
-    // a subtree occupies (so adjacent branches don't collide). subtreeWidth
-    // takes the max of "this row's width via branches" and "next subtree's
-    // width" so vertically-stacked branches with their own branches are
-    // accounted for.
-    function subtreeWidth(rootId, memo) {
-        if (memo[rootId] !== undefined) return memo[rootId];
-        memo[rootId] = 1;   // cycle guard (impossible in tree, but cheap)
-        const n = state.nodes[rootId];
-        if (!n || isHidden(rootId)) { memo[rootId] = 1; return 1; }
-        const branches = branchesOf(n).filter(c => !isHidden(c.id));
-        const branchesSum = branches.reduce((s, c) => s + subtreeWidth(c.id, memo), 0);
-        const myRowWidth = 1 + branchesSum;
-        const nx = nextOf(n);
-        const nextWidth = (nx && !isHidden(nx.id)) ? subtreeWidth(nx.id, memo) : 0;
-        memo[rootId] = Math.max(myRowWidth, nextWidth);
-        return memo[rootId];
-    }
+    function buildSequenceFlow(component) {
+        const flow = document.createElement('div');
+        flow.className = 'gb__container-flow gb__container-flow--seq';
 
-    function layout() {
-        if (Object.keys(state.nodes).length === 0) return;
-        const rect = canvas.getBoundingClientRect();
-        const anchorX = Math.round(rect.width  / 2)  || 480;
-        const anchorY = Math.round(rect.height / 3)  || 120;
-        const positions = Object.create(null);
-        const widthMemo = Object.create(null);
+        addFlowWire(flow, 'branch');
+        addFlowWire(flow, 'sub');
+        addFlowWire(flow, 'merge');
 
-        const roots = Object.values(state.nodes).filter(n => n.parents.length === 0);
-        let baseCol = 0;
-        for (const r of roots) {
-            placeRecursive(r.id, baseCol, 0, positions, widthMemo);
-            baseCol += subtreeWidth(r.id, widthMemo);
-        }
-        // Centre the union of all roots' subtrees around anchorX.
-        const totalWidth = baseCol;
-        const offsetCol = -(totalWidth - 1) / 2;
+        const list = document.createElement('div');
+        list.className = 'gb__sub-flow-list';
 
-        Object.values(state.nodes).forEach(n => {
-            const p = positions[n.id];
-            if (!p) return;
-            n.x = anchorX + (p.col + offsetCol) * COL_W;
-            n.y = anchorY + p.row * ROW_H;
+        component.steps.forEach((slot, i) => {
+            list.appendChild(buildSubRow({
+                variant: 'seq',
+                glyph: String(i + 1),
+                slot: slot,
+                isAdd: false,
+            }));
         });
+        list.appendChild(buildSubRow({
+            variant: 'seq',
+            isAdd: true,
+            addLabel: 'Add step',
+            onAdd: () => {
+                component.steps.push(newSlot('Step', component.steps.length + 1));
+                render();
+            },
+        }));
+
+        flow.appendChild(list);
+        return flow;
     }
 
-    function placeRecursive(nodeId, col, row, positions, widthMemo) {
-        if (positions[nodeId]) return;
-        positions[nodeId] = { col, row };
-        const n = state.nodes[nodeId];
-        if (!n || isHidden(nodeId)) return;
-        // Branches at this row, starting from col+1, shifting right by each
-        // sibling's full subtree width.
-        const branches = branchesOf(n).filter(c => !isHidden(c.id));
-        let branchCol = col + 1;
-        const branchCols = [];
-        for (const b of branches) {
-            placeRecursive(b.id, branchCol, row, positions, widthMemo);
-            branchCols.push(branchCol);
-            branchCol += subtreeWidth(b.id, widthMemo);
+    function buildTabsFlow(component) {
+        // Horizontal Tabs: parallel branches arranged side-by-side as
+        // columns. The top bus (horizontal) feeds each column from above;
+        // each column has its own vertical thread descending through the
+        // tab node and any nested control flow; the bottom bus collects
+        // them all and the merge curve returns to the main thread.
+        const flow = document.createElement('div');
+        flow.className = 'gb__container-flow gb__container-flow--tabs gb__container-flow--horiz';
+
+        // Branch: vertical → horizontal quarter-arc.
+        addFlowWire(flow, 'branch-h');
+
+        // Top and bottom buses: their left/width are positioned by JS
+        // after layout, since column widths are content-driven.
+        const topBus = document.createElement('span');
+        topBus.className = 'gb__flow-line gb__flow-line--top-bus';
+        flow.appendChild(topBus);
+
+        const cols = document.createElement('div');
+        cols.className = 'gb__tabs-columns';
+
+        component.tabs.forEach((slot) => {
+            cols.appendChild(buildTabColumn(slot, false));
+        });
+        cols.appendChild(buildTabColumn(null, true, () => {
+            component.tabs.push(newSlot('Tab', component.tabs.length + 1));
+            render();
+        }));
+
+        flow.appendChild(cols);
+
+        const bottomBus = document.createElement('span');
+        bottomBus.className = 'gb__flow-line gb__flow-line--bottom-bus';
+        flow.appendChild(bottomBus);
+
+        // Synchronizing join at the LEFT end of the bottom bus, where the
+        // merge curve departs back to the main thread.
+        const join = document.createElement('span');
+        join.className = 'gb__flow-join';
+        flow.appendChild(join);
+
+        // Merge: horizontal → vertical quarter-arc.
+        addFlowWire(flow, 'merge-h');
+
+        return flow;
+    }
+
+    function buildTabColumn(slot, isAdd, onAdd) {
+        const col = document.createElement('div');
+        col.className = 'gb__tab-column' + (isAdd ? ' gb__tab-column--add' : '');
+
+        const header = document.createElement('div');
+        header.className = 'gb__tab-column-header';
+
+        const node = document.createElement(isAdd ? 'button' : 'span');
+        node.className = 'gb__sub-node gb__sub-node--tab' + (isAdd ? ' gb__sub-node--add' : '');
+        if (isAdd) {
+            node.type = 'button';
+            node.textContent = '+';
+            node.title = 'Add a tab';
+            node.setAttribute('aria-label', 'Add a tab');
+            node.addEventListener('click', onAdd);
         }
-        // Container nodes are visually invisible (rendered as just a frame
-        // around their branches). Re-anchor the container's col to the
-        // centre of its branches so its next-edge drops from the bbox
-        // centre rather than the leftmost column.
-        let nextCol = col;
-        if (isContainer(n.type) && branchCols.length > 0) {
-            const centerCol = (branchCols[0] + branchCols[branchCols.length - 1]) / 2;
-            positions[nodeId].col = centerCol;
-            nextCol = centerCol;
+        header.appendChild(node);
+
+        const lbl = document.createElement('span');
+        lbl.className = 'gb__sub-label' + (isAdd ? ' gb__sub-label--add' : '');
+        lbl.textContent = isAdd ? 'Add tab' : slot.label;
+        header.appendChild(lbl);
+
+        col.appendChild(header);
+
+        if (!isAdd) {
+            // Nested control flow inside this tab — same recursive renderStem
+            // as everywhere else. The column owns its thread (::before), so
+            // nested-stem's own thread is hidden via CSS inside columns.
+            const nestedStem = document.createElement('div');
+            nestedStem.className = 'gb__nested-stem';
+            renderStem(slot.components, nestedStem);
+            col.appendChild(nestedStem);
         }
-        // Next at this col, row+1.
-        const nx = nextOf(n);
-        if (nx && !isHidden(nx.id)) placeRecursive(nx.id, nextCol, row + 1, positions, widthMemo);
+
+        return col;
+    }
+
+    // No buildGroupFlow — Group renders as a chat-bubble header only.
+    // Its components array is populated later (drill-down / Page Editor),
+    // not via inline graph affordances.
+
+    // Tabs and Sequence carry their own sub-flow wiring; Group is just
+    // a generic labeled node (its contents are accessed elsewhere).
+    const CONTAINER_DESCS = {
+        tabs:     'Parallel branches — every tap is reachable simultaneously; all must complete to merge.',
+        sequence: 'Sequential steps — each gates the next.',
+        group:    'A generic scope — components can be added later.',
+    };
+
+    // ----- Row builder -----
+    function buildComponentRow(component) {
+        // Vertical layout: a chat-bubble header on top (avatar + meta +
+        // description). Tabs and Sequence append a sub-flow region whose
+        // wiring matches their control-flow semantics; Group stops at
+        // the header.
+        const meta = TYPE_BY_ID[component.type];
+
+        const row = document.createElement('div');
+        row.className = 'gb__row gb__row--container gb__row--' + component.type;
+
+        const header = document.createElement('div');
+        header.className = 'gb__container-header';
+
+        header.appendChild(gradientAvatar(meta.glyph));
+
+        const body = document.createElement('div');
+        body.className = 'gb__body';
+
+        const metaEl = document.createElement('div');
+        metaEl.className = 'gb__meta';
+        metaEl.textContent = meta.label;
+        body.appendChild(metaEl);
+
+        const desc = document.createElement('p');
+        desc.className = 'gb__text';
+        desc.textContent = CONTAINER_DESCS[component.type];
+        body.appendChild(desc);
+
+        header.appendChild(body);
+        row.appendChild(header);
+
+        if (component.type === 'tabs') {
+            row.appendChild(buildTabsFlow(component));
+        } else if (component.type === 'sequence') {
+            row.appendChild(buildSequenceFlow(component));
+        }
+        // Group has no inline flow region.
+
+        return row;
+    }
+
+    function buildGhostRow(targetArray) {
+        const row = document.createElement('div');
+        row.className = 'gb__row gb__row--ghost';
+
+        const av = dashedAvatar('+', { button: true });
+        av.setAttribute('aria-label', 'Add component');
+        av.addEventListener('click', () => {
+            state.pickingArray = targetArray;
+            render();
+        });
+        row.appendChild(av);
+
+        return row;
+    }
+
+    function buildPickerRow(targetArray) {
+        const row = document.createElement('div');
+        row.className = 'gb__row gb__row--picker';
+
+        // Decorative dashed `+` avatar — keeps the visual rhythm aligned
+        // with the thread while the picker is open.
+        row.appendChild(dashedAvatar('+'));
+
+        const picker = document.createElement('div');
+        picker.className = 'gb__picker';
+        picker.setAttribute('role', 'menu');
+
+        const title = document.createElement('div');
+        title.className = 'gb__picker-title';
+        title.textContent = 'Add component';
+        picker.appendChild(title);
+
+        TYPES.forEach(t => {
+            const opt = document.createElement('button');
+            opt.type = 'button';
+            opt.className = 'gb__picker-option';
+            opt.dataset.type = t.id;
+            opt.setAttribute('role', 'menuitem');
+
+            const lbl = document.createElement('span');
+            lbl.className = 'gb__picker-label';
+            lbl.textContent = t.label;
+            opt.appendChild(lbl);
+
+            const desc = document.createElement('span');
+            desc.className = 'gb__picker-desc';
+            desc.textContent = t.desc;
+            opt.appendChild(desc);
+
+            opt.addEventListener('click', () => {
+                targetArray.push(newComponent(t.id));
+                state.pickingArray = null;
+                render();
+            });
+            picker.appendChild(opt);
+        });
+
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'gb__picker-cancel';
+        cancel.textContent = 'Cancel';
+        cancel.addEventListener('click', () => {
+            state.pickingArray = null;
+            render();
+        });
+        picker.appendChild(cancel);
+
+        row.appendChild(picker);
+        return row;
     }
 
     // ----- Render -----
-    // Container nodes are invisible. Their visual representation is a labelled
-    // bounding box around their branches plus an HTML "tag" handle at the
-    // bbox top-left. Bboxes are computed once per render pass and cached on
-    // each container node so edge/ghost/node renderers can read them.
+    // renderStem is the recursive workhorse: given a components array and
+    // a DOM container, it renders each component row followed by either
+    // the picker (if state.pickingArray points at this exact array) or
+    // a + ghost (otherwise). Container components call renderStem on
+    // their nested arrays via buildSubRow → same UX everywhere.
+    function renderStem(arr, container) {
+        arr.forEach(c => container.appendChild(buildComponentRow(c)));
+        if (state.pickingArray === arr) {
+            container.appendChild(buildPickerRow(arr));
+        } else {
+            container.appendChild(buildGhostRow(arr));
+        }
+    }
+
+    function positionHorizontalBuses(flow) {
+        // The top and bottom buses span from the FIRST column's thread
+        // to the LAST column's thread (which is the trailing add column).
+        // Column widths are content-driven, so we measure positions after
+        // layout and write left/width inline.
+        const cols = flow.querySelectorAll(':scope > .gb__tabs-columns > .gb__tab-column');
+        if (cols.length === 0) return;
+        const flowRect = flow.getBoundingClientRect();
+        const firstRect = cols[0].getBoundingClientRect();
+        const lastRect = cols[cols.length - 1].getBoundingClientRect();
+        // Each column's thread is at left:14 of the column.
+        const firstX = firstRect.left - flowRect.left + 14;
+        const lastX  = lastRect.left  - flowRect.left + 14;
+        const width  = lastX - firstX;
+
+        const top = flow.querySelector(':scope > .gb__flow-line--top-bus');
+        const bot = flow.querySelector(':scope > .gb__flow-line--bottom-bus');
+        if (top) { top.style.left = firstX + 'px'; top.style.width = width + 'px'; }
+        if (bot) { bot.style.left = firstX + 'px'; bot.style.width = width + 'px'; }
+
+        // Sync diamond sits at the LEFT end of the bottom bus, where the
+        // merge curve starts. It defaults to left:44 in CSS (matching
+        // vertical Tabs); for horizontal we override with the measured x.
+        const join = flow.querySelector(':scope > .gb__flow-join');
+        if (join) join.style.left = firstX + 'px';
+    }
+
     function render() {
-        computeContainerBBoxes();
-        renderEdges();
-        renderNodes();
-        renderGhosts();
+        stem.innerHTML = '';
+        renderStem(state.components, stem);
+        // After the DOM is in place, lay out any horizontal Tabs buses.
+        // getBoundingClientRect triggers layout, so positions are correct.
+        document.querySelectorAll('.gb__container-flow--horiz')
+            .forEach(positionHorizontalBuses);
     }
 
-    function computeContainerBBoxes() {
-        Object.values(state.nodes).forEach(n => { n._bbox = null; });
-        const PAD_X = 22, PAD_Y = 24;
-        const visible = new Set(visibleNodes().map(n => n.id));
-        const visited = new Set();
-        function visit(id) {
-            if (visited.has(id)) return;
-            visited.add(id);
-            const n = state.nodes[id];
-            if (!n) return;
-            // Children first so nested container bboxes are known when their
-            // parent's bbox is computed.
-            n.children.forEach(visit);
-            if (!isContainer(n.type) || !visible.has(id) || n.collapsed) return;
-            const branches = branchesOf(n).filter(c => visible.has(c.id));
-            if (branches.length === 0) {
-                n._bbox = { x: n.x - 50, y: n.y - 24, w: 100, h: 48 };
-                return;
-            }
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-            for (const b of branches) {
-                const bb = visualBBox(b);
-                minX = Math.min(minX, bb.x);
-                maxX = Math.max(maxX, bb.x + bb.w);
-                minY = Math.min(minY, bb.y);
-                maxY = Math.max(maxY, bb.y + bb.h);
-            }
-            n._bbox = {
-                x: minX - PAD_X,
-                y: minY - PAD_Y,
-                w: (maxX - minX) + 2 * PAD_X,
-                h: (maxY - minY) + 2 * PAD_Y,
-            };
-        }
-        Object.values(state.nodes).forEach(n => visit(n.id));
-    }
-
-    // Visual extent of a node — the container's bbox if it has one, otherwise
-    // the leaf's shape footprint. Used so nested containers' frames enclose
-    // their inner containers' frames, not just their (zero-width) anchors.
-    function visualBBox(n) {
-        if (isContainer(n.type) && n._bbox) return n._bbox;
-        const halfW = nodeHalfW(n);
-        const halfH = 22;
-        return { x: n.x - halfW, y: n.y - halfH, w: 2 * halfW, h: 2 * halfH };
-    }
-
-    function renderEdges() {
-        while (svg.firstChild) svg.removeChild(svg.firstChild);
-        const visible = new Set(visibleNodes().map(n => n.id));
-
-        // Container frames: dashed bounding box around each container's
-        // branches. Drawn first so edges + nodes paint over them.
-        Object.values(state.nodes).forEach(n => {
-            if (!n._bbox) return;
-            const rect = document.createElementNS(SVG_NS, 'rect');
-            rect.setAttribute('class', 'gb-container-frame');
-            rect.setAttribute('data-kind', n.type);
-            rect.setAttribute('x', n._bbox.x);
-            rect.setAttribute('y', n._bbox.y);
-            rect.setAttribute('width',  n._bbox.w);
-            rect.setAttribute('height', n._bbox.h);
-            svg.appendChild(rect);
-        });
-
-        // Edges. We draw:
-        //   - chain segments between consecutive branches of a container or
-        //     leaf parent (so the horizontal strip reads as a single track);
-        //   - the parent → first-branch segment ONLY if the parent is NOT a
-        //     container (containers express membership via the bbox);
-        //   - vertical next edges from a parent's bottom (or bbox bottom for
-        //     containers) down to the next child.
-        Object.values(state.nodes).forEach(n => {
-            if (!visible.has(n.id)) return;
-            const branches = branchesOf(n).filter(c => visible.has(c.id));
-            for (let i = 1; i < branches.length; i++) {
-                drawBranchEdge(branches[i - 1], branches[i]);
-            }
-            if (branches.length > 0 && !isContainer(n.type)) {
-                drawBranchEdge(n, branches[0]);
-            }
-            const nx = nextOf(n);
-            if (nx && visible.has(nx.id)) drawNextEdge(n, nx);
-        });
-
-        // Ghost stubs: dotted line between a node and its (would-be) next
-        // child, where the leaf ghost lives. For containers the stub
-        // originates at bbox bottom-centre.
-        Object.values(state.nodes).forEach(n => {
-            if (!visible.has(n.id)) return;
-            const nx = nextOf(n);
-            if (nx && visible.has(nx.id)) return;
-            const start = nextEdgeStart(n);
-            const x1 = start.x, y1 = start.y + 6;
-            const x2 = start.x, y2 = start.y + ROW_H - NODE_R - STUB_GAP_BOT;
-            const path = document.createElementNS(SVG_NS, 'path');
-            path.setAttribute('d', `M ${x1} ${y1} L ${x2} ${y2}`);
-            path.setAttribute('class', 'gb-stub');
-            svg.appendChild(path);
-        });
-    }
-
-    // The point on a node (or container bbox) where its next-edge / next-stub
-    // should originate.
-    function nextEdgeStart(n) {
-        if (isContainer(n.type) && n._bbox) {
-            return { x: n._bbox.x + n._bbox.w / 2, y: n._bbox.y + n._bbox.h };
-        }
-        return { x: n.x, y: n.y + NODE_R };
-    }
-
-    function drawBranchEdge(fromN, toN) {
-        // Horizontal connection: from-right → to-left. Straight line if
-        // same Y; gentle bezier otherwise.
-        const x1 = fromN.x + nodeHalfW(fromN), y1 = fromN.y;
-        const x2 = toN.x   - nodeHalfW(toN),   y2 = toN.y;
-        const midX = (x1 + x2) / 2;
-        const d = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
-        const g = document.createElementNS(SVG_NS, 'g');
-        g.setAttribute('class', 'gb-edge-group');
-        g.setAttribute('data-from', fromN.id);
-        g.setAttribute('data-to',   toN.id);
-        const hit = document.createElementNS(SVG_NS, 'path');
-        hit.setAttribute('d', d);
-        hit.setAttribute('class', 'gb-edge-hit');
-        g.appendChild(hit);
-        const visiblePath = document.createElementNS(SVG_NS, 'path');
-        visiblePath.setAttribute('d', d);
-        visiblePath.setAttribute('class', 'gb-edge');
-        g.appendChild(visiblePath);
-        // No splice + on branch edges.
-        svg.appendChild(g);
-    }
-
-    function drawNextEdge(parentN, childN) {
-        const start = nextEdgeStart(parentN);
-        const x1 = start.x, y1 = start.y;
-        const x2 = childN.x,  y2 = childN.y - NODE_R;
-        const midY = (y1 + y2) / 2;
-        const d = `M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`;
-        const mx = (x1 + x2) / 2;
-        const my = (y1 + y2) / 2;
-        const g = document.createElementNS(SVG_NS, 'g');
-        g.setAttribute('class', 'gb-edge-group');
-        g.setAttribute('data-from', parentN.id);
-        g.setAttribute('data-to',   childN.id);
-        const hit = document.createElementNS(SVG_NS, 'path');
-        hit.setAttribute('d', d);
-        hit.setAttribute('class', 'gb-edge-hit');
-        g.appendChild(hit);
-        const visiblePath = document.createElementNS(SVG_NS, 'path');
-        visiblePath.setAttribute('d', d);
-        visiblePath.setAttribute('class', 'gb-edge');
-        g.appendChild(visiblePath);
-        const btn = document.createElementNS(SVG_NS, 'g');
-        btn.setAttribute('class', 'gb-edge-btn');
-        btn.setAttribute('transform', `translate(${mx}, ${my})`);
-        btn.addEventListener('click', () => spliceEdge(parentN.id, childN.id));
-        const circle = document.createElementNS(SVG_NS, 'circle');
-        circle.setAttribute('r', '13');
-        btn.appendChild(circle);
-        const txt = document.createElementNS(SVG_NS, 'text');
-        txt.setAttribute('dy', '0.32em');
-        txt.textContent = '+';
-        btn.appendChild(txt);
-        g.appendChild(btn);
-        svg.appendChild(g);
-    }
-
-    function nodeHalfW(n) {
-        // Half-widths reflect the data-type widths set in CSS.
-        if (n.type === 'group') return 40;
-        if (n.type === 'tabs')  return 35;
-        return 22;
-    }
-
-    function subtreeIds(rootId) {
-        const seen = new Set();
-        const stack = [rootId];
-        const out = [];
-        while (stack.length) {
-            const id = stack.pop();
-            if (seen.has(id)) continue;
-            seen.add(id);
-            out.push(id);
-            const n = state.nodes[id];
-            if (n) n.children.forEach(cid => stack.push(cid));
-        }
-        return out;
-    }
-
-    function subtreeBBox(ids) {
-        const PAD = 26;
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        ids.forEach(id => {
-            const n = state.nodes[id];
-            if (!n) return;
-            const halfW = nodeHalfW(n);
-            const halfH = 22;
-            minX = Math.min(minX, n.x - halfW);
-            maxX = Math.max(maxX, n.x + halfW);
-            minY = Math.min(minY, n.y - halfH);
-            maxY = Math.max(maxY, n.y + halfH);
-        });
-        return { x: minX - PAD, y: minY - PAD, w: (maxX - minX) + 2 * PAD, h: (maxY - minY) + 2 * PAD };
-    }
-
-    function renderNodes() {
-        nodeL.innerHTML = '';
-        visibleNodes().forEach(n => {
-            if (isContainer(n.type)) renderContainer(n);
-            else                     renderLeafNode(n);
-        });
-    }
-
-    // Leaf nodes (form / action) render as a coloured shape centred on (x,y),
-    // with the type pill / label stack on the right and the Create-Branch
-    // affordance hidden via CSS.
-    function renderLeafNode(n) {
-        const el = document.createElement('div');
-        el.className = 'gb-node';
-        el.dataset.id = n.id;
-        el.dataset.type = n.type;
-        el.style.left = n.x + 'px';
-        el.style.top  = n.y + 'px';
-
-        const shape = document.createElement('div');
-        shape.className = 'gb-node-shape';
-        const glyph = document.createElement('span');
-        glyph.className = 'gb-node-glyph';
-        glyph.textContent = n.id.slice(1);
-        shape.appendChild(glyph);
-        el.appendChild(shape);
-
-        const stack = document.createElement('div');
-        stack.className = 'gb-node-stack';
-        const lab = document.createElement('span');
-        lab.className = 'gb-node-label';
-        lab.textContent = n.label;
-        stack.appendChild(lab);
-        const typePill = document.createElement('span');
-        typePill.className = 'gb-node-type';
-        typePill.textContent = TYPE_LABELS[n.type];
-        typePill.title = 'Click to cycle type';
-        typePill.addEventListener('click', e => { e.stopPropagation(); cycleType(n.id); });
-        stack.appendChild(typePill);
-        el.appendChild(stack);
-        nodeL.appendChild(el);
-    }
-
-    // Container nodes (group / tabs / switch) are invisible — only the bbox
-    // (drawn in renderEdges) and a small HTML tag handle anchored to the
-    // bbox top-left. The tag is the interactive locus: click it to cycle
-    // kind, click + to add another branch, click ▾ to collapse.
-    function renderContainer(n) {
-        if (!n._bbox) return;
-        const tag = document.createElement('div');
-        tag.className = 'gb-container-tag';
-        tag.dataset.id = n.id;
-        tag.dataset.kind = n.type;
-        tag.style.left = n._bbox.x + 'px';
-        tag.style.top  = n._bbox.y + 'px';   // CSS translateY(-100%) lifts it above the bbox
-        tag.title = 'Click to cycle container kind';
-        tag.addEventListener('click', e => {
-            // Plain click anywhere on the tag (except the inner buttons)
-            // cycles kind. Inner button handlers stop propagation.
-            cycleType(n.id);
-        });
-
-        const label = document.createElement('span');
-        label.className = 'gb-container-tag__label';
-        label.textContent = TYPE_LABELS[n.type];
-        tag.appendChild(label);
-
-        const addBranchBtn = document.createElement('span');
-        addBranchBtn.className = 'gb-container-tag__addbranch';
-        addBranchBtn.textContent = '+';
-        addBranchBtn.title = 'Add a branch';
-        addBranchBtn.addEventListener('click', e => { e.stopPropagation(); addBranch(n.id); });
-        tag.appendChild(addBranchBtn);
-
-        const caret = document.createElement('span');
-        caret.className = 'gb-container-tag__caret';
-        caret.textContent = n.collapsed ? '▸' : '▾';
-        caret.title = n.collapsed ? 'Expand' : 'Collapse';
-        caret.addEventListener('click', e => { e.stopPropagation(); toggleCollapse(n.id); });
-        tag.appendChild(caret);
-
-        if (n.collapsed) {
-            const badge = document.createElement('span');
-            badge.className = 'gb-node-badge';
-            badge.style.marginLeft = '4px';
-            const c = descendantCount(n.id);
-            badge.textContent = c + ' hidden';
-            tag.appendChild(badge);
-        }
-
-        nodeL.appendChild(tag);
-    }
-
-    function renderGhosts() {
-        ghostL.innerHTML = '';
-        const visible = new Set(visibleNodes().map(n => n.id));
-        Object.values(state.nodes).forEach(n => {
-            if (!visible.has(n.id)) return;
-            const nx = nextOf(n);
-            if (nx && visible.has(nx.id)) return;   // already has a next
-            const start = nextEdgeStart(n);
-            const el = document.createElement('div');
-            el.className = 'gb-ghost';
-            el.dataset.parentId = n.id;
-            el.style.left = start.x + 'px';
-            el.style.top  = (start.y + ROW_H - NODE_R) + 'px';
-            el.textContent = '+';
-            el.title = 'Add sequence step';
-            el.addEventListener('click', () => addNext(n.id));
-            const tip = document.createElement('span');
-            tip.className = 'gb-ghost-tip';
-            tip.textContent = 'Add sequence step';
-            el.appendChild(tip);
-            ghostL.appendChild(el);
-        });
-    }
-
-    // ----- Wire up reset and initial render -----
-    root.querySelector('[data-action="reset"]').addEventListener('click', init);
-    requestAnimationFrame(init);
+    render();
 })();
 </script>
 {% endblock %}
