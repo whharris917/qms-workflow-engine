@@ -969,16 +969,104 @@
     border: none;
     box-shadow: 0 0 0 4px rgba(247, 249, 255, 0.95), 0 2px 8px rgba(34, 197, 94, 0.4);
 }
-/* QA's nested-Sequence sub-step avatars — same 22px size, with
-   completion (green) and locked (dim) state variants. */
-.expD-sub-done {
-    background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
-    box-shadow: 0 0 0 4px rgba(247, 249, 255, 0.95), 0 2px 8px rgba(34, 197, 94, 0.4);
+/* (Earlier numbered-avatar variants for the old per-phase chat-bubble
+   layout — `.expD-sub-done`, `.expD-sub-locked`, `.expD-step-locked`,
+   and the locked variants of `.expD-tabs-junction` — were removed when
+   D was unified onto the junction-with-step-pills motif below: every
+   gated sequence now renders as an S-junction with the lock state on
+   the pills themselves, not on a separate chat-bubble avatar.) */
+
+/* T-junction for D's tab strips. A small node sits ON the vertical
+   thread at x=14 (its center, like the bubble avatar above), and a short
+   horizontal connector bridges it to the tab strip at the strip's
+   natural position. Replaces the JS-driven "shift the strip so the
+   active tab centers on the thread" treatment that C still uses;
+   every tab button stays where padding put it, and the thread-to-tabs
+   relationship is made explicit by geometry instead of by alignment. */
+.expD-tabs-junction {
+    z-index: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0;
 }
-.expD-sub-locked {
-    background: rgba(160, 180, 220, 0.35);
+.expD-tabs-tnode {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.32);
+}
+.expD-tabs-connector {
+    display: block;
+    flex-shrink: 0;
+    width: 16px;
+    height: 2px;
+    background: linear-gradient(to right, rgba(99, 102, 241, 0.65), #a855f7);
+    border-radius: 1px;
+}
+.expD-tabs-junction .exp431x-tabs {
+    padding-left: 4px;
+}
+
+/* S-junction (vertical) — the unified motif for ANY gated sequence.
+   Each step is rendered as its own row, with the pill button sitting
+   flush at x=0 so the main thread (at x=14 of .expC-nav) intersects
+   the pill — the thread visually enters the top of the pill and
+   exits the bottom. With one pill per row, the pill replaces the
+   snode-on-thread + connector + pill-to-the-right scaffold the prior
+   round used: there's no longer anything to anchor to the thread
+   alongside the pill, so the pill itself becomes the on-thread
+   element. The active step's content (instruction + T-junction with
+   reviewer tabs + active tab content) is interleaved between the
+   active row and the next row, so "what content belongs to which
+   step" stays geometrically obvious — content literally sits between
+   the step's button and the next step's button. Same motif at every
+   depth: outer Phase 1 → Phase 2, QA tab's inner Procedural
+   compliance → Risk and impact, etc. Tabs (parallel) keep the
+   horizontal layout — only Sequence goes vertical. */
+.expD-seq-row {
+    z-index: 1;
+    position: relative;
+}
+.expD-seq-row .exp431x-tab.is-locked {
+    opacity: 0.55;
     color: #8088a8;
-    opacity: 0.7;
+    background: rgba(160, 180, 220, 0.18);
+    border-color: rgba(160, 180, 220, 0.35);
+    cursor: not-allowed;
+}
+.expD-seq-row .exp431x-tab.is-locked::before {
+    content: '\01F512';   /* 🔒 */
+    margin-right: 6px;
+    font-size: 11px;
+    opacity: 0.8;
+}
+.expD-seq-row .exp431x-tab.is-locked .exp431x-tab-check {
+    border-color: rgba(160, 180, 220, 0.55);
+}
+
+/* Active step / sub-step instruction — small contextual text below
+   a junction's pill row, indented to align with where the pills
+   start (28 node + 16 connector + 4 pad = 48; round to 56 for a bit
+   of breathing room). Used for both the outer step's instruction
+   below the outer S-junction and the QA sub-step's instruction
+   below the inner S-junction. */
+.expD-instruction-row {
+    z-index: 1;
+    position: relative;
+    margin: -4px 0 0 56px;
+    padding: 0 0 0 0;
+    color: #4a4e6d;
+    font-size: 13px;
+    line-height: 1.55;
 }
 .expC-comp-body {
     flex: 1;
@@ -2374,470 +2462,414 @@ const expRing = (function () {
     render();
 })();
 
-// ----- Experiment D — same structural shape as C (two consecutive
-// non-nested tab sets, components as nodes on the main thread), but
-// populated with a real-world Change Control workflow:
+// ----- Experiment D — Change Control workflow modelled as Razem's
+// container vocabulary, with a unified visual motif for every gated
+// sequential relationship in the tree:
 //
-//   Phase 1 of 2 · Pre-approval review
-//     Tab: Technical review   (TU sign-off on design/feasibility)
-//     Tab: Business review    (BU sign-off on user/product impact)
-//     Tab: Quality assurance  (QA sign-off on procedural compliance)
+//   Outer Sequence (gated, S-junction at page level):
+//     Step 1: Pre-approval review
+//       Tabs (parallel, T-junction):
+//         Technical review   (TU sign-off on design/feasibility)
+//         Business review    (BU sign-off on user/product impact)
+//         Quality assurance  (QA sign-off on procedural compliance) —
+//           itself an inner Sequence (gated, S-junction inside the QA
+//           tab body): Procedural compliance, then Risk and impact
+//     Step 2: Post-execution verification
+//       Tabs (parallel, T-junction):
+//         Technical verification, Business verification, QA closure
 //
-//   Phase 2 of 2 · Post-execution verification
-//     Tab: Technical verification  (TU verifies implementation matches plan)
-//     Tab: Business verification   (BU verifies UX outcome)
-//     Tab: QA closure              (QA confirms evidence and closes the CR)
+// Visual rules:
+//   - Sequence (gated)  → vertical S-stack: each step is its own row,
+//                         with the pill button sitting flush at the
+//                         left edge of the row so the main thread
+//                         (at x=14 of .expC-nav) intersects the pill
+//                         — thread enters the pill's top, hides
+//                         behind its background, and exits the bottom.
+//                         The active step's content is interleaved
+//                         between its row and the next row, so
+//                         content literally sits between the step's
+//                         button and the next step's button. Locked
+//                         pills carry a 🔒 prefix and dim styling.
+//                         Same motif at every depth (outer phases,
+//                         inner QA sub-steps).
+//   - Tabs (parallel)   → horizontal T-junction: a single node on the
+//                         thread + horizontal connector + a row of
+//                         clickable pills. Pills never carry .is-locked
+//                         (they unlock together as a set, gated only
+//                         by their parent Sequence).
 //
-// Each tab carries the reviewer's review form: comments + a binary
-// decision (recommend / request changes for Phase 1; confirm / reject
-// for Phase 2). The mark-as-done toggle becomes "Submit review" /
-// "Submit verification" — semantically the act of finalizing that
-// reviewer's input. Phase 2 is gated until all three Phase-1 reviewers
-// have submitted, which models the real CR rule that execution can't
-// merge until pre-approval is fully signed off.
+// Each reviewer tab carries a review form (comments + binary decision)
+// plus a Submit toggle. After a successful submit, sequence pointers
+// auto-advance to the next reachable not-done item along the same
+// sequence axis (outer or inner); tab navigation stays explicit
+// (parallel semantics).
 //
 // Visual styling reuses C's classes (.expC-step, .expC-comp-row, etc.)
-// since the spatial language is the same — only the content differs.
+// for the canvas, intro bubble, and component rows.
 (function () {
     const root = document.querySelector('.expD-root');
     if (!root) return;
 
     const STEPS = [
         {
-            label: 'Phase 1 of 2 · Pre-approval review',
-            instruction: 'Each reviewer signs off on the proposed change before execution begins. Reviewers unlock left-to-right; all three sign-offs are required before the CR can be pre-approved and execution can start.',
+            label: 'Pre-approval review',
+            instruction: 'Each reviewer signs off on the proposed change before execution begins. The three reviews proceed in parallel — submit in any order — and all three sign-offs are required before the CR can be pre-approved.',
             tabs: ['Technical review', 'Business review', 'Quality assurance'],
         },
         {
-            label: 'Phase 2 of 2 · Post-execution verification',
-            instruction: 'After execution, the same reviewers verify that the change was implemented as approved and that evidence is in order. This phase was locked until Phase 1 was fully signed off.',
+            label: 'Post-execution verification',
+            instruction: 'After execution, the same reviewers verify that the change was implemented as approved and that evidence is in order. This phase remained locked until the previous phase was fully signed off; verifications can be submitted in any order.',
             tabs: ['Technical verification', 'Business verification', 'QA closure'],
         },
     ];
 
+    // QA review (step 0, tab 2) is itself a gated 2-step sub-sequence.
+    // Its done-keys in the global `done` Set are `1.3.1` / `1.3.2`.
+    const QA_STEP_IDX = 0, QA_TAB_IDX = 2;
+    const QA_SUB_STEPS = [
+        {
+            label: 'Procedural compliance',
+            instruction: 'Verify the CR follows SOP-002, has a complete execution-item table, and includes the required scope and justification sections.',
+            commentsTitle: 'Procedural compliance notes',
+            commentsHelp: 'Note any procedural gaps, missing sections, or SOP deviations.',
+            decisionHelp: 'Does this CR meet procedural compliance requirements?',
+            optYes: 'Pass — procedural requirements met',
+            optNo:  'Flag — procedural concerns to address',
+            submitVerb:   'Submit procedural compliance check',
+            submittedTxt: '✓ Procedural compliance submitted',
+        },
+        {
+            label: 'Risk and impact',
+            instruction: 'Verify the risk assessment is appropriate for the change scope, and that potentially affected systems and stakeholders are identified.',
+            commentsTitle: 'Risk and impact notes',
+            commentsHelp: 'Note any unaddressed risks, impact gaps, or stakeholder omissions.',
+            decisionHelp: 'Is the risk and impact analysis adequate?',
+            optYes: 'Pass — risk and impact properly documented',
+            optNo:  'Flag — risk or impact concerns to address',
+            submitVerb:   'Submit risk and impact assessment',
+            submittedTxt: '✓ Risk and impact submitted',
+        },
+    ];
+
+    // ----- State ----------------------------------------------------
+    // Three orthogonal selections, one per navigation level. Each is
+    // an index into its respective array (no path-encoded strings).
     const done = new Set();
-    let selectedTab = null;
+    let selectedStep = 0;        // outer Sequence: 0 (Pre-approval) | 1 (Post-execution)
+    let selectedTab = null;      // active step's Tabs: 0 (Tech) | 1 (Bus) | 2 (QA)
+    let selectedQASubStep = 0;   // QA's inner Sequence: 0 (Procedural) | 1 (Risk)
 
-    function key(stepIdx, tabIdx) { return (stepIdx + 1) + '.' + (tabIdx + 1); }
-    function parseKey(k) { const [s, t] = k.split('.').map(Number); return [s - 1, t - 1]; }
+    function tabKey(stepIdx, tabIdx) { return (stepIdx + 1) + '.' + (tabIdx + 1); }
+    function qaSubKey(subIdx) { return tabKey(QA_STEP_IDX, QA_TAB_IDX) + '.' + (subIdx + 1); }
+    function isQATab(stepIdx, tabIdx) { return stepIdx === QA_STEP_IDX && tabIdx === QA_TAB_IDX; }
 
-    // QA review (Phase 1, Tab 3) is a nested 2-step sequence; the tab
-    // counts complete only when both sub-steps are submitted. Their
-    // done keys are "1.3.1" and "1.3.2" — the regular tab keys are
-    // never directly added for QA, so the override below routes the
-    // tab-completion check through the sub-step keys instead.
-    function isQATab(stepIdx, tabIdx) { return stepIdx === 0 && tabIdx === 2; }
+    function qaSubDone(subIdx) { return done.has(qaSubKey(subIdx)); }
+    function qaSubReachable(subIdx) {
+        for (let i = 0; i < subIdx; i++) if (!qaSubDone(i)) return false;
+        return true;
+    }
     function tabDone(stepIdx, tabIdx) {
-        if (isQATab(stepIdx, tabIdx)) {
-            const tk = key(stepIdx, tabIdx);
-            return done.has(tk + '.1') && done.has(tk + '.2');
-        }
-        return done.has(key(stepIdx, tabIdx));
+        if (isQATab(stepIdx, tabIdx)) return qaSubDone(0) && qaSubDone(1);
+        return done.has(tabKey(stepIdx, tabIdx));
     }
     function stepDone(stepIdx) {
         return STEPS[stepIdx].tabs.every((_, t) => tabDone(stepIdx, t));
     }
     function stepReachable(stepIdx) {
-        for (let s = 0; s < stepIdx; s++) if (!stepDone(s)) return false;
+        for (let i = 0; i < stepIdx; i++) if (!stepDone(i)) return false;
         return true;
-    }
-    function tabLocked(stepIdx, tabIdx) {
-        if (!stepReachable(stepIdx)) return true;
-        for (let t = 0; t < tabIdx; t++) if (!tabDone(stepIdx, t)) return true;
-        return false;
-    }
-    function activeStepIdx() {
-        if (!selectedTab) return 0;
-        return parseKey(selectedTab)[0];
-    }
-
-    function buildComponents(stepIdx, tabIdx) {
-        // Two components per reviewer: a comments TextForm + a decision
-        // ChoiceForm. Phase 1 uses recommend/request-changes; Phase 2
-        // uses confirm/reject closure.
-        const k = key(stepIdx, tabIdx);
-        const radioName = 'decision-D-' + k;
-        const reviewerName = STEPS[stepIdx].tabs[tabIdx];
-        const isPost = stepIdx === 1;
-
-        const commentsLabel = isPost ? 'verification notes' : 'review comments';
-        const commentsHelp  = isPost
-            ? 'Confirm whether the change was implemented as approved. Note any deviations, follow-ups, or evidence gaps.'
-            : 'Document concerns, suggested revisions, or rationale for recommending approval. Review-independence applies — reach your own conclusion.';
-        const decisionHelp  = isPost
-            ? 'Does this change clear post-execution verification?'
-            : 'Recommend the change for approval, or request changes before approval?';
-        const optYes = isPost
-            ? 'Confirm closure — change implemented correctly'
-            : 'Recommend approval';
-        const optNo  = isPost
-            ? 'Reject closure — discrepancies or gaps found'
-            : 'Request changes — revisions needed before approval';
-
-        return [
-            {
-                glyph: '✎',
-                html: ''
-                    + '<div class="component" data-form="text" data-key="comments-D-' + k + '">'
-                    +   '<h3>' + reviewerName + ' — ' + commentsLabel + '</h3>'
-                    +   '<p>' + commentsHelp + '</p>'
-                    +   '<form onsubmit="event.preventDefault();">'
-                    +     '<input name="value" type="text" placeholder="Your ' + commentsLabel + '">'
-                    +     '<div style="margin-top: 4px;">'
-                    +       '<button type="submit">Save draft</button>'
-                    +     '</div>'
-                    +   '</form>'
-                    + '</div>',
-            },
-            {
-                glyph: '⚖',
-                html: ''
-                    + '<div class="component" data-form="choice" data-key="decision-D-' + k + '">'
-                    +   '<h3>Decision</h3>'
-                    +   '<p>' + decisionHelp + '</p>'
-                    +   '<div style="margin: 4px 0;">'
-                    +     '<label><input type="radio" name="' + radioName + '"> ' + optYes + '</label>'
-                    +     '<label><input type="radio" name="' + radioName + '"> ' + optNo + '</label>'
-                    +   '</div>'
-                    + '</div>',
-            },
-        ];
     }
 
     function autoSelect() {
-        if (selectedTab) return;
-        for (let s = 0; s < STEPS.length; s++) {
-            if (!stepReachable(s)) return;
-            for (let t = 0; t < STEPS[s].tabs.length; t++) {
-                if (tabLocked(s, t)) return;
-                if (!tabDone(s, t)) { selectedTab = key(s, t); return; }
+        // Repair invariants: keep selections pointing at reachable items,
+        // and pick the first not-done tab when no tab is selected.
+        if (!stepReachable(selectedStep)) selectedStep = 0;
+        if (selectedTab === null) {
+            const tabs = STEPS[selectedStep].tabs;
+            for (let t = 0; t < tabs.length; t++) {
+                if (!tabDone(selectedStep, t)) { selectedTab = t; break; }
             }
+            if (selectedTab === null) selectedTab = 0;
         }
+        if (!qaSubReachable(selectedQASubStep)) selectedQASubStep = 0;
     }
 
-    function buildStep(stepIdx) {
-        const cfg = STEPS[stepIdx];
-        const reachable = stepReachable(stepIdx);
-        const allDoneInStep = stepDone(stepIdx);
-        const stepDoneCount = cfg.tabs.filter((_, t) => tabDone(stepIdx, t)).length;
-        const isFocus = activeStepIdx() === stepIdx && stepReachable(stepIdx);
+    // ----- Submit handlers ------------------------------------------
+    // After a successful submission, advance the appropriate sequence
+    // pointer to the next reachable not-done item — only along sequence
+    // axes (outer Phase 1→Phase 2; QA sub-sequence). Tab switches stay
+    // explicit (parallel semantics).
+    function toggleDone(k) { if (done.has(k)) { done.delete(k); return false; } done.add(k); return true; }
 
-        const stepEl = document.createElement('div');
-        stepEl.className = 'exp431x-step expC-step';
-        stepEl.dataset.step = stepIdx;
+    function submitTab(stepIdx, tabIdx) {
+        const advanced = toggleDone(tabKey(stepIdx, tabIdx));
+        if (advanced && stepDone(stepIdx) && stepIdx + 1 < STEPS.length && stepReachable(stepIdx + 1)) {
+            selectedStep = stepIdx + 1;
+            selectedTab = null;
+        }
+        render();
+    }
+    function submitQASubStep(subIdx) {
+        const advanced = toggleDone(qaSubKey(subIdx));
+        if (advanced && subIdx + 1 < QA_SUB_STEPS.length && qaSubReachable(subIdx + 1)) {
+            selectedQASubStep = subIdx + 1;
+        }
+        // If completing this sub-step also completes the QA tab and the
+        // outer step, advance the outer step too.
+        if (advanced && stepDone(QA_STEP_IDX) && QA_STEP_IDX + 1 < STEPS.length && stepReachable(QA_STEP_IDX + 1)) {
+            selectedStep = QA_STEP_IDX + 1;
+            selectedTab = null;
+        }
+        render();
+    }
 
+    // ----- Atomic builders ------------------------------------------
+
+    function buildIntroBubble(label, text) {
+        const wrap = document.createElement('div');
+        wrap.className = 'exp431x-step expC-step';
         const bubble = document.createElement('div');
         bubble.className = 'exp431x-bubble';
         const avatar = document.createElement('span');
         avatar.className = 'exp431x-avatar';
-        if (allDoneInStep) {
-            avatar.classList.add('expC-avatar-done');
-            avatar.textContent = '✓';
-        } else {
-            avatar.textContent = '✨';
-        }
+        avatar.textContent = '✨';
         bubble.appendChild(avatar);
-
         const body = document.createElement('div');
         body.className = 'exp431x-bubble-body';
         const meta = document.createElement('div');
         meta.className = 'exp431x-bubble-meta';
-        const metaLabel = document.createElement('span');
-        metaLabel.textContent = cfg.label;
-        meta.appendChild(metaLabel);
-        const metaProg = document.createElement('span');
-        metaProg.className = 'exp431x-bubble-progress';
-        metaProg.textContent = stepDoneCount + ' of ' + cfg.tabs.length + ' submitted';
-        meta.appendChild(metaProg);
+        const lbl = document.createElement('span');
+        lbl.textContent = label;
+        meta.appendChild(lbl);
         body.appendChild(meta);
-
         const p = document.createElement('p');
         p.className = 'exp431x-bubble-text';
-        p.textContent = !reachable
-            ? 'This phase is locked until Phase 1 is fully signed off.'
-            : cfg.instruction;
+        p.textContent = text;
         body.appendChild(p);
-
-        if (reachable && !allDoneInStep) {
-            const blockedAfter = cfg.tabs.findIndex((_, t) => !tabDone(stepIdx, t));
-            const hasLockedTabs = blockedAfter >= 0 && blockedAfter < cfg.tabs.length - 1;
-            if (hasLockedTabs && blockedAfter > 0) {
-                const hint = document.createElement('div');
-                hint.className = 'expC-gate-hint';
-                hint.innerHTML = '<strong>Note:</strong> Subsequent reviewers unlock once the current reviewer has submitted.';
-                body.appendChild(hint);
-            }
-        }
-
         bubble.appendChild(body);
-        stepEl.appendChild(bubble);
+        wrap.appendChild(bubble);
+        return wrap;
+    }
 
+    function buildInstructionRow(text) {
+        const row = document.createElement('p');
+        row.className = 'expD-instruction-row';
+        row.textContent = text;
+        return row;
+    }
+
+    function buildPill(item) {
+        // Shared pill for both junctions. .exp431x-tab carries the
+        // active/done styling; the .is-locked state is honored by the
+        // S-junction CSS only (sequence-specific 🔒 prefix).
+        const pill = document.createElement('button');
+        pill.type = 'button';
+        pill.className = 'exp431x-tab';
+        if (item.active) pill.classList.add('is-active');
+        if (item.done) pill.classList.add('is-done');
+        if (item.locked) pill.classList.add('is-locked');
+        const check = document.createElement('span');
+        check.className = 'exp431x-tab-check';
+        check.textContent = '✓';
+        pill.appendChild(check);
+        const lbl = document.createElement('span');
+        lbl.className = 'exp431x-tab-label';
+        lbl.textContent = item.label;
+        pill.appendChild(lbl);
+        if (item.locked) {
+            pill.title = item.lockedTitle || 'Locked — previous step must be completed first';
+        } else {
+            pill.addEventListener('click', item.onClick);
+        }
+        return pill;
+    }
+
+    function buildSeqRow(item) {
+        // One step of a vertical S-stack: a single pill positioned at
+        // x=0 of the row, so the main thread (at x=14 of .expC-nav)
+        // intersects the pill — the thread enters the top, the pill's
+        // background covers it, and the thread exits the bottom. The
+        // active step's content is appended by the caller AFTER this
+        // row but BEFORE the next row, so content sits geometrically
+        // between siblings.
+        const row = document.createElement('div');
+        row.className = 'expD-seq-row';
+        row.appendChild(buildPill(item));
+        return row;
+    }
+
+    function buildTabsJunction(items) {
+        const j = document.createElement('div');
+        j.className = 'expD-tabs-junction';
+        const node = document.createElement('span');
+        node.className = 'expD-tabs-tnode';
+        node.textContent = 'T';
+        j.appendChild(node);
+        const conn = document.createElement('span');
+        conn.className = 'expD-tabs-connector';
+        j.appendChild(conn);
         const tabs = document.createElement('div');
         tabs.className = 'exp431x-tabs';
-        cfg.tabs.forEach((label, t) => {
-            const k = key(stepIdx, t);
-            const tab = document.createElement('button');
-            tab.type = 'button';
-            tab.className = 'exp431x-tab';
-            tab.dataset.path = k;
-
-            const isLocked = tabLocked(stepIdx, t);
-            const isDoneTab = tabDone(stepIdx, t);
-            const isActive = selectedTab === k;
-            if (isActive) tab.classList.add('is-active');
-            if (isDoneTab) tab.classList.add('is-done');
-            if (isLocked) tab.classList.add('is-locked');
-
-            const check = document.createElement('span');
-            check.className = 'exp431x-tab-check';
-            check.textContent = '✓';
-            tab.appendChild(check);
-
-            const lbl = document.createElement('span');
-            lbl.className = 'exp431x-tab-label';
-            lbl.textContent = label;
-            tab.appendChild(lbl);
-
-            if (isLocked) {
-                tab.title = 'Locked — previous reviewer must submit first';
-            } else {
-                tab.addEventListener('click', () => {
-                    selectedTab = k;
-                    render();
-                });
-            }
-            tabs.appendChild(tab);
-        });
-        stepEl.appendChild(tabs);
-
-        return { stepEl, isFocus };
+        items.forEach(item => tabs.appendChild(buildPill(item)));
+        j.appendChild(tabs);
+        return j;
     }
 
     function buildCompRow(comp) {
         const row = document.createElement('div');
         row.className = 'expC-comp-row';
-
         const avatar = document.createElement('span');
         avatar.className = 'expC-comp-avatar';
         avatar.textContent = comp.glyph;
         row.appendChild(avatar);
-
         const body = document.createElement('div');
         body.className = 'expC-comp-body';
         body.innerHTML = comp.html;
         row.appendChild(body);
-
         return row;
     }
 
-    function buildToggleRow(stepIdx, tabIdx) {
-        const k = key(stepIdx, tabIdx);
-        const isDoneLeaf = tabDone(stepIdx, tabIdx);
-        const isPost = stepIdx === 1;
-        const submitVerb   = isPost ? 'Submit verification' : 'Submit review';
-        const submittedTxt = isPost ? '✓ Verification submitted' : '✓ Review submitted';
-
+    function buildSubmitToggle(submitVerb, submittedTxt, isDoneFlag, onClick) {
         const row = document.createElement('div');
         row.className = 'expC-comp-row';
-
         const avatar = document.createElement('span');
-        avatar.className = 'expC-comp-avatar expC-toggle-avatar' + (isDoneLeaf ? ' is-done' : '');
-        avatar.textContent = isDoneLeaf ? '✓' : '○';
+        avatar.className = 'expC-comp-avatar expC-toggle-avatar' + (isDoneFlag ? ' is-done' : '');
+        avatar.textContent = isDoneFlag ? '✓' : '○';
         row.appendChild(avatar);
-
         const body = document.createElement('div');
         body.className = 'expC-comp-body';
-
-        const toggle = document.createElement('button');
-        toggle.type = 'button';
-        toggle.className = 'expC-toggle-btn' + (isDoneLeaf ? ' is-done' : '');
-        toggle.textContent = isDoneLeaf ? submittedTxt : submitVerb;
-        toggle.addEventListener('click', () => {
-            if (done.has(k)) done.delete(k);
-            else done.add(k);
-            render();
-        });
-        body.appendChild(toggle);
-
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'expC-toggle-btn' + (isDoneFlag ? ' is-done' : '');
+        btn.textContent = isDoneFlag ? submittedTxt : submitVerb;
+        btn.addEventListener('click', onClick);
+        body.appendChild(btn);
         row.appendChild(body);
         return row;
     }
 
-    function buildLeafFlat(stepIdx, tabIdx) {
-        // QA review (Phase 1, Tab 3) breaks into two consecutive
-        // sub-steps; everything else uses the flat single-leaf layout.
-        if (isQATab(stepIdx, tabIdx)) {
-            return buildQASubFlow(stepIdx, tabIdx);
-        }
-        const group = document.createElement('div');
-        group.className = 'expC-leaf-group';
+    // ----- Active-tab content ---------------------------------------
 
-        buildComponents(stepIdx, tabIdx).forEach(c => {
-            group.appendChild(buildCompRow(c));
-        });
-        group.appendChild(buildToggleRow(stepIdx, tabIdx));
-
-        return group;
-    }
-
-    function buildQASubFlow(stepIdx, tabIdx) {
-        // QA's review is a 2-step Sequence that lives inside the QA tab.
-        // The two sub-steps are gated: Step 2 unlocks once Step 1 is
-        // submitted. Each sub-step gets its own components (comments +
-        // decision) and its own submit toggle. Both bubbles render even
-        // when locked, so the user can see the upcoming structure;
-        // components and the submit toggle for a locked sub-step are
-        // suppressed until the previous one is submitted.
-        const QA_SUB_STEPS = [
-            {
-                metaLabel: 'QA · Step 1 of 2 · Procedural compliance',
-                instruction: 'Verify the CR follows SOP-002, has a complete execution-item table, and includes the required scope and justification sections.',
-                commentsTitle: 'Procedural compliance notes',
-                commentsHelp: 'Note any procedural gaps, missing sections, or SOP deviations.',
-                decisionHelp: 'Does this CR meet procedural compliance requirements?',
-                optYes: 'Pass — procedural requirements met',
-                optNo:  'Flag — procedural concerns to address',
-                submitVerb:   'Submit procedural compliance check',
-                submittedTxt: '✓ Procedural compliance submitted',
+    function reviewerComponents(stepIdx, tabIdx) {
+        const k = tabKey(stepIdx, tabIdx);
+        const radioName = 'decision-D-' + k;
+        const reviewerName = STEPS[stepIdx].tabs[tabIdx];
+        const isPost = stepIdx === 1;
+        const commentsLabel = isPost ? 'verification notes' : 'review comments';
+        const commentsHelp  = isPost
+            ? 'Confirm whether the change was implemented as approved. Note any deviations, follow-ups, or evidence gaps.'
+            : 'Document concerns, suggested revisions, or rationale for recommending approval. Review-independence applies — reach your own conclusion.';
+        const decisionHelp = isPost
+            ? 'Does this change clear post-execution verification?'
+            : 'Recommend the change for approval, or request changes before approval?';
+        const optYes = isPost ? 'Confirm closure — change implemented correctly' : 'Recommend approval';
+        const optNo  = isPost ? 'Reject closure — discrepancies or gaps found' : 'Request changes — revisions needed before approval';
+        return [
+            { glyph: '✎', html: ''
+                + '<div class="component" data-form="text" data-key="comments-D-' + k + '">'
+                +   '<h3>' + reviewerName + ' — ' + commentsLabel + '</h3>'
+                +   '<p>' + commentsHelp + '</p>'
+                +   '<form onsubmit="event.preventDefault();">'
+                +     '<input name="value" type="text" placeholder="Your ' + commentsLabel + '">'
+                +     '<div style="margin-top: 4px;"><button type="submit">Save draft</button></div>'
+                +   '</form>'
+                + '</div>',
             },
-            {
-                metaLabel: 'QA · Step 2 of 2 · Risk and impact',
-                instruction: 'Verify the risk assessment is appropriate for the change scope, and that potentially affected systems and stakeholders are identified.',
-                commentsTitle: 'Risk and impact notes',
-                commentsHelp: 'Note any unaddressed risks, impact gaps, or stakeholder omissions.',
-                decisionHelp: 'Is the risk and impact analysis adequate?',
-                optYes: 'Pass — risk and impact properly documented',
-                optNo:  'Flag — risk or impact concerns to address',
-                submitVerb:   'Submit risk and impact assessment',
-                submittedTxt: '✓ Risk and impact submitted',
+            { glyph: '⚖', html: ''
+                + '<div class="component" data-form="choice" data-key="decision-D-' + k + '">'
+                +   '<h3>Decision</h3>'
+                +   '<p>' + decisionHelp + '</p>'
+                +   '<div style="margin: 4px 0;">'
+                +     '<label><input type="radio" name="' + radioName + '"> ' + optYes + '</label>'
+                +     '<label><input type="radio" name="' + radioName + '"> ' + optNo + '</label>'
+                +   '</div>'
+                + '</div>',
             },
         ];
+    }
 
-        const tabKey = key(stepIdx, tabIdx);
+    function qaSubStepComponents(subIdx) {
+        const sub = QA_SUB_STEPS[subIdx];
+        const subKey = qaSubKey(subIdx);
+        const radioName = 'decision-D-' + subKey;
+        return [
+            { glyph: '✎', html: ''
+                + '<div class="component" data-form="text" data-key="comments-' + subKey + '">'
+                +   '<h3>' + sub.commentsTitle + '</h3>'
+                +   '<p>' + sub.commentsHelp + '</p>'
+                +   '<form onsubmit="event.preventDefault();">'
+                +     '<input name="value" type="text" placeholder="Your notes">'
+                +     '<div style="margin-top: 4px;"><button type="submit">Save draft</button></div>'
+                +   '</form>'
+                + '</div>',
+            },
+            { glyph: '⚖', html: ''
+                + '<div class="component" data-form="choice" data-key="decision-' + subKey + '">'
+                +   '<h3>Decision</h3>'
+                +   '<p>' + sub.decisionHelp + '</p>'
+                +   '<div style="margin: 4px 0;">'
+                +     '<label><input type="radio" name="' + radioName + '"> ' + sub.optYes + '</label>'
+                +     '<label><input type="radio" name="' + radioName + '"> ' + sub.optNo + '</label>'
+                +   '</div>'
+                + '</div>',
+            },
+        ];
+    }
+
+    function buildPlainTabContent(stepIdx, tabIdx) {
+        const group = document.createElement('div');
+        group.className = 'expC-leaf-group';
+        const k = tabKey(stepIdx, tabIdx);
+        const isPost = stepIdx === 1;
+        const submitVerb   = isPost ? 'Submit verification' : 'Submit review';
+        const submittedTxt = isPost ? '✓ Verification submitted' : '✓ Review submitted';
+        reviewerComponents(stepIdx, tabIdx).forEach(c => group.appendChild(buildCompRow(c)));
+        group.appendChild(buildSubmitToggle(submitVerb, submittedTxt, done.has(k),
+            () => submitTab(stepIdx, tabIdx)));
+        return group;
+    }
+
+    function buildQATabContent() {
+        // QA's inner Sequence — same vertical-stack motif as the outer
+        // phase sequence, just rendered inside the QA tab's leaf-group.
+        // For each sub-step: append the row, then if active, append its
+        // content (instruction + components + Submit toggle) right
+        // before the next row.
         const group = document.createElement('div');
         group.className = 'expC-leaf-group';
 
-        let prevSubDone = true;
         QA_SUB_STEPS.forEach((sub, i) => {
-            const subKey = tabKey + '.' + (i + 1);
-            const isSubDone = done.has(subKey);
-            const isSubReachable = prevSubDone;
+            group.appendChild(buildSeqRow({
+                label: (i + 1) + '. ' + sub.label,
+                active: i === selectedQASubStep,
+                done: qaSubDone(i),
+                locked: !qaSubReachable(i) && !qaSubDone(i),
+                lockedTitle: 'Locked — previous QA sub-step must be submitted first',
+                onClick: () => { selectedQASubStep = i; render(); },
+            }));
 
-            // Sub-step bubble: small avatar + meta label + instruction,
-            // styled in the same chat-bubble vocabulary as everything
-            // else on the thread.
-            const subRow = document.createElement('div');
-            subRow.className = 'expC-comp-row';
-            const subAvatar = document.createElement('span');
-            subAvatar.className = 'expC-comp-avatar';
-            if (isSubDone) {
-                subAvatar.classList.add('expD-sub-done');
-                subAvatar.textContent = '✓';
-            } else if (!isSubReachable) {
-                subAvatar.classList.add('expD-sub-locked');
-                subAvatar.textContent = String(i + 1);
+            if (i !== selectedQASubStep) return;
+
+            const isReachable = qaSubReachable(i);
+            const isSubDone = qaSubDone(i);
+            if (isReachable) {
+                group.appendChild(buildInstructionRow(sub.instruction));
+                qaSubStepComponents(i).forEach(c => group.appendChild(buildCompRow(c)));
+                group.appendChild(buildSubmitToggle(sub.submitVerb, sub.submittedTxt, isSubDone,
+                    () => submitQASubStep(i)));
             } else {
-                subAvatar.textContent = String(i + 1);
+                group.appendChild(buildInstructionRow('This sub-step unlocks once the previous QA sub-step is submitted.'));
             }
-            subRow.appendChild(subAvatar);
-            const subBody = document.createElement('div');
-            subBody.className = 'expC-comp-body';
-            const meta = document.createElement('div');
-            meta.className = 'exp431x-bubble-meta';
-            const metaSpan = document.createElement('span');
-            metaSpan.textContent = sub.metaLabel;
-            meta.appendChild(metaSpan);
-            subBody.appendChild(meta);
-            const text = document.createElement('p');
-            text.className = 'exp431x-bubble-text';
-            text.textContent = !isSubReachable
-                ? 'This sub-step unlocks once the previous QA sub-step is submitted.'
-                : sub.instruction;
-            subBody.appendChild(text);
-            subRow.appendChild(subBody);
-            group.appendChild(subRow);
-
-            // Components and submit toggle — only when this sub-step is
-            // reachable. Locked sub-steps render only the bubble above.
-            if (isSubReachable) {
-                const radioName = 'decision-D-' + subKey;
-                [
-                    {
-                        glyph: '✎',
-                        html: ''
-                            + '<div class="component" data-form="text" data-key="comments-' + subKey + '">'
-                            +   '<h3>' + sub.commentsTitle + '</h3>'
-                            +   '<p>' + sub.commentsHelp + '</p>'
-                            +   '<form onsubmit="event.preventDefault();">'
-                            +     '<input name="value" type="text" placeholder="Your notes">'
-                            +     '<div style="margin-top: 4px;">'
-                            +       '<button type="submit">Save draft</button>'
-                            +     '</div>'
-                            +   '</form>'
-                            + '</div>',
-                    },
-                    {
-                        glyph: '⚖',
-                        html: ''
-                            + '<div class="component" data-form="choice" data-key="decision-' + subKey + '">'
-                            +   '<h3>Decision</h3>'
-                            +   '<p>' + sub.decisionHelp + '</p>'
-                            +   '<div style="margin: 4px 0;">'
-                            +     '<label><input type="radio" name="' + radioName + '"> ' + sub.optYes + '</label>'
-                            +     '<label><input type="radio" name="' + radioName + '"> ' + sub.optNo + '</label>'
-                            +   '</div>'
-                            + '</div>',
-                    },
-                ].forEach(c => group.appendChild(buildCompRow(c)));
-
-                // Sub-step submit toggle — adds/removes the sub-key
-                // from the global done set; tabDone(QA) checks both keys.
-                const tRow = document.createElement('div');
-                tRow.className = 'expC-comp-row';
-                const tAvatar = document.createElement('span');
-                tAvatar.className = 'expC-comp-avatar expC-toggle-avatar' + (isSubDone ? ' is-done' : '');
-                tAvatar.textContent = isSubDone ? '✓' : '○';
-                tRow.appendChild(tAvatar);
-                const tBody = document.createElement('div');
-                tBody.className = 'expC-comp-body';
-                const tBtn = document.createElement('button');
-                tBtn.type = 'button';
-                tBtn.className = 'expC-toggle-btn' + (isSubDone ? ' is-done' : '');
-                tBtn.textContent = isSubDone ? sub.submittedTxt : sub.submitVerb;
-                tBtn.addEventListener('click', () => {
-                    if (done.has(subKey)) done.delete(subKey);
-                    else done.add(subKey);
-                    render();
-                });
-                tBody.appendChild(tBtn);
-                tRow.appendChild(tBody);
-                group.appendChild(tRow);
-            }
-
-            prevSubDone = isSubDone;
         });
 
         return group;
     }
 
-    function findNextStep() {
-        for (let s = 0; s < STEPS.length; s++) if (!stepDone(s)) return s;
-        return -1;
+    function buildTabContent(stepIdx, tabIdx) {
+        return isQATab(stepIdx, tabIdx) ? buildQATabContent() : buildPlainTabContent(stepIdx, tabIdx);
     }
 
-    function alignActiveTabsToThread() {
-        const strips = root.querySelectorAll('.expC-step .exp431x-tabs');
-        strips.forEach(strip => {
-            const active = strip.querySelector('.exp431x-tab.is-active');
-            if (!active) {
-                strip.style.transform = '';
-                return;
-            }
-            if (active.offsetWidth === 0) return;
-            const center = active.offsetLeft + active.offsetWidth / 2;
-            strip.style.transform = 'translateX(' + (14 - center) + 'px)';
-        });
-    }
+    // ----- Top-level render -----------------------------------------
 
     function render() {
         autoSelect();
@@ -2846,19 +2878,44 @@ const expRing = (function () {
         const navWrap = document.createElement('div');
         navWrap.className = 'expC-nav';
 
-        const focusStep = activeStepIdx();
-        STEPS.forEach((_, stepIdx) => {
-            const { stepEl, isFocus } = buildStep(stepIdx);
-            navWrap.appendChild(stepEl);
+        // 1. Container intro bubble
+        navWrap.appendChild(buildIntroBubble(
+            'Change Control review',
+            'The CR moves through two sequential phases: pre-approval review (three reviewers in parallel), then post-execution verification (the same reviewers, after execution). Each phase must be fully signed off before the next can begin.'
+        ));
 
-            if (isFocus && selectedTab && parseKey(selectedTab)[0] === stepIdx) {
-                const tabIdx = parseKey(selectedTab)[1];
-                navWrap.appendChild(buildLeafFlat(stepIdx, tabIdx));
+        // 2. Outer Sequence — vertical stack of step rows. For each
+        //    step: append its row, then if it's the active step, also
+        //    append its content (instruction + T-junction with reviewer
+        //    tabs + active tab content) immediately after the row, so
+        //    the content sits between this step's button and the next.
+        STEPS.forEach((cfg, i) => {
+            navWrap.appendChild(buildSeqRow({
+                label: (i + 1) + '. ' + cfg.label,
+                active: i === selectedStep,
+                done: stepDone(i),
+                locked: !stepReachable(i) && !stepDone(i),
+                lockedTitle: 'Locked — previous phase must be fully signed off first',
+                onClick: () => { selectedStep = i; selectedTab = null; render(); },
+            }));
+
+            if (i !== selectedStep) return;
+
+            navWrap.appendChild(buildInstructionRow(cfg.instruction));
+            navWrap.appendChild(buildTabsJunction(cfg.tabs.map((label, t) => ({
+                label,
+                active: t === selectedTab,
+                done: tabDone(i, t),
+                locked: false,
+                onClick: () => { selectedTab = t; render(); },
+            }))));
+            if (selectedTab !== null) {
+                navWrap.appendChild(buildTabContent(i, selectedTab));
             }
         });
 
-        const allStepsDone = STEPS.every((_, s) => stepDone(s));
-        if (allStepsDone) {
+        // 3. Workshop-complete celebration
+        if (STEPS.every((_, s) => stepDone(s))) {
             const cmp = document.createElement('div');
             cmp.className = 'expA-complete';
             const cNode = document.createElement('div');
@@ -2870,35 +2927,9 @@ const expRing = (function () {
             text.textContent = 'CR closed — pre-approval and post-execution verification complete.';
             cmp.appendChild(text);
             navWrap.appendChild(cmp);
-        } else if (stepDone(focusStep)) {
-            const next = findNextStep();
-            if (next > focusStep) {
-                const proceed = document.createElement('div');
-                proceed.className = 'expA-proceed';
-                const pNode = document.createElement('div');
-                pNode.className = 'expA-proceed-node';
-                pNode.textContent = '→';
-                proceed.appendChild(pNode);
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'expA-proceed-btn';
-                btn.textContent = 'Proceed to ' + STEPS[next].label.split(' · ')[1] + ' →';
-                btn.addEventListener('click', () => {
-                    selectedTab = key(next, 0);
-                    render();
-                });
-                proceed.appendChild(btn);
-                navWrap.appendChild(proceed);
-            }
         }
 
         root.appendChild(navWrap);
-        alignActiveTabsToThread();
-    }
-
-    const panel = document.querySelector('.nest-ws__canvas[data-panel="exp-d"]');
-    if (panel) {
-        panel.addEventListener('panelshown', alignActiveTabsToThread);
     }
 
     render();
