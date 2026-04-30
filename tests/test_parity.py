@@ -82,6 +82,7 @@ def extract_json_affordances(data) -> list[dict]:
             "action": action,
             "label": override_label if override_label is not None else aff.get("label", ""),
             "_chrome_rendered": bool(aff.get("_chrome_rendered")),
+            "disabled": bool(aff.get("disabled")),
             "path": path,
         })
 
@@ -255,7 +256,7 @@ def test_no_empty_url_affordances(all_pages, page_key):
         if not a["url"]
         and not a["_chrome_rendered"]
         # Disabled buttons (Action precondition-unmet) intentionally have no URL.
-        and "disabled" not in a.get("label", "").lower()
+        and not a["disabled"]
     ]
     if offenders:
         lines = "\n  ".join(f"[{a['path']}] {a['label']!r} action={a['action']!r}" for a in offenders)

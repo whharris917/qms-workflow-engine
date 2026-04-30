@@ -26,11 +26,23 @@ from engine.templates import render_template
 
 
 class DisabledAffordance(Affordance):
-    """An affordance rendered as a disabled button with a message."""
+    """An affordance rendered as a disabled button with a message.
+
+    Carries a top-level ``disabled: true`` flag in its serialized form so
+    consumers (UI renderers, parity tests, agent clients) can distinguish
+    it from a misconfigured affordance that happens to have an empty URL.
+    The flag survives the page-level render_hints strip in
+    ``Page._serialize_full``, so the signal reaches the agent-facing JSON.
+    """
 
     def __init__(self, label: str, message: str = ""):
         super().__init__(label=label, method="POST", url="", body={})
         self.message = message
+
+    def serialize(self) -> dict:
+        result = super().serialize()
+        result["disabled"] = True
+        return result
 
     def _render_hints(self) -> dict:
         return {"type": "disabled_button", "message": self.message}
